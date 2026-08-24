@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
@@ -27,7 +27,7 @@ const (
 
 func init() {
 	driver.RegisterDriver(
-		stroppy.DriverConfig_DRIVER_TYPE_PICODATA,
+		config.DriverTypePicodata,
 		func(ctx context.Context, opts driver.Options) (driver.Driver, error) {
 			return NewDriver(ctx, opts)
 		},
@@ -95,7 +95,7 @@ func NewDriver(
 		d.bulkSize = int(cfg.GetBulkSize())
 	}
 
-	d.logger.Debug("Connecting to Picodata...", zap.String("url", cfg.GetUrl()))
+	d.logger.Debug("Connecting to Picodata...", zap.String("url", cfg.URL))
 
 	const maxConnPerInstance = 20
 
@@ -130,7 +130,7 @@ func NewDriver(
 
 	d.pool = &PoolX{conn}
 
-	d.logger.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
+	d.logger.Debug("Checking db connection...", zap.String("url", cfg.URL))
 
 	if err := sqldriver.WaitForDB(ctx, d.logger, d.pool, dbConnectionTimeout); err != nil {
 		return nil, err
@@ -177,6 +177,6 @@ var (
 	ErrTransactionsUnsupported = errors.New("transactions are not supported in Picodata yet")
 )
 
-func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (driver.Tx, error) {
+func (d *Driver) Begin(ctx context.Context, isolation config.TxIsolationLevel) (driver.Tx, error) {
 	return nil, ErrTransactionsUnsupported
 }

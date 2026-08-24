@@ -38,6 +38,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 - TPC-DS typed loads format common cell types directly into reusable buffers. ([#126](https://github.com/stroppy-io/stroppy/pull/126))
 - Benchmark metrics now use standard OpenTelemetry counters, gauges, and fixed-bucket histograms. Query throughput and error rates are derived from monotonic `*_total` counters instead of k6-style sampled rates. ([#125](https://github.com/stroppy-io/stroppy/pull/125))
 - The `stroppy help <topic>` topics (drivers, config-file, steps, resolution, sql, envs, datagen, probe) now describe the Go-native binary — the previous text still documented the removed TypeScript/k6 workflow (`k6Args`, `declareDriverSetup`, `.ts` script mode, the `--` passthrough).
+- Stroppy configuration is now plain Go under `pkg/config` instead of frozen application protobuf types. Existing v5 lower-camel and snake_case JSON field names, nullable fields, int32 number forms, and logger enum names/ordinals remain compatible, while duplicate, colliding, mis-cased, unknown, malformed, and trailing input is rejected recursively across config files and raw driver JSON. `global.seed` is the sole accepted-form change and now requires a bare unsigned JSON integer. The generated schema documents the complete `stroppy-config.json` envelope, including `run.queryTimeout` and workload parameters. ([#150](https://github.com/stroppy-io/stroppy/pull/150))
 
 ### Fixed
 

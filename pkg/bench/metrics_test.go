@@ -9,7 +9,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
-	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 func TestTrendUsesBoundedHistogram(t *testing.T) {
@@ -176,7 +176,7 @@ func TestTransactionEndKeepsActionAndIsolationAttributes(t *testing.T) {
 	t.Cleanup(func() { root = previousRoot })
 
 	rootState.txMetrics.recordTxEnd(
-		vu, "commit", "payment", stroppy.TxIsolationLevel_READ_COMMITTED, time.Millisecond, 3, true,
+		vu, "commit", "payment", config.TxIsolationLevelReadCommitted, time.Millisecond, 3, true,
 	)
 
 	var data metricdata.ResourceMetrics

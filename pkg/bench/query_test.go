@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/mysql"
 )
@@ -73,7 +73,7 @@ func (d *queryTestDriver) RunQuery(context.Context, string, map[string]any) (*dr
 
 func (d *queryTestDriver) Begin(
 	context.Context,
-	stroppy.TxIsolationLevel,
+	config.TxIsolationLevel,
 ) (driver.Tx, error) {
 	return &queryTestTx{result: d.result, runErr: d.runErr}, nil
 }
@@ -436,9 +436,9 @@ func TestMySQLCallTimeoutIsReportedOnce(t *testing.T) {
 
 	mysqlDriver, err := mysql.NewDriver(ctx, driver.Options{
 		Logger: zap.NewNop(),
-		Config: &stroppy.DriverConfig{
-			Url:        dsn,
-			DriverType: stroppy.DriverConfig_DRIVER_TYPE_MYSQL,
+		Config: &config.DriverConfig{
+			URL:        dsn,
+			DriverType: config.DriverTypeMySQL,
 		},
 		QueryTimeout: timeout,
 	})

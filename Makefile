@@ -46,9 +46,9 @@ install-bin-deps: install-linter # Install binary dependencies in ./bin
 app-deps: # Install application dependencies
 	GOPROXY=$(GOPROXY) go mod tidy
 
-# NOTE: the .pb.go types under pkg/common/proto/stroppy and pkg/datagen/dgproto
-# are frozen hand-edited Go types (the driver/workload contract). There is no
-# .proto source and no codegen step; do not regenerate.
+# Application configuration is plain Go under pkg/config. Regenerate the
+# committed JSON Schema with `go generate ./pkg/config`; protobuf is retained
+# only through external SDK dependencies.
 
 .PHONY: linter linter_fix tests
 

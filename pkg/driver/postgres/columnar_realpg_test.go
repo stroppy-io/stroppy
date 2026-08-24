@@ -16,7 +16,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
 )
@@ -57,7 +57,7 @@ func realPGDriverWithTimeout(t *testing.T, bulkSize int, queryTimeout time.Durat
 		t.Skip("STROPPY_PG_DSN not set; skipping real-postgres columnar test")
 	}
 
-	cfg, err := pool.ParseConfig(&stroppy.DriverConfig{Url: dsn}, logger.Global())
+	cfg, err := pool.ParseConfig(&config.DriverConfig{URL: dsn}, logger.Global())
 	if err != nil {
 		t.Fatalf("parse dsn: %v", err)
 	}

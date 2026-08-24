@@ -1,2082 +1,2304 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$ref": "#/$defs/.stroppy.RunConfig",
   "$defs": {
-    ".stroppy.DriverConfig.InsertProgressConfig": {
+    "DriverRunConfig": {
+      "additionalProperties": false,
       "allOf": [
         {
-          "oneOf": [
-            {
-              "required": [
-                "enabled"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "enabled"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
+          "not": {
+            "required": [
+              "driverType",
+              "driver_type"
+            ]
+          }
         },
         {
-          "oneOf": [
-            {
-              "required": [
-                "interval"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "interval"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
+          "not": {
+            "required": [
+              "errorMode",
+              "error_mode"
+            ]
+          }
         },
         {
-          "oneOf": [
-            {
-              "required": [
-                "stallAfter"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "stallAfter"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
+          "not": {
+            "required": [
+              "bulkSize",
+              "bulk_size"
+            ]
+          }
         },
         {
-          "oneOf": [
-            {
-              "required": [
-                "mode"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "mode"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
+          "not": {
+            "required": [
+              "caCertFile",
+              "ca_cert_file"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "authToken",
+              "auth_token"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "authUser",
+              "auth_user"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "authPassword",
+              "auth_password"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "tlsInsecureSkipVerify",
+              "tls_insecure_skip_verify"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "defaultTxIsolation",
+              "default_tx_isolation"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "defaultInsertMethod",
+              "default_insert_method"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "insertProgress",
+              "insert_progress"
+            ]
+          }
         }
       ],
       "properties": {
-        "enabled": {
-          "oneOf": [
+        "authPassword": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
             {
               "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.InsertProgressConfig.enabled"
-            }
-          ]
-        },
-        "interval": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.InsertProgressConfig.interval"
-            }
-          ]
-        },
-        "stallAfter": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.InsertProgressConfig.stall_after"
-            }
-          ]
-        },
-        "mode": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.InsertProgressConfig.mode"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "description": "* Periodic InsertSpec progress reporting."
-    },
-    ".stroppy.DriverConfig.InsertProgressConfig.enabled": {
-      "type": "boolean",
-      "description": "* Enable progress watcher for long-running data loads (default: true)."
-    },
-    ".stroppy.DriverConfig.InsertProgressConfig.interval": {
-      "type": "string",
-      "description": "* Reporting cadence as Go duration string, e.g. \"10s\", \"30s\", \"1m\"."
-    },
-    ".stroppy.DriverConfig.InsertProgressConfig.mode": {
-      "type": "string",
-      "description": "* Output mode: off, log, metrics, both (default: both)."
-    },
-    ".stroppy.DriverConfig.InsertProgressConfig.stall_after": {
-      "type": "string",
-      "description": "* No-progress duration before stall warnings, e.g. \"60s\", \"2m\"."
-    },
-    ".stroppy.DriverConfig.PostgresConfig": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "traceLogLevel"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "traceLogLevel"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "maxConnLifetime"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "maxConnLifetime"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "maxConnIdleTime"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "maxConnIdleTime"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "maxConns"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "maxConns"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "minConns"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "minConns"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "minIdleConns"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "minIdleConns"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "defaultQueryExecMode"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "defaultQueryExecMode"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "descriptionCacheCapacity"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "descriptionCacheCapacity"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "statementCacheCapacity"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "statementCacheCapacity"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "traceLogLevel": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.trace_log_level"
-            }
-          ]
-        },
-        "maxConnLifetime": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.max_conn_lifetime"
-            }
-          ]
-        },
-        "maxConnIdleTime": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.max_conn_idle_time"
-            }
-          ]
-        },
-        "maxConns": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.max_conns"
-            }
-          ]
-        },
-        "minConns": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.min_conns"
-            }
-          ]
-        },
-        "minIdleConns": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.min_idle_conns"
-            }
-          ]
-        },
-        "defaultQueryExecMode": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.default_query_exec_mode"
-            }
-          ]
-        },
-        "descriptionCacheCapacity": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.description_cache_capacity"
-            }
-          ]
-        },
-        "statementCacheCapacity": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig.statement_cache_capacity"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "description": "* PostgreSQL-specific pool and connection configuration"
-    },
-    ".stroppy.DriverConfig.PostgresConfig.default_query_exec_mode": {
-      "type": "string",
-      "description": "* Query execution mode: exec, cache_statement, cache_describe,\n describe_exec, simple_protocol"
-    },
-    ".stroppy.DriverConfig.PostgresConfig.description_cache_capacity": {
-      "type": "integer",
-      "description": "* Description cache capacity (only with cache_describe mode)"
-    },
-    ".stroppy.DriverConfig.PostgresConfig.max_conn_idle_time": {
-      "type": "string",
-      "description": "* Max connection idle time (Go duration string, e.g. \"10m\")"
-    },
-    ".stroppy.DriverConfig.PostgresConfig.max_conn_lifetime": {
-      "type": "string",
-      "description": "* Max connection lifetime (Go duration string, e.g. \"1h\")"
-    },
-    ".stroppy.DriverConfig.PostgresConfig.max_conns": {
-      "type": "integer",
-      "description": "* Maximum number of connections in the pool"
-    },
-    ".stroppy.DriverConfig.PostgresConfig.min_conns": {
-      "type": "integer",
-      "description": "* Minimum number of connections in the pool"
-    },
-    ".stroppy.DriverConfig.PostgresConfig.min_idle_conns": {
-      "type": "integer",
-      "description": "* Minimum number of idle connections"
-    },
-    ".stroppy.DriverConfig.PostgresConfig.statement_cache_capacity": {
-      "type": "integer",
-      "description": "* Statement cache capacity (only with cache_statement mode)"
-    },
-    ".stroppy.DriverConfig.PostgresConfig.trace_log_level": {
-      "type": "string",
-      "description": "* pgx trace log level: debug, info, warn, error"
-    },
-    ".stroppy.DriverConfig.SqlConfig": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "maxOpenConns"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "maxOpenConns"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "maxIdleConns"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "maxIdleConns"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "connMaxLifetime"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "connMaxLifetime"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "connMaxIdleTime"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "connMaxIdleTime"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "maxOpenConns": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.SqlConfig.max_open_conns"
-            }
-          ]
-        },
-        "maxIdleConns": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.SqlConfig.max_idle_conns"
-            }
-          ]
-        },
-        "connMaxLifetime": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.SqlConfig.conn_max_lifetime"
-            }
-          ]
-        },
-        "connMaxIdleTime": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverConfig.SqlConfig.conn_max_idle_time"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "description": "* Generic database/sql pool settings for SQL-based drivers"
-    },
-    ".stroppy.DriverConfig.SqlConfig.conn_max_idle_time": {
-      "type": "string",
-      "description": "* Maximum idle connection time (Go duration string, e.g. \"10m\")"
-    },
-    ".stroppy.DriverConfig.SqlConfig.conn_max_lifetime": {
-      "type": "string",
-      "description": "* Maximum connection lifetime (Go duration string, e.g. \"1h\")"
-    },
-    ".stroppy.DriverConfig.SqlConfig.max_idle_conns": {
-      "type": "integer",
-      "description": "* Maximum number of idle connections"
-    },
-    ".stroppy.DriverConfig.SqlConfig.max_open_conns": {
-      "type": "integer",
-      "description": "* Maximum number of open connections"
-    },
-    ".stroppy.DriverRunConfig": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "driverType"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "driverType"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "url"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "url"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "pool"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "pool"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "errorMode"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "errorMode"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "bulkSize"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "bulkSize"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "caCertFile"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "caCertFile"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "authToken"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "authToken"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "authUser"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "authUser"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "authPassword"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "authPassword"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "tlsInsecureSkipVerify"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "tlsInsecureSkipVerify"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "defaultTxIsolation"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "defaultTxIsolation"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "defaultInsertMethod"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "defaultInsertMethod"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "postgres"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "postgres"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "sql"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "sql"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "insertProgress"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "insertProgress"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "driverType": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.driver_type"
-            }
-          ]
-        },
-        "url": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.url"
-            }
-          ]
-        },
-        "pool": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.pool"
-            }
-          ]
-        },
-        "errorMode": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.error_mode"
-            }
-          ]
-        },
-        "bulkSize": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.bulk_size"
-            }
-          ]
-        },
-        "caCertFile": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.ca_cert_file"
             }
           ]
         },
         "authToken": {
-          "oneOf": [
+          "anyOf": [
             {
-              "type": "null"
+              "type": "string"
             },
             {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.auth_token"
+              "type": "null"
             }
           ]
         },
         "authUser": {
-          "oneOf": [
+          "anyOf": [
             {
-              "type": "null"
+              "type": "string"
             },
             {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.auth_user"
+              "type": "null"
             }
           ]
         },
-        "authPassword": {
-          "oneOf": [
+        "auth_password": {
+          "anyOf": [
             {
-              "type": "null"
+              "type": "string"
             },
             {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.auth_password"
+              "type": "null"
             }
           ]
         },
-        "tlsInsecureSkipVerify": {
-          "oneOf": [
+        "auth_token": {
+          "anyOf": [
             {
-              "type": "null"
+              "type": "string"
             },
             {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.tls_insecure_skip_verify"
+              "type": "null"
             }
           ]
         },
-        "defaultTxIsolation": {
-          "oneOf": [
+        "auth_user": {
+          "anyOf": [
             {
-              "type": "null"
+              "type": "string"
             },
             {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.default_tx_isolation"
+              "type": "null"
+            }
+          ]
+        },
+        "bulkSize": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bulk_size": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "caCertFile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ca_cert_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ]
         },
         "defaultInsertMethod": {
-          "oneOf": [
+          "anyOf": [
             {
-              "type": "null"
+              "type": "string"
             },
             {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.default_insert_method"
+              "type": "null"
             }
           ]
         },
-        "postgres": {
-          "oneOf": [
+        "defaultTxIsolation": {
+          "anyOf": [
             {
-              "type": "null"
+              "type": "string"
             },
             {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.postgres"
+              "type": "null"
             }
           ]
         },
-        "sql": {
-          "oneOf": [
+        "default_insert_method": {
+          "anyOf": [
             {
-              "type": "null"
+              "type": "string"
             },
             {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.sql"
+              "type": "null"
+            }
+          ]
+        },
+        "default_tx_isolation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "driverType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "driver_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "errorMode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ]
         },
         "insertProgress": {
-          "oneOf": [
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InsertProgressConfig"
+            },
             {
               "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.insert_progress"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "description": "*\n DriverRunConfig is the user-facing driver configuration for the stroppy config file.\n It mirrors the TypeScript DriverSetup interface so that protojson serialization\n (camelCase field names, string values) is directly readable by declareDriverSetup()\n in the TypeScript layer via the STROPPY_DRIVER_N environment variable.\n\n This is intentionally separate from DriverConfig (the runtime binary proto for TS-\u003eGo dispatch)."
-    },
-    ".stroppy.DriverRunConfig.PoolConfig": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "maxConns"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "maxConns"
-                    ]
-                  }
-                ]
-              }
             }
           ]
         },
-        {
-          "oneOf": [
+        "insert_progress": {
+          "anyOf": [
             {
-              "required": [
-                "minConns"
-              ]
+              "$ref": "#/$defs/InsertProgressConfig"
             },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "minConns"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "minIdleConns"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "minIdleConns"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "maxConnLifetime"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "maxConnLifetime"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "maxConnIdleTime"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "maxConnIdleTime"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "traceLogLevel"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "traceLogLevel"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "defaultQueryExecMode"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "defaultQueryExecMode"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "descriptionCacheCapacity"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "descriptionCacheCapacity"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "statementCacheCapacity"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "statementCacheCapacity"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "maxOpenConns"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "maxOpenConns"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "maxIdleConns"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "maxIdleConns"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "connMaxLifetime"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "connMaxLifetime"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "connMaxIdleTime"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "connMaxIdleTime"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "maxConns": {
-          "oneOf": [
             {
               "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.max_conns"
             }
           ]
         },
-        "minConns": {
-          "oneOf": [
+        "pool": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PoolConfig"
+            },
             {
               "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.min_conns"
             }
           ]
         },
-        "minIdleConns": {
-          "oneOf": [
+        "postgres": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PostgresConfig"
+            },
             {
               "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.min_idle_conns"
-            }
-          ]
-        },
-        "maxConnLifetime": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.max_conn_lifetime"
-            }
-          ]
-        },
-        "maxConnIdleTime": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.max_conn_idle_time"
-            }
-          ]
-        },
-        "traceLogLevel": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.trace_log_level"
-            }
-          ]
-        },
-        "defaultQueryExecMode": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.default_query_exec_mode"
-            }
-          ]
-        },
-        "descriptionCacheCapacity": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.description_cache_capacity"
-            }
-          ]
-        },
-        "statementCacheCapacity": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.statement_cache_capacity"
-            }
-          ]
-        },
-        "maxOpenConns": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.max_open_conns"
-            }
-          ]
-        },
-        "maxIdleConns": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.max_idle_conns"
-            }
-          ]
-        },
-        "connMaxLifetime": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.conn_max_lifetime"
-            }
-          ]
-        },
-        "connMaxIdleTime": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig.conn_max_idle_time"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "description": "*\n Pool configuration. Sugar field that maps to PostgresConfig or SqlConfig\n in the TypeScript layer based on driver_type.\n Matches TS DriverSetup.pool (PoolConfig)."
-    },
-    ".stroppy.DriverRunConfig.PoolConfig.conn_max_idle_time": {
-      "type": "string"
-    },
-    ".stroppy.DriverRunConfig.PoolConfig.conn_max_lifetime": {
-      "type": "string"
-    },
-    ".stroppy.DriverRunConfig.PoolConfig.default_query_exec_mode": {
-      "type": "string"
-    },
-    ".stroppy.DriverRunConfig.PoolConfig.description_cache_capacity": {
-      "type": "integer"
-    },
-    ".stroppy.DriverRunConfig.PoolConfig.max_conn_idle_time": {
-      "type": "string"
-    },
-    ".stroppy.DriverRunConfig.PoolConfig.max_conn_lifetime": {
-      "type": "string"
-    },
-    ".stroppy.DriverRunConfig.PoolConfig.max_conns": {
-      "type": "integer",
-      "description": "pgx / postgres pool fields"
-    },
-    ".stroppy.DriverRunConfig.PoolConfig.max_idle_conns": {
-      "type": "integer"
-    },
-    ".stroppy.DriverRunConfig.PoolConfig.max_open_conns": {
-      "type": "integer",
-      "description": "database/sql pool fields (mysql, ydb)"
-    },
-    ".stroppy.DriverRunConfig.PoolConfig.min_conns": {
-      "type": "integer"
-    },
-    ".stroppy.DriverRunConfig.PoolConfig.min_idle_conns": {
-      "type": "integer"
-    },
-    ".stroppy.DriverRunConfig.PoolConfig.statement_cache_capacity": {
-      "type": "integer"
-    },
-    ".stroppy.DriverRunConfig.PoolConfig.trace_log_level": {
-      "type": "string"
-    },
-    ".stroppy.DriverRunConfig.auth_password": {
-      "type": "string",
-      "description": "* Password for static credentials. Matches TS DriverSetup.authPassword."
-    },
-    ".stroppy.DriverRunConfig.auth_token": {
-      "type": "string",
-      "description": "* Authentication token (e.g. IAM token). Matches TS DriverSetup.authToken."
-    },
-    ".stroppy.DriverRunConfig.auth_user": {
-      "type": "string",
-      "description": "* Username for static credentials. Matches TS DriverSetup.authUser."
-    },
-    ".stroppy.DriverRunConfig.bulk_size": {
-      "type": "integer",
-      "description": "* Rows per bulk INSERT statement. Matches TS DriverSetup.bulkSize."
-    },
-    ".stroppy.DriverRunConfig.ca_cert_file": {
-      "type": "string",
-      "description": "* Path to CA certificate PEM file. Matches TS DriverSetup.caCertFile."
-    },
-    ".stroppy.DriverRunConfig.default_insert_method": {
-      "type": "string",
-      "description": "*\n Driver-level insert method. One of: \"plain_query\", \"plain_bulk\", \"native\".\n Matches TS DriverSetup.defaultInsertMethod."
-    },
-    ".stroppy.DriverRunConfig.default_tx_isolation": {
-      "type": "string",
-      "description": "*\n Default transaction isolation level.\n One of: \"read_uncommitted\", \"read_committed\", \"repeatable_read\",\n \"serializable\", \"db_default\", \"conn\", \"none\".\n Matches TS DriverSetup.defaultTxIsolation."
-    },
-    ".stroppy.DriverRunConfig.driver_type": {
-      "type": "string",
-      "description": "*\n Driver type. One of: \"postgres\", \"mysql\", \"picodata\", \"ydb\", \"noop\", \"csv\".\n Matches TS DriverSetup.driverType (string union, not proto enum)."
-    },
-    ".stroppy.DriverRunConfig.error_mode": {
-      "type": "string",
-      "description": "*\n Error handling mode. One of: \"silent\", \"log\", \"throw\", \"fail\", \"abort\".\n Matches TS DriverSetup.errorMode."
-    },
-    ".stroppy.DriverRunConfig.insert_progress": {
-      "$ref": "#/$defs/.stroppy.DriverConfig.InsertProgressConfig",
-      "description": "*\n Periodic InsertSpec progress reporting. Matches TS DriverSetup.insertProgress."
-    },
-    ".stroppy.DriverRunConfig.pool": {
-      "$ref": "#/$defs/.stroppy.DriverRunConfig.PoolConfig"
-    },
-    ".stroppy.DriverRunConfig.postgres": {
-      "$ref": "#/$defs/.stroppy.DriverConfig.PostgresConfig",
-      "description": "*\n PostgreSQL-specific pool config. Matches TS DriverSetup.postgres.\n Takes priority over pool when both are set."
-    },
-    ".stroppy.DriverRunConfig.sql": {
-      "$ref": "#/$defs/.stroppy.DriverConfig.SqlConfig",
-      "description": "*\n Generic database/sql pool config. Matches TS DriverSetup.sql.\n Takes priority over pool when both are set."
-    },
-    ".stroppy.DriverRunConfig.tls_insecure_skip_verify": {
-      "type": "boolean",
-      "description": "* Skip TLS certificate verification. Matches TS DriverSetup.tlsInsecureSkipVerify."
-    },
-    ".stroppy.DriverRunConfig.url": {
-      "type": "string",
-      "description": "* Database connection URL"
-    },
-    ".stroppy.ExporterConfig": {
-      "properties": {
-        "name": {
-          "$ref": "#/$defs/.stroppy.ExporterConfig.name"
-        },
-        "otlpExport": {
-          "$ref": "#/$defs/.stroppy.ExporterConfig.otlp_export"
-        }
-      },
-      "type": "object",
-      "required": [
-        "name",
-        "otlpExport"
-      ],
-      "description": "*\n OtlpExporterConfig contains named configuration for an OTLP exporter."
-    },
-    ".stroppy.ExporterConfig.name": {
-      "type": "string",
-      "description": "* Name of the OTLP exporter"
-    },
-    ".stroppy.ExporterConfig.otlp_export": {
-      "$ref": "#/$defs/.stroppy.OtlpExport",
-      "description": "* Configuration for the OTLP exporter"
-    },
-    ".stroppy.GlobalConfig": {
-      "properties": {
-        "version": {
-          "$ref": "#/$defs/.stroppy.GlobalConfig.version"
-        },
-        "runId": {
-          "$ref": "#/$defs/.stroppy.GlobalConfig.run_id"
-        },
-        "seed": {
-          "$ref": "#/$defs/.stroppy.GlobalConfig.seed"
-        },
-        "metadata": {
-          "$ref": "#/$defs/.stroppy.GlobalConfig.metadata"
-        },
-        "logger": {
-          "$ref": "#/$defs/.stroppy.GlobalConfig.logger"
-        },
-        "exporter": {
-          "$ref": "#/$defs/.stroppy.GlobalConfig.exporter"
-        }
-      },
-      "type": "object",
-      "required": [
-        "version",
-        "runId",
-        "seed",
-        "logger",
-        "exporter"
-      ]
-    },
-    ".stroppy.GlobalConfig.exporter": {
-      "$ref": "#/$defs/.stroppy.ExporterConfig",
-      "description": "* Exporter configuration"
-    },
-    ".stroppy.GlobalConfig.logger": {
-      "$ref": "#/$defs/.stroppy.LoggerConfig",
-      "description": "* Logging configuration"
-    },
-    ".stroppy.GlobalConfig.metadata": {
-      "additionalProperties": {
-        "type": "string"
-      },
-      "type": "object",
-      "description": "* Arbitrary metadata, may be passed to result labels and json output"
-    },
-    ".stroppy.GlobalConfig.run_id": {
-      "type": "string",
-      "description": "*\n Run identifier for reproducible test runs or debugging\n If set to \"generate()\" stroppy eval ulid for run_id"
-    },
-    ".stroppy.GlobalConfig.seed": {
-      "type": "integer",
-      "description": "* Random seed for reproducible test runs"
-    },
-    ".stroppy.GlobalConfig.version": {
-      "type": "string",
-      "description": "*\n Version of the configuration format e.g. proto files version.\n This is used for backward compatibility of configs\n and will be set automatically from binary run if not present."
-    },
-    ".stroppy.LoggerConfig": {
-      "properties": {
-        "logLevel": {
-          "$ref": "#/$defs/.stroppy.LoggerConfig.log_level"
-        },
-        "logMode": {
-          "$ref": "#/$defs/.stroppy.LoggerConfig.log_mode"
-        }
-      },
-      "type": "object",
-      "required": [
-        "logLevel",
-        "logMode"
-      ],
-      "description": "*\n LoggerConfig contains configuration for the logging system.\n It controls log levels and output formatting."
-    },
-    ".stroppy.LoggerConfig.LogLevel": {
-      "type": "string",
-      "enum": [
-        "LOG_LEVEL_DEBUG",
-        "LOG_LEVEL_INFO",
-        "LOG_LEVEL_WARN",
-        "LOG_LEVEL_ERROR",
-        "LOG_LEVEL_FATAL"
-      ]
-    },
-    ".stroppy.LoggerConfig.LogMode": {
-      "type": "string",
-      "enum": [
-        "LOG_MODE_DEVELOPMENT",
-        "LOG_MODE_PRODUCTION"
-      ]
-    },
-    ".stroppy.LoggerConfig.log_level": {
-      "$ref": "#/$defs/.stroppy.LoggerConfig.LogLevel",
-      "description": "* Minimum log level to output"
-    },
-    ".stroppy.LoggerConfig.log_mode": {
-      "$ref": "#/$defs/.stroppy.LoggerConfig.LogMode",
-      "description": "* Logging mode (development or production)"
-    },
-    ".stroppy.OtlpExport": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "otlpGrpcEndpoint"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "otlpGrpcEndpoint"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "otlpHttpEndpoint"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "otlpHttpEndpoint"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "otlpHttpExporterUrlPath"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "otlpHttpExporterUrlPath"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "otlpEndpointInsecure"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "otlpEndpointInsecure"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "otlpHeaders"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "otlpHeaders"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "otlpMetricsPrefix"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "otlpMetricsPrefix"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "otlpGrpcEndpoint": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.OtlpExport.otlp_grpc_endpoint"
-            }
-          ]
-        },
-        "otlpHttpEndpoint": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.OtlpExport.otlp_http_endpoint"
-            }
-          ]
-        },
-        "otlpHttpExporterUrlPath": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.OtlpExport.otlp_http_exporter_url_path"
-            }
-          ]
-        },
-        "otlpEndpointInsecure": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.OtlpExport.otlp_endpoint_insecure"
-            }
-          ]
-        },
-        "otlpHeaders": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.OtlpExport.otlp_headers"
-            }
-          ]
-        },
-        "otlpMetricsPrefix": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.OtlpExport.otlp_metrics_prefix"
-            }
-          ]
-        }
-      },
-      "type": "object",
-      "description": "*\n OtlpExport contains configuration for exporting metrics via OpenTelemetry\n Protocol (OTLP). It specifies the endpoint and metrics prefix for telemetry\n data export."
-    },
-    ".stroppy.OtlpExport.otlp_endpoint_insecure": {
-      "type": "boolean",
-      "description": "* Disable transport security for the exporter"
-    },
-    ".stroppy.OtlpExport.otlp_grpc_endpoint": {
-      "type": "string",
-      "description": "* gRPC endpoint for OpenTelemetry collector"
-    },
-    ".stroppy.OtlpExport.otlp_headers": {
-      "type": "string",
-      "description": "* Headers for otlp requests e.g. Authorization=..."
-    },
-    ".stroppy.OtlpExport.otlp_http_endpoint": {
-      "type": "string",
-      "description": "* HTTP endpoint for the OpenTelemetry collector"
-    },
-    ".stroppy.OtlpExport.otlp_http_exporter_url_path": {
-      "type": "string",
-      "description": "* HTTP exporter path. Default is '/v1/metrics'"
-    },
-    ".stroppy.OtlpExport.otlp_metrics_prefix": {
-      "type": "string",
-      "description": "* Prefix to be added to all exported metrics"
-    },
-    ".stroppy.RunConfig": {
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "required": [
-                "script"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "script"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "required": [
-                "sql"
-              ]
-            },
-            {
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "sql"
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "properties": {
-        "version": {
-          "$ref": "#/$defs/.stroppy.RunConfig.version"
-        },
-        "script": {
-          "oneOf": [
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/.stroppy.RunConfig.script"
             }
           ]
         },
         "sql": {
-          "oneOf": [
+          "anyOf": [
             {
-              "type": "null"
+              "$ref": "#/$defs/SQLConfig"
             },
             {
-              "$ref": "#/$defs/.stroppy.RunConfig.sql"
+              "type": "null"
+            }
+          ]
+        },
+        "tlsInsecureSkipVerify": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tls_insecure_skip_verify": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "ExporterConfig": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "otlpExport",
+              "otlp_export"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "otlpExport": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OtlpExport"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "otlp_export": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OtlpExport"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "GlobalConfig": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "runId",
+              "run_id"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "exporter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExporterConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "logger": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LoggerConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "description": "A bare unsigned JSON integer; quoted, decimal-point, and exponent forms are rejected.",
+              "maximum": 18446744073709551615,
+              "minimum": 0,
+              "type": "integer",
+              "x-stroppy-bareInteger": true,
+              "x-stroppy-rejectExponent": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "InsertProgressConfig": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "stallAfter",
+              "stall_after"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "enabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "interval": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stallAfter": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stall_after": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "LoggerConfig": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "logLevel",
+              "log_level"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "logMode",
+              "log_mode"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "logLevel": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "enum": [
+                    "LOG_LEVEL_DEBUG",
+                    "LOG_LEVEL_INFO",
+                    "LOG_LEVEL_WARN",
+                    "LOG_LEVEL_ERROR",
+                    "LOG_LEVEL_FATAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4
+                  ],
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "logMode": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "enum": [
+                    "LOG_MODE_DEVELOPMENT",
+                    "LOG_MODE_PRODUCTION"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    0,
+                    1
+                  ],
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "log_level": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "enum": [
+                    "LOG_LEVEL_DEBUG",
+                    "LOG_LEVEL_INFO",
+                    "LOG_LEVEL_WARN",
+                    "LOG_LEVEL_ERROR",
+                    "LOG_LEVEL_FATAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4
+                  ],
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "log_mode": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "enum": [
+                    "LOG_MODE_DEVELOPMENT",
+                    "LOG_MODE_PRODUCTION"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    0,
+                    1
+                  ],
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "OtlpExport": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "otlpGrpcEndpoint",
+              "otlp_grpc_endpoint"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "otlpHttpEndpoint",
+              "otlp_http_endpoint"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "otlpHttpExporterUrlPath",
+              "otlp_http_exporter_url_path"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "otlpEndpointInsecure",
+              "otlp_endpoint_insecure"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "otlpHeaders",
+              "otlp_headers"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "otlpMetricsPrefix",
+              "otlp_metrics_prefix"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "otlpEndpointInsecure": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "otlpGrpcEndpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "otlpHeaders": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "otlpHttpEndpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "otlpHttpExporterUrlPath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "otlpMetricsPrefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "otlp_endpoint_insecure": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "otlp_grpc_endpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "otlp_headers": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "otlp_http_endpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "otlp_http_exporter_url_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "otlp_metrics_prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "PoolConfig": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "maxConns",
+              "max_conns"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "minConns",
+              "min_conns"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "minIdleConns",
+              "min_idle_conns"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "maxConnLifetime",
+              "max_conn_lifetime"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "maxConnIdleTime",
+              "max_conn_idle_time"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "traceLogLevel",
+              "trace_log_level"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "defaultQueryExecMode",
+              "default_query_exec_mode"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "descriptionCacheCapacity",
+              "description_cache_capacity"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "statementCacheCapacity",
+              "statement_cache_capacity"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "maxOpenConns",
+              "max_open_conns"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "maxIdleConns",
+              "max_idle_conns"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "connMaxLifetime",
+              "conn_max_lifetime"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "connMaxIdleTime",
+              "conn_max_idle_time"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "connMaxIdleTime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "connMaxLifetime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conn_max_idle_time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conn_max_lifetime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "defaultQueryExecMode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "default_query_exec_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "descriptionCacheCapacity": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "description_cache_capacity": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxConnIdleTime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxConnLifetime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxConns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxIdleConns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxOpenConns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_conn_idle_time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_conn_lifetime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_conns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_idle_conns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_open_conns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "minConns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "minIdleConns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "min_conns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "min_idle_conns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "statementCacheCapacity": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "statement_cache_capacity": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "traceLogLevel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trace_log_level": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "PostgresConfig": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "traceLogLevel",
+              "trace_log_level"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "maxConnLifetime",
+              "max_conn_lifetime"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "maxConnIdleTime",
+              "max_conn_idle_time"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "maxConns",
+              "max_conns"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "minConns",
+              "min_conns"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "minIdleConns",
+              "min_idle_conns"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "defaultQueryExecMode",
+              "default_query_exec_mode"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "descriptionCacheCapacity",
+              "description_cache_capacity"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "statementCacheCapacity",
+              "statement_cache_capacity"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "defaultQueryExecMode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "default_query_exec_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "descriptionCacheCapacity": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "description_cache_capacity": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxConnIdleTime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxConnLifetime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxConns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_conn_idle_time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_conn_lifetime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_conns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "minConns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "minIdleConns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "min_conns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "min_idle_conns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "statementCacheCapacity": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "statement_cache_capacity": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "traceLogLevel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trace_log_level": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "RunConfig": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "noSteps",
+              "no_steps"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "k6Args",
+              "k6_args"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "k6Config",
+              "k6_config"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "drivers": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/DriverRunConfig"
+              },
+              "propertyNames": {
+                "description": "Unsigned decimal uint32; leading zeroes are accepted and canonicalized.",
+                "pattern": "^[0-9]+$",
+                "x-stroppy-uint32Key": true
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "env": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
             }
           ]
         },
         "global": {
-          "$ref": "#/$defs/.stroppy.RunConfig.global"
-        },
-        "drivers": {
-          "$ref": "#/$defs/.stroppy.RunConfig.drivers"
-        },
-        "env": {
-          "$ref": "#/$defs/.stroppy.RunConfig.env"
-        },
-        "run": {
-          "$ref": "#/$defs/.stroppy.RunConfig.run"
-        },
-        "params": {
-          "$ref": "#/$defs/.stroppy.RunConfig.params"
-        },
-        "steps": {
-          "$ref": "#/$defs/.stroppy.RunConfig.steps"
-        },
-        "noSteps": {
-          "$ref": "#/$defs/.stroppy.RunConfig.no_steps"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "description": "Top-level stroppy config. Typed parameter precedence: CLI flag > process environment > -e override > matching run/params value > env map > declared default. The selected workload schema validates names and concrete values in params at runtime."
-    },
-    ".stroppy.RunConfig.drivers": {
-      "additionalProperties": {
-        "$ref": "#/$defs/.stroppy.DriverRunConfig"
-      },
-      "type": "object",
-      "description": "*\n Driver configurations indexed by driver number (0-based string key in JSON).\n Equivalent to -d/-D CLI flags but type-safe and with full pool config support.\n CLI -d/-D takes precedence over entries here."
-    },
-    ".stroppy.RunConfig.env": {
-      "additionalProperties": {
-        "type": "string"
-      },
-      "type": "object",
-      "description": "Legacy string-valued parameter overrides. Keys are uppercased on load."
-    },
-    ".stroppy.RunConfig.run": {
-      "additionalProperties": false,
-      "properties": {
-        "executor": {
-          "type": "string",
-          "enum": [
-            "shared-iterations",
-            "constant-vus"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GlobalConfig"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
-        "vus": {
-          "type": "integer"
+        "k6Args": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
-        "iterations": {
-          "type": "integer"
+        "k6Config": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
-        "duration": {
-          "type": "string"
+        "k6_args": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
-        "queryTimeout": {
-          "type": "string",
-          "description": "Per-statement query deadline as a Go duration; 0 disables it."
+        "k6_config": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "noSteps": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "no_steps": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "params": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "description": "Selected-workload parameter names. Snake-case aliases are canonicalized to lower camel case; null and container values are rejected.",
+          "propertyNames": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][A-Za-z0-9]*$"
+              },
+              {
+                "pattern": "^[a-z][a-z0-9]*(_[a-z0-9]+)+$"
+              }
+            ]
+          },
+          "type": "object",
+          "x-stroppy-aliasCollision": "snake-to-lower-camel"
+        },
+        "run": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "queryTimeout",
+                  "query_timeout"
+                ]
+              }
+            }
+          ],
+          "properties": {
+            "duration": {
+              "type": "string"
+            },
+            "executor": {
+              "type": "string"
+            },
+            "iterations": {
+              "description": "A bare JSON integer; quoted, decimal-point, and exponent forms are rejected.",
+              "type": "integer",
+              "x-stroppy-bareInteger": true,
+              "x-stroppy-rejectExponent": true
+            },
+            "queryTimeout": {
+              "description": "Per-statement query deadline as a Go duration; 0 disables it.",
+              "type": "string"
+            },
+            "query_timeout": {
+              "description": "Per-statement query deadline as a Go duration; 0 disables it.",
+              "type": "string"
+            },
+            "vus": {
+              "description": "A bare JSON integer; quoted, decimal-point, and exponent forms are rejected.",
+              "type": "integer",
+              "x-stroppy-bareInteger": true,
+              "x-stroppy-rejectExponent": true
+            }
+          },
+          "propertyNames": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][A-Za-z0-9]*$"
+              },
+              {
+                "pattern": "^[a-z][a-z0-9]*(_[a-z0-9]+)+$"
+              }
+            ]
+          },
+          "type": "object"
+        },
+        "script": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sql": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "steps": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
-      "type": "object",
-      "description": "Typed shared run parameters. Select shared-iterations or constant-vus explicitly."
+      "type": "object"
     },
-    ".stroppy.RunConfig.params": {
-      "additionalProperties": {
-        "oneOf": [
-          {
-            "type": "string"
-          },
-          {
-            "type": "number"
-          },
-          {
-            "type": "boolean"
+    "SQLConfig": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "maxOpenConns",
+              "max_open_conns"
+            ]
           }
-        ]
+        },
+        {
+          "not": {
+            "required": [
+              "maxIdleConns",
+              "max_idle_conns"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "connMaxLifetime",
+              "conn_max_lifetime"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "connMaxIdleTime",
+              "conn_max_idle_time"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "connMaxIdleTime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "connMaxLifetime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conn_max_idle_time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conn_max_lifetime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxIdleConns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxOpenConns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_idle_conns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_open_conns": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "multipleOf": 1,
+                  "type": "number"
+                },
+                {
+                  "description": "Must evaluate exactly to an in-range int32; fractional and overflowing values are rejected.",
+                  "pattern": "^-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?$",
+                  "type": "string",
+                  "x-stroppy-exactInt32": true
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
       },
-      "type": "object",
-      "description": "Typed parameters declared by the selected workload. Names and concrete types are validated against that workload's runtime schema."
-    },
-    ".stroppy.RunConfig.global": {
-      "$ref": "#/$defs/.stroppy.GlobalConfig",
-      "description": "*\n Global stroppy settings: logger level/mode, OTEL exporter, seed, run_id, metadata.\n These activate the previously-dead GlobalConfig plumbing."
-    },
-    ".stroppy.RunConfig.no_steps": {
-      "items": {
-        "type": "string",
-        "description": "*\n Step blocklist. Equivalent to --no-steps.\n CLI --no-steps takes precedence; this is used only when --no-steps is absent."
-      },
-      "type": "array",
-      "description": "*\n Step blocklist. Equivalent to --no-steps.\n CLI --no-steps takes precedence; this is used only when --no-steps is absent."
-    },
-    ".stroppy.RunConfig.script": {
-      "type": "string",
-      "description": "*\n Script to run: preset name (e.g. \"tpcc\"), .ts path, .sql path, or inline SQL.\n If omitted, the first CLI positional argument is used."
-    },
-    ".stroppy.RunConfig.sql": {
-      "type": "string",
-      "description": "*\n SQL file: path or name. If omitted, auto-resolved from script/preset."
-    },
-    ".stroppy.RunConfig.steps": {
-      "items": {
-        "type": "string",
-        "description": "*\n Step allowlist. Equivalent to --steps.\n CLI --steps takes precedence; this is used only when --steps is absent."
-      },
-      "type": "array",
-      "description": "*\n Step allowlist. Equivalent to --steps.\n CLI --steps takes precedence; this is used only when --steps is absent."
-    },
-    ".stroppy.RunConfig.version": {
-      "type": "string",
-      "description": "* Config file format version. Currently \"1\"."
+      "type": "object"
     }
   },
-  "type": "object"
+  "$ref": "#/$defs/RunConfig",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The stroppy-config.json file envelope, including typed run and workload parameters.",
+  "title": "Stroppy run configuration"
 }

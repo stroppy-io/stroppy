@@ -15,7 +15,7 @@ import (
 	"github.com/stroppy-io/stroppy/internal/runner"
 	_ "github.com/stroppy-io/stroppy/internal/workloads/simple"
 	"github.com/stroppy-io/stroppy/pkg/bench"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
 )
 
@@ -561,14 +561,14 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 	specificMaxConns := int32(5)
 	statementCache := int32(13)
 
-	configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*stroppy.DriverRunConfig{
+	configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
 		0: {
 			DriverType: &driverType,
-			Url:        &fileURL,
+			URL:        &fileURL,
 			ErrorMode:  &errorMode,
 			BulkSize:   &bulkSize,
-			Pool:       &stroppy.DriverRunConfig_PoolConfig{MaxConns: &maxConns},
-			Postgres: &stroppy.DriverConfig_PostgresConfig{
+			Pool:       &config.PoolConfig{MaxConns: &maxConns},
+			Postgres: &config.PostgresConfig{
 				MaxConns:               &specificMaxConns,
 				StatementCacheCapacity: &statementCache,
 			},
@@ -595,11 +595,11 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 		t.Fatalf("buildDriverConfig() error = %v", err)
 	}
 
-	if runtimeConfig.GetUrl() != "postgres://cli" ||
+	if runtimeConfig.URL != "postgres://cli" ||
 		runtimeConfig.GetBulkSize() != 20 ||
-		runtimeConfig.GetErrorMode() != stroppy.DriverConfig_ERROR_MODE_THROW ||
-		runtimeConfig.GetPostgres().GetMaxConns() != 10 ||
-		runtimeConfig.GetPostgres().GetStatementCacheCapacity() != 13 {
+		runtimeConfig.ErrorMode != config.ErrorModeThrow ||
+		runtimeConfig.Postgres.GetMaxConns() != 10 ||
+		runtimeConfig.Postgres.GetStatementCacheCapacity() != 13 {
 		t.Fatalf("runtime driver config = %#v, extra = %#v", runtimeConfig, configs[0].Extra)
 	}
 
@@ -608,11 +608,11 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 	specificMaxOpenConns := int32(5)
 	maxIdleConns := int32(4)
 
-	configs, err = runner.DriverCLIConfigsFromFile(map[uint32]*stroppy.DriverRunConfig{
+	configs, err = runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
 		0: {
 			DriverType: &mysql,
-			Pool:       &stroppy.DriverRunConfig_PoolConfig{MaxOpenConns: &maxOpenConns},
-			Sql: &stroppy.DriverConfig_SqlConfig{
+			Pool:       &config.PoolConfig{MaxOpenConns: &maxOpenConns},
+			SQL: &config.SQLConfig{
 				MaxOpenConns: &specificMaxOpenConns,
 				MaxIdleConns: &maxIdleConns,
 			},
@@ -626,12 +626,16 @@ func TestLegacyEnvAndConfigDriversMergeBelowCLI(t *testing.T) {
 		t.Fatalf("applyDriverOpt(pool.maxOpenConns) error = %v", err)
 	}
 
+	if err := applyDriverOpt(configs, 0, "pool.maxConns", "20"); err != nil {
+		t.Fatalf("applyDriverOpt(pool.maxConns) error = %v", err)
+	}
+
 	runtimeConfig, err = buildDriverConfig(0, configs[0], nil)
 	if err != nil {
 		t.Fatalf("buildDriverConfig(mysql) error = %v", err)
 	}
 
-	if runtimeConfig.GetSql().GetMaxOpenConns() != 12 || runtimeConfig.GetSql().GetMaxIdleConns() != 4 {
+	if runtimeConfig.SQL.GetMaxOpenConns() != 12 || runtimeConfig.SQL.GetMaxIdleConns() != 4 {
 		t.Fatalf("runtime mysql driver config = %#v", runtimeConfig)
 	}
 }
@@ -652,7 +656,7 @@ func TestPoolSizePreservesPostgresSpecificConfig(t *testing.T) {
 		t.Fatalf("buildDriverConfig() error = %v", err)
 	}
 
-	postgres := config.GetPostgres()
+	postgres := config.Postgres
 	if postgres.GetMaxConns() != 11 || postgres.GetMinConns() != 11 ||
 		postgres.GetStatementCacheCapacity() != 13 || postgres.GetMaxConnLifetime() != "1h" {
 		t.Fatalf("postgres config = %#v", postgres)
@@ -667,8 +671,8 @@ func TestLegacyPostgresPoolSizeRejectsInt32Overflow(t *testing.T) {
 		t.Fatalf("buildDriverConfig() error = %v", err)
 	}
 
-	if config.GetPostgres() != nil {
-		t.Fatalf("postgres config = %#v", config.GetPostgres())
+	if config.Postgres != nil {
+		t.Fatalf("postgres config = %#v", config.Postgres)
 	}
 }
 
@@ -1230,6 +1234,129 @@ func TestApplyDriverPresetInvalidJSON(t *testing.T) {
 	err := applyDriverPreset(configs, 0, `{broken`)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+func TestApplyDriverPresetStrictJSON(t *testing.T) {
+	tests := []struct {
+		name string
+		doc  string
+		path string
+	}{
+		{name: "exact duplicate", doc: `{"url":"a","url":"b"}`, path: `$.url`},
+		{name: "alias collision", doc: `{"bulkSize":1,"bulk_size":2}`, path: `$.bulkSize`},
+		{name: "wrong case", doc: `{"DriverType":"postgres"}`, path: `$["DriverType"]`},
+		{name: "unknown nested field", doc: `{"pool":{"MaxConns":1}}`, path: `$.pool["MaxConns"]`},
+		{name: "fractional int32", doc: `{"bulkSize":1.5}`, path: `$.bulkSize`},
+		{name: "trailing JSON", doc: `{} {}`, path: `$`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configs := runner.DriverCLIConfigs{}
+
+			err := applyDriverPreset(configs, 0, test.doc)
+			if err == nil || !contains(err.Error(), test.path) {
+				t.Fatalf("applyDriverPreset() error = %v, want path %s", err, test.path)
+			}
+		})
+	}
+}
+
+func TestApplyDriverPresetAliasesReachRuntimeConfig(t *testing.T) {
+	configs := runner.DriverCLIConfigs{}
+	if err := applyDriverPreset(
+		configs,
+		0,
+		`  {"driver_type":"postgres","bulk_size":"2e2","pool":{"max_conns":3}}  `,
+	); err != nil {
+		t.Fatalf("applyDriverPreset() error = %v", err)
+	}
+
+	got, err := buildDriverConfig(0, configs[0], nil)
+	if err != nil {
+		t.Fatalf("buildDriverConfig() error = %v", err)
+	}
+
+	if got.GetBulkSize() != 200 {
+		t.Fatalf("bulkSize = %d, want 200", got.GetBulkSize())
+	}
+
+	if got.Postgres.GetMaxConns() != 3 {
+		t.Fatalf("postgres.maxConns = %d, want 3", got.Postgres.GetMaxConns())
+	}
+}
+
+func TestDriverExtrasRejectAliasCollisionsAndWrongCase(t *testing.T) {
+	tests := []struct {
+		name string
+		keys [][2]string
+		path string
+	}{
+		{
+			name: "alias collision",
+			keys: [][2]string{{"bulkSize", "1"}, {"bulk_size", "2"}},
+			path: `$.bulkSize`,
+		},
+		{
+			name: "nested alias collision",
+			keys: [][2]string{{"pool.maxConns", "1"}, {"pool.max_conns", "2"}},
+			path: `$.pool.maxConns`,
+		},
+		{
+			name: "wrong case",
+			keys: [][2]string{{"pool.MaxConns", "1"}},
+			path: `$.pool["MaxConns"]`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configs := runner.DriverCLIConfigs{0: {DriverType: "postgres"}}
+			for _, keyValue := range test.keys {
+				if err := applyDriverOpt(configs, 0, keyValue[0], keyValue[1]); err != nil {
+					t.Fatalf("applyDriverOpt(%q) error = %v", keyValue[0], err)
+				}
+			}
+
+			_, err := buildDriverConfig(0, configs[0], nil)
+			if err == nil || !contains(err.Error(), test.path) {
+				t.Fatalf("buildDriverConfig() error = %v, want path %s", err, test.path)
+			}
+		})
+	}
+}
+
+func TestApplyDriverOptStrictNumericLexemes(t *testing.T) {
+	configs := runner.DriverCLIConfigs{}
+
+	if err := applyDriverOpt(configs, 0, "driverType", "postgres"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := applyDriverOpt(configs, 0, "bulkSize", "1e1"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := buildDriverConfig(0, configs[0], nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.GetBulkSize() != 10 {
+		t.Fatalf("bulkSize = %d, want 10", got.GetBulkSize())
+	}
+
+	for _, value := range []string{"1.0000000000000001", "1.", "01"} {
+		invalidConfigs := runner.DriverCLIConfigs{}
+
+		if err := applyDriverOpt(invalidConfigs, 0, "bulkSize", value); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := buildDriverConfig(0, invalidConfigs[0], nil); err == nil {
+			t.Errorf("bulkSize %q unexpectedly succeeded", value)
+		}
 	}
 }
 

@@ -10,7 +10,7 @@ import (
 
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
 )
 
@@ -67,7 +67,7 @@ func TestRunRejectsNegativeQueryTimeout(t *testing.T) {
 	err := Run(
 		context.Background(),
 		"test/query-timeout-negative",
-		map[int]*stroppy.DriverConfig{0: {DriverType: stroppy.DriverConfig_DRIVER_TYPE_NOOP}},
+		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
 		nil,
 		ParamInputs{CLI: map[string]string{"query-timeout": "-5s"}},
 		zap.NewNop(),
@@ -106,7 +106,7 @@ func TestRunPassesScenarioCancellationToWorkload(t *testing.T) {
 	err := Run(
 		context.Background(),
 		"test/fatal-context",
-		map[int]*stroppy.DriverConfig{0: {DriverType: stroppy.DriverConfig_DRIVER_TYPE_NOOP}},
+		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
 		map[string]string{"VUS": "2", "ITER": "2"},
 		ParamInputs{LegacyEnv: map[string]string{"VUS": "2", "ITER": "2"}},
 		zap.NewNop(),

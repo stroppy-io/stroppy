@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
@@ -77,9 +77,9 @@ func (t *fakeTx) RunQuery(_ context.Context, sql string, _ map[string]any) (*dri
 	return &driver.QueryResult{Rows: &fakeRows{rows: rows}}, nil
 }
 
-func (t *fakeTx) Commit(context.Context) error        { return t.commitErr }
-func (t *fakeTx) Rollback(context.Context) error      { return t.rollbackErr }
-func (t *fakeTx) Isolation() stroppy.TxIsolationLevel { return stroppy.TxIsolationLevel_READ_COMMITTED }
+func (t *fakeTx) Commit(context.Context) error       { return t.commitErr }
+func (t *fakeTx) Rollback(context.Context) error     { return t.rollbackErr }
+func (t *fakeTx) Isolation() config.TxIsolationLevel { return config.TxIsolationLevelReadCommitted }
 
 // fakeDriver implements driver.Driver and hands out a pre-wired tx.
 type fakeDriver struct{ tx driver.Tx }
@@ -92,7 +92,7 @@ func (d *fakeDriver) RunQuery(context.Context, string, map[string]any) (*driver.
 	return &driver.QueryResult{}, nil
 }
 
-func (d *fakeDriver) Begin(context.Context, stroppy.TxIsolationLevel) (driver.Tx, error) {
+func (d *fakeDriver) Begin(context.Context, config.TxIsolationLevel) (driver.Tx, error) {
 	return d.tx, nil
 }
 
@@ -100,7 +100,7 @@ func (d *fakeDriver) ClassifyError(error) driver.ErrorFacts { return driver.Erro
 func (d *fakeDriver) Teardown(context.Context) error        { return nil }
 
 const (
-	fakeDriverType           = stroppy.DriverConfig_DriverType(99)
+	fakeDriverType           = config.DriverType(99)
 	newOrderTestWorkloadName = "tpcc/test-new-order"
 )
 
@@ -177,7 +177,7 @@ func runNewOrderBody(
 	if err := bench.Run(
 		context.Background(),
 		newOrderTestWorkloadName,
-		map[int]*stroppy.DriverConfig{0: {DriverType: fakeDriverType}},
+		map[int]*config.DriverConfig{0: {DriverType: fakeDriverType}},
 		nil,
 		bench.ParamInputs{},
 		zap.NewNop(),

@@ -19,7 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 const (
@@ -53,10 +53,10 @@ func (p *PoolX) QueryContext(ctx context.Context, sql string, args ...any) (pgx.
 
 func NewPool(
 	ctx context.Context,
-	config *stroppy.DriverConfig,
+	driverConfig *config.DriverConfig,
 	logger *zap.Logger,
 ) (*PoolX, error) {
-	parsedConfig, err := ParseConfig(config, logger)
+	parsedConfig, err := ParseConfig(driverConfig, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -69,17 +69,17 @@ func NewPool(
 	return &PoolX{pool}, nil
 }
 
-func NewWithConfig(ctx context.Context, config *pgxpool.Config) (*PoolX, error) {
-	pool, err := pgxpool.NewWithConfig(ctx, config)
+func NewWithConfig(ctx context.Context, pgConfig *pgxpool.Config) (*PoolX, error) {
+	pool, err := pgxpool.NewWithConfig(ctx, pgConfig)
 
 	return &PoolX{pool}, err
 }
 
 func ParseConfig(
-	config *stroppy.DriverConfig,
+	driverConfig *config.DriverConfig,
 	logger *zap.Logger,
 ) (*pgxpool.Config, error) {
-	cfg, err := pgxpool.ParseConfig(config.GetUrl())
+	cfg, err := pgxpool.ParseConfig(driverConfig.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -95,13 +95,13 @@ func ParseConfig(
 	// Disable connection lifetime limits
 	// NOTE: unfortunately "MaxConnLifetime = 0" != "no lifetime limits".
 	// "MaxConnLifetime = 0" == spam with expired connections.
-	if !strings.Contains(config.GetUrl(), "pool_max_conn_lifetime") {
+	if !strings.Contains(driverConfig.URL, "pool_max_conn_lifetime") {
 		const oneDay = 24 * time.Hour
 
 		cfg.MaxConnLifetime = oneDay // Nearly never
 	}
 
-	pg := config.GetPostgres()
+	pg := driverConfig.Postgres
 	if pg != nil {
 		if err := applyPostgresConfig(cfg, pg); err != nil {
 			return nil, err
@@ -113,7 +113,7 @@ func ParseConfig(
 		logLevel = pg.GetTraceLogLevel()
 	}
 
-	applySecurityOverrides(logger, cfg.ConnConfig, config)
+	applySecurityOverrides(logger, cfg.ConnConfig, driverConfig)
 
 	loggerTracer, err := newLoggerTracer(
 		logger.WithOptions(zap.AddCallerSkip(1), zap.IncreaseLevel(mustParseLevel(logLevel))))
@@ -140,7 +140,7 @@ func mustParseLevel(s string) zap.AtomicLevel {
 	return lvl
 }
 
-func applyPostgresConfig(cfg *pgxpool.Config, pg *stroppy.DriverConfig_PostgresConfig) error {
+func applyPostgresConfig(cfg *pgxpool.Config, pg *config.PostgresConfig) error {
 	if v := pg.GetMaxConnLifetime(); v != "" {
 		d, err := time.ParseDuration(v)
 		if err != nil {
@@ -178,7 +178,7 @@ func applyPostgresConfig(cfg *pgxpool.Config, pg *stroppy.DriverConfig_PostgresC
 	return nil
 }
 
-func parsePgxOptimizations(pg *stroppy.DriverConfig_PostgresConfig, cfg *pgxpool.Config) error {
+func parsePgxOptimizations(pg *config.PostgresConfig, cfg *pgxpool.Config) error {
 	modeStr := pg.GetDefaultQueryExecMode()
 	if modeStr == "" { // set by default
 		// NOTE: Testing purpose default query execution mode is "exec".
@@ -250,7 +250,7 @@ func parseDefaultQueryExecMode(modeStr string) (pgx.QueryExecMode, error) {
 func applySecurityOverrides(
 	lg *zap.Logger,
 	connCfg *pgx.ConnConfig,
-	driverCfg *stroppy.DriverConfig,
+	driverCfg *config.DriverConfig,
 ) {
 	// auth_user / auth_password — override only when DSN had no user.
 	if u := driverCfg.GetAuthUser(); u != "" && connCfg.User == "" {
@@ -263,7 +263,7 @@ func applySecurityOverrides(
 	// TLS overrides — only when DSN did not configure TLS (sslmode=disable
 	// or absent → TLSConfig == nil).
 	caCert := driverCfg.GetCaCertFile()
-	skipVerify := driverCfg.GetTlsInsecureSkipVerify()
+	skipVerify := driverCfg.GetTLSInsecureSkipVerify()
 
 	if caCert == "" && !skipVerify {
 		return

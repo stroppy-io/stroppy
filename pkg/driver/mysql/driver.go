@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
@@ -23,7 +23,7 @@ import (
 
 func init() {
 	driver.RegisterDriver(
-		stroppy.DriverConfig_DRIVER_TYPE_MYSQL,
+		config.DriverTypeMySQL,
 		func(ctx context.Context, opts driver.Options) (driver.Driver, error) {
 			return NewDriver(ctx, opts)
 		},
@@ -34,7 +34,7 @@ type Driver struct {
 	db           *sql.DB
 	dialect      queries.Dialect
 	logger       *zap.Logger
-	sqlCfg       *stroppy.DriverConfig_SqlConfig
+	sqlCfg       *config.SQLConfig
 	bulkSize     int
 	queryTimeout time.Duration
 }
@@ -59,14 +59,14 @@ func NewDriver(
 
 	db := sql.OpenDB(connector)
 
-	sqlCfg := cfg.GetSql()
+	sqlCfg := cfg.SQL
 	if err = sqldriver.ApplySQLConfig(db, sqlCfg); err != nil {
 		db.Close()
 
 		return nil, fmt.Errorf("failed to apply SQL config: %w", err)
 	}
 
-	lg.Debug("Checking db connection...", zap.String("url", cfg.GetUrl()))
+	lg.Debug("Checking db connection...", zap.String("url", cfg.URL))
 
 	if err = sqldriver.WaitForDB(ctx, lg, &sqldriver.DBPinger{DB: db}, 0); err != nil {
 		db.Close()
@@ -92,11 +92,11 @@ func NewDriver(
 }
 
 func prepareConnector(
-	driverCfg *stroppy.DriverConfig,
+	driverCfg *config.DriverConfig,
 	dialFunc func(ctx context.Context, network, addr string) (net.Conn, error),
 	lg *zap.Logger,
 ) (godriver.Connector, error) {
-	mysqlCfg, err := gomysql.ParseDSN(driverCfg.GetUrl())
+	mysqlCfg, err := gomysql.ParseDSN(driverCfg.URL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse mysql DSN: %w", err)
 	}
@@ -125,7 +125,7 @@ func prepareConnector(
 func applySecurityOverrides(
 	lg *zap.Logger,
 	mysqlCfg *gomysql.Config,
-	driverCfg *stroppy.DriverConfig,
+	driverCfg *config.DriverConfig,
 ) {
 	// auth_user / auth_password — override only when DSN had no user.
 	if u := driverCfg.GetAuthUser(); u != "" && mysqlCfg.User == "" {
@@ -138,7 +138,7 @@ func applySecurityOverrides(
 	// TLS overrides — only when DSN did not configure TLS
 	// (TLSConfig == "" and TLS == nil means no TLS from DSN).
 	caCert := driverCfg.GetCaCertFile()
-	skipVerify := driverCfg.GetTlsInsecureSkipVerify()
+	skipVerify := driverCfg.GetTLSInsecureSkipVerify()
 
 	if caCert == "" && !skipVerify {
 		return
@@ -188,8 +188,8 @@ func applySecurityOverrides(
 	mysqlCfg.TLS = tlsCfg
 }
 
-func (d *Driver) Begin(ctx context.Context, isolation stroppy.TxIsolationLevel) (driver.Tx, error) {
-	if isolation == stroppy.TxIsolationLevel_CONNECTION_ONLY {
+func (d *Driver) Begin(ctx context.Context, isolation config.TxIsolationLevel) (driver.Tx, error) {
+	if isolation == config.TxIsolationLevelConnectionOnly {
 		conn, err := d.db.Conn(ctx)
 		if err != nil {
 			return nil, err

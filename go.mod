@@ -3,7 +3,6 @@ module github.com/stroppy-io/stroppy
 go 1.26
 
 require (
-	github.com/envoyproxy/protoc-gen-validate v1.3.3
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx-shopspring-decimal v0.0.0-20220624020537-1d36b5a1853e
@@ -24,8 +23,6 @@ require (
 	go.uber.org/zap v1.28.0
 	golang.org/x/sync v0.21.0
 	google.golang.org/grpc v1.81.1
-	google.golang.org/protobuf v1.36.11
-	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
@@ -55,11 +52,11 @@ require (
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260810153831-ec0a7760b754 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260807164820-c8921c73eeea // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

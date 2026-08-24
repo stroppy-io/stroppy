@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/mysql"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/postgres"
@@ -21,14 +21,14 @@ import (
 // dispatchQueryTimeout builds a stroppy driver with a per-statement deadline.
 func dispatchQueryTimeout(
 	t *testing.T,
-	typ stroppy.DriverConfig_DriverType,
+	typ config.DriverType,
 	url string,
 	timeout time.Duration,
 ) driver.Driver {
 	t.Helper()
 
 	drv, err := driver.Dispatch(context.Background(), driver.Options{
-		Config:       &stroppy.DriverConfig{DriverType: typ, Url: url},
+		Config:       &config.DriverConfig{DriverType: typ, URL: url},
 		Logger:       zap.NewExample(),
 		QueryTimeout: timeout,
 	})
@@ -190,7 +190,7 @@ func TestQueryTimeoutPostgres(t *testing.T) {
 	skipIfRequested(t)
 
 	url := envOr(envTmpfsURL, defaultTmpfsURL)
-	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_POSTGRES, url, 150*time.Millisecond)
+	drv := dispatchQueryTimeout(t, config.DriverTypePostgres, url, 150*time.Millisecond)
 
 	start := time.Now()
 	err := runQueryToCompletion(drv, "SELECT pg_sleep(10)")
@@ -226,7 +226,7 @@ func TestQueryTimeoutMySQL(t *testing.T) {
 	const timeout = 150 * time.Millisecond
 
 	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
-	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_MYSQL, url, timeout)
+	drv := dispatchQueryTimeout(t, config.DriverTypeMySQL, url, timeout)
 
 	const query = "SELECT COUNT(*) FROM information_schema.columns a " +
 		"CROSS JOIN information_schema.columns b CROSS JOIN information_schema.columns c"
@@ -240,7 +240,7 @@ func TestQueryTimeoutMySQLMergesOptimizerHints(t *testing.T) {
 	const timeout = 150 * time.Millisecond
 
 	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
-	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_MYSQL, url, timeout)
+	drv := dispatchQueryTimeout(t, config.DriverTypeMySQL, url, timeout)
 
 	t.Run("SET_VAR survives", func(t *testing.T) {
 		const query = "SELECT /*+ SET_VAR(sort_buffer_size=32768) */ " +
@@ -268,7 +268,7 @@ func TestQueryTimeoutMySQLSelectSleep(t *testing.T) {
 	const timeout = 150 * time.Millisecond
 
 	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
-	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_MYSQL, url, timeout)
+	drv := dispatchQueryTimeout(t, config.DriverTypeMySQL, url, timeout)
 
 	assertMySQLClientTimeout(t, drv, "SELECT SLEEP(10)", timeout)
 }
@@ -279,7 +279,7 @@ func TestQueryTimeoutMySQLUnrepresentableDuration(t *testing.T) {
 	const timeout = time.Millisecond - time.Nanosecond
 
 	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
-	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_MYSQL, url, timeout)
+	drv := dispatchQueryTimeout(t, config.DriverTypeMySQL, url, timeout)
 
 	const query = "SELECT COUNT(*) FROM information_schema.columns a " +
 		"CROSS JOIN information_schema.columns b CROSS JOIN information_schema.columns c"
@@ -293,7 +293,7 @@ func TestQueryTimeoutMySQLUnhintedStatements(t *testing.T) {
 	const timeout = 150 * time.Millisecond
 
 	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
-	drv := dispatchQueryTimeout(t, stroppy.DriverConfig_DRIVER_TYPE_MYSQL, url, timeout)
+	drv := dispatchQueryTimeout(t, config.DriverTypeMySQL, url, timeout)
 
 	tests := []struct {
 		name string

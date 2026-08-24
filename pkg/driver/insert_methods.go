@@ -3,13 +3,13 @@ package driver
 import (
 	"slices"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 // InsertCapability pairs a driver type with the insert methods its
 // implementation serves.
 type InsertCapability struct {
-	Type          stroppy.DriverConfig_DriverType
+	Type          config.DriverType
 	InsertMethods []InsertMethod
 }
 
@@ -20,37 +20,37 @@ type InsertCapability struct {
 // binary. Keep each row in sync with the method switch in
 // pkg/driver/<type>.
 //
-//nolint:exhaustive // DRIVER_TYPE_UNSPECIFIED deliberately has no capability row.
-var insertMethodsByDriver = map[stroppy.DriverConfig_DriverType][]InsertMethod{
-	stroppy.DriverConfig_DRIVER_TYPE_POSTGRES: {
+//nolint:exhaustive // DriverTypeUnspecified deliberately has no capability row.
+var insertMethodsByDriver = map[config.DriverType][]InsertMethod{
+	config.DriverTypePostgres: {
 		InsertPlainQuery,
 		InsertPlainBulk,
 		InsertColumnar,
 		InsertNative,
 	},
-	stroppy.DriverConfig_DRIVER_TYPE_MYSQL: {
+	config.DriverTypeMySQL: {
 		InsertPlainQuery,
 		InsertPlainBulk,
 		InsertNative,
 	},
-	stroppy.DriverConfig_DRIVER_TYPE_PICODATA: {
+	config.DriverTypePicodata: {
 		InsertPlainQuery,
 		InsertPlainBulk,
 		InsertNative,
 	},
-	stroppy.DriverConfig_DRIVER_TYPE_YDB: {
-		InsertPlainQuery,
-		InsertPlainBulk,
-		InsertColumnar,
-		InsertNative,
-	},
-	stroppy.DriverConfig_DRIVER_TYPE_NOOP: {
+	config.DriverTypeYDB: {
 		InsertPlainQuery,
 		InsertPlainBulk,
 		InsertColumnar,
 		InsertNative,
 	},
-	stroppy.DriverConfig_DRIVER_TYPE_CSV: {
+	config.DriverTypeNoop: {
+		InsertPlainQuery,
+		InsertPlainBulk,
+		InsertColumnar,
+		InsertNative,
+	},
+	config.DriverTypeCSV: {
 		InsertNative,
 	},
 }
@@ -59,7 +59,7 @@ var insertMethodsByDriver = map[stroppy.DriverConfig_DriverType][]InsertMethod{
 // driver enum value. Method lists follow enum value order too, so output
 // is deterministic for machine consumers.
 func InsertCapabilities() []InsertCapability {
-	types := make([]stroppy.DriverConfig_DriverType, 0, len(insertMethodsByDriver))
+	types := make([]config.DriverType, 0, len(insertMethodsByDriver))
 	for driverType := range insertMethodsByDriver {
 		types = append(types, driverType)
 	}

@@ -21,8 +21,8 @@ func EffectiveSQL(cliSQL string, cfg *LoadedConfig) string {
 		return cliSQL
 	}
 
-	if cfg != nil && cfg.RunConfig != nil && cfg.RunConfig.Sql != nil {
-		return cfg.RunConfig.GetSql()
+	if cfg != nil && cfg.RunConfig != nil && cfg.RunConfig.SQL != nil {
+		return cfg.RunConfig.GetSQL()
 	}
 
 	return ""
@@ -36,7 +36,7 @@ func EffectiveSteps(cliSteps []string, cfg *LoadedConfig) []string {
 	}
 
 	if cfg != nil && cfg.RunConfig != nil {
-		return cfg.RunConfig.GetSteps()
+		return cfg.RunConfig.Steps
 	}
 
 	return nil
@@ -50,7 +50,7 @@ func EffectiveNoSteps(cliNoSteps []string, cfg *LoadedConfig) []string {
 	}
 
 	if cfg != nil && cfg.RunConfig != nil {
-		return cfg.RunConfig.GetNoSteps()
+		return cfg.RunConfig.NoSteps
 	}
 
 	return nil

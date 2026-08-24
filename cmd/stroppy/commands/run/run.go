@@ -14,14 +14,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
 	"github.com/stroppy-io/stroppy/internal/version"
 	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	"github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 const (
@@ -41,7 +39,6 @@ var (
 	errUnknownRunFlag     = errors.New("unknown run flag")
 	errPositionalAfterOpt = errors.New("unexpected positional argument after options")
 	errKeyValuePositional = errors.New("unexpected key=value positional argument")
-	errDriverExtraType    = errors.New("invalid driver extra field type")
 	errSQLFilePositional  = errors.New("workload does not accept sql_file positional")
 	errTooManyPositionals = errors.New(
 		"too many positional arguments; expected script and optional sql_file before --",
@@ -170,10 +167,10 @@ Signals:
 				)
 			}
 
-			if len(parsed.steps) > 0 && len(fileConfig.RunConfig.GetSteps()) > 0 {
+			if len(parsed.steps) > 0 && len(fileConfig.RunConfig.Steps) > 0 {
 				lg.Debug("CLI --steps overrides config file steps",
 					zap.Strings("cli", parsed.steps),
-					zap.Strings("file", fileConfig.RunConfig.GetSteps()),
+					zap.Strings("file", fileConfig.RunConfig.Steps),
 				)
 			}
 		}
@@ -195,10 +192,10 @@ Signals:
 		if fileConfig != nil {
 			paramInputs.RunConfig = fileConfig.Run
 			paramInputs.WorkloadConfig = fileConfig.Params
-			paramInputs.LegacyConfigEnv = fileConfig.RunConfig.GetEnv()
-			rootEnv = mergeLegacyEnv(fileConfig.RunConfig.GetEnv(), envOverrides)
+			paramInputs.LegacyConfigEnv = fileConfig.RunConfig.Env
+			rootEnv = mergeLegacyEnv(fileConfig.RunConfig.Env, envOverrides)
 
-			driverConfigs, err = runner.DriverCLIConfigsFromFile(fileConfig.RunConfig.GetDrivers())
+			driverConfigs, err = runner.DriverCLIConfigsFromFile(fileConfig.RunConfig.Drivers)
 			if err != nil {
 				return invalidConfig(err)
 			}
@@ -306,32 +303,32 @@ func mergeLegacyEnv(configEnv, cliEnv map[string]string) map[string]string {
 	return merged
 }
 
-func loadedRunConfig(config *runner.LoadedConfig) *stroppy.RunConfig {
-	if config == nil {
+func loadedRunConfig(loaded *runner.LoadedConfig) *config.RunConfig {
+	if loaded == nil {
 		return nil
 	}
 
-	return config.RunConfig
+	return loaded.RunConfig
 }
 
-func metricsConfig(config *stroppy.RunConfig) *bench.MetricsConfig {
+func metricsConfig(cfg *config.RunConfig) *bench.MetricsConfig {
 	metrics := &bench.MetricsConfig{ServiceVersion: version.Version}
-	if config == nil || config.GetGlobal() == nil {
+	if cfg == nil || cfg.Global == nil {
 		return metrics
 	}
 
-	global := config.GetGlobal()
-	metrics.RunID = global.GetRunId()
-	metrics.ResourceAttributes = global.GetMetadata()
+	global := cfg.Global
+	metrics.RunID = global.RunID
+	metrics.ResourceAttributes = global.Metadata
 
-	export := global.GetExporter().GetOtlpExport()
-	if export == nil {
+	if global.Exporter == nil || global.Exporter.OtlpExport == nil {
 		return metrics
 	}
 
+	export := global.Exporter.OtlpExport
 	metrics.GRPCEndpoint = export.GetOtlpGrpcEndpoint()
-	metrics.HTTPEndpoint = export.GetOtlpHttpEndpoint()
-	metrics.HTTPPath = export.GetOtlpHttpExporterUrlPath()
+	metrics.HTTPEndpoint = export.GetOtlpHTTPEndpoint()
+	metrics.HTTPPath = export.GetOtlpHTTPExporterURLPath()
 	metrics.Headers = export.GetOtlpHeaders()
 	metrics.Insecure = export.GetOtlpEndpointInsecure()
 	metrics.Prefix = export.GetOtlpMetricsPrefix()
@@ -618,7 +615,7 @@ func restoreProcessEnv(name, value string, set bool) {
 }
 
 // runGoWorkload dispatches to the Go-native bench engine. Driver CLI configs are
-// converted to *stroppy.DriverConfig; -e overrides become the script env map;
+// converted to *config.DriverConfig; -e overrides become the script env map;
 // steps/noSteps are the merged (CLI over config-file) step filters, published via
 // STROPPY_STEPS env (the bench step filter reads it at Run start).
 func runGoWorkload(
@@ -630,7 +627,7 @@ func runGoWorkload(
 	driverConfigs runner.DriverCLIConfigs,
 	metrics *bench.MetricsConfig,
 ) error {
-	drivers := map[int]*stroppy.DriverConfig{}
+	drivers := map[int]*config.DriverConfig{}
 
 	for idx, cfg := range driverConfigs {
 		dc, err := buildDriverConfig(idx, cfg, env)
@@ -644,9 +641,9 @@ func runGoWorkload(
 	if _, ok := drivers[0]; !ok {
 		// No -d given: default to the local postgres preset (mirrors TS
 		// declareDriverSetup defaults).
-		drivers[0] = &stroppy.DriverConfig{ //nolint:gosec // G101: URL field name, not an embedded credential
-			DriverType: stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
-			Url:        "postgres://postgres:postgres@localhost:5432",
+		drivers[0] = &config.DriverConfig{ //nolint:gosec // G101: URL field name, not an embedded credential
+			DriverType: config.DriverTypePostgres,
+			URL:        "postgres://postgres:postgres@localhost:5432",
 		}
 	}
 
@@ -677,17 +674,36 @@ func runGoWorkload(
 	return nil
 }
 
-// buildDriverConfig translates one parsed -d/-D driver entry into the proto
+// buildDriverConfig translates one parsed -d/-D driver entry into the runtime
 // DriverConfig the bench layer expects. driverType arrives as a preset short
-// name ("noop"); Extra (-D postgres.* / sql.*) merges as nested proto fields.
-// POOL_SIZE script env maps to the postgres pool size.
+// name ("noop"). Retained -D entries undergo strict decoding before their
+// nested driver fields merge with config-file values. POOL_SIZE script env maps
+// to the postgres pool size.
 func buildDriverConfig(
 	idx int, cfg *runner.DriverCLIConfig, envOverrides map[string]string,
-) (*stroppy.DriverConfig, error) {
-	dc := &stroppy.DriverConfig{Url: cfg.URL}
+) (*config.DriverConfig, error) {
+	overrides, err := cfg.DecodeOverrides()
+	if err != nil {
+		return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
+	}
 
-	if cfg.DriverType != "" {
-		t, err := bench.ParseDriverType(cfg.DriverType)
+	driverType := cfg.DriverType
+	url := cfg.URL
+
+	if overrides != nil {
+		if overrides.DriverType != nil {
+			driverType = overrides.GetDriverType()
+		}
+
+		if overrides.URL != nil {
+			url = overrides.GetURL()
+		}
+	}
+
+	dc := &config.DriverConfig{URL: url}
+
+	if driverType != "" {
+		t, err := bench.ParseDriverType(driverType)
 		if err != nil {
 			return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
 		}
@@ -700,13 +716,19 @@ func buildDriverConfig(
 		return nil, invalidConfig(err)
 	}
 
+	if overrides != nil {
+		if err := applyDriverRunConfigExtras(idx, dc, overrides); err != nil {
+			return nil, invalidConfig(err)
+		}
+	}
+
 	applyLegacyPostgresPoolSize(dc, envOverrides)
 
 	return dc, nil
 }
 
-func applyLegacyPostgresPoolSize(config *stroppy.DriverConfig, env map[string]string) {
-	if config.GetDriverType() != stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
+func applyLegacyPostgresPoolSize(driverConfig *config.DriverConfig, env map[string]string) {
+	if driverConfig.DriverType != config.DriverTypePostgres {
 		return
 	}
 
@@ -726,96 +748,99 @@ func applyLegacyPostgresPoolSize(config *stroppy.DriverConfig, env map[string]st
 
 	connections := int32(value) //nolint:gosec // G109: range-checked above
 
-	postgres := config.GetPostgres()
+	postgres := driverConfig.Postgres
 	if postgres == nil {
-		postgres = &stroppy.DriverConfig_PostgresConfig{}
+		postgres = &config.PostgresConfig{}
 	}
 
 	postgres.MaxConns = &connections
 	postgres.MinConns = &connections
-	config.DriverSpecific = &stroppy.DriverConfig_Postgres{Postgres: postgres}
+	driverConfig.Postgres = postgres
 }
 
-func applyDriverExtras(idx int, config *stroppy.DriverConfig, extras map[string]any) error {
+func applyDriverExtras(idx int, driverConfig *config.DriverConfig, extras map[string]any) error {
 	if len(extras) == 0 {
 		return nil
 	}
 
-	values := maps.Clone(extras)
-
-	if errorModeValue, ok := popDriverExtra(values, "errorMode", "error_mode"); ok {
-		errorMode, isString := errorModeValue.(string)
-		if !isString {
-			return fmt.Errorf("driver %d errorMode: %w", idx, errDriverExtraType)
-		}
-
-		parsed, err := bench.ParseErrorMode(errorMode)
-		if err != nil {
-			return fmt.Errorf("driver %d errorMode: %w", idx, err)
-		}
-
-		config.ErrorMode = parsed
-	}
-
-	if _, ok := popDriverExtra(values, "defaultTxIsolation", "default_tx_isolation"); ok {
-		warnIgnoredDriverExtra(idx, "defaultTxIsolation", "use workload parameter --tx-isolation")
-	}
-
-	pool, hasPool := popDriverExtra(values, "pool")
-
-	if config.GetDriverType() == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
-		if _, ok := popDriverExtra(values, "sql"); ok {
-			warnIgnoredDriverExtra(idx, "sql", "PostgreSQL uses postgres pool settings")
-		}
-	} else if _, ok := popDriverExtra(values, "postgres"); ok {
-		warnIgnoredDriverExtra(idx, "postgres", "only PostgreSQL uses postgres pool settings")
-	}
-
-	if hasPool && !driverSupportsPool(config.GetDriverType()) {
-		warnIgnoredDriverExtra(idx, "pool", "selected driver has no connection pool")
-
-		hasPool = false
-	}
-
-	extraConfig := &stroppy.DriverConfig{}
-
-	data, err := json.Marshal(values)
+	data, err := json.Marshal(extras)
 	if err != nil {
 		return fmt.Errorf("driver %d extra config: %w", idx, err)
 	}
 
-	if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(data, extraConfig); err != nil {
+	fileConfig := &config.DriverRunConfig{}
+	if err := runner.UnmarshalStrict(data, fileConfig); err != nil {
 		return fmt.Errorf("driver %d extra config: %w", idx, err)
 	}
 
-	if hasPool {
-		if err := mergePoolDriverSpecific(config.GetDriverType(), pool, extraConfig); err != nil {
-			return fmt.Errorf("driver %d pool config: %w", idx, err)
-		}
-	}
-
-	config.BulkSize = extraConfig.BulkSize
-	config.DriverSpecific = extraConfig.GetDriverSpecific()
-	config.CaCertFile = extraConfig.CaCertFile
-	config.AuthToken = extraConfig.AuthToken
-	config.AuthUser = extraConfig.AuthUser
-	config.AuthPassword = extraConfig.AuthPassword
-	config.TlsInsecureSkipVerify = extraConfig.TlsInsecureSkipVerify
-	config.InsertProgress = extraConfig.GetInsertProgress()
-
-	return nil
+	return applyDriverRunConfigExtras(idx, driverConfig, fileConfig)
 }
 
-func popDriverExtra(values map[string]any, names ...string) (any, bool) {
-	for _, name := range names {
-		if value, ok := values[name]; ok {
-			delete(values, name)
-
-			return value, true
-		}
+func applyDriverRunConfigExtras(
+	idx int,
+	driverConfig *config.DriverConfig,
+	fileConfig *config.DriverRunConfig,
+) error {
+	if fileConfig == nil {
+		return nil
 	}
 
-	return nil, false
+	if fileConfig.ErrorMode != nil {
+		parsed, err := bench.ParseErrorMode(fileConfig.GetErrorMode())
+		if err != nil {
+			return fmt.Errorf("driver %d errorMode: %w", idx, err)
+		}
+
+		driverConfig.ErrorMode = parsed
+	}
+
+	if fileConfig.DefaultTxIsolation != nil {
+		warnIgnoredDriverExtra(idx, "defaultTxIsolation", "use workload parameter --tx-isolation")
+	}
+
+	pool := applicableDriverPool(idx, driverConfig.DriverType, fileConfig)
+
+	if fileConfig.BulkSize != nil {
+		driverConfig.BulkSize = fileConfig.BulkSize
+	}
+
+	if fileConfig.Postgres != nil {
+		driverConfig.Postgres = runner.MergePostgresConfig(driverConfig.Postgres, fileConfig.Postgres)
+	}
+
+	if fileConfig.SQL != nil {
+		driverConfig.SQL = runner.MergeSQLConfig(driverConfig.SQL, fileConfig.SQL)
+	}
+
+	if fileConfig.CaCertFile != nil {
+		driverConfig.CaCertFile = fileConfig.CaCertFile
+	}
+
+	if fileConfig.AuthToken != nil {
+		driverConfig.AuthToken = fileConfig.AuthToken
+	}
+
+	if fileConfig.AuthUser != nil {
+		driverConfig.AuthUser = fileConfig.AuthUser
+	}
+
+	if fileConfig.AuthPassword != nil {
+		driverConfig.AuthPassword = fileConfig.AuthPassword
+	}
+
+	if fileConfig.TLSInsecureSkipVerify != nil {
+		driverConfig.TLSInsecureSkipVerify = fileConfig.TLSInsecureSkipVerify
+	}
+
+	if fileConfig.InsertProgress != nil {
+		driverConfig.InsertProgress = fileConfig.InsertProgress
+	}
+
+	if pool != nil {
+		mergePoolDriverSpecific(driverConfig.DriverType, pool, driverConfig)
+	}
+
+	return nil
 }
 
 func warnIgnoredDriverExtra(idx int, field, reason string) {
@@ -827,12 +852,38 @@ func warnIgnoredDriverExtra(idx int, field, reason string) {
 	)
 }
 
-func driverSupportsPool(driverType stroppy.DriverConfig_DriverType) bool {
+func applicableDriverPool(
+	idx int,
+	driverType config.DriverType,
+	fileConfig *config.DriverRunConfig,
+) *config.PoolConfig {
+	if driverType == config.DriverTypePostgres {
+		if fileConfig.SQL != nil {
+			warnIgnoredDriverExtra(idx, "sql", "PostgreSQL uses postgres pool settings")
+
+			fileConfig.SQL = nil
+		}
+	} else if fileConfig.Postgres != nil {
+		warnIgnoredDriverExtra(idx, "postgres", "only PostgreSQL uses postgres pool settings")
+
+		fileConfig.Postgres = nil
+	}
+
+	if fileConfig.Pool != nil && !driverSupportsPool(driverType) {
+		warnIgnoredDriverExtra(idx, "pool", "selected driver has no connection pool")
+
+		return nil
+	}
+
+	return fileConfig.Pool
+}
+
+func driverSupportsPool(driverType config.DriverType) bool {
 	switch driverType {
-	case stroppy.DriverConfig_DRIVER_TYPE_POSTGRES,
-		stroppy.DriverConfig_DRIVER_TYPE_MYSQL,
-		stroppy.DriverConfig_DRIVER_TYPE_PICODATA,
-		stroppy.DriverConfig_DRIVER_TYPE_YDB:
+	case config.DriverTypePostgres,
+		config.DriverTypeMySQL,
+		config.DriverTypePicodata,
+		config.DriverTypeYDB:
 		return true
 	default:
 		return false
@@ -840,44 +891,50 @@ func driverSupportsPool(driverType stroppy.DriverConfig_DriverType) bool {
 }
 
 func mergePoolDriverSpecific(
-	driverType stroppy.DriverConfig_DriverType,
-	pool any,
-	config *stroppy.DriverConfig,
-) error {
-	data, err := json.Marshal(pool)
-	if err != nil {
-		return err
-	}
-
-	unmarshal := protojson.UnmarshalOptions{DiscardUnknown: false}
-
-	if driverType == stroppy.DriverConfig_DRIVER_TYPE_POSTGRES {
-		postgres := &stroppy.DriverConfig_PostgresConfig{}
-		if err := unmarshal.Unmarshal(data, postgres); err != nil {
-			return err
+	driverType config.DriverType,
+	pool *config.PoolConfig,
+	driverConfig *config.DriverConfig,
+) {
+	if driverType == config.DriverTypePostgres {
+		postgres := poolPostgresConfig(pool)
+		if specific := driverConfig.Postgres; specific != nil {
+			postgres = runner.MergePostgresConfig(postgres, specific)
 		}
 
-		if specific := config.GetPostgres(); specific != nil {
-			proto.Merge(postgres, specific)
-		}
+		driverConfig.Postgres = postgres
 
-		config.DriverSpecific = &stroppy.DriverConfig_Postgres{Postgres: postgres}
-
-		return nil
+		return
 	}
 
-	sqlConfig := &stroppy.DriverConfig_SqlConfig{}
-	if err := unmarshal.Unmarshal(data, sqlConfig); err != nil {
-		return err
+	sqlConfig := poolSQLConfig(pool)
+	if specific := driverConfig.SQL; specific != nil {
+		sqlConfig = runner.MergeSQLConfig(sqlConfig, specific)
 	}
 
-	if specific := config.GetSql(); specific != nil {
-		proto.Merge(sqlConfig, specific)
+	driverConfig.SQL = sqlConfig
+}
+
+func poolPostgresConfig(pool *config.PoolConfig) *config.PostgresConfig {
+	return &config.PostgresConfig{
+		TraceLogLevel:            pool.TraceLogLevel,
+		MaxConnLifetime:          pool.MaxConnLifetime,
+		MaxConnIdleTime:          pool.MaxConnIdleTime,
+		MaxConns:                 pool.MaxConns,
+		MinConns:                 pool.MinConns,
+		MinIdleConns:             pool.MinIdleConns,
+		DefaultQueryExecMode:     pool.DefaultQueryExecMode,
+		DescriptionCacheCapacity: pool.DescriptionCacheCapacity,
+		StatementCacheCapacity:   pool.StatementCacheCapacity,
 	}
+}
 
-	config.DriverSpecific = &stroppy.DriverConfig_Sql{Sql: sqlConfig}
-
-	return nil
+func poolSQLConfig(pool *config.PoolConfig) *config.SQLConfig {
+	return &config.SQLConfig{
+		MaxOpenConns:    pool.MaxOpenConns,
+		MaxIdleConns:    pool.MaxIdleConns,
+		ConnMaxLifetime: pool.ConnMaxLifetime,
+		ConnMaxIdleTime: pool.ConnMaxIdleTime,
+	}
 }
 
 // runArgs holds the result of parseRunArgs.
@@ -1502,6 +1559,7 @@ func nextFlagValue(args []string, i int) (string, error) {
 // applyDriverPreset loads a preset or parses raw JSON and sets it on the config map.
 // If the value starts with '{', it's treated as a JSON driver config; otherwise as a preset name.
 func applyDriverPreset(configs runner.DriverCLIConfigs, idx int, value string) error {
+	value = strings.TrimSpace(value)
 	if strings.HasPrefix(value, "{") {
 		cfg, err := runner.NewDriverCLIConfigFromJSON(value)
 		if err != nil {

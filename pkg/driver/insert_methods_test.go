@@ -4,29 +4,24 @@ import (
 	"slices"
 	"testing"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 // TestInsertMethodsCoverAllDriverTypes guards the matrix against new driver
-// types landing in the proto enum without a capability row.
+// types landing in the config enum without a capability row.
 func TestInsertMethodsCoverAllDriverTypes(t *testing.T) {
 	t.Parallel()
 
-	for value, name := range stroppy.DriverConfig_DriverType_name {
-		driverType := stroppy.DriverConfig_DriverType(value)
-		if driverType == stroppy.DriverConfig_DRIVER_TYPE_UNSPECIFIED {
-			continue
-		}
-
+	for _, driverType := range config.DriverTypeValues() {
 		methods, ok := insertMethodsByDriver[driverType]
 		if !ok {
-			t.Errorf("driver type %s has no insert-method capability row", name)
+			t.Errorf("driver type %s has no insert-method capability row", driverType)
 
 			continue
 		}
 
 		if len(methods) == 0 {
-			t.Errorf("driver type %s declares an empty insert-method list", name)
+			t.Errorf("driver type %s declares an empty insert-method list", driverType)
 		}
 	}
 }
@@ -63,7 +58,7 @@ func TestInsertCapabilitiesDeterministic(t *testing.T) {
 			len(insertMethodsByDriver), len(capabilities))
 	}
 
-	types := make([]stroppy.DriverConfig_DriverType, 0, len(capabilities))
+	types := make([]config.DriverType, 0, len(capabilities))
 	for _, capability := range capabilities {
 		types = append(types, capability.Type)
 	}

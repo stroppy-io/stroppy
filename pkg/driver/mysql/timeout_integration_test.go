@@ -10,7 +10,7 @@ import (
 	gomysql "github.com/go-sql-driver/mysql"
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
 )
 
@@ -29,9 +29,9 @@ func realMySQLTimeoutDriver(t *testing.T, timeout time.Duration) *Driver {
 
 	d, err := NewDriver(ctx, driver.Options{
 		Logger: zap.NewNop(),
-		Config: &stroppy.DriverConfig{
-			Url:        dsn,
-			DriverType: stroppy.DriverConfig_DRIVER_TYPE_MYSQL,
+		Config: &config.DriverConfig{
+			URL:        dsn,
+			DriverType: config.DriverTypeMySQL,
 		},
 		QueryTimeout: timeout,
 	})

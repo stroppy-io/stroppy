@@ -38,16 +38,16 @@ DRIVER PRESETS (-d / --driver)
   Each preset includes default credentials for local development.
   Use -D url=... to override the connection URL.
 
-  CSV is a driver type (DRIVER_TYPE_CSV) with no short preset. It dumps
+  CSV is the "csv" driver type with no short preset. It dumps
   generated rows instead of talking to a database. Configure it directly:
 
     stroppy run tpcb/tx -D driverType=csv \
       -D url='/tmp/tpcb-csv?merge=true&workload=tpcb' \
       --steps drop_schema,create_schema,load_data
 
-  The CSV driver supports relational InsertSpec loads only. It accepts DDL
-  in setup steps, rejects runtime query execution, and requires native
-  InsertSpec emission.
+  The CSV driver supports typed InsertRequest loads only. It accepts DDL in
+  setup steps, rejects runtime query execution, and requires the native insert
+  method.
 
   Use -d (driver 0) or -d1, -d2, ... for additional drivers:
 
@@ -58,7 +58,9 @@ DRIVER PRESETS (-d / --driver)
 
     stroppy run tpcc/tx -d '{"url":"postgres://prod:5432","driverType":"postgres"}'
 
-  Useful when no preset matches or many fields must be set at once.
+  Useful when no preset matches or many fields must be set at once. Raw JSON is
+  validated recursively: field names must use exact lower-camel spelling or the
+  former snake_case alias, and duplicate/colliding/unknown fields are rejected.
 
 DRIVER OPTIONS (-D / --driver-opt)
 
@@ -73,12 +75,9 @@ DRIVER OPTIONS (-D / --driver-opt)
     url                    string    Database connection URL
     driverType             string    postgres | mysql | picodata | ydb |
                                      noop | csv
-    defaultTxIsolation     string    read_uncommitted | read_committed |
-                                     repeatable_read | serializable |
-                                     db_default | conn | none
     errorMode              string    silent | log | throw | fail | abort
     bulkSize               int       Rows per bulk INSERT (default: 2500)
-    insertProgress.enabled bool      Enable InsertSpec progress watcher
+    insertProgress.enabled bool      Enable load progress watcher
     insertProgress.interval duration Progress log/metric cadence (default: 10s)
     insertProgress.stallAfter duration Warn after no row progress (default: 60s)
     insertProgress.mode    string    off | log | metrics | both
@@ -107,16 +106,17 @@ DRIVER OPTIONS (-D / --driver-opt)
   POOL_SIZE env (for the postgres driver) is a shorthand that sets both the
   pgx pool MinConns and MaxConns to the same value.
 
+  "defaultTxIsolation" and "defaultInsertMethod" remain accepted in config
+  files for compatibility, but do not control workload execution. Use the
+  workload's "--tx-isolation" parameter where applicable.
+
 HOW IT WORKS
 
-  1. CLI flags (-d, -D) are parsed by stroppy into a DriverConfig per index.
+  1. CLI flags (-d, -D) and config-file drivers are parsed into the selected
+     Go driver's runtime configuration.
 
-  2. Each DriverConfig is passed directly to the Go-native bench engine,
-     which dispatches to the registered driver implementation.
-
-  3. STROPPY_DRIVER_N env vars are honored by the config-file loader: if
-     STROPPY_DRIVER_N is already set in the environment, CLI-composed driver
-     config for that index is skipped — user-set env takes precedence.
+  2. STROPPY_DRIVER_N environment variables are not runtime driver inputs.
+     Use -d/-D or the config-file "drivers" map instead.
 
   To inspect the driver insert methods each driver supports:
 
@@ -144,7 +144,7 @@ EXAMPLES
   # Pool tuning
   stroppy run tpcc/tx -d pg -D pool.maxConns=20 -D pool.maxConnLifetime=30m
 
-  # Show InsertSpec load progress every 30 seconds and warn after 2 minutes idle
+  # Show load progress every 30 seconds and warn after 2 minutes idle
   stroppy run tpcc/tx -d pg -D insertProgress.interval=30s \
     -D insertProgress.stallAfter=2m
 
@@ -158,9 +158,6 @@ EXAMPLES
   # YDB with static credentials
   stroppy run tpcc/tx -d ydb -D url=grpcs://host:2135/db \
     -D authUser=admin -D authPassword=secret
-
-  # Pre-set env takes precedence over CLI flags
-  STROPPY_DRIVER_0='{"url":"postgres://staging:5432"}' stroppy run tpcc/tx -d pg
 
   # List driver insert methods
   stroppy probe

@@ -2,15 +2,16 @@ package runner_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 func TestLoadRunConfig_ExplicitPath(t *testing.T) {
@@ -118,12 +119,12 @@ func TestLoadRunConfig_DriverConfig(t *testing.T) {
 	drv := cfg.RunConfig.Drivers[0]
 	require.NotNil(t, drv)
 	assert.Equal(t, "postgres", drv.GetDriverType())
-	assert.Equal(t, "postgres://user:pass@localhost:5432/bench", drv.GetUrl())
+	assert.Equal(t, "postgres://user:pass@localhost:5432/bench", drv.GetURL())
 	assert.Equal(t, int32(200), drv.Pool.GetMaxConns())
 	assert.Equal(t, "native", drv.GetDefaultInsertMethod())
 	assert.Equal(t, int32(5), drv.Pool.GetMinIdleConns())
 	assert.Equal(t, int32(128), drv.Postgres.GetStatementCacheCapacity())
-	assert.Equal(t, int32(12), drv.Sql.GetMaxOpenConns())
+	assert.Equal(t, int32(12), drv.SQL.GetMaxOpenConns())
 }
 
 func TestLoadRunConfig_TypedParameterScopes(t *testing.T) {
@@ -177,16 +178,16 @@ func TestLoadRunConfigRejectsCaseInsensitiveEnvCollisions(t *testing.T) {
 }
 
 func TestBuildProbeEnvFromRunConfigIncludesFileDriver(t *testing.T) {
-	cfg := &stroppy.RunConfig{
+	cfg := &config.RunConfig{
 		Env: map[string]string{"WAREHOUSES": "10"},
-		Drivers: map[uint32]*stroppy.DriverRunConfig{
+		Drivers: map[uint32]*config.DriverRunConfig{
 			0: {
-				DriverType:          proto.String("ydb"),
-				Url:                 proto.String("grpc://localhost:2136/local"),
-				DefaultInsertMethod: proto.String("native"),
-				DefaultTxIsolation:  proto.String("repeatable_read"),
-				Pool: &stroppy.DriverRunConfig_PoolConfig{
-					MaxOpenConns: proto.Int32(7),
+				DriverType:          ptr("ydb"),
+				URL:                 ptr("grpc://localhost:2136/local"),
+				DefaultInsertMethod: ptr("native"),
+				DefaultTxIsolation:  ptr("repeatable_read"),
+				Pool: &config.PoolConfig{
+					MaxOpenConns: ptr[int32](7),
 				},
 			},
 		},
@@ -203,3 +204,118 @@ func TestBuildProbeEnvFromRunConfigIncludesFileDriver(t *testing.T) {
 		"pool": { "maxOpenConns": 7 }
 	}`, env["STROPPY_DRIVER_0"])
 }
+
+func TestLoadRunConfigCanonicalizesAliases(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{
+		"no_steps":["load_data"],
+		"global":{"run_id":"run-1"},
+		"drivers":{"0":{"driver_type":"postgres","bulk_size":"2e2"}},
+		"run":{"query_timeout":"250ms"},
+		"params":{"scale_factor":1}
+	}`), 0o600))
+
+	loaded, found, err := runner.LoadRunConfig(path)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, []string{"load_data"}, loaded.RunConfig.NoSteps)
+	require.Equal(t, "run-1", loaded.RunConfig.Global.RunID)
+	require.Equal(t, int32(200), loaded.RunConfig.Drivers[0].GetBulkSize())
+	require.JSONEq(t, `"250ms"`, string(loaded.Run["queryTimeout"]))
+	require.JSONEq(t, `1`, string(loaded.Params["scaleFactor"]))
+}
+
+func TestLoadRunConfigStrictErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		doc  string
+		path string
+	}{
+		{name: "nested duplicate", doc: `{"global":{"runId":"a","runId":"b"}}`, path: `$.global.runId`},
+		{name: "alias collision", doc: `{"global":{"runId":"a","run_id":"b"}}`, path: `$.global.runId`},
+		{name: "wrong case", doc: `{"drivers":{"0":{"BulkSize":1}}}`, path: `$.drivers["0"]["BulkSize"]`},
+		{name: "nested map null", doc: `{"global":{"metadata":{"key":null}}}`, path: `$.global.metadata["key"]`},
+		{name: "scope alias collision", doc: `{"params":{"scaleFactor":1,"scale_factor":2}}`, path: `$.params.scaleFactor`},
+		{name: "scope container", doc: `{"params":{"scaleFactor":[]}}`, path: `$.params.scaleFactor`},
+		{name: "trailing JSON", doc: `{}[]`, path: `$`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			require.NoError(t, os.WriteFile(path, []byte(test.doc), 0o600))
+
+			_, _, err := runner.LoadRunConfig(path)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), test.path)
+		})
+	}
+}
+
+func TestLoadRunConfigLogger(t *testing.T) {
+	const configPathEnv = "STROPPY_TEST_CONFIG_PATH"
+
+	if path := os.Getenv(configPathEnv); path != "" {
+		_, _, err := runner.LoadRunConfig(path)
+		require.NoError(t, err)
+
+		return
+	}
+
+	tests := []struct {
+		name        string
+		logger      string
+		wantLog     bool
+		wantJSONLog bool
+	}{
+		{
+			name:   "error suppresses loader info",
+			logger: `{"logLevel":"LOG_LEVEL_ERROR","logMode":"LOG_MODE_DEVELOPMENT"}`,
+		},
+		{
+			name:        "info production emits JSON",
+			logger:      `{"logLevel":"LOG_LEVEL_INFO","logMode":"LOG_MODE_PRODUCTION"}`,
+			wantLog:     true,
+			wantJSONLog: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			require.NoError(t, os.WriteFile(
+				path,
+				[]byte(`{"global":{"logger":`+test.logger+`}}`),
+				0o600,
+			))
+
+			cmd := exec.Command(os.Args[0], "-test.run=^TestLoadRunConfigLogger$")
+
+			cmd.Env = append(os.Environ(), configPathEnv+"="+path)
+			output, err := cmd.CombinedOutput()
+			require.NoError(t, err, string(output))
+
+			gotLog := strings.Contains(string(output), "Loaded config file")
+			assert.Equal(t, test.wantLog, gotLog, string(output))
+
+			if test.wantJSONLog {
+				assert.Contains(t, string(output), `"level":"info"`)
+			}
+		})
+	}
+}
+
+func TestLoadRunConfigAcceptsIntegralLoggerOrdinals(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{
+		"global":{"logger":{"logLevel":1.0,"logMode":1e0}}
+	}`), 0o600))
+
+	loaded, found, err := runner.LoadRunConfig(path)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, config.LogLevelInfo, loaded.RunConfig.Global.Logger.LogLevel)
+	require.Equal(t, config.LogModeProduction, loaded.RunConfig.Global.Logger.LogMode)
+}
+
+func ptr[T any](v T) *T { return &v }

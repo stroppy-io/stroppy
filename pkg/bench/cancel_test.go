@@ -9,7 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 )
 
 // cancelDuringSetupWorkload blocks Setup until ctx is canceled and surfaces the
@@ -40,7 +40,7 @@ func TestRunCancelsSetup(t *testing.T) {
 	err := Run(
 		ctx,
 		"test/cancel-setup",
-		map[int]*stroppy.DriverConfig{0: {DriverType: stroppy.DriverConfig_DRIVER_TYPE_NOOP}},
+		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
 		map[string]string{},
 		ParamInputs{},
 		zap.NewNop(),
@@ -144,7 +144,7 @@ func TestRunTeardownRunsOnCancellation(t *testing.T) {
 	err := Run(
 		ctx,
 		"test/teardown-on-cancel",
-		map[int]*stroppy.DriverConfig{0: {DriverType: stroppy.DriverConfig_DRIVER_TYPE_NOOP}},
+		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
 		nil,
 		ParamInputs{},
 		zap.NewNop(),

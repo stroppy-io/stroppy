@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
-	stroppy "github.com/stroppy-io/stroppy/pkg/common/proto/stroppy"
+	"github.com/stroppy-io/stroppy/pkg/config"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
 )
 
@@ -189,7 +189,7 @@ func TestWorkloadRunLogVolumeIsBounded(t *testing.T) {
 		err := Run(
 			context.Background(),
 			"test/step-lifecycle",
-			map[int]*stroppy.DriverConfig{0: {DriverType: stroppy.DriverConfig_DRIVER_TYPE_NOOP}},
+			map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
 			nil,
 			ParamInputs{CLI: map[string]string{"iterations": iterations, "vus": "1"}},
 			lg,
