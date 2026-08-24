@@ -1208,6 +1208,7 @@ func TestRemovedErrorModeOverrideRejected(t *testing.T) {
 	if err := applyDriverPreset(configs, 0, "noop"); err != nil {
 		t.Fatalf("applyDriverPreset() error = %v", err)
 	}
+
 	if err := applyDriverOpt(configs, 0, "errorMode", "throw"); err != nil {
 		t.Fatalf("applyDriverOpt() error = %v", err)
 	}

@@ -71,6 +71,7 @@ func newErrorReporter(lg *zap.Logger, interval time.Duration) *errorReporter {
 	if lg == nil {
 		lg = zap.NewNop()
 	}
+
 	if interval <= 0 {
 		interval = errorReportInterval
 	}
@@ -156,6 +157,7 @@ func (r *errorReporter) groupState(group errorGroup) (errorGroup, *errorGroupSta
 	r.mu.RLock()
 	state := r.groups[group]
 	r.mu.RUnlock()
+
 	if state != nil {
 		return group, state
 	}
@@ -163,13 +165,15 @@ func (r *errorReporter) groupState(group errorGroup) (errorGroup, *errorGroupSta
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if state = r.groups[group]; state != nil {
-		return group, state
+	if existing := r.groups[group]; existing != nil {
+		return group, existing
 	}
+
 	if len(r.groups) >= maxErrorGroups {
 		group = errorGroup{operation: "other", kind: driver.ErrorKindUnknown}
-		if state = r.groups[group]; state != nil {
-			return group, state
+
+		if existing := r.groups[group]; existing != nil {
+			return group, existing
 		}
 	} else {
 		group.operation = strings.Clone(group.operation)
@@ -197,6 +201,7 @@ func (r *errorReporter) reportPeriodic() {
 	failedIterations := r.failedIterations.Load()
 	failedQueries := r.failedQueries.Load()
 	total := failedIterations + failedQueries
+
 	if total == r.lastPeriodic {
 		return
 	}
@@ -241,9 +246,11 @@ func (r *errorReporter) snapshot() errorSummary {
 
 	r.mu.RLock()
 	summary.groups = make([]errorGroupSummary, 0, len(r.groups))
+
 	for group, state := range r.groups {
 		summary.groups = append(summary.groups, errorGroupSummary{errorGroup: group, count: state.count.Load()})
 	}
+
 	r.mu.RUnlock()
 
 	slices.SortFunc(summary.groups, func(a, b errorGroupSummary) int {
@@ -320,6 +327,7 @@ func (b *Bench) RecordQueryError(operation string, err error) {
 	if b == nil || b.root == nil || b.root.errorReporter == nil || b.vu == nil || err == nil {
 		return
 	}
+
 	if canceledError(b.vu.Context(), err) {
 		return
 	}

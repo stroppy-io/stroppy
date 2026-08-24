@@ -115,6 +115,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 			err := b.Exec(ctx, body, nil)
 
 			ms := time.Since(start).Milliseconds()
+
 			if err != nil {
 				if ctx.Err() != nil {
 					return ctx.Err()

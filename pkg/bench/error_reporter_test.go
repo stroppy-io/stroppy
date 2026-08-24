@@ -40,6 +40,7 @@ func TestErrorReporterSuppressesDuplicatesAndRecordsMetrics(t *testing.T) {
 			vu, terminalErrorQuery, "q1", errors.New("same backend failure"), classifyDeadlock,
 		)
 	}
+
 	rootState.errorReporter.record(
 		vu, terminalErrorIteration, "iteration", errors.New("different failure"), classifyCustom,
 	)
@@ -68,10 +69,13 @@ func TestErrorReporterSuppressesDuplicatesAndRecordsMetrics(t *testing.T) {
 			if m.Name != rootState.metricsPrefix+"terminal_errors_total" {
 				continue
 			}
+
 			sum, ok := m.Data.(metricdata.Sum[float64])
 			require.True(t, ok)
+
 			for _, point := range sum.DataPoints {
 				attrs := point.Attributes.ToSlice()
+
 				for _, attr := range attrs {
 					require.NotContains(t, attr.Value.AsString(), "failure")
 				}
@@ -99,6 +103,7 @@ func TestErrorReporterBoundsGroupsAndPeriodicNotices(t *testing.T) {
 	require.Equal(t, uint64(maxErrorGroups+10), snapshot.terminalErrors)
 	require.Len(t, snapshot.groups, maxErrorGroups+1)
 	require.Len(t, logs.FilterMessage("nonfatal error; continuing").All(), maxErrorGroups+1)
+
 	for _, group := range snapshot.groups {
 		require.LessOrEqual(t, len(group.operation), maxErrorOperationBytes)
 	}
@@ -116,6 +121,7 @@ func TestRecordQueryErrorExcludesRunCancellation(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
+
 	rootState := &RootState{errorReporter: reporter, txMetrics: &txMetrics{}}
 	b := &Bench{root: rootState, vu: &VU{root: rootState, ctx: ctx}}
 	b.RecordQueryError("query", errors.Join(errors.New("backend detail"), context.Canceled))
@@ -132,6 +138,7 @@ func TestErrorSummaryIsProminentAndDeterministic(t *testing.T) {
 		rootState.errorReporter.stopAndWait()
 		rootState.shutdownMetrics()
 	})
+
 	reporter := rootState.errorReporter
 
 	reporter.record(

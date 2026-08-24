@@ -160,6 +160,7 @@ func TestRemovedFieldsAreAbsentFromPublicConfigTypes(t *testing.T) {
 	_, hasErrorMode := driverConfig.FieldByName("ErrorMode")
 	runtimeDriverConfig := reflect.TypeFor[config.DriverConfig]()
 	_, runtimeHasErrorMode := runtimeDriverConfig.FieldByName("ErrorMode")
+
 	require.False(t, hasDefaultTxIsolation)
 	require.False(t, hasErrorMode)
 	require.False(t, runtimeHasErrorMode)

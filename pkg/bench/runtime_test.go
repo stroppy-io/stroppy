@@ -68,6 +68,7 @@ func TestRunScenarioContinuesAfterOrdinaryErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runScenario() error = %v, want nil", err)
 	}
+
 	if calls.Load() != 5 || failures.Load() != 5 {
 		t.Fatalf("calls = %d, failures = %d, want 5 each", calls.Load(), failures.Load())
 	}
@@ -75,6 +76,7 @@ func TestRunScenarioContinuesAfterOrdinaryErrors(t *testing.T) {
 
 func TestRunContinuesAndSummarizesOrdinaryErrors(t *testing.T) {
 	var workload *ordinaryErrorWorkload
+
 	Register(func() Workload {
 		workload = &ordinaryErrorWorkload{}
 
@@ -82,6 +84,7 @@ func TestRunContinuesAndSummarizesOrdinaryErrors(t *testing.T) {
 	})
 
 	core, logs := observer.New(zapcore.WarnLevel)
+
 	err := Run(
 		context.Background(),
 		"test/ordinary-errors-continue",
@@ -95,6 +98,7 @@ func TestRunContinuesAndSummarizesOrdinaryErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run() error = %v, want nil", err)
 	}
+
 	if workload.calls.Load() != 6 {
 		t.Fatalf("iteration calls = %d, want 6", workload.calls.Load())
 	}
@@ -103,9 +107,11 @@ func TestRunContinuesAndSummarizesOrdinaryErrors(t *testing.T) {
 	if snapshot.terminalErrors != 6 || snapshot.failedIterations != 6 || snapshot.failedQueries != 0 {
 		t.Fatalf("error summary = %#v, want six failed iterations", snapshot)
 	}
+
 	if got := logs.FilterMessage("nonfatal error; continuing").Len(); got != 1 {
 		t.Fatalf("initial nonfatal warnings = %d, want 1", got)
 	}
+
 	if got := logs.FilterLevelExact(zapcore.ErrorLevel).Len(); got != 0 {
 		t.Fatalf("error-level logs = %d, want 0", got)
 	}

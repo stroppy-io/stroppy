@@ -45,6 +45,7 @@ func TestExitCodeFor(t *testing.T) {
 
 func TestCommandErrorExitAndDiagnosticContract(t *testing.T) {
 	var ordinary *commandErrorWorkload
+
 	bench.Register(func() bench.Workload {
 		ordinary = &commandErrorWorkload{name: "test/command-ordinary-error"}
 
@@ -60,6 +61,7 @@ func TestCommandErrorExitAndDiagnosticContract(t *testing.T) {
 	if ordinaryCode != 0 {
 		t.Fatalf("ordinary-error exit code = %d, output = %q, want 0", ordinaryCode, ordinaryOutput)
 	}
+
 	if ordinary.calls.Load() != 3 {
 		t.Fatalf("ordinary-error iterations = %d, want 3", ordinary.calls.Load())
 	}
@@ -70,6 +72,7 @@ func TestCommandErrorExitAndDiagnosticContract(t *testing.T) {
 	if fatalCode != 1 {
 		t.Fatalf("fatal exit code = %d, output = %q, want 1", fatalCode, fatalOutput)
 	}
+
 	if got := strings.Count(fatalOutput, "fatal command sentinel"); got != 1 {
 		t.Fatalf("fatal diagnostic occurrences = %d, output = %q, want 1", got, fatalOutput)
 	}
@@ -79,6 +82,7 @@ func executeTestCommand(t *testing.T, args []string) (int, string) {
 	t.Helper()
 
 	var output bytes.Buffer
+
 	clearCommandContexts(rootCmd)
 	rootCmd.SetArgs(args)
 	rootCmd.SetOut(&output)
@@ -93,7 +97,8 @@ func executeTestCommand(t *testing.T, args []string) (int, string) {
 }
 
 func clearCommandContexts(cmd *cobra.Command) {
-	cmd.SetContext(nil)
+	cmd.SetContext(context.TODO())
+
 	for _, child := range cmd.Commands() {
 		clearCommandContexts(child)
 	}
@@ -110,6 +115,7 @@ func (*commandErrorWorkload) Define(*bench.Def) error                   { return
 func (*commandErrorWorkload) Setup(context.Context, *bench.Bench) error { return nil }
 func (w *commandErrorWorkload) Iterate(ctx context.Context, b *bench.Bench) error {
 	w.calls.Add(1)
+
 	if !w.fatal {
 		return errors.New("ordinary command failure")
 	}
@@ -123,4 +129,5 @@ func (w *commandErrorWorkload) Iterate(ctx context.Context, b *bench.Bench) erro
 
 	return bench.Retry0(ctx, policy, func() error { return errors.New("fatal command sentinel") })
 }
+
 func (*commandErrorWorkload) Teardown(context.Context, *bench.Bench) error { return nil }

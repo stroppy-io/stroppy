@@ -175,6 +175,7 @@ func TestCancellationStopsRemainingQueries(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	canceling := &cancelingDriver{cancel: cancel}
+
 	driver.RegisterDriver(driverType, func(context.Context, driver.Options) (driver.Driver, error) {
 		return canceling, nil
 	})

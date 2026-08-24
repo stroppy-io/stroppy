@@ -184,6 +184,7 @@ func (b *Bench) TxRetryPolicy(opts TxRetryPolicyOptions) RetryPolicy {
 		if b.root != nil && b.root.errorReporter != nil {
 			b.root.errorReporter.recordRetry(b.vu)
 		}
+
 		if workloadOnRetry != nil {
 			workloadOnRetry(attempt, err, decision)
 		}

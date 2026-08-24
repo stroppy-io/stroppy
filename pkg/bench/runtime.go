@@ -496,12 +496,15 @@ func runWorker(
 		if err == nil {
 			continue
 		}
+
 		if IsFatalError(err) {
 			return err
 		}
+
 		if canceledError(ctx, err) {
 			return ctx.Err()
 		}
+
 		if onIterationError != nil {
 			onIterationError(vu, err)
 		}

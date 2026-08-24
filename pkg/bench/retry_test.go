@@ -113,6 +113,7 @@ func TestBenchRetryPolicyCountsOnlyScheduledRetries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newRootState() error = %v", err)
 	}
+
 	t.Cleanup(func() {
 		rootState.errorReporter.stopAndWait()
 		rootState.shutdownMetrics()
@@ -131,6 +132,7 @@ func TestBenchRetryPolicyCountsOnlyScheduledRetries(t *testing.T) {
 	attempts := 0
 
 	var callbacks []int
+
 	policy := b.TxRetryPolicy(TxRetryPolicyOptions{
 		MaxAttempts: 3,
 		Actions: ErrorActionMap{ //nolint:exhaustive // test overrides one kind
@@ -152,9 +154,11 @@ func TestBenchRetryPolicyCountsOnlyScheduledRetries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Retry0() error = %v", err)
 	}
+
 	if attempts != 3 {
 		t.Fatalf("attempts = %d, want 3", attempts)
 	}
+
 	if len(callbacks) != 2 || callbacks[0] != 2 || callbacks[1] != 3 {
 		t.Fatalf("workload callbacks = %v, want [2 3]", callbacks)
 	}
