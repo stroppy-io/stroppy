@@ -147,16 +147,18 @@ endef
 
 # Scenario-branch smoke on the noop driver (NO database). Every workload has
 # two executor archetypes — constant-vus (DURATION set, throughput) and
-# shared-iterations (power test). The noop driver runs the full lifecycle
-# without a DB, so this catches executor/options regressions for ~free. The
-# VUS=2/ITER=1 case also guards the shared-iterations "iterations < VUs" floor.
-# Third field skips each workload's data-validation step (noop has no data to
-# check); "-" means nothing to skip.
+# shared-iterations (power test). Setup still runs against noop, while the
+# database-dependent workload step is excluded: noop cannot return rows required
+# by transactions such as TPC-C new_order. This still exercises each executor,
+# typed options, setup lifecycle, and iteration scheduling without manufacturing
+# expected query failures. The VUS=2/ITER=1 case also guards the
+# shared-iterations "iterations < VUs" floor. Third field names any additional
+# data-validation step to exclude; "-" means no additional step.
 .PHONY: run-scenario-smoke
 run-scenario-smoke: # Tier 0: scenario-branch smoke on noop (no DB), all workloads x both branches
 	@rc=0;                                                                          \
 	for spec in "tpcb/tx 1 -" "tpcc/tx 1 validate_population" "tpcds 0.01 -" "tpch/tx 0.01 validate_answers"; do \
-		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns=""; [ "$$skip" = "-" ] || ns="--no-steps $$skip"; \
+		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns="--no-steps workload"; [ "$$skip" = "-" ] || ns="--no-steps workload,$$skip"; \
 		$(call smoke_run,noop constant-vus: $$wl,./build/stroppy run $$wl -d noop -e SCALE_FACTOR=$$sf -e DURATION=2s -e VUS=2 $$ns); \
 		$(call smoke_run,noop shared-iters: $$wl,./build/stroppy run $$wl -d noop -e SCALE_FACTOR=$$sf -e VUS=2 -e ITER=1 $$ns); \
 	done;                                                                           \
