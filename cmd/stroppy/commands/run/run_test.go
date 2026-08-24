@@ -1476,6 +1476,73 @@ func TestRemovedIsolationRejectedAtDriverCLISurfaces(t *testing.T) {
 	}
 }
 
+func TestBuildDriverConfigEmptyDefaultInsertMethod(t *testing.T) {
+	postgres := "postgres"
+	empty := ""
+
+	build := func(t *testing.T, cfg *runner.DriverCLIConfig, want string) {
+		t.Helper()
+
+		got, err := buildDriverConfig(0, cfg)
+		if err != nil {
+			t.Fatalf("buildDriverConfig() error = %v", err)
+		}
+
+		if got.DefaultInsertMethod != want {
+			t.Fatalf("DefaultInsertMethod = %q, want %q", got.DefaultInsertMethod, want)
+		}
+	}
+
+	for _, key := range []string{
+		"defaultInsertMethod",
+		"default_insert_method",
+		"insertMethod",
+		"insert_method",
+	} {
+		t.Run("driver option/"+key, func(t *testing.T) {
+			cfg := &runner.DriverCLIConfig{DriverType: postgres}
+			if err := cfg.ApplyOverride(key, empty); err != nil {
+				t.Fatalf("ApplyOverride(%q) error = %v", key, err)
+			}
+
+			build(t, cfg, "plain_query")
+		})
+	}
+
+	t.Run("raw driver JSON", func(t *testing.T) {
+		cfg, err := runner.NewDriverCLIConfigFromJSON(`{"driverType":"postgres","defaultInsertMethod":""}`)
+		if err != nil {
+			t.Fatalf("NewDriverCLIConfigFromJSON() error = %v", err)
+		}
+
+		build(t, &cfg, "plain_query")
+	})
+
+	t.Run("config file", func(t *testing.T) {
+		configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
+			0: {DriverType: &postgres, DefaultInsertMethod: &empty},
+		})
+		if err != nil {
+			t.Fatalf("DriverCLIConfigsFromFile() error = %v", err)
+		}
+
+		build(t, configs[0], "plain_query")
+	})
+
+	t.Run("absent", func(t *testing.T) {
+		build(t, &runner.DriverCLIConfig{DriverType: postgres}, "")
+
+		configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
+			0: {DriverType: &postgres},
+		})
+		if err != nil {
+			t.Fatalf("DriverCLIConfigsFromFile() error = %v", err)
+		}
+
+		build(t, configs[0], "")
+	})
+}
+
 func TestBuildDriverConfigDefaultInsertMethod(t *testing.T) {
 	for _, test := range []struct {
 		name    string

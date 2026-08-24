@@ -63,7 +63,7 @@ func TestInsertUsesDriverFallbackWithoutMutatingRequest(t *testing.T) {
 		drv:  drv,
 		cfg: &config.DriverConfig{
 			DriverType:          config.DriverTypePostgres,
-			DefaultInsertMethod: "plain_bulk",
+			DefaultInsertMethod: "plain_query",
 		},
 	}
 	req := &driver.InsertRequest{Table: "t", Workers: 1, Source: validInsertSource()}
@@ -72,8 +72,8 @@ func TestInsertUsesDriverFallbackWithoutMutatingRequest(t *testing.T) {
 		t.Fatalf("Insert() error = %v", err)
 	}
 
-	if drv.method != driver.InsertPlainBulk {
-		t.Fatalf("driver method = %v, want plain_bulk", drv.method)
+	if drv.method != driver.InsertPlainQuery {
+		t.Fatalf("driver method = %v, want plain_query", drv.method)
 	}
 
 	if req.Method != 0 {
@@ -84,8 +84,8 @@ func TestInsertUsesDriverFallbackWithoutMutatingRequest(t *testing.T) {
 		t.Fatal("driver did not receive progress tracker")
 	}
 
-	if snapshot := drv.tracker.Finish(nil); snapshot.Method != "plain_bulk" {
-		t.Fatalf("progress method = %q, want plain_bulk", snapshot.Method)
+	if snapshot := drv.tracker.Finish(nil); snapshot.Method != "plain_query" {
+		t.Fatalf("progress method = %q, want plain_query", snapshot.Method)
 	}
 }
 

@@ -116,6 +116,8 @@ type DriverCLIConfig struct {
 	URL                 string `json:"url,omitempty"`
 	DefaultInsertMethod string `json:"defaultInsertMethod,omitempty"`
 
+	defaultInsertMethodSet bool
+
 	// Extra fields from config-file drivers that don't map to known fields.
 	Extra map[string]any `json:"-"`
 
@@ -137,13 +139,18 @@ func (d DriverCLIConfig) MarshalJSON() ([]byte, error) {
 		merged["url"] = d.URL
 	}
 
-	if d.DefaultInsertMethod != "" {
+	if d.HasDefaultInsertMethod() {
 		merged["defaultInsertMethod"] = d.DefaultInsertMethod
 	}
 
 	maps.Copy(merged, d.Extra)
 
 	return json.Marshal(merged)
+}
+
+// HasDefaultInsertMethod reports whether a default was explicitly provided.
+func (d *DriverCLIConfig) HasDefaultInsertMethod() bool {
+	return d.defaultInsertMethodSet || d.DefaultInsertMethod != ""
 }
 
 // DriverOverride is one -D key=value occurrence.
@@ -180,6 +187,7 @@ func (d *DriverCLIConfig) ApplyOverride(key, value string) error {
 		}
 
 		d.DefaultInsertMethod = value
+		d.defaultInsertMethodSet = true
 	default:
 		if err := d.setExtraPath(path, driverOverrideValue(value)); err != nil {
 			return err
@@ -452,9 +460,10 @@ func resolveDriverConfigPaths(fileConfig *config.DriverRunConfig) {
 // NewDriverCLIConfigFromPreset creates a DriverCLIConfig from a preset.
 func NewDriverCLIConfigFromPreset(p DriverPreset) DriverCLIConfig {
 	return DriverCLIConfig{
-		DriverType:          p.DriverType,
-		URL:                 p.URL,
-		DefaultInsertMethod: p.DefaultInsertMethod,
+		DriverType:             p.DriverType,
+		URL:                    p.URL,
+		DefaultInsertMethod:    p.DefaultInsertMethod,
+		defaultInsertMethodSet: p.DefaultInsertMethod != "",
 	}
 }
 
@@ -520,9 +529,10 @@ func driverCLIConfigFromFile(fileConfig *config.DriverRunConfig) (DriverCLIConfi
 
 	extraConfig := *fileConfig
 	cfg := DriverCLIConfig{
-		DriverType:          fileConfig.GetDriverType(),
-		URL:                 fileConfig.GetURL(),
-		DefaultInsertMethod: fileConfig.GetDefaultInsertMethod(),
+		DriverType:             fileConfig.GetDriverType(),
+		URL:                    fileConfig.GetURL(),
+		DefaultInsertMethod:    fileConfig.GetDefaultInsertMethod(),
+		defaultInsertMethodSet: fileConfig.DefaultInsertMethod != nil,
 	}
 
 	extraConfig.DriverType = nil

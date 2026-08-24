@@ -542,6 +542,8 @@ func buildDriverConfig(idx int, cfg *runner.DriverCLIConfig) (*config.DriverConf
 
 	driverType := cfg.DriverType
 	url := cfg.URL
+	defaultInsertMethod := cfg.DefaultInsertMethod
+	hasDefaultInsertMethod := cfg.HasDefaultInsertMethod()
 
 	if overrides != nil {
 		if overrides.DriverType != nil {
@@ -550,6 +552,11 @@ func buildDriverConfig(idx int, cfg *runner.DriverCLIConfig) (*config.DriverConf
 
 		if overrides.URL != nil {
 			url = overrides.GetURL()
+		}
+
+		if overrides.DefaultInsertMethod != nil {
+			defaultInsertMethod = overrides.GetDefaultInsertMethod()
+			hasDefaultInsertMethod = true
 		}
 	}
 
@@ -564,8 +571,8 @@ func buildDriverConfig(idx int, cfg *runner.DriverCLIConfig) (*config.DriverConf
 		dc.DriverType = t
 	}
 
-	if cfg.DefaultInsertMethod != "" {
-		method, err := driver.ResolveInsertMethod(dc.DriverType, cfg.DefaultInsertMethod)
+	if hasDefaultInsertMethod {
+		method, err := driver.ResolveInsertMethod(dc.DriverType, defaultInsertMethod)
 		if err != nil {
 			return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
 		}
