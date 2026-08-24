@@ -26,9 +26,8 @@ type Config struct {
 }
 
 var (
-	errInvalidLogMode     = errors.New("invalid log mode")
-	errInvalidQueryEscape = errors.New("invalid query escape")
-	globalLogger          atomic.Pointer[zap.Logger]
+	errInvalidLogMode = errors.New("invalid log mode")
+	globalLogger      atomic.Pointer[zap.Logger]
 )
 
 func init() {
@@ -179,36 +178,47 @@ func redactQueryValues(dsn string) string {
 }
 
 func isSecretKey(key string) bool {
-	decoded := key
+	decoded := decodeQueryKey(key)
+
+	return hasSecretKeySuffix(normalizeQueryKey(decoded)) ||
+		hasSecretKeySuffix(normalizeQueryKey(stripMalformedEscapes(decoded)))
+}
+
+func decodeQueryKey(value string) string {
 	for range queryDecodePasses {
-		value, err := urlQueryUnescape(decoded)
-		if err != nil {
-			decoded = stripMalformedEscapes(decoded)
-
+		decoded := urlQueryUnescape(value)
+		if decoded == value {
 			break
 		}
 
-		if value == decoded {
-			break
-		}
-
-		decoded = value
+		value = decoded
 	}
 
+	return value
+}
+
+func normalizeQueryKey(value string) string {
 	var normalized strings.Builder
 
-	for _, r := range decoded {
+	for _, r := range value {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) {
 			normalized.WriteRune(unicode.ToLower(r))
 		}
 	}
 
-	switch normalized.String() {
-	case "password", "passwd", "pwd", "token", "authtoken", "accesstoken", "secret", "credential", "credentials", "apikey":
-		return true
-	default:
-		return false
+	return normalized.String()
+}
+
+func hasSecretKeySuffix(key string) bool {
+	for _, suffix := range []string{
+		"password", "passwd", "pwd", "secret", "token", "credential", "credentials", "apikey",
+	} {
+		if strings.HasSuffix(key, suffix) {
+			return true
+		}
 	}
+
+	return false
 }
 
 func stripMalformedEscapes(value string) string {
@@ -227,7 +237,7 @@ func stripMalformedEscapes(value string) string {
 	return result.String()
 }
 
-func urlQueryUnescape(value string) (string, error) {
+func urlQueryUnescape(value string) string {
 	var result strings.Builder
 
 	for index := 0; index < len(value); index++ {
@@ -247,7 +257,9 @@ func urlQueryUnescape(value string) (string, error) {
 
 		low, okLow := fromHex(value[index+percentEscapeDigits])
 		if !okHigh || !okLow {
-			return "", errInvalidQueryEscape
+			result.WriteByte(value[index])
+
+			continue
 		}
 
 		result.WriteByte(high<<4 | low)
@@ -255,7 +267,7 @@ func urlQueryUnescape(value string) (string, error) {
 		index += percentEscapeDigits
 	}
 
-	return result.String(), nil
+	return result.String()
 }
 
 func fromHex(value byte) (byte, bool) {
