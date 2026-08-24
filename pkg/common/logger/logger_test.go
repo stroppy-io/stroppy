@@ -171,6 +171,7 @@ func TestRedactDSNMySQL(t *testing.T) {
 		name          string
 		dsn           string
 		emptyPassword bool
+		passwordless  bool
 	}{
 		{
 			name: "password contains scheme separator",
@@ -196,6 +197,11 @@ func TestRedactDSNMySQL(t *testing.T) {
 		{
 			name: "addressless protocol",
 			dsn:  "user:marker-secret@tcp/bench?charset=utf8",
+		},
+		{
+			name:         "username only",
+			dsn:          "user@tcp(db:3306)/bench?charset=utf8",
+			passwordless: true,
 		},
 	}
 
@@ -223,7 +229,13 @@ func TestRedactDSNMySQL(t *testing.T) {
 			require.Equal(t, original.Net, parsed.Net)
 			require.Equal(t, original.Addr, parsed.Addr)
 			require.Equal(t, original.DBName, parsed.DBName)
-			require.Equal(t, redactedSecret, parsed.Passwd)
+
+			if test.passwordless {
+				require.Empty(t, original.Passwd)
+				require.Empty(t, parsed.Passwd)
+			} else {
+				require.Equal(t, redactedSecret, parsed.Passwd)
+			}
 
 			for key, value := range original.Params {
 				secret, certain := classifyQueryKey(key)
