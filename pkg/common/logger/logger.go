@@ -165,6 +165,9 @@ func RedactDSN(dsn string) string {
 	}
 
 	assignments, conninfoOK := parseConninfo(dsn)
+	if conninfoOK && containsASCIIWhitespace(dsn) {
+		return redactConninfo(dsn, assignments)
+	}
 
 	mysqlRedacted, mysqlOK := redactMySQL(dsn)
 	if conninfoOK {
@@ -286,17 +289,7 @@ func redactMySQL(dsn string) (redacted string, ok bool) {
 }
 
 func hasMySQLStructure(dsn string) bool {
-	if !strings.Contains(dsn, "/") {
-		return false
-	}
-
-	for index := range len(dsn) {
-		if isASCIIWhitespace(dsn[index]) {
-			return false
-		}
-	}
-
-	return true
+	return strings.Contains(dsn, "/") && hasMySQLPasswordEnvelope(dsn)
 }
 
 func hasMySQLPasswordEnvelope(dsn string) bool {
@@ -322,7 +315,7 @@ func looksLikeMySQLEndpointSuffix(dsn string, start int) bool {
 
 	for index := start; index < len(dsn); index++ {
 		switch dsn[index] {
-		case '(', '[':
+		case '(', '[', '/':
 			return true
 		case '?', '#', '@':
 			return false
@@ -471,6 +464,16 @@ func skipASCIIWhitespace(dsn string, index int) int {
 	}
 
 	return index
+}
+
+func containsASCIIWhitespace(value string) bool {
+	for index := range len(value) {
+		if isASCIIWhitespace(value[index]) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func isASCIIWhitespace(value byte) bool {

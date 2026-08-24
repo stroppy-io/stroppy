@@ -189,6 +189,14 @@ func TestRedactDSNMySQL(t *testing.T) {
 			dsn:           "user:@tcp(db:3306)/bench?charset=utf8",
 			emptyPassword: true,
 		},
+		{
+			name: "whitespace password",
+			dsn:  "user:marker secret@tcp(db:3306)/bench?charset=utf8",
+		},
+		{
+			name: "addressless protocol",
+			dsn:  "user:marker-secret@tcp/bench?charset=utf8",
+		},
 	}
 
 	for _, test := range tests {
@@ -202,7 +210,11 @@ func TestRedactDSNMySQL(t *testing.T) {
 
 			got := RedactDSN(test.dsn)
 			require.NotEqual(t, redactedDSN, got)
-			require.NotContains(t, got, "marker-secret")
+
+			for _, marker := range []string{"marker-secret", "marker secret", "query-secret"} {
+				require.NotContains(t, got, marker)
+			}
+
 			require.Equal(t, got, RedactDSN(got))
 
 			parsed, err := mysql.ParseDSN(got)
