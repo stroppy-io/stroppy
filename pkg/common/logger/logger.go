@@ -291,12 +291,17 @@ type mysqlEnvelope struct {
 }
 
 func parseMySQLEnvelope(dsn string) mysqlEnvelope {
-	end := len(dsn)
-	if queryStart := strings.IndexByte(dsn, '?'); queryStart >= 0 {
-		end = queryStart
+	databaseSlash := strings.LastIndexByte(dsn, '/')
+	if databaseSlash < 0 {
+		return mysqlEnvelope{userinfoEnd: -1}
 	}
 
-	for at := end - 1; at >= 0; at-- {
+	end := len(dsn)
+	if queryStart := strings.IndexByte(dsn[databaseSlash+1:], '?'); queryStart >= 0 {
+		end = databaseSlash + queryStart + 1
+	}
+
+	for at := databaseSlash - 1; at >= 0; at-- {
 		if dsn[at] == '@' && isMySQLEndpoint(dsn, at+1, end) {
 			return mysqlEnvelope{userinfoEnd: at, valid: true}
 		}

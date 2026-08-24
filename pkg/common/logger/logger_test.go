@@ -199,6 +199,14 @@ func TestRedactDSNMySQL(t *testing.T) {
 			dsn:  "user:marker-secret@tcp/bench?charset=utf8",
 		},
 		{
+			name: "query punctuation in password",
+			dsn:  "user:marker?secret@tcp(db:3306)/bench?charset=utf8",
+		},
+		{
+			name: "Unix socket password",
+			dsn:  "user:marker-secret@unix(/tmp/mysql.sock)/bench?charset=utf8",
+		},
+		{
 			name:         "username only",
 			dsn:          "user@tcp(db:3306)/bench?charset=utf8",
 			passwordless: true,
@@ -211,6 +219,11 @@ func TestRedactDSNMySQL(t *testing.T) {
 		{
 			name:         "credential free custom network",
 			dsn:          "custom-net(db:3306)/bench?charset=utf8",
+			passwordless: true,
+		},
+		{
+			name:         "credential free Unix socket",
+			dsn:          "unix(/tmp/mysql.sock)/bench?charset=utf8",
 			passwordless: true,
 		},
 		{
@@ -242,7 +255,7 @@ func TestRedactDSNMySQL(t *testing.T) {
 			got := RedactDSN(test.dsn)
 			require.NotEqual(t, redactedDSN, got)
 
-			for _, marker := range []string{"marker-secret", "marker secret", "query-secret"} {
+			for _, marker := range []string{"marker-secret", "marker secret", "marker?secret", "query-secret"} {
 				require.NotContains(t, got, marker)
 			}
 
