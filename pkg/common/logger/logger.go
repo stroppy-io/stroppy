@@ -164,17 +164,19 @@ func RedactDSN(dsn string) string {
 		return redacted
 	}
 
-	if redacted, ok := redactMySQL(dsn); ok {
-		return redacted
-	}
+	assignments, conninfoOK := parseConninfo(dsn)
 
-	assignments, ok := parseConninfo(dsn)
-	if ok {
-		if hasAmbiguousMySQLCredentialEnvelope(dsn) {
+	mysqlRedacted, mysqlOK := redactMySQL(dsn)
+	if conninfoOK {
+		if mysqlOK || hasMySQLStructure(dsn) && hasMySQLPasswordEnvelope(dsn) {
 			return redactedDSN
 		}
 
 		return redactConninfo(dsn, assignments)
+	}
+
+	if mysqlOK {
+		return mysqlRedacted
 	}
 
 	return redactedDSN
@@ -217,7 +219,7 @@ func redactURI(dsn string) (string, bool) {
 	}
 
 	for key, values := range values {
-		secret, certain := isSecretQueryKey(key)
+		secret, certain := classifyQueryKey(key)
 		if !certain {
 			return "", false
 		}
@@ -246,46 +248,92 @@ func redactMySQL(dsn string) (redacted string, ok bool) {
 		}
 	}()
 
+	if !hasMySQLStructure(dsn) {
+		return "", false
+	}
+
 	cfg, err := mysql.ParseDSN(dsn)
 	if err != nil {
 		return "", false
 	}
 
-	if cfg.Passwd != "" {
-		cfg.Passwd = redactedSecret
-	} else if hasPasswordEnvelope(dsn) {
+	passwordPresent := hasMySQLPasswordEnvelope(dsn)
+	if cfg.Passwd != "" && !passwordPresent {
 		return "", false
 	}
 
+	if passwordPresent {
+		cfg.Passwd = redactedSecret
+	}
+
 	for key := range cfg.Params {
-		if isSecretName(key) {
+		secret, certain := classifyQueryKey(key)
+		if !certain {
+			return "", false
+		}
+
+		if secret {
 			cfg.Params[key] = redactedSecret
 		}
 	}
 
 	formatted := cfg.FormatDSN()
-	if hasPasswordEnvelope(dsn) && !strings.Contains(formatted, redactedSecret) {
+	if passwordPresent && !strings.Contains(formatted, redactedSecret) {
 		return "", false
 	}
 
 	return formatted, true
 }
 
-func hasPasswordEnvelope(dsn string) bool {
-	colon := strings.IndexByte(dsn, ':')
-	at := strings.LastIndexByte(dsn, '@')
-
-	return colon >= 0 && colon < at
-}
-
-func hasAmbiguousMySQLCredentialEnvelope(dsn string) bool {
-	if !hasPasswordEnvelope(dsn) {
+func hasMySQLStructure(dsn string) bool {
+	if !strings.Contains(dsn, "/") {
 		return false
 	}
 
-	at := strings.LastIndexByte(dsn, '@')
+	for index := range len(dsn) {
+		if isASCIIWhitespace(dsn[index]) {
+			return false
+		}
+	}
 
-	return strings.ContainsAny(dsn[at+1:], "([")
+	return true
+}
+
+func hasMySQLPasswordEnvelope(dsn string) bool {
+	for at := len(dsn) - 1; at >= 0; at-- {
+		if dsn[at] != '@' || !looksLikeMySQLEndpointSuffix(dsn, at+1) {
+			continue
+		}
+
+		return strings.IndexByte(dsn[:at], ':') >= 0
+	}
+
+	return false
+}
+
+func looksLikeMySQLEndpointSuffix(dsn string, start int) bool {
+	if start == len(dsn) {
+		return false
+	}
+
+	if dsn[start] == '/' {
+		return true
+	}
+
+	for index := start; index < len(dsn); index++ {
+		switch dsn[index] {
+		case '(', '[':
+			return true
+		case '?', '#', '@':
+			return false
+		default:
+			if isASCIIWhitespace(dsn[index]) {
+				return false
+			}
+		}
+	}
+
+	return false
 }
 
 type conninfoAssignment struct {
@@ -438,16 +486,48 @@ func isConninfoKeyByte(value byte) bool {
 	return isASCIIAlpha(value) || isASCIIDigit(value) || value == '_' || value == '-'
 }
 
-func isSecretQueryKey(key string) (secret, certain bool) {
-	decoded, err := url.QueryUnescape(key)
-	if err != nil || strings.Contains(decoded, "%") {
+func classifyQueryKey(key string) (secret, certain bool) {
+	decoded, ok := decodeQueryKey(key)
+	if !ok {
 		return false, false
 	}
 
-	return isSecretName(decoded), true
+	normalized, ok := normalizeSecretName(decoded)
+	if !ok {
+		return false, false
+	}
+
+	return hasSecretSuffix(normalized), true
+}
+
+func decodeQueryKey(key string) (string, bool) {
+	for range 2 {
+		decoded, err := url.QueryUnescape(key)
+		if err != nil {
+			return "", false
+		}
+
+		if decoded == key {
+			break
+		}
+
+		key = decoded
+	}
+
+	if strings.Contains(key, "%") {
+		return "", false
+	}
+
+	return key, true
 }
 
 func isSecretName(name string) bool {
+	normalized, ok := normalizeSecretName(name)
+
+	return ok && hasSecretSuffix(normalized)
+}
+
+func normalizeSecretName(name string) (string, bool) {
 	var normalized strings.Builder
 
 	for index := range len(name) {
@@ -459,14 +539,18 @@ func isSecretName(name string) bool {
 			normalized.WriteByte(value)
 		case value == '_', value == '-', value == '.':
 		default:
-			return false
+			return "", false
 		}
 	}
 
+	return normalized.String(), true
+}
+
+func hasSecretSuffix(name string) bool {
 	for _, suffix := range []string{
 		"password", "passwd", "pwd", "secret", "token", "credential", "credentials", "apikey",
 	} {
-		if strings.HasSuffix(normalized.String(), suffix) {
+		if strings.HasSuffix(name, suffix) {
 			return true
 		}
 	}

@@ -118,13 +118,17 @@ func TestRedactDSNEmptyAndFallback(t *testing.T) {
 
 func TestRedactDSNURI(t *testing.T) {
 	dsn := "postgres://user:uri:secret@host:5432/db@name?sslmode=require" +
-		"&client_secret=query-secret&client%255Fsecret=nested-secret&keep=yes#note@name"
+		"&client_secret=query-secret&client%255Fsecret=nested-secret" +
+		"&x%2Dapi%2Dkey=api-secret&token=first-token&token=second-token&keep=yes#note@name"
 
 	got := RedactDSN(dsn)
 	require.NotEqual(t, redactedDSN, got)
 	require.NotContains(t, got, "uri:secret")
 	require.NotContains(t, got, "query-secret")
 	require.NotContains(t, got, "nested-secret")
+	require.NotContains(t, got, "api-secret")
+	require.NotContains(t, got, "first-token")
+	require.NotContains(t, got, "second-token")
 	require.Equal(t, got, RedactDSN(got))
 
 	parsed, err := url.Parse(got)
@@ -144,40 +148,46 @@ func TestRedactDSNURI(t *testing.T) {
 	require.Equal(t, "yes", query.Get("keep"))
 	require.Equal(t, redactedSecret, query.Get("client_secret"))
 	require.Equal(t, redactedSecret, query.Get("client%5Fsecret"))
+	require.Equal(t, redactedSecret, query.Get("x-api-key"))
+	require.Equal(t, []string{redactedSecret, redactedSecret}, query["token"])
 }
 
 func TestRedactDSNFallsBackForAmbiguousURI(t *testing.T) {
 	for _, dsn := range []string{
 		"postgres_://user:marker-secret@[2001:db8::1]:5432/db?sslmode=require",
 		"postgres://user:marker-secret@host/db?bad=%zz",
+		"postgres://user:marker-secret@host/db?client+secret=query-secret",
 		"postgres://user:marker-secret@host/db?x=1;y=2",
 	} {
 		got := RedactDSN(dsn)
 		require.Equal(t, redactedDSN, got)
 		require.NotContains(t, got, "marker-secret")
+		require.NotContains(t, got, "query-secret")
 	}
 }
 
 func TestRedactDSNMySQL(t *testing.T) {
 	tests := []struct {
-		name string
-		dsn  string
+		name          string
+		dsn           string
+		emptyPassword bool
 	}{
-		{
-			name: "equals username and secret params",
-			dsn:  "bench=prod:marker-secret@tcp(db:3306)/bench?charset=utf8&client_secret=query-secret",
-		},
 		{
 			name: "password contains scheme separator",
 			dsn:  "user:marker://secret@tcp(db:3306)/bench?keep=yes",
 		},
 		{
-			name: "password-like username stays MySQL",
-			dsn:  "password=account:marker-secret@tcp(db:3306)/bench?sslmode=require",
-		},
-		{
 			name: "custom network",
 			dsn:  "user:marker-secret@custom-net(db:3306)/bench?keep=yes",
+		},
+		{
+			name: "encoded secret parameter",
+			dsn:  "user:marker-secret@tcp(db:3306)/bench?client%5Fsecret=query-secret&keep=yes&charset=utf8",
+		},
+		{
+			name:          "explicit empty password",
+			dsn:           "user:@tcp(db:3306)/bench?charset=utf8",
+			emptyPassword: true,
 		},
 	}
 
@@ -185,6 +195,10 @@ func TestRedactDSNMySQL(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			original, err := mysql.ParseDSN(test.dsn)
 			require.NoError(t, err)
+
+			if test.emptyPassword {
+				require.Empty(t, original.Passwd)
+			}
 
 			got := RedactDSN(test.dsn)
 			require.NotEqual(t, redactedDSN, got)
@@ -200,7 +214,10 @@ func TestRedactDSNMySQL(t *testing.T) {
 			require.Equal(t, redactedSecret, parsed.Passwd)
 
 			for key, value := range original.Params {
-				if isSecretName(key) {
+				secret, certain := classifyQueryKey(key)
+				require.True(t, certain)
+
+				if secret {
 					require.Equal(t, redactedSecret, parsed.Params[key])
 				} else {
 					require.Equal(t, value, parsed.Params[key])
@@ -219,6 +236,30 @@ func TestRedactDSNFallsBackForMalformedMySQL(t *testing.T) {
 		got := RedactDSN(dsn)
 		require.Equal(t, redactedDSN, got)
 		require.NotContains(t, got, "marker-secret")
+	}
+}
+
+func TestRedactDSNFallsBackForUncertainMySQLParam(t *testing.T) {
+	dsn := "user:marker-secret@tcp(db:3306)/bench?client+secret=query-secret&keep=yes"
+	got := RedactDSN(dsn)
+
+	require.Equal(t, redactedDSN, got)
+	require.NotContains(t, got, "marker-secret")
+	require.NotContains(t, got, "query-secret")
+}
+
+func TestRedactDSNFallsBackForConninfoMySQLAmbiguity(t *testing.T) {
+	for _, dsn := range []string{
+		"password=marker-secret:other-secret@tcp(db:3306)/bench?keep=yes",
+		"bench=prod:marker-secret@tcp(db:3306)/bench?keep=yes",
+		"password=account:marker-secret@tcp(db:3306)/bench?keep=yes",
+	} {
+		got := RedactDSN(dsn)
+
+		require.Equal(t, redactedDSN, got)
+		require.NotContains(t, got, "marker-secret")
+		require.NotContains(t, got, "other-secret")
+		require.Equal(t, got, RedactDSN(got))
 	}
 }
 
