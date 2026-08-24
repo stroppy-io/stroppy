@@ -10,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"go.uber.org/zap"
 
@@ -289,13 +291,28 @@ func (r *errorReporter) writeSummary(w io.Writer) {
 }
 
 func boundErrorOperation(operation string) string {
-	if len(operation) > maxErrorOperationBytes {
-		operation = operation[:maxErrorOperationBytes]
-	}
+	operation = strings.ToValidUTF8(operation, "?")
+	operation = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.In(r, unicode.Cf) {
+			return '?'
+		}
 
-	operation = strings.TrimSpace(strings.ToValidUTF8(operation, "?"))
+		return r
+	}, operation)
+	operation = strings.TrimSpace(operation)
+
 	if operation == "" {
 		return "unknown"
+	}
+
+	if len(operation) <= maxErrorOperationBytes {
+		return operation
+	}
+
+	operation = operation[:maxErrorOperationBytes]
+
+	for !utf8.ValidString(operation) {
+		operation = operation[:len(operation)-1]
 	}
 
 	return operation

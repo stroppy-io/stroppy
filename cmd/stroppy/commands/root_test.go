@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -44,16 +45,7 @@ func TestExitCodeFor(t *testing.T) {
 }
 
 func TestCommandErrorExitAndDiagnosticContract(t *testing.T) {
-	var ordinary *commandErrorWorkload
-
-	bench.Register(func() bench.Workload {
-		ordinary = &commandErrorWorkload{name: "test/command-ordinary-error"}
-
-		return ordinary
-	})
-	bench.Register(func() bench.Workload {
-		return &commandErrorWorkload{name: "test/command-fatal-error", fatal: true}
-	})
+	registerCommandErrorWorkloads()
 
 	ordinaryCode, ordinaryOutput := executeTestCommand(t, []string{
 		"run", "test/command-ordinary-error", "-d", "noop", "--iterations", "3", "--vus", "1",
@@ -62,8 +54,8 @@ func TestCommandErrorExitAndDiagnosticContract(t *testing.T) {
 		t.Fatalf("ordinary-error exit code = %d, output = %q, want 0", ordinaryCode, ordinaryOutput)
 	}
 
-	if ordinary.calls.Load() != 3 {
-		t.Fatalf("ordinary-error iterations = %d, want 3", ordinary.calls.Load())
+	if commandOrdinaryErrorWorkload.calls.Load() != 3 {
+		t.Fatalf("ordinary-error iterations = %d, want 3", commandOrdinaryErrorWorkload.calls.Load())
 	}
 
 	fatalCode, fatalOutput := executeTestCommand(t, []string{
@@ -102,6 +94,24 @@ func clearCommandContexts(cmd *cobra.Command) {
 	for _, child := range cmd.Commands() {
 		clearCommandContexts(child)
 	}
+}
+
+var (
+	registerCommandErrorWorkloadsOnce sync.Once
+	commandOrdinaryErrorWorkload      *commandErrorWorkload
+)
+
+func registerCommandErrorWorkloads() {
+	registerCommandErrorWorkloadsOnce.Do(func() {
+		bench.Register(func() bench.Workload {
+			commandOrdinaryErrorWorkload = &commandErrorWorkload{name: "test/command-ordinary-error"}
+
+			return commandOrdinaryErrorWorkload
+		})
+		bench.Register(func() bench.Workload {
+			return &commandErrorWorkload{name: "test/command-fatal-error", fatal: true}
+		})
+	})
 }
 
 type commandErrorWorkload struct {

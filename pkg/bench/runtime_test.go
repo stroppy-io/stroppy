@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -75,13 +76,7 @@ func TestRunScenarioContinuesAfterOrdinaryErrors(t *testing.T) {
 }
 
 func TestRunContinuesAndSummarizesOrdinaryErrors(t *testing.T) {
-	var workload *ordinaryErrorWorkload
-
-	Register(func() Workload {
-		workload = &ordinaryErrorWorkload{}
-
-		return workload
-	})
+	registerOrdinaryErrorWorkload()
 
 	core, logs := observer.New(zapcore.WarnLevel)
 
@@ -99,8 +94,8 @@ func TestRunContinuesAndSummarizesOrdinaryErrors(t *testing.T) {
 		t.Fatalf("Run() error = %v, want nil", err)
 	}
 
-	if workload.calls.Load() != 6 {
-		t.Fatalf("iteration calls = %d, want 6", workload.calls.Load())
+	if ordinaryErrorWorkloadRun.calls.Load() != 6 {
+		t.Fatalf("iteration calls = %d, want 6", ordinaryErrorWorkloadRun.calls.Load())
 	}
 
 	snapshot := root.errorReporter.snapshot()
@@ -115,6 +110,21 @@ func TestRunContinuesAndSummarizesOrdinaryErrors(t *testing.T) {
 	if got := logs.FilterLevelExact(zapcore.ErrorLevel).Len(); got != 0 {
 		t.Fatalf("error-level logs = %d, want 0", got)
 	}
+}
+
+var (
+	registerOrdinaryErrorWorkloadOnce sync.Once
+	ordinaryErrorWorkloadRun          *ordinaryErrorWorkload
+)
+
+func registerOrdinaryErrorWorkload() {
+	registerOrdinaryErrorWorkloadOnce.Do(func() {
+		Register(func() Workload {
+			ordinaryErrorWorkloadRun = &ordinaryErrorWorkload{}
+
+			return ordinaryErrorWorkloadRun
+		})
+	})
 }
 
 type ordinaryErrorWorkload struct {

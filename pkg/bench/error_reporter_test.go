@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
@@ -113,6 +114,22 @@ func TestErrorReporterBoundsGroupsAndPeriodicNotices(t *testing.T) {
 	}, time.Second, time.Millisecond)
 	time.Sleep(15 * time.Millisecond)
 	require.Len(t, logs.FilterMessage("nonfatal errors continue").All(), 1)
+}
+
+func TestBoundErrorOperationSanitizesAndPreservesRuneBoundaries(t *testing.T) {
+	t.Parallel()
+
+	bidi := string(rune(0x202e))
+	format := bidi + string(rune(0x200d))
+	require.Equal(t, "safe???[31m??end", boundErrorOperation("safe\r\n\x1b[31m\x00"+bidi+"end"))
+	require.Equal(t, "left??right", boundErrorOperation("left"+format+"right"))
+	require.Equal(t, "a?b", boundErrorOperation(string([]byte{'a', 0xff, 'b'})))
+
+	prefix := strings.Repeat("a", maxErrorOperationBytes-1)
+	got := boundErrorOperation(prefix + "é")
+	require.Equal(t, prefix, got)
+	require.True(t, utf8.ValidString(got))
+	require.LessOrEqual(t, len(got), maxErrorOperationBytes)
 }
 
 func TestRecordQueryErrorExcludesRunCancellation(t *testing.T) {
