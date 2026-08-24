@@ -16,11 +16,12 @@ func init() {
     stroppy run -f prod.json tpcc/tx       # config file + override workload
     stroppy run -f prod.json ./local.sql   # config file + override SQL file
 
-  RunConfig fields use strict JSON decoding (unknown fields are rejected). The
-  "run" and "params" objects retain native JSON values for typed scenario and
-  workload parameters; their names are validated after the selected workload
-  declares its schema. Unknown top-level fields and unknown names within either
-  scope are rejected.
+  Config objects are strict recursively. Use exact lower-camel field names or
+  their former snake_case ProtoJSON aliases; duplicates, canonical/alias
+  collisions, wrong case, unknown fields, null container members, and trailing
+  JSON are rejected. The "run" and "params" objects retain non-null scalar JSON
+  values for typed scenario and workload parameters; unknown names are rejected
+  after the selected workload declares its schema.
 
 Example stroppy-config.json:
   {
@@ -71,6 +72,17 @@ Example stroppy-config.json:
     steps    []string          Step allowlist (same as CLI --steps)
     noSteps  []string          Step blocklist (same as CLI --no-steps)
 
+  Compatibility aliases use exact snake_case (for example no_steps,
+  global.run_id, drivers.*.bulk_size, and run.query_timeout). Do not set an
+  alias together with its lower-camel name. Former int32 fields accept bare or
+  quoted decimal/exponent forms only when the value is exactly integral and
+  in range. global.seed accepts null or a bare unsigned JSON integer only.
+  Logger enums accept their LOG_LEVEL_*/LOG_MODE_* names or valid numeric
+  ordinals.
+
+  The generated schema is docs/jsonschema/run.schema.json; regenerate it with
+  go generate ./pkg/config after changing the file envelope.
+
   OTLP METRICS
 
     Configure either otlpGrpcEndpoint or otlpHttpEndpoint. If both are set,
@@ -82,7 +94,7 @@ Example stroppy-config.json:
 
   Driver types: postgres, mysql, picodata, ydb, noop, csv
   Error modes:  silent, log, throw, fail, abort
-  Insert methods: native, plain_bulk, plain_query (set per InsertSpec in code)
+  Insert methods: native, plain_bulk, plain_query (selected by workload InsertRequest)
 
 PRECEDENCE (highest to lowest)
 
@@ -103,8 +115,9 @@ PRECEDENCE (highest to lowest)
     steps / noSteps:             CLI --steps > config file "steps" field
     logger / OTEL exporter:      config file "global" only (no CLI equivalent)
 
-  There is no "--" k6-args passthrough and no k6Args field in effect.
-  Use typed executor/vus/iterations/duration/queryTimeout parameters. The
+  There is no "--" k6-args passthrough. Legacy k6Args and k6Config fields are
+  accepted only so existing v5 files still decode; the Go-native runner ignores
+  them. Use typed executor/vus/iterations/duration/queryTimeout parameters. The
   VUS/DURATION/ITER/QUERY_TIMEOUT environment values remain compatible. A
   queryTimeout of "0" disables the per-statement deadline. Legacy DURATION
   without an explicit executor infers constant-vus and emits a warning; prefer

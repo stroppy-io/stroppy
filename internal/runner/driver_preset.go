@@ -27,24 +27,19 @@ const (
 // pathFields lists Extra keys that contain file paths and must be
 // resolved to absolute paths before the working directory changes.
 var pathFields = map[string]bool{
-	"cacertfile": true,
+	"caCertFile":   true,
+	"ca_cert_file": true,
 }
 
 var (
 	errUnknownDriver          = errors.New("unknown driver")
 	errInvalidDriverOverride  = errors.New("invalid driver override")
 	errDriverOverrideConflict = errors.New("driver override conflicts with existing non-object value")
+	errNilDriverConfig        = errors.New("nil driver config")
 )
 
-const (
-	driverTypeKey          = "drivertype"
-	urlKey                 = "url"
-	defaultInsertMethodKey = "defaultinsertmethod"
-)
-
-// inferType converts a CLI string value to its most specific Go type
-// so that JSON serialization emits a number/bool instead of a quoted string.
-// This is required because protobuf (TS side) rejects "20" for int32 fields.
+// inferType converts a CLI string value to its most specific Go type so JSON
+// serialization preserves numeric and boolean -D values for strict validation.
 func inferType(value string) any {
 	if i, err := strconv.ParseInt(value, 10, 64); err == nil {
 		return i
@@ -132,8 +127,8 @@ func LookupDriverPreset(name string) (DriverPreset, error) {
 	return preset, nil
 }
 
-// DriverCLIConfig represents a fully resolved driver configuration from CLI flags.
-// It is serialized to JSON and passed as STROPPY_DRIVER_N env var to the k6 script.
+// DriverCLIConfig is one mutable driver configuration assembled from -d/-D
+// inputs before conversion to the runtime config.
 type DriverCLIConfig struct {
 	// Base fields from preset (overridable via -D).
 	DriverType          string `json:"driverType,omitempty"`
@@ -165,19 +160,19 @@ func (d DriverCLIConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(merged)
 }
 
-// ApplyOverride sets a field by key=value. Known fields are set on the struct,
-// unknown fields go into Extra for pass-through to TS.
+// ApplyOverride sets a field by key=value. Known fields are set on the struct;
+// remaining fields are retained for strict nested validation during conversion.
 func (d *DriverCLIConfig) ApplyOverride(key, value string) error {
 	if key == "" {
 		return fmt.Errorf("%w: empty key", errInvalidDriverOverride)
 	}
 
-	switch normalizeKey(key) {
-	case driverTypeKey:
+	switch key {
+	case "driverType", "driver_type":
 		d.DriverType = value
-	case urlKey:
+	case "url":
 		d.URL = value
-	case defaultInsertMethodKey:
+	case "defaultInsertMethod", "default_insert_method":
 		d.DefaultInsertMethod = value
 	default:
 		return d.setExtraPath(strings.Split(key, "."), convertOverrideValue(key, value))
@@ -241,8 +236,8 @@ func validateOverridePath(path []string) error {
 }
 
 func isDriverCLIField(key string) bool {
-	switch normalizeKey(key) {
-	case driverTypeKey, urlKey, defaultInsertMethodKey:
+	switch key {
+	case "driverType", "driver_type", "url", "defaultInsertMethod", "default_insert_method":
 		return true
 	default:
 		return false
@@ -250,19 +245,13 @@ func isDriverCLIField(key string) bool {
 }
 
 func convertOverrideValue(key, value string) any {
-	if pathFields[normalizeKey(key)] {
+	if pathFields[key] {
 		if abs, err := filepath.Abs(value); err == nil {
 			return abs
 		}
 	}
 
 	return inferType(value)
-}
-
-func normalizeKey(key string) string {
-	replacer := strings.NewReplacer("_", "", "-", "")
-
-	return strings.ToLower(replacer.Replace(key))
 }
 
 // NewDriverCLIConfigFromPreset creates a DriverCLIConfig from a preset.
@@ -274,41 +263,46 @@ func NewDriverCLIConfigFromPreset(p DriverPreset) DriverCLIConfig {
 	}
 }
 
-// NewDriverCLIConfigFromJSON creates a DriverCLIConfig from a raw JSON string.
-// Known fields are extracted into the struct, everything else goes into Extra.
+// NewDriverCLIConfigFromJSON strictly validates a raw -d JSON object before
+// separating its base fields from the nested driver extras.
 func NewDriverCLIConfigFromJSON(raw string) (DriverCLIConfig, error) {
-	var m map[string]any
-	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+	fileConfig := &config.DriverRunConfig{}
+	if err := config.Unmarshal([]byte(raw), fileConfig); err != nil {
 		return DriverCLIConfig{}, fmt.Errorf("invalid driver JSON: %w", err)
 	}
 
-	cfg := DriverCLIConfig{}
+	return driverCLIConfigFromFile(fileConfig)
+}
 
-	for field, val := range m {
-		str, _ := val.(string)
+func driverCLIConfigFromFile(fileConfig *config.DriverRunConfig) (DriverCLIConfig, error) {
+	if fileConfig == nil {
+		return DriverCLIConfig{}, errNilDriverConfig
+	}
 
-		switch normalizeKey(field) {
-		case driverTypeKey:
-			cfg.DriverType = str
-		case urlKey:
-			cfg.URL = str
-		case defaultInsertMethodKey:
-			cfg.DefaultInsertMethod = str
-		default:
-			if cfg.Extra == nil {
-				cfg.Extra = make(map[string]any)
-			}
+	extraConfig := *fileConfig
+	cfg := DriverCLIConfig{
+		DriverType:          fileConfig.GetDriverType(),
+		URL:                 fileConfig.GetURL(),
+		DefaultInsertMethod: fileConfig.GetDefaultInsertMethod(),
+	}
 
-			if pathFields[normalizeKey(field)] {
-				if s, ok := val.(string); ok {
-					if abs, err := filepath.Abs(s); err == nil {
-						val = abs
-					}
-				}
-			}
+	extraConfig.DriverType = nil
+	extraConfig.URL = nil
+	extraConfig.DefaultInsertMethod = nil
 
-			cfg.Extra[field] = val
+	if extraConfig.CaCertFile != nil {
+		if absolute, err := filepath.Abs(*extraConfig.CaCertFile); err == nil {
+			extraConfig.CaCertFile = &absolute
 		}
+	}
+
+	data, err := json.Marshal(&extraConfig) //nolint:gosec // serializing validated config fields
+	if err != nil {
+		return DriverCLIConfig{}, err
+	}
+
+	if err := json.Unmarshal(data, &cfg.Extra); err != nil {
+		return DriverCLIConfig{}, err
 	}
 
 	return cfg, nil
@@ -322,12 +316,7 @@ func DriverCLIConfigsFromFile(fileDrivers map[uint32]*config.DriverRunConfig) (D
 	configs := make(DriverCLIConfigs, len(fileDrivers))
 
 	for idx, fileConfig := range fileDrivers {
-		data, err := json.Marshal(fileConfig) //nolint:gosec // serializing config to env vars, not extracting a secret
-		if err != nil {
-			return nil, fmt.Errorf("serialize config file driver %d: %w", idx, err)
-		}
-
-		cfg, err := NewDriverCLIConfigFromJSON(string(data))
+		cfg, err := driverCLIConfigFromFile(fileConfig)
 		if err != nil {
 			return nil, fmt.Errorf("convert config file driver %d: %w", idx, err)
 		}

@@ -1,18 +1,10 @@
 package runner
 
-import (
-	"bytes"
-	"encoding/json"
+import "github.com/stroppy-io/stroppy/pkg/config"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
-)
-
-// UnmarshalStrict decodes JSON into v, rejecting unknown fields.
+// UnmarshalStrict validates the full JSON token stream before decoding it.
 func UnmarshalStrict(data []byte, v any) error {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-
-	return decoder.Decode(v)
+	return config.Unmarshal(data, v)
 }
 
 // MergePostgresConfig merges src into dst and returns the result. Every field

@@ -39,7 +39,6 @@ var (
 	errUnknownRunFlag     = errors.New("unknown run flag")
 	errPositionalAfterOpt = errors.New("unexpected positional argument after options")
 	errKeyValuePositional = errors.New("unexpected key=value positional argument")
-	errDriverExtraType    = errors.New("invalid driver extra field type")
 	errSQLFilePositional  = errors.New("workload does not accept sql_file positional")
 	errTooManyPositionals = errors.New(
 		"too many positional arguments; expected script and optional sql_file before --",
@@ -739,15 +738,18 @@ func applyDriverExtras(idx int, driverConfig *config.DriverConfig, extras map[st
 		return nil
 	}
 
-	values := maps.Clone(extras)
+	data, err := json.Marshal(extras)
+	if err != nil {
+		return fmt.Errorf("driver %d extra config: %w", idx, err)
+	}
 
-	if errorModeValue, ok := popDriverExtra(values, "errorMode", "error_mode"); ok {
-		errorMode, isString := errorModeValue.(string)
-		if !isString {
-			return fmt.Errorf("driver %d errorMode: %w", idx, errDriverExtraType)
-		}
+	fileConfig := &config.DriverRunConfig{}
+	if err := runner.UnmarshalStrict(data, fileConfig); err != nil {
+		return fmt.Errorf("driver %d extra config: %w", idx, err)
+	}
 
-		parsed, err := bench.ParseErrorMode(errorMode)
+	if fileConfig.ErrorMode != nil {
+		parsed, err := bench.ParseErrorMode(fileConfig.GetErrorMode())
 		if err != nil {
 			return fmt.Errorf("driver %d errorMode: %w", idx, err)
 		}
@@ -755,66 +757,47 @@ func applyDriverExtras(idx int, driverConfig *config.DriverConfig, extras map[st
 		driverConfig.ErrorMode = parsed
 	}
 
-	if _, ok := popDriverExtra(values, "defaultTxIsolation", "default_tx_isolation"); ok {
+	if fileConfig.DefaultTxIsolation != nil {
 		warnIgnoredDriverExtra(idx, "defaultTxIsolation", "use workload parameter --tx-isolation")
 	}
 
-	pool, hasPool := popDriverExtra(values, "pool")
+	pool := fileConfig.Pool
 
 	if driverConfig.DriverType == config.DriverTypePostgres {
-		if _, ok := popDriverExtra(values, "sql"); ok {
+		if fileConfig.SQL != nil {
 			warnIgnoredDriverExtra(idx, "sql", "PostgreSQL uses postgres pool settings")
+
+			fileConfig.SQL = nil
 		}
-	} else if _, ok := popDriverExtra(values, "postgres"); ok {
+	} else if fileConfig.Postgres != nil {
 		warnIgnoredDriverExtra(idx, "postgres", "only PostgreSQL uses postgres pool settings")
+
+		fileConfig.Postgres = nil
 	}
 
-	if hasPool && !driverSupportsPool(driverConfig.DriverType) {
+	if pool != nil && !driverSupportsPool(driverConfig.DriverType) {
 		warnIgnoredDriverExtra(idx, "pool", "selected driver has no connection pool")
 
-		hasPool = false
+		pool = nil
 	}
 
-	extraConfig := &config.DriverConfig{}
+	driverConfig.BulkSize = fileConfig.BulkSize
+	driverConfig.Postgres = fileConfig.Postgres
+	driverConfig.SQL = fileConfig.SQL
+	driverConfig.CaCertFile = fileConfig.CaCertFile
+	driverConfig.AuthToken = fileConfig.AuthToken
+	driverConfig.AuthUser = fileConfig.AuthUser
+	driverConfig.AuthPassword = fileConfig.AuthPassword
+	driverConfig.TLSInsecureSkipVerify = fileConfig.TLSInsecureSkipVerify
+	driverConfig.InsertProgress = fileConfig.InsertProgress
 
-	data, err := json.Marshal(values)
-	if err != nil {
-		return fmt.Errorf("driver %d extra config: %w", idx, err)
-	}
-
-	if err := runner.UnmarshalStrict(data, extraConfig); err != nil {
-		return fmt.Errorf("driver %d extra config: %w", idx, err)
-	}
-
-	if hasPool {
-		if err := mergePoolDriverSpecific(driverConfig.DriverType, pool, extraConfig); err != nil {
+	if pool != nil {
+		if err := mergePoolDriverSpecific(driverConfig.DriverType, pool, driverConfig); err != nil {
 			return fmt.Errorf("driver %d pool config: %w", idx, err)
 		}
 	}
 
-	driverConfig.BulkSize = extraConfig.BulkSize
-	driverConfig.Postgres = extraConfig.Postgres
-	driverConfig.SQL = extraConfig.SQL
-	driverConfig.CaCertFile = extraConfig.CaCertFile
-	driverConfig.AuthToken = extraConfig.AuthToken
-	driverConfig.AuthUser = extraConfig.AuthUser
-	driverConfig.AuthPassword = extraConfig.AuthPassword
-	driverConfig.TLSInsecureSkipVerify = extraConfig.TLSInsecureSkipVerify
-	driverConfig.InsertProgress = extraConfig.InsertProgress
-
 	return nil
-}
-
-func popDriverExtra(values map[string]any, names ...string) (any, bool) {
-	for _, name := range names {
-		if value, ok := values[name]; ok {
-			delete(values, name)
-
-			return value, true
-		}
-	}
-
-	return nil, false
 }
 
 func warnIgnoredDriverExtra(idx int, field, reason string) {
@@ -840,7 +823,7 @@ func driverSupportsPool(driverType config.DriverType) bool {
 
 func mergePoolDriverSpecific(
 	driverType config.DriverType,
-	pool any,
+	pool *config.PoolConfig,
 	driverConfig *config.DriverConfig,
 ) error {
 	data, err := json.Marshal(pool)
@@ -1499,6 +1482,7 @@ func nextFlagValue(args []string, i int) (string, error) {
 // applyDriverPreset loads a preset or parses raw JSON and sets it on the config map.
 // If the value starts with '{', it's treated as a JSON driver config; otherwise as a preset name.
 func applyDriverPreset(configs runner.DriverCLIConfigs, idx int, value string) error {
+	value = strings.TrimSpace(value)
 	if strings.HasPrefix(value, "{") {
 		cfg, err := runner.NewDriverCLIConfigFromJSON(value)
 		if err != nil {

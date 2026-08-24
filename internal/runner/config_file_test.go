@@ -203,4 +203,51 @@ func TestBuildProbeEnvFromRunConfigIncludesFileDriver(t *testing.T) {
 	}`, env["STROPPY_DRIVER_0"])
 }
 
+func TestLoadRunConfigCanonicalizesAliases(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{
+		"no_steps":["load_data"],
+		"global":{"run_id":"run-1"},
+		"drivers":{"0":{"driver_type":"postgres","bulk_size":"2e2"}},
+		"run":{"query_timeout":"250ms"},
+		"params":{"scale_factor":1}
+	}`), 0o600))
+
+	loaded, found, err := runner.LoadRunConfig(path)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, []string{"load_data"}, loaded.RunConfig.NoSteps)
+	require.Equal(t, "run-1", loaded.RunConfig.Global.RunID)
+	require.Equal(t, int32(200), loaded.RunConfig.Drivers[0].GetBulkSize())
+	require.JSONEq(t, `"250ms"`, string(loaded.Run["queryTimeout"]))
+	require.JSONEq(t, `1`, string(loaded.Params["scaleFactor"]))
+}
+
+func TestLoadRunConfigStrictErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		doc  string
+		path string
+	}{
+		{name: "nested duplicate", doc: `{"global":{"runId":"a","runId":"b"}}`, path: `$.global.runId`},
+		{name: "alias collision", doc: `{"global":{"runId":"a","run_id":"b"}}`, path: `$.global.runId`},
+		{name: "wrong case", doc: `{"drivers":{"0":{"BulkSize":1}}}`, path: `$.drivers["0"]["BulkSize"]`},
+		{name: "nested map null", doc: `{"global":{"metadata":{"key":null}}}`, path: `$.global.metadata["key"]`},
+		{name: "scope alias collision", doc: `{"params":{"scaleFactor":1,"scale_factor":2}}`, path: `$.params.scaleFactor`},
+		{name: "scope container", doc: `{"params":{"scaleFactor":[]}}`, path: `$.params.scaleFactor`},
+		{name: "trailing JSON", doc: `{}[]`, path: `$`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			require.NoError(t, os.WriteFile(path, []byte(test.doc), 0o600))
+
+			_, _, err := runner.LoadRunConfig(path)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), test.path)
+		})
+	}
+}
+
 func ptr[T any](v T) *T { return &v }

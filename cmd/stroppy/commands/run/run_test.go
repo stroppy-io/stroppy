@@ -1233,6 +1233,96 @@ func TestApplyDriverPresetInvalidJSON(t *testing.T) {
 	}
 }
 
+func TestApplyDriverPresetStrictJSON(t *testing.T) {
+	tests := []struct {
+		name string
+		doc  string
+		path string
+	}{
+		{name: "exact duplicate", doc: `{"url":"a","url":"b"}`, path: `$.url`},
+		{name: "alias collision", doc: `{"bulkSize":1,"bulk_size":2}`, path: `$.bulkSize`},
+		{name: "wrong case", doc: `{"DriverType":"postgres"}`, path: `$["DriverType"]`},
+		{name: "unknown nested field", doc: `{"pool":{"MaxConns":1}}`, path: `$.pool["MaxConns"]`},
+		{name: "fractional int32", doc: `{"bulkSize":1.5}`, path: `$.bulkSize`},
+		{name: "trailing JSON", doc: `{} {}`, path: `$`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configs := runner.DriverCLIConfigs{}
+
+			err := applyDriverPreset(configs, 0, test.doc)
+			if err == nil || !contains(err.Error(), test.path) {
+				t.Fatalf("applyDriverPreset() error = %v, want path %s", err, test.path)
+			}
+		})
+	}
+}
+
+func TestApplyDriverPresetAliasesReachRuntimeConfig(t *testing.T) {
+	configs := runner.DriverCLIConfigs{}
+	if err := applyDriverPreset(
+		configs,
+		0,
+		`  {"driver_type":"postgres","bulk_size":"2e2","pool":{"max_conns":3}}  `,
+	); err != nil {
+		t.Fatalf("applyDriverPreset() error = %v", err)
+	}
+
+	got, err := buildDriverConfig(0, configs[0], nil)
+	if err != nil {
+		t.Fatalf("buildDriverConfig() error = %v", err)
+	}
+
+	if got.GetBulkSize() != 200 {
+		t.Fatalf("bulkSize = %d, want 200", got.GetBulkSize())
+	}
+
+	if got.Postgres.GetMaxConns() != 3 {
+		t.Fatalf("postgres.maxConns = %d, want 3", got.Postgres.GetMaxConns())
+	}
+}
+
+func TestDriverExtrasRejectAliasCollisionsAndWrongCase(t *testing.T) {
+	tests := []struct {
+		name string
+		keys [][2]string
+		path string
+	}{
+		{
+			name: "alias collision",
+			keys: [][2]string{{"bulkSize", "1"}, {"bulk_size", "2"}},
+			path: `$.bulkSize`,
+		},
+		{
+			name: "nested alias collision",
+			keys: [][2]string{{"pool.maxConns", "1"}, {"pool.max_conns", "2"}},
+			path: `$.pool.maxConns`,
+		},
+		{
+			name: "wrong case",
+			keys: [][2]string{{"pool.MaxConns", "1"}},
+			path: `$.pool["MaxConns"]`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configs := runner.DriverCLIConfigs{0: {DriverType: "postgres"}}
+			for _, keyValue := range test.keys {
+				if err := applyDriverOpt(configs, 0, keyValue[0], keyValue[1]); err != nil {
+					t.Fatalf("applyDriverOpt(%q) error = %v", keyValue[0], err)
+				}
+			}
+
+			_, err := buildDriverConfig(0, configs[0], nil)
+			if err == nil || !contains(err.Error(), test.path) {
+				t.Fatalf("buildDriverConfig() error = %v, want path %s", err, test.path)
+			}
+		})
+	}
+}
+
 func TestApplyDriverOptDottedPool(t *testing.T) {
 	t.Parallel()
 

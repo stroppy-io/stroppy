@@ -45,9 +45,9 @@ DRIVER PRESETS (-d / --driver)
       -D url='/tmp/tpcb-csv?merge=true&workload=tpcb' \
       --steps drop_schema,create_schema,load_data
 
-  The CSV driver supports relational InsertSpec loads only. It accepts DDL
-  in setup steps, rejects runtime query execution, and requires native
-  InsertSpec emission.
+  The CSV driver supports typed InsertRequest loads only. It accepts DDL in
+  setup steps, rejects runtime query execution, and requires the native insert
+  method.
 
   Use -d (driver 0) or -d1, -d2, ... for additional drivers:
 
@@ -58,7 +58,9 @@ DRIVER PRESETS (-d / --driver)
 
     stroppy run tpcc/tx -d '{"url":"postgres://prod:5432","driverType":"postgres"}'
 
-  Useful when no preset matches or many fields must be set at once.
+  Useful when no preset matches or many fields must be set at once. Raw JSON is
+  validated recursively: field names must use exact lower-camel spelling or the
+  former snake_case alias, and duplicate/colliding/unknown fields are rejected.
 
 DRIVER OPTIONS (-D / --driver-opt)
 
@@ -78,7 +80,7 @@ DRIVER OPTIONS (-D / --driver-opt)
                                      db_default | conn | none
     errorMode              string    silent | log | throw | fail | abort
     bulkSize               int       Rows per bulk INSERT (default: 2500)
-    insertProgress.enabled bool      Enable InsertSpec progress watcher
+    insertProgress.enabled bool      Enable load progress watcher
     insertProgress.interval duration Progress log/metric cadence (default: 10s)
     insertProgress.stallAfter duration Warn after no row progress (default: 60s)
     insertProgress.mode    string    off | log | metrics | both
@@ -144,7 +146,7 @@ EXAMPLES
   # Pool tuning
   stroppy run tpcc/tx -d pg -D pool.maxConns=20 -D pool.maxConnLifetime=30m
 
-  # Show InsertSpec load progress every 30 seconds and warn after 2 minutes idle
+  # Show load progress every 30 seconds and warn after 2 minutes idle
   stroppy run tpcc/tx -d pg -D insertProgress.interval=30s \
     -D insertProgress.stallAfter=2m
 

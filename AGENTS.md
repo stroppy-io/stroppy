@@ -22,9 +22,10 @@ make linter         # read-only check after linter_fix
 make tests          # all tests with race detector and coverage
 ```
 
-There is no `make proto` and no TypeScript toolchain. The `.pb.go` types under
-`pkg/common/proto/stroppy/` are frozen hand-edited Go types (RunConfig,
-DriverConfig, etc.), and `pkg/datagen/dgproto` no longer exists — load-time
+Application configuration is plain Go under `pkg/config`; `config.Unmarshal` owns
+strict JSON/ProtoJSON compatibility. Regenerate the committed file-envelope schema
+with `go generate ./pkg/config`. There is no application protobuf generation step,
+and protobuf remains only as an indirect dependency of external SDKs. Load-time
 generation is plain Go under `pkg/gen/` (see `docs/parallelism.md`).
 
 **Embedded FS rebuild rule:** `workloads/` is `//go:embed *` (SQL/JSON/MD only).
@@ -55,7 +56,7 @@ Resolution order for SQL files: **cwd → `~/.stroppy/` → embedded**.
 | `pkg/gen/` | imperative generation primitives: Root/Domain/Field scalars, reusable typed Batches, IndexedSource, Permute/SplitMix64 |
 | `pkg/datagen/` | row-production seam: `source` (Partitionable/RowSource) + canonical TPC-DS/TPC-H generator adapters (`tpcdsgen`, `tpchgen`) |
 | `internal/runner/` | run-config merge, env override parsing, driver presets, config-file load |
-| `pkg/common/proto/stroppy/` | frozen Go types (RunConfig, DriverConfig, etc.) — the contract, not codegen |
+| `pkg/config/` | plain-Go application config types + strict recursive JSON normalizer; schema source for `docs/jsonschema/run.schema.json` |
 | `workloads/` | embedded SQL/JSON workloads: tpcb, tpcc, tpch, tpcds |
 | `docs/parallelism.md` | InsertRequest parallelism contract and tuning |
 
@@ -244,15 +245,16 @@ Full isolation type names: `read_uncommitted`, `read_committed`, `repeatable_rea
 go doc github.com/jackc/pgx/v5.Rows        # pgx Rows interface
 go doc ./pkg/driver Rows                    # local interface
 go doc ./pkg/bench Workload                 # workload interface
+go doc ./pkg/config RunConfig               # plain application config envelope
 ```
 
-Prefer `go doc` over grepping source for type/interface definitions. The `.pb.go`
-files under `pkg/common/proto/stroppy/` are frozen hand-edited types — read them
-directly (there is no `.proto` source).
+Prefer `go doc` over grepping source for type/interface definitions. Application
+configuration is ordinary Go under `pkg/config`; inspect the types and the shared
+normalizer there rather than looking for generated descriptors.
 
 ## Key Dependencies
 
 - `github.com/jackc/pgx/v5` — PostgreSQL driver
 - `github.com/spf13/cobra` — CLI
 - `google.golang.org/grpc` — YDB SDK transport
-- `google.golang.org/protobuf` — frozen `.pb.go` types compile against it
+- `google.golang.org/protobuf` — indirect protocol dependency of external SDKs (not application config)
