@@ -2,35 +2,30 @@ package bench
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 )
 
-// Step filtering (STROPPY_STEPS allowlist / STROPPY_NO_STEPS blocklist), parsed at
-// Run start (see newRootState) once STROPPY_STEPS env is in place.
+// Step filtering turns the explicit --steps allowlist and --no-steps blocklist
+// passed to Run into the per-step allow/deny decision used by Bench.Step.
 
 type stepFilterState struct {
 	only   map[string]struct{}
 	except map[string]struct{}
 }
 
-func newStepFilter() *stepFilterState {
+func newStepFilter(steps, noSteps []string) *stepFilterState {
 	s := &stepFilterState{only: map[string]struct{}{}, except: map[string]struct{}{}}
 
-	if v := os.Getenv("STROPPY_STEPS"); v != "" {
-		for _, n := range strings.Split(v, ",") {
-			if n = strings.TrimSpace(n); n != "" {
-				s.only[n] = struct{}{}
-			}
+	for _, n := range steps {
+		if n = strings.TrimSpace(n); n != "" {
+			s.only[n] = struct{}{}
 		}
 	}
 
-	if v := os.Getenv("STROPPY_NO_STEPS"); v != "" {
-		for _, n := range strings.Split(v, ",") {
-			if n = strings.TrimSpace(n); n != "" {
-				s.except[n] = struct{}{}
-			}
+	for _, n := range noSteps {
+		if n = strings.TrimSpace(n); n != "" {
+			s.except[n] = struct{}{}
 		}
 	}
 

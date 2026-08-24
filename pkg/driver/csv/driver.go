@@ -85,8 +85,8 @@ type config struct {
 	// at <outdir>/<workload>/<table>.w%03d.csv for downstream tools
 	// that accept glob inputs.
 	merge bool
-	// workload pins the workload sub-directory. Empty means "fall
-	// back to STROPPY_CSV_WORKLOAD env var, then 'default'."
+	// workload pins the workload sub-directory. Empty means "fall back to
+	// 'default'." The name comes from the explicit ?workload= URL option.
 	workload string
 }
 
@@ -298,11 +298,10 @@ func parseSeparator(raw string) (rune, error) {
 	}
 }
 
-// resolveWorkload pins the workload sub-directory on first use. The
-// workload name comes from the URL's ?workload= query parameter when
-// present, else from the STROPPY_CSV_WORKLOAD env var, else
-// "default". We cannot infer from the spec alone because InsertSpecs
-// know their table name, not the workload grouping.
+// resolveWorkload pins the workload sub-directory on first use. The workload
+// name comes from the explicit ?workload= URL query parameter; when absent it
+// defaults to "default". It cannot be inferred from the spec alone because
+// InsertSpecs know their table name, not the workload grouping.
 func (d *Driver) resolveWorkload() string {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -312,10 +311,6 @@ func (d *Driver) resolveWorkload() string {
 	}
 
 	name := d.cfg.workload
-	if name == "" {
-		name = os.Getenv("STROPPY_CSV_WORKLOAD")
-	}
-
 	if name == "" {
 		name = "default"
 	}

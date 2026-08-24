@@ -185,13 +185,14 @@ const teardownTimeout = 30 * time.Second
 
 // Run looks up a fresh workload instance and executes it: Define and parameter
 // resolution first, Setup once, Iterate across the scenario, then Teardown once.
-// env remains available to legacy workload Env calls through the root state.
+// steps/noSteps are the explicit --steps / --no-steps filters; drivers and params
+// flow explicitly through the typed configuration channels.
 func Run(
 	ctx context.Context,
 	name string,
 	drivers map[int]*config.DriverConfig,
-	env map[string]string,
 	paramInputs ParamInputs,
+	steps, noSteps []string,
 	lg *zap.Logger,
 	metricsConfig *MetricsConfig,
 ) (retErr error) {
@@ -210,7 +211,7 @@ func Run(
 		return fmt.Errorf("scenario: %w", err)
 	}
 
-	root, err = newRootState(lg, ctx, env, metricsConfig)
+	root, err = newRootState(lg, ctx, steps, noSteps, metricsConfig)
 	if err != nil {
 		return fmt.Errorf("initialize metrics: %w", err)
 	}

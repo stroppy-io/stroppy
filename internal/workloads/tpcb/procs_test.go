@@ -119,8 +119,9 @@ func TestProcsNoopEndToEnd(t *testing.T) {
 		context.Background(),
 		"tpcb/procs",
 		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		nil,
 		bench.ParamInputs{},
+		nil,
+		nil,
 		zap.NewNop(),
 		&bench.MetricsConfig{},
 	)

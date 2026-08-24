@@ -3,6 +3,7 @@ package config_test
 import (
 	"encoding/json"
 	"math"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -48,8 +49,6 @@ func TestRunConfigJSONAccepted(t *testing.T) {
 
 	require.Equal(t, "tpcc/tx", cfg.GetScript())
 	require.Equal(t, "pico.sql", cfg.GetSQL())
-	require.Nil(t, cfg.K6Args)
-	require.Nil(t, cfg.K6Config)
 
 	require.NotNil(t, cfg.Global)
 	require.Equal(t, "run-42", cfg.Global.RunID)
@@ -76,13 +75,17 @@ func TestRunConfigJSONAccepted(t *testing.T) {
 func TestRunConfigJSONRejects(t *testing.T) {
 	cases := map[string]string{
 		"unknown top-level field": `{"unknownField": 1}`,
-		"unknown driver field":    `{"drivers":{"0":{"driverType":"postgres","unknown":true}}}`,
-		"unknown global field":    `{"global":{"unknown":true}}`,
-		"wrong scalar type":       `{"drivers":{"0":{"bulkSize":"twenty"}}}`,
-		"wrong nested type":       `{"global":{"seed":"not-a-number"}}`,
-		"wrong bool type":         `{"drivers":{"0":{"tlsInsecureSkipVerify":"yes"}}}`,
-		"unknown logLevel":        `{"global":{"logger":{"logLevel":"NOT_A_LEVEL"}}}`,
-		"unknown logMode":         `{"global":{"logger":{"logMode":"NOT_A_MODE"}}}`,
+		"removed k6Args":          `{"k6Args": ["--vus", "10"]}`,
+		"removed k6Config":        `{"k6Config": "k6.json"}`,
+		"removed driver defaultTxIsolation": `{"drivers":{"0":{
+			"driverType":"postgres","defaultTxIsolation":"repeatable_read"}}}`,
+		"unknown driver field": `{"drivers":{"0":{"driverType":"postgres","unknown":true}}}`,
+		"unknown global field": `{"global":{"unknown":true}}`,
+		"wrong scalar type":    `{"drivers":{"0":{"bulkSize":"twenty"}}}`,
+		"wrong nested type":    `{"global":{"seed":"not-a-number"}}`,
+		"wrong bool type":      `{"drivers":{"0":{"tlsInsecureSkipVerify":"yes"}}}`,
+		"unknown logLevel":     `{"global":{"logger":{"logLevel":"NOT_A_LEVEL"}}}`,
+		"unknown logMode":      `{"global":{"logger":{"logMode":"NOT_A_MODE"}}}`,
 	}
 
 	for name, doc := range cases {
@@ -93,17 +96,66 @@ func TestRunConfigJSONRejects(t *testing.T) {
 	}
 }
 
+func TestRemovedFieldsUseOrdinaryUnknownFieldErrors(t *testing.T) {
+	tests := []struct {
+		name  string
+		doc   string
+		path  string
+		field string
+	}{
+		{name: "k6 args", doc: `{"k6Args":[]}`, path: `$.k6Args`, field: "k6Args"},
+		{name: "k6 args alias", doc: `{"k6_args":[]}`, path: `$["k6_args"]`, field: "k6_args"},
+		{name: "k6 config", doc: `{"k6Config":"k6.json"}`, path: `$.k6Config`, field: "k6Config"},
+		{name: "k6 config alias", doc: `{"k6_config":"k6.json"}`, path: `$["k6_config"]`, field: "k6_config"},
+		{
+			name:  "driver isolation",
+			doc:   `{"drivers":{"0":{"defaultTxIsolation":"serializable"}}}`,
+			path:  `$.drivers["0"].defaultTxIsolation`,
+			field: "defaultTxIsolation",
+		},
+		{
+			name:  "driver isolation alias",
+			doc:   `{"drivers":{"0":{"default_tx_isolation":"serializable"}}}`,
+			path:  `$.drivers["0"]["default_tx_isolation"]`,
+			field: "default_tx_isolation",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var cfg config.RunConfig
+
+			err := config.Unmarshal([]byte(test.doc), &cfg)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), test.path)
+			require.Contains(t, err.Error(), `unknown field "`+test.field+`"`)
+		})
+	}
+}
+
+func TestRemovedFieldsAreAbsentFromPublicConfigTypes(t *testing.T) {
+	runConfig := reflect.TypeFor[config.RunConfig]()
+	_, hasK6Args := runConfig.FieldByName("K6Args")
+	_, hasK6Config := runConfig.FieldByName("K6Config")
+
+	require.False(t, hasK6Args)
+	require.False(t, hasK6Config)
+
+	driverConfig := reflect.TypeFor[config.DriverRunConfig]()
+	_, hasDefaultTxIsolation := driverConfig.FieldByName("DefaultTxIsolation")
+	require.False(t, hasDefaultTxIsolation)
+}
+
 func TestJSONFieldNamesPreserved(t *testing.T) {
 	driver := config.DriverRunConfig{
-		DriverType:         ptr("postgres"),
-		URL:                ptr("postgres://x"),
-		ErrorMode:          ptr("throw"),
-		BulkSize:           ptr[int32](20),
-		CaCertFile:         ptr("/tls/ca.pem"),
-		AuthToken:          ptr("token"),
-		AuthUser:           ptr("bench"),
-		AuthPassword:       ptr("secret"),
-		DefaultTxIsolation: ptr("read_committed"),
+		DriverType:   ptr("postgres"),
+		URL:          ptr("postgres://x"),
+		ErrorMode:    ptr("throw"),
+		BulkSize:     ptr[int32](20),
+		CaCertFile:   ptr("/tls/ca.pem"),
+		AuthToken:    ptr("token"),
+		AuthUser:     ptr("bench"),
+		AuthPassword: ptr("secret"),
 	}
 
 	data, err := json.Marshal(&driver)
@@ -116,8 +168,7 @@ func TestJSONFieldNamesPreserved(t *testing.T) {
 		"caCertFile": "/tls/ca.pem",
 		"authToken": "token",
 		"authUser": "bench",
-		"authPassword": "secret",
-		"defaultTxIsolation": "read_committed"
+		"authPassword": "secret"
 	}`, string(data))
 }
 

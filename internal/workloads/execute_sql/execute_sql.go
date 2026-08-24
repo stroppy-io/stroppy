@@ -1,8 +1,8 @@
 // Package execute_sql is the Go-native port of workloads/execute_sql/execute_sql.ts:
 // a generic runner that executes every query in a SQL file (or inline SQL string) once.
-// The SQL source is STROPPY_SQL_BODY (inline, CLI-wrapped with a --= marker) or, failing
-// that, SQL_FILE (a path resolved cwd → workloads/execute_sql/ → embedded). Queries are
-// delimited by `--= name` markers, matching parse_sql.ts — a markerless file yields none.
+// The SQL source is one of two typed workload parameters: --sql-file (a path resolved
+// cwd → workloads/execute_sql/ → embedded) or --sql-body (inline SQL text). Queries are
+// delimited by `--= name` markers, matching parse_sql.ts — a markerless source yields none.
 package execute_sql
 
 import (
@@ -15,14 +15,15 @@ import (
 )
 
 var (
-	errNoSQLSource      = errors.New("execute_sql: no SQL source — set STROPPY_SQL_BODY (inline) or SQL_FILE (path)")
-	errSQLFileNoQueries = errors.New("execute_sql: SQL_FILE has no `--= name` queries")
+	errNoSQLSource        = errors.New("execute_sql: no SQL source — pass --sql-file <path> or --sql-body <inline sql>")
+	errSQLSourceNoQueries = errors.New("execute_sql: SQL source has no `--= name` queries")
 )
 
 type workload struct {
 	sql     *bench.SQL
 	names   []string
 	preset  string
+	sqlBody string
 	sqlFile string
 }
 
@@ -31,29 +32,70 @@ func init() { bench.Register(func() bench.Workload { return &workload{} }) }
 func (*workload) Name() string { return "execute_sql" }
 
 func (w *workload) Define(d *bench.Def) error {
-	w.sqlFile = d.Param.String("sql-file", "", "SQL file to execute.").Value()
+	sqlBody := d.Param.String(
+		"sql-body", "", "Inline SQL to execute.",
+		bench.LegacyEnvAliases("STROPPY_SQL_BODY"),
+	)
+	sqlFile := d.Param.String("sql-file", "", "SQL file to execute.")
+
+	bodyPriority := sqlSourcePriority(sqlBody.Source())
+	filePriority := sqlSourcePriority(sqlFile.Source())
+
+	switch {
+	case filePriority > bodyPriority:
+		w.sqlFile = sqlFile.Value()
+		w.sqlBody = ""
+	case bodyPriority > filePriority:
+		w.sqlBody = sqlBody.Value()
+		w.sqlFile = ""
+	case sqlFile.Value() != "" && sqlBody.Value() == "":
+		w.sqlFile = sqlFile.Value()
+		w.sqlBody = ""
+	default:
+		w.sqlBody = sqlBody.Value()
+		w.sqlFile = ""
+	}
 
 	return nil
 }
 
+func sqlSourcePriority(source bench.ParamSource) int {
+	switch source {
+	case bench.ParamSourceCLI:
+		return 5
+	case bench.ParamSourceProcessEnv:
+		return 4
+	case bench.ParamSourceLegacyEnv:
+		return 3
+	case bench.ParamSourceConfig:
+		return 2
+	case bench.ParamSourceLegacyConfigEnv:
+		return 1
+	default:
+		return 0
+	}
+}
+
 func (w *workload) Setup(_ context.Context, b *bench.Bench) error {
 	w.preset = "execute_sql"
-	if body := bench.Env("STROPPY_SQL_BODY", ""); body != "" {
-		w.sql = bench.ParseSQL(body)
-	} else if w.sqlFile != "" {
+
+	switch {
+	case w.sqlBody != "":
+		w.sql = bench.ParseSQL(w.sqlBody)
+	case w.sqlFile != "":
 		s, err := bench.LoadSQL(w.preset, w.sqlFile)
 		if err != nil {
 			return fmt.Errorf("execute_sql: load %s: %w", w.sqlFile, err)
 		}
 
 		w.sql = s
-	} else {
+	default:
 		return errNoSQLSource
 	}
 
 	w.names = w.sql.Names("")
 	if len(w.names) == 0 {
-		return errSQLFileNoQueries
+		return errSQLSourceNoQueries
 	}
 
 	return nil

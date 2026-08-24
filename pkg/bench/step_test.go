@@ -32,8 +32,6 @@ type testBenchFixture struct {
 
 func newTestBenchFixture(t *testing.T) *testBenchFixture {
 	t.Helper()
-	t.Setenv("STROPPY_STEPS", "")
-	t.Setenv("STROPPY_NO_STEPS", "")
 
 	core, logs := observer.New(zapcore.InfoLevel)
 	lg := zap.New(core)
@@ -46,7 +44,7 @@ func newTestBenchFixture(t *testing.T) *testBenchFixture {
 		lg:         lg,
 		registry:   NewRegistry(provider.Meter("test"), prefix),
 		txMetrics:  &txMetrics{},
-		stepFilter: newStepFilter(),
+		stepFilter: newStepFilter(nil, nil),
 	}
 
 	return &testBenchFixture{
@@ -140,6 +138,17 @@ func TestStepAndStepSilentRespectFilter(t *testing.T) {
 	})
 }
 
+func TestStepFilterUsesExplicitNonEmptyNames(t *testing.T) {
+	filter := newStepFilter(
+		[]string{" load_data ", "", "   "},
+		[]string{" workload ", "", "   "},
+	)
+
+	require.True(t, filter.enabled("load_data"))
+	require.False(t, filter.enabled("workload"))
+	require.False(t, filter.enabled("create_schema"))
+}
+
 // stepLifecycleWorkload exhibits the uniform workload-step contract: one loud
 // setup step (load_data) and one silent per-iteration step (workload). Its
 // iteration runs one query so per-iteration query metrics carry the step tag.
@@ -177,8 +186,6 @@ func registerStepLifecycleWorkload() {
 
 func TestWorkloadRunLogVolumeIsBounded(t *testing.T) {
 	registerStepLifecycleWorkload()
-	t.Setenv("STROPPY_STEPS", "")
-	t.Setenv("STROPPY_NO_STEPS", "")
 
 	runAndCount := func(iterations string) (*observer.ObservedLogs, int, int64) {
 		stepLifecycleWorkloadRuns.Store(0)
@@ -190,8 +197,9 @@ func TestWorkloadRunLogVolumeIsBounded(t *testing.T) {
 			context.Background(),
 			"test/step-lifecycle",
 			map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-			nil,
 			ParamInputs{CLI: map[string]string{"iterations": iterations, "vus": "1"}},
+			nil,
+			nil,
 			lg,
 			&MetricsConfig{},
 		)
@@ -229,4 +237,31 @@ func TestWorkloadRunLogVolumeIsBounded(t *testing.T) {
 	require.Zero(t, workloadRecords, "no per-iteration start/end workload records")
 	require.Equal(t, 1, setupStarts, "setup step emits exactly one start record")
 	require.Equal(t, 1, setupEnds, "setup step emits exactly one end record")
+}
+
+func TestRunStepFiltersDoNotLeakBetweenRuns(t *testing.T) {
+	registerStepLifecycleWorkload()
+
+	run := func(steps, noSteps []string) int64 {
+		stepLifecycleWorkloadRuns.Store(0)
+
+		err := Run(
+			context.Background(),
+			"test/step-lifecycle",
+			map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
+			ParamInputs{CLI: map[string]string{"iterations": "1", "vus": "1"}},
+			steps,
+			noSteps,
+			zap.NewNop(),
+			&MetricsConfig{},
+		)
+		require.NoError(t, err)
+
+		return stepLifecycleWorkloadRuns.Load()
+	}
+
+	require.Zero(t, run([]string{"load_data"}, nil))
+	require.Equal(t, int64(1), run(nil, nil))
+	require.Zero(t, run(nil, []string{"workload"}))
+	require.Equal(t, int64(1), run(nil, nil))
 }

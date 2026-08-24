@@ -41,8 +41,9 @@ func TestRunCancelsSetup(t *testing.T) {
 		ctx,
 		"test/cancel-setup",
 		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		map[string]string{},
 		ParamInputs{},
+		nil,
+		nil,
 		zap.NewNop(),
 		&MetricsConfig{},
 	)
@@ -145,8 +146,9 @@ func TestRunTeardownRunsOnCancellation(t *testing.T) {
 		ctx,
 		"test/teardown-on-cancel",
 		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		nil,
 		ParamInputs{},
+		nil,
+		nil,
 		zap.NewNop(),
 		&MetricsConfig{},
 	)

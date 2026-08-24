@@ -46,6 +46,8 @@ func TestNewDriverCLIConfigFromJSONRejectsStrictErrors(t *testing.T) {
 		{name: "alias collision", doc: `{"bulkSize":1,"bulk_size":2}`, path: `$.bulkSize`},
 		{name: "wrong case", doc: `{"DriverType":"postgres"}`, path: `$["DriverType"]`},
 		{name: "unknown field", doc: `{"missing":true}`, path: `$.missing`},
+		{name: "removed isolation", doc: `{"defaultTxIsolation":"serializable"}`, path: `$.defaultTxIsolation`},
+		{name: "removed isolation alias", doc: `{"default_tx_isolation":"serializable"}`, path: `$["default_tx_isolation"]`},
 		{name: "unknown nested field", doc: `{"pool":{"MaxConns":1}}`, path: `$.pool["MaxConns"]`},
 		{name: "null map value", doc: `{"postgres":null,"pool":{"maxConns":1},"extra":null}`, path: `$.extra`},
 		{name: "fractional int32", doc: `{"bulkSize":1.5}`, path: `$.bulkSize`},
@@ -99,6 +101,27 @@ func TestDriverCLIConfigDecodeOverridesPreservesLexemes(t *testing.T) {
 		cfg := runner.DriverCLIConfig{Overrides: overrides}
 		_, err := cfg.DecodeOverrides()
 		require.Error(t, err)
+	}
+}
+
+func TestDriverCLIConfigDecodeOverridesRejectsRemovedIsolation(t *testing.T) {
+	for _, key := range []string{"defaultTxIsolation", "default_tx_isolation"} {
+		t.Run(key, func(t *testing.T) {
+			cfg := runner.DriverCLIConfig{
+				Overrides: []runner.DriverOverride{{Key: key, Value: "serializable"}},
+			}
+
+			_, err := cfg.DecodeOverrides()
+			require.Error(t, err)
+
+			path := `$.` + key
+			if key == "default_tx_isolation" {
+				path = `$["default_tx_isolation"]`
+			}
+
+			require.Contains(t, err.Error(), path)
+			require.Contains(t, err.Error(), `unknown field "`+key+`"`)
+		})
 	}
 }
 

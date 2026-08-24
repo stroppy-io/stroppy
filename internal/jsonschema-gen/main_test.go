@@ -17,6 +17,15 @@ func TestBuildSchemaDescribesFileEnvelope(t *testing.T) {
 	require.Equal(t, false, runConfig["additionalProperties"])
 
 	properties := object(t, runConfig["properties"])
+	for _, name := range []string{"k6Args", "k6_args", "k6Config", "k6_config"} {
+		require.NotContains(t, properties, name)
+	}
+
+	driverConfig := object(t, defs["DriverRunConfig"])
+	driverProperties := object(t, driverConfig["properties"])
+	require.NotContains(t, driverProperties, "defaultTxIsolation")
+	require.NotContains(t, driverProperties, "default_tx_isolation")
+
 	run := object(t, properties["run"])
 	params := object(t, properties["params"])
 	require.NotNil(t, run["additionalProperties"])

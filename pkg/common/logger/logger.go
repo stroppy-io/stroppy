@@ -3,7 +3,6 @@ package logger
 import (
 	"fmt"
 	"os"
-	"strings"
 	"sync/atomic"
 
 	"go.uber.org/zap"
@@ -93,18 +92,6 @@ const (
 	envLogLevel = "LOG_LEVEL"
 	envLogMod   = "LOG_MODE"
 )
-
-func SetLoggerEnv(level zapcore.Level, mod LogMod) {
-	os.Setenv(envLogLevel, strings.ToLower(level.String()))
-	os.Setenv(envLogMod, strings.ToLower(string(mod)))
-}
-
-func PrepareLoggerEnvs(level zapcore.Level, mod LogMod) []string {
-	return []string{
-		envLogLevel + "=" + strings.ToLower(level.String()),
-		envLogMod + "=" + strings.ToLower(string(mod)),
-	}
-}
 
 func NewFromEnv(opts ...zap.Option) *zap.Logger {
 	cfg := &Config{

@@ -178,8 +178,9 @@ func runNewOrderBody(
 		context.Background(),
 		newOrderTestWorkloadName,
 		map[int]*config.DriverConfig{0: {DriverType: fakeDriverType}},
-		nil,
 		bench.ParamInputs{},
+		nil,
+		nil,
 		zap.NewNop(),
 		&bench.MetricsConfig{},
 	); err != nil {

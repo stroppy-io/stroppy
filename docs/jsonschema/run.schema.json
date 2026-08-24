@@ -70,14 +70,6 @@
         {
           "not": {
             "required": [
-              "defaultTxIsolation",
-              "default_tx_isolation"
-            ]
-          }
-        },
-        {
-          "not": {
-            "required": [
               "defaultInsertMethod",
               "default_insert_method"
             ]
@@ -229,27 +221,7 @@
             }
           ]
         },
-        "defaultTxIsolation": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "default_insert_method": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "default_tx_isolation": {
           "anyOf": [
             {
               "type": "string"
@@ -1854,22 +1826,6 @@
               "no_steps"
             ]
           }
-        },
-        {
-          "not": {
-            "required": [
-              "k6Args",
-              "k6_args"
-            ]
-          }
-        },
-        {
-          "not": {
-            "required": [
-              "k6Config",
-              "k6_config"
-            ]
-          }
         }
       ],
       "properties": {
@@ -1908,52 +1864,6 @@
           "anyOf": [
             {
               "$ref": "#/$defs/GlobalConfig"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "k6Args": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "k6Config": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "k6_args": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "k6_config": {
-          "anyOf": [
-            {
-              "type": "string"
             },
             {
               "type": "null"

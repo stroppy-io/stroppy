@@ -177,32 +177,45 @@ func TestLoadRunConfigRejectsCaseInsensitiveEnvCollisions(t *testing.T) {
 	assert.Contains(t, err.Error(), `config env keys collide case-insensitively: "VUS" and "vus"`)
 }
 
-func TestBuildProbeEnvFromRunConfigIncludesFileDriver(t *testing.T) {
-	cfg := &config.RunConfig{
-		Env: map[string]string{"WAREHOUSES": "10"},
-		Drivers: map[uint32]*config.DriverRunConfig{
-			0: {
-				DriverType:          ptr("ydb"),
-				URL:                 ptr("grpc://localhost:2136/local"),
-				DefaultInsertMethod: ptr("native"),
-				DefaultTxIsolation:  ptr("repeatable_read"),
-				Pool: &config.PoolConfig{
-					MaxOpenConns: ptr[int32](7),
-				},
-			},
-		},
-	}
+func TestLoadRunConfigRejectsRemovedFieldsAsUnknown(t *testing.T) {
+	for _, field := range []string{"k6Args", "k6_args", "k6Config", "k6_config"} {
+		t.Run(field, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			require.NoError(t, os.WriteFile(path, []byte(`{"script":"tpcc/tx","`+field+`":"x"}`), 0o600))
 
-	env, err := runner.BuildProbeEnvFromRunConfig(cfg)
-	require.NoError(t, err)
-	assert.Equal(t, "10", env["WAREHOUSES"])
-	assert.JSONEq(t, `{
-		"driverType": "ydb",
-		"url": "grpc://localhost:2136/local",
-		"defaultInsertMethod": "native",
-		"defaultTxIsolation": "repeatable_read",
-		"pool": { "maxOpenConns": 7 }
-	}`, env["STROPPY_DRIVER_0"])
+			_, _, err := runner.LoadRunConfig(path)
+			require.Error(t, err)
+
+			fieldPath := `$.` + field
+			if strings.Contains(field, "_") {
+				fieldPath = `$["` + field + `"]`
+			}
+
+			assert.Contains(t, err.Error(), fieldPath)
+			assert.Contains(t, err.Error(), `unknown field "`+field+`"`)
+		})
+	}
+}
+
+func TestLoadRunConfigRejectsRemovedDriverFieldAsUnknown(t *testing.T) {
+	for _, field := range []string{"defaultTxIsolation", "default_tx_isolation"} {
+		t.Run(field, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			doc := `{"drivers":{"0":{"` + field + `":"serializable"}}}`
+			require.NoError(t, os.WriteFile(path, []byte(doc), 0o600))
+
+			_, _, err := runner.LoadRunConfig(path)
+			require.Error(t, err)
+
+			fieldPath := `$.drivers["0"].` + field
+			if strings.Contains(field, "_") {
+				fieldPath = `$.drivers["0"]["` + field + `"]`
+			}
+
+			assert.Contains(t, err.Error(), fieldPath)
+			assert.Contains(t, err.Error(), `unknown field "`+field+`"`)
+		})
+	}
 }
 
 func TestLoadRunConfigCanonicalizesAliases(t *testing.T) {

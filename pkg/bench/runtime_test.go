@@ -68,8 +68,9 @@ func TestRunRejectsNegativeQueryTimeout(t *testing.T) {
 		context.Background(),
 		"test/query-timeout-negative",
 		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		nil,
 		ParamInputs{CLI: map[string]string{"query-timeout": "-5s"}},
+		nil,
+		nil,
 		zap.NewNop(),
 		&MetricsConfig{},
 	)
@@ -107,8 +108,9 @@ func TestRunPassesScenarioCancellationToWorkload(t *testing.T) {
 		context.Background(),
 		"test/fatal-context",
 		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		map[string]string{"VUS": "2", "ITER": "2"},
 		ParamInputs{LegacyEnv: map[string]string{"VUS": "2", "ITER": "2"}},
+		nil,
+		nil,
 		zap.NewNop(),
 		&MetricsConfig{},
 	)
@@ -164,7 +166,7 @@ func installRuntimeTestRoot(t *testing.T) {
 
 	oldRoot := root
 
-	testRoot, err := newRootState(zap.NewNop(), context.Background(), nil, &MetricsConfig{})
+	testRoot, err := newRootState(zap.NewNop(), context.Background(), nil, nil, &MetricsConfig{})
 	if err != nil {
 		t.Fatalf("newRootState() error = %v", err)
 	}

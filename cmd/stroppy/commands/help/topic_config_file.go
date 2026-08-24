@@ -53,8 +53,7 @@ Example stroppy-config.json:
     },
     "params": {},
     "env": {
-      "WAREHOUSES": "10",
-      "POOL_SIZE": "200"
+      "WAREHOUSES": "10"
     },
     "steps": ["create_schema", "load_data"]
   }
@@ -115,9 +114,8 @@ PRECEDENCE (highest to lowest)
     steps / noSteps:             CLI --steps > config file "steps" field
     logger / OTEL exporter:      config file "global" only (no CLI equivalent)
 
-  There is no "--" k6-args passthrough. Legacy k6Args and k6Config fields are
-  accepted only so existing v5 files still decode; the Go-native runner ignores
-  them. Use typed executor/vus/iterations/duration/queryTimeout parameters. The
+  There is no "--" k6-args passthrough. Use typed
+  executor/vus/iterations/duration/queryTimeout parameters. The
   VUS/DURATION/ITER/QUERY_TIMEOUT environment values remain compatible. A
   queryTimeout of "0" disables the per-statement deadline. Legacy DURATION
   without an explicit executor infers constant-vus and emits a warning; prefer

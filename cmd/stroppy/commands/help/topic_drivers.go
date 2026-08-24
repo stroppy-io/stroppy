@@ -103,20 +103,17 @@ DRIVER OPTIONS (-D / --driver-opt)
   pool.* options are sugar — they map to the driver-specific pool config
   (pgx pool or sql pool) based on driverType. They are ignored for noop/csv.
 
-  POOL_SIZE env (for the postgres driver) is a shorthand that sets both the
-  pgx pool MinConns and MaxConns to the same value.
-
-  "defaultTxIsolation" and "defaultInsertMethod" remain accepted in config
-  files for compatibility, but do not control workload execution. Use the
-  workload's "--tx-isolation" parameter where applicable.
+  "defaultInsertMethod" remains accepted in config files for compatibility,
+  but does not control workload execution. Insert methods are owned by each
+  workload's load request.
 
 HOW IT WORKS
 
   1. CLI flags (-d, -D) and config-file drivers are parsed into the selected
      Go driver's runtime configuration.
 
-  2. STROPPY_DRIVER_N environment variables are not runtime driver inputs.
-     Use -d/-D or the config-file "drivers" map instead.
+  2. Each DriverConfig is passed directly to the Go-native bench engine,
+     which dispatches to the registered driver implementation.
 
   To inspect the driver insert methods each driver supports:
 
