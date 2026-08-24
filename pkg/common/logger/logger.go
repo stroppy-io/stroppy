@@ -165,9 +165,6 @@ func RedactDSN(dsn string) string {
 	}
 
 	assignments, conninfoOK := parseConninfo(dsn)
-	if conninfoOK && containsASCIIWhitespace(dsn) {
-		return redactConninfo(dsn, assignments)
-	}
 
 	mysqlRedacted, mysqlOK := redactMySQL(dsn)
 	if conninfoOK {
@@ -464,16 +461,6 @@ func skipASCIIWhitespace(dsn string, index int) int {
 	}
 
 	return index
-}
-
-func containsASCIIWhitespace(value string) bool {
-	for index := range len(value) {
-		if isASCIIWhitespace(value[index]) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func isASCIIWhitespace(value byte) bool {

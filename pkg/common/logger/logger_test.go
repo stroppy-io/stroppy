@@ -261,17 +261,67 @@ func TestRedactDSNFallsBackForUncertainMySQLParam(t *testing.T) {
 }
 
 func TestRedactDSNFallsBackForConninfoMySQLAmbiguity(t *testing.T) {
-	for _, dsn := range []string{
-		"password=marker-secret:other-secret@tcp(db:3306)/bench?keep=yes",
-		"bench=prod:marker-secret@tcp(db:3306)/bench?keep=yes",
-		"password=account:marker-secret@tcp(db:3306)/bench?keep=yes",
-	} {
-		got := RedactDSN(dsn)
+	tests := []struct {
+		name    string
+		dsn     string
+		secrets []string
+	}{
+		{
+			name: "single-token overlap",
+			dsn:  "password=marker-secret:other-secret@tcp(db:3306)/bench?keep=yes",
+			secrets: []string{
+				"marker-secret", "other-secret",
+			},
+		},
+		{
+			name: "equals username",
+			dsn:  "bench=prod:marker-secret@tcp(db:3306)/bench?keep=yes",
+			secrets: []string{
+				"marker-secret",
+			},
+		},
+		{
+			name: "password-like username",
+			dsn:  "password=account:marker-secret@tcp(db:3306)/bench?keep=yes",
+			secrets: []string{
+				"marker-secret",
+			},
+		},
+		{
+			name: "space-separated dual grammar",
+			dsn:  "bench=prod:first-secret password=second-secret@tcp(db:3306)/bench?keep=yes",
+			secrets: []string{
+				"first-secret", "second-secret",
+			},
+		},
+		{
+			name: "tab-separated dual grammar",
+			dsn:  "bench=prod:first-secret\tpassword=second-secret@tcp(db:3306)/bench?keep=yes",
+			secrets: []string{
+				"first-secret", "second-secret",
+			},
+		},
+		{
+			name: "newline-separated dual grammar",
+			dsn:  "bench=prod:first-secret\npassword=second-secret@tcp(db:3306)/bench?keep=yes",
+			secrets: []string{
+				"first-secret", "second-secret",
+			},
+		},
+	}
 
-		require.Equal(t, redactedDSN, got)
-		require.NotContains(t, got, "marker-secret")
-		require.NotContains(t, got, "other-secret")
-		require.Equal(t, got, RedactDSN(got))
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := RedactDSN(test.dsn)
+
+			require.Equal(t, redactedDSN, got)
+
+			for _, secret := range test.secrets {
+				require.NotContains(t, got, secret)
+			}
+
+			require.Equal(t, got, RedactDSN(got))
+		})
 	}
 }
 
@@ -283,8 +333,8 @@ func TestRedactDSNConninfo(t *testing.T) {
 	}{
 		{
 			name: "duplicate secrets preserve outside spans",
-			dsn:  "host=db application_name=worker:@/path password=first-secret sslmode=require token=second-secret",
-			want: "host=db application_name=worker:@/path password=xxxxx sslmode=require token=xxxxx",
+			dsn:  "host=db application_name=worker password=first-secret sslmode=require token=second-secret",
+			want: "host=db application_name=worker password=xxxxx sslmode=require token=xxxxx",
 		},
 		{
 			name: "quoted token text is content not query",
