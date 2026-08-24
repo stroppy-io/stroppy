@@ -117,11 +117,11 @@ func normalizeValue(
 	}
 
 	if target == logLevelType {
-		return normalizeEnum(token, path, logLevelNames, out)
+		return normalizeLogLevel(token, path, out)
 	}
 
 	if target == logModeType {
-		return normalizeEnum(token, path, logModeNames, out)
+		return normalizeLogMode(token, path, out)
 	}
 
 	switch target.Kind() {
@@ -613,6 +613,30 @@ func normalizeScopeScalar(
 	}
 
 	return nil
+}
+
+func normalizeLogLevel(token json.Token, path string, out *bytes.Buffer) error {
+	if value, ok := token.(string); ok {
+		if level, valid := parseLogLevelName(value); valid {
+			writeJSONString(out, level.String())
+
+			return nil
+		}
+	}
+
+	return normalizeEnum(token, path, logLevelNames, out)
+}
+
+func normalizeLogMode(token json.Token, path string, out *bytes.Buffer) error {
+	if value, ok := token.(string); ok {
+		if mode, valid := parseLogModeName(value); valid {
+			writeJSONString(out, mode.String())
+
+			return nil
+		}
+	}
+
+	return normalizeEnum(token, path, logModeNames, out)
 }
 
 func normalizeEnum[T ~int32](token json.Token, path string, names map[T]string, out *bytes.Buffer) error {

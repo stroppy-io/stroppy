@@ -62,7 +62,8 @@ Example stroppy-config.json:
 
     script   string            Workload name, .sql path, or inline SQL
     sql      string            Explicit SQL file override (2nd positional)
-    global   object            Logger and OTEL exporter config (no CLI equivalent)
+    global   object            Logger and OTEL exporter config; --log-level/--log-mode override logger fields,
+                              while exporter has no CLI equivalent
     drivers  map[string]obj    Per-index driver configs (keys "0", "1", ...)
     run      object            Typed scenario params: executor, vus, iterations, duration,
                               queryTimeout
@@ -76,8 +77,10 @@ Example stroppy-config.json:
   alias together with its lower-camel name. Former int32 fields accept bare or
   quoted decimal/exponent forms only when the value is exactly integral and
   in range. global.seed accepts null or a bare unsigned JSON integer only.
-  Logger enums accept their LOG_LEVEL_*/LOG_MODE_* names or valid numeric
-  ordinals.
+  Logger enums accept short names (debug, info, warn, error, fatal;
+  development, production), their LOG_LEVEL_*/LOG_MODE_* names, or valid
+  numeric ordinals. Fractional, out-of-range, and wrong-type values are
+  rejected. Logger defaults are debug/development.
 
   The generated schema is docs/jsonschema/run.schema.json; regenerate it with
   go generate ./pkg/config after changing the file envelope.
@@ -112,7 +115,12 @@ PRECEDENCE (highest to lowest)
 
     workload / sql positionals:  CLI arg > config file "script"/"sql" fields
     steps / noSteps:             CLI --steps > config file "steps" field
-    logger / OTEL exporter:      config file "global" only (no CLI equivalent)
+    logger:  --log-level/--log-mode > LOG_LEVEL/LOG_MODE process env >
+             -e LOG_LEVEL/LOG_MODE > global.logger > debug/development
+    OTEL exporter: global config only (no CLI equivalent)
+
+  Database URLs in configuration diagnostics are redacted: passwords, tokens,
+  secrets, credentials, and API keys never appear in logs.
 
   There is no "--" k6-args passthrough. Use typed
   executor/vus/iterations/duration/queryTimeout parameters. The
@@ -134,7 +142,7 @@ DEBUG LOGGING
     env_override   when real env takes precedence over -e or file env keys
     driver_preset  which source was applied per driver index
 
-  At INFO level (default) stroppy logs:
+  With the debug/development defaults, stroppy logs:
 
     "Loaded config file: <path>"
 

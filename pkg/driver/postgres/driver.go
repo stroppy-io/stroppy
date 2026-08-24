@@ -61,9 +61,7 @@ func NewDriver(
 ) (d *Driver, err error) {
 	lg := opts.Logger
 	if lg == nil {
-		lg = logger.NewFromEnv().
-			Named(pool.DriverLoggerName).
-			WithOptions(zap.AddCallerSkip(0))
+		lg = logger.Global().Named(pool.DriverLoggerName)
 	}
 
 	const defaultBulkSize = 2500
@@ -98,7 +96,7 @@ func NewDriver(
 		}
 	}
 
-	d.logger.Debug("Checking db connection...", zap.String("url", cfg.URL))
+	d.logger.Debug("Checking db connection...", zap.String("url", logger.RedactDSN(cfg.URL)))
 
 	// TODO: make waiting optional
 	err = sqldriver.WaitForDB(ctx, d.logger, d.pool, dbConnectionTimeout)

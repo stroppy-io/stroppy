@@ -33,6 +33,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
+- Logging now uses one safely replaceable process-wide logger, with configurable level and output mode precedence plus redacted database connection diagnostics. ([#154](https://github.com/stroppy-io/stroppy/pull/154))
 - Driver insert-method defaults now fill only load requests that leave their method unset, preserving methods selected by workloads. ([#152](https://github.com/stroppy-io/stroppy/pull/152))
 - SIGINT and SIGTERM now cancel the running workload and trigger graceful teardown; a second signal forces immediate exit. Exit status is 130 (SIGINT) or 143 (SIGTERM) after a graceful cancellation, 2 after a forced exit, and 1 for other errors. ([#148](https://github.com/stroppy-io/stroppy/pull/148))
 - Built-in workloads expose their tuning options as typed parameters while preserving the existing environment-variable names. ([#128](https://github.com/stroppy-io/stroppy/pull/128))

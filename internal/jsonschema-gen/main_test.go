@@ -77,12 +77,19 @@ func TestBuildSchemaDescribesAcceptedScalarForms(t *testing.T) {
 	logForms := anyOf(t, logLevel)
 	require.Equal(t, "string", object(t, logForms[0])["type"])
 	require.Equal(t, []string{
-		"LOG_LEVEL_DEBUG",
-		"LOG_LEVEL_INFO",
-		"LOG_LEVEL_WARN",
-		"LOG_LEVEL_ERROR",
-		"LOG_LEVEL_FATAL",
+		"LOG_LEVEL_DEBUG", "debug",
+		"LOG_LEVEL_INFO", "info",
+		"LOG_LEVEL_WARN", "warn",
+		"LOG_LEVEL_ERROR", "error",
+		"LOG_LEVEL_FATAL", "fatal",
 	}, stringSlice(t, object(t, logForms[0])["enum"]))
+	logMode := firstAnyOf(t, loggerProperties["logMode"])
+	modeForms := anyOf(t, logMode)
+	require.Equal(t, []string{
+		"LOG_MODE_DEVELOPMENT", "development",
+		"LOG_MODE_PRODUCTION", "production",
+	}, stringSlice(t, object(t, modeForms[0])["enum"]))
+
 	require.Equal(t, "integer", object(t, logForms[1])["type"])
 	require.Equal(t, []int{0, 1, 2, 3, 4}, intSlice(t, object(t, logForms[1])["enum"]))
 }

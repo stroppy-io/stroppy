@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -28,6 +29,15 @@ const (
 	flagDriverOpt    = "--driver-opt"
 )
 
+const (
+	loggerLevelParam = "log-level"
+	loggerModeParam  = "log-mode"
+	envLogLevel      = "LOG_LEVEL"
+	envLogMode       = "LOG_MODE"
+	defaultLogLevel  = "debug"
+	defaultLogMode   = "development"
+)
+
 var (
 	errNoScript           = errors.New("script argument is required")
 	errFlagRequiresValue  = errors.New("flag requires a value")
@@ -43,7 +53,11 @@ var (
 	errK6PassthroughRemoved = errors.New(
 		"the '--' k6 passthrough is removed; use --executor/--vus/--iterations/--duration",
 	)
-	errUnknownWorkload = errors.New("unknown workload; expected a registered Go workload, a .sql file, or inline SQL")
+	errUnknownWorkload = errors.New(
+		"unknown workload; expected a registered Go workload, a .sql file, or inline SQL",
+	)
+	errInvalidConfigLogLevel = errors.New("invalid config log level")
+	errInvalidConfigLogMode  = errors.New("invalid config log mode")
 )
 
 var Cmd = &cobra.Command{
@@ -62,6 +76,13 @@ The workload and optional sql_file positionals must be adjacent.
 Environment flags:
   -e, --env KEY=VALUE     Set a legacy env value for the workload.
                           Real env and typed flags take precedence.
+
+Logging:
+  --log-level VALUE       Minimum level: debug, info, warn, error, or fatal.
+  --log-mode VALUE        Output mode: development or production.
+                          Each accepts its LOG_LEVEL_*/LOG_MODE_* name or ordinal.
+                          Sources: flags > process env > -e > global.logger > defaults.
+                          Defaults: debug and development.
 
 Typed parameter flags:
   --name VALUE            Set a run or selected-workload parameter.
@@ -118,11 +139,25 @@ Signals:
 			return printSelectedWorkloadHelp(cmd, parsed.scriptArg, parsed.sqlArg)
 		}
 
-		// Load config file if -f is specified or stroppy-config.json exists.
+		// Resolve -e values before loading configuration so logger input is ready
+		// before any configuration diagnostics are emitted.
+		envOverrides, err := runner.ResolveEnvOverrides(parsed.envArgs)
+		if err != nil {
+			return invalidConfig(err)
+		}
+
+		// Load configuration without emitting diagnostics. The effective logger is
+		// initialized immediately afterward so every following log shares it.
 		fileConfig, _, err := runner.LoadRunConfig(parsed.fileArg)
 		if err != nil {
 			return invalidConfig(fmt.Errorf("failed to load config file: %w", err))
 		}
+
+		if err := initializeLogger(parsed.typedParams, envOverrides, fileConfig); err != nil {
+			return invalidConfig(err)
+		}
+
+		runner.LogConfigFile(fileConfig)
 
 		// Apply effective values: CLI overrides config file.
 		scriptArg := runner.EffectiveScript(parsed.scriptArg, fileConfig)
@@ -172,15 +207,9 @@ Signals:
 			}
 		}
 
-		// Resolve -e overrides (uppercase keys, validate format).
-		envOverrides, err := runner.ResolveEnvOverrides(parsed.envArgs)
-		if err != nil {
-			return invalidConfig(err)
-		}
-
 		paramInputs := bench.ParamInputs{
-			CLI:       parsed.typedParams,
-			LegacyEnv: envOverrides,
+			CLI:       withoutLoggerParams(parsed.typedParams),
+			LegacyEnv: withoutLoggerEnv(envOverrides),
 		}
 
 		driverConfigs := runner.DriverCLIConfigs{}
@@ -188,7 +217,7 @@ Signals:
 		if fileConfig != nil {
 			paramInputs.RunConfig = fileConfig.Run
 			paramInputs.WorkloadConfig = fileConfig.Params
-			paramInputs.LegacyConfigEnv = fileConfig.RunConfig.Env
+			paramInputs.LegacyConfigEnv = withoutLoggerEnv(fileConfig.RunConfig.Env)
 
 			driverConfigs, err = runner.DriverCLIConfigsFromFile(fileConfig.RunConfig.Drivers)
 			if err != nil {
@@ -315,6 +344,130 @@ func loadedRunConfig(loaded *runner.LoadedConfig) *config.RunConfig {
 	return loaded.RunConfig
 }
 
+func initializeLogger(
+	cli, legacyEnv map[string]string,
+	loaded *runner.LoadedConfig,
+) error {
+	var fileLogger *config.LoggerConfig
+	if loaded != nil && loaded.RunConfig != nil && loaded.RunConfig.Global != nil {
+		fileLogger = loaded.RunConfig.Global.Logger
+	}
+
+	level, err := resolveLogLevel(cli, legacyEnv, fileLogger)
+	if err != nil {
+		return err
+	}
+
+	mode, err := resolveLogMode(cli, legacyEnv, fileLogger)
+	if err != nil {
+		return err
+	}
+
+	return logger.Init(level, mode)
+}
+
+func resolveLogLevel(cli, legacyEnv map[string]string, fileLogger *config.LoggerConfig) (string, error) {
+	if value, ok := cli[loggerLevelParam]; ok {
+		return parseLogLevel(value)
+	}
+
+	if value, ok := os.LookupEnv(envLogLevel); ok {
+		return parseLogLevel(value)
+	}
+
+	if value, ok := legacyEnv[envLogLevel]; ok {
+		return parseLogLevel(value)
+	}
+
+	if fileLogger != nil {
+		return loggerLevelValue(fileLogger.LogLevel)
+	}
+
+	return defaultLogLevel, nil
+}
+
+func resolveLogMode(cli, legacyEnv map[string]string, fileLogger *config.LoggerConfig) (string, error) {
+	if value, ok := cli[loggerModeParam]; ok {
+		return parseLogMode(value)
+	}
+
+	if value, ok := os.LookupEnv(envLogMode); ok {
+		return parseLogMode(value)
+	}
+
+	if value, ok := legacyEnv[envLogMode]; ok {
+		return parseLogMode(value)
+	}
+
+	if fileLogger != nil {
+		return loggerModeValue(fileLogger.LogMode)
+	}
+
+	return defaultLogMode, nil
+}
+
+func parseLogLevel(value string) (string, error) {
+	level, err := config.ParseLogLevel(value)
+	if err != nil {
+		return "", err
+	}
+
+	return level.Short(), nil
+}
+
+func parseLogMode(value string) (string, error) {
+	mode, err := config.ParseLogMode(value)
+	if err != nil {
+		return "", err
+	}
+
+	return mode.Short(), nil
+}
+
+func loggerLevelValue(value config.LogLevel) (string, error) {
+	if short := value.Short(); short != "" {
+		return short, nil
+	}
+
+	return "", fmt.Errorf("%w: %s", errInvalidConfigLogLevel, value.String())
+}
+
+func loggerModeValue(value config.LogMode) (string, error) {
+	if short := value.Short(); short != "" {
+		return short, nil
+	}
+
+	return "", fmt.Errorf("%w: %s", errInvalidConfigLogMode, value.String())
+}
+
+func withoutLoggerParams(values map[string]string) map[string]string {
+	if _, hasLevel := values[loggerLevelParam]; !hasLevel {
+		if _, hasMode := values[loggerModeParam]; !hasMode {
+			return values
+		}
+	}
+
+	without := maps.Clone(values)
+	delete(without, loggerLevelParam)
+	delete(without, loggerModeParam)
+
+	return without
+}
+
+func withoutLoggerEnv(values map[string]string) map[string]string {
+	if _, hasLevel := values[envLogLevel]; !hasLevel {
+		if _, hasMode := values[envLogMode]; !hasMode {
+			return values
+		}
+	}
+
+	without := maps.Clone(values)
+	delete(without, envLogLevel)
+	delete(without, envLogMode)
+
+	return without
+}
+
 func metricsConfig(cfg *config.RunConfig) *bench.MetricsConfig {
 	metrics := &bench.MetricsConfig{ServiceVersion: version.Version}
 	if cfg == nil || cfg.Global == nil {
@@ -406,6 +559,8 @@ func printWorkloadHelp(cmd *cobra.Command, description bench.Description) error 
 	output.WriteString("  -d, --driver NAME        Use a driver preset\n")
 	output.WriteString("  -D, --driver-opt K=V     Override a driver field\n")
 	output.WriteString("  -e, --env KEY=VALUE      Set a legacy workload environment value\n")
+	output.WriteString("      --log-level VALUE     Set global log level\n")
+	output.WriteString("      --log-mode VALUE      Set global log output mode\n")
 	output.WriteString("      --steps NAMES        Run only named steps\n")
 	output.WriteString("      --no-steps NAMES     Skip named steps\n")
 	output.WriteString("  -h, --help               Show this help\n")

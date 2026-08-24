@@ -2,17 +2,54 @@ package runner_test
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
+	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/config"
 )
+
+func TestLoadRunConfigIsSilentUntilLogged(t *testing.T) {
+	core, observed := observer.New(zap.DebugLevel)
+
+	require.NoError(t, logger.Init("debug", "development", zap.WrapCore(func(zapcore.Core) zapcore.Core {
+		return core
+	})))
+
+	path := filepath.Join(t.TempDir(), "config.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{
+		"drivers":{"0":{"driverType":"postgres","url":"host=localhost user=bench password=dsn-secret`+
+		` sslmode=require token=token-secret client_secret=client-secret"}}
+	}`), 0o600))
+
+	loaded, found, err := runner.LoadRunConfig(path)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Empty(t, observed.All())
+
+	runner.LogConfigFile(loaded)
+
+	entries := observed.All()
+	require.Len(t, entries, 2)
+	require.Equal(t, "Loaded config file", entries[0].Message)
+
+	url := entries[1].ContextMap()["url"]
+	for _, secret := range []string{"dsn-secret", "token-secret", "client-secret"} {
+		require.NotContains(t, url, secret)
+	}
+
+	for _, option := range []string{"host=localhost", "user=bench", "sslmode=require"} {
+		require.Contains(t, url, option)
+	}
+}
 
 func TestLoadRunConfig_ExplicitPath(t *testing.T) {
 	t.Run("valid file", func(t *testing.T) {
@@ -261,59 +298,6 @@ func TestLoadRunConfigStrictErrors(t *testing.T) {
 			_, _, err := runner.LoadRunConfig(path)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), test.path)
-		})
-	}
-}
-
-func TestLoadRunConfigLogger(t *testing.T) {
-	const configPathEnv = "STROPPY_TEST_CONFIG_PATH"
-
-	if path := os.Getenv(configPathEnv); path != "" {
-		_, _, err := runner.LoadRunConfig(path)
-		require.NoError(t, err)
-
-		return
-	}
-
-	tests := []struct {
-		name        string
-		logger      string
-		wantLog     bool
-		wantJSONLog bool
-	}{
-		{
-			name:   "error suppresses loader info",
-			logger: `{"logLevel":"LOG_LEVEL_ERROR","logMode":"LOG_MODE_DEVELOPMENT"}`,
-		},
-		{
-			name:        "info production emits JSON",
-			logger:      `{"logLevel":"LOG_LEVEL_INFO","logMode":"LOG_MODE_PRODUCTION"}`,
-			wantLog:     true,
-			wantJSONLog: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), "config.json")
-			require.NoError(t, os.WriteFile(
-				path,
-				[]byte(`{"global":{"logger":`+test.logger+`}}`),
-				0o600,
-			))
-
-			cmd := exec.Command(os.Args[0], "-test.run=^TestLoadRunConfigLogger$")
-
-			cmd.Env = append(os.Environ(), configPathEnv+"="+path)
-			output, err := cmd.CombinedOutput()
-			require.NoError(t, err, string(output))
-
-			gotLog := strings.Contains(string(output), "Loaded config file")
-			assert.Equal(t, test.wantLog, gotLog, string(output))
-
-			if test.wantJSONLog {
-				assert.Contains(t, string(output), `"level":"info"`)
-			}
 		})
 	}
 }
