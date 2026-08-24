@@ -33,7 +33,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
-- Nonfatal transaction and query-set errors now keep virtual users running, exit successfully, and appear in bounded warnings, terminal-error metrics, and a prominent final summary; the unused driver `errorMode` option has been removed and is now rejected.
+- Nonfatal transaction and query-set errors now keep virtual users running, exit successfully, and appear in bounded warnings, terminal-error metrics, and a prominent final summary; the unused driver `errorMode` option has been removed and is now rejected. ([#156](https://github.com/stroppy-io/stroppy/pull/156))
 - Logging now uses one safely replaceable process-wide logger, with configurable level and output mode precedence plus redacted database connection diagnostics. ([#154](https://github.com/stroppy-io/stroppy/pull/154))
 - Driver insert-method defaults now fill only load requests that leave their method unset, preserving methods selected by workloads. ([#152](https://github.com/stroppy-io/stroppy/pull/152))
 - SIGINT and SIGTERM now cancel the running workload and trigger graceful teardown; a second signal forces immediate exit. Exit status is 130 (SIGINT) or 143 (SIGTERM) after a graceful cancellation, 2 after a forced exit, and 1 for other errors. ([#148](https://github.com/stroppy-io/stroppy/pull/148))
