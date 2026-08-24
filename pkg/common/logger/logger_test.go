@@ -224,6 +224,34 @@ func TestRedactDSN(t *testing.T) {
 			secrets:   []string{"dsn-secret"},
 			preserved: []string{"host=localhost", "sslmode=require"},
 		},
+		{
+			name:      "URI password begins after first colon",
+			dsn:       "postgres://u:pre:secret@host/db",
+			want:      "postgres://u:xxxxx@host/db",
+			secrets:   []string{"pre", "secret"},
+			preserved: []string{"host/db"},
+		},
+		{
+			name:      "PostgreSQL unquoted escaped whitespace",
+			dsn:       `host=db password=top\ secret sslmode=require`,
+			want:      "host=db password=xxxxx sslmode=require",
+			secrets:   []string{`top\ secret`, "secret"},
+			preserved: []string{"host=db", "sslmode=require"},
+		},
+		{
+			name:      "PostgreSQL unquoted escaped backslash",
+			dsn:       `host=db password=top\\secret sslmode=require`,
+			want:      "host=db password=xxxxx sslmode=require",
+			secrets:   []string{`top\\secret`, "secret"},
+			preserved: []string{"host=db", "sslmode=require"},
+		},
+		{
+			name:      "PostgreSQL malformed trailing escape",
+			dsn:       `host=db password=top\`,
+			want:      "host=db password=xxxxx",
+			secrets:   []string{`top\`, "top"},
+			preserved: []string{"host=db"},
+		},
 	}
 
 	for _, test := range tests {
@@ -243,4 +271,37 @@ func TestRedactDSN(t *testing.T) {
 
 	require.Equal(t, "postgres://host/db?sslmode=require", RedactDSN("postgres://host/db?sslmode=require"))
 	require.Empty(t, RedactDSN(""))
+}
+
+func TestRedactDSNMySQLPasswordPunctuation(t *testing.T) {
+	tests := []struct {
+		name   string
+		marker string
+	}{
+		{name: "colon", marker: "marker:colon"},
+		{name: "slash", marker: "marker/slash"},
+		{name: "at sign", marker: "marker@at"},
+		{name: "question mark", marker: "marker?query"},
+		{name: "fragment mark", marker: "marker#fragment"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dsn := "user:" + test.marker + "@tcp(db:3306)/bench?charset=utf8"
+			got := RedactDSN(dsn)
+
+			require.Equal(t, "user:xxxxx@tcp(db:3306)/bench?charset=utf8", got)
+			require.NotContains(t, got, test.marker)
+			require.Contains(t, got, "tcp(db:3306)/bench")
+			require.Contains(t, got, "charset=utf8")
+		})
+	}
+}
+
+func TestRedactDSNMySQLMalformedUserinfo(t *testing.T) {
+	got := RedactDSN("user:marker-secret@tcp(db:3306")
+
+	require.Equal(t, "user:xxxxx@tcp(db:3306", got)
+	require.NotContains(t, got, "marker-secret")
+	require.Contains(t, got, "tcp(db:3306")
 }

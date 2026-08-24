@@ -148,7 +148,118 @@ func RedactDSN(dsn string) string {
 		return dsn
 	}
 
-	return redactUserinfo(redactKeywordValues(redactQueryValues(dsn)))
+	switch {
+	case hasURIScheme(dsn):
+		return redactURI(dsn)
+	case isConninfoDSN(dsn):
+		return redactConninfo(dsn)
+	default:
+		return redactMySQLDSN(dsn)
+	}
+}
+
+func hasURIScheme(dsn string) bool {
+	schemeEnd := strings.Index(dsn, "://")
+	if schemeEnd <= 0 || !unicode.IsLetter(rune(dsn[0])) {
+		return false
+	}
+
+	for _, r := range dsn[1:schemeEnd] {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '+' && r != '-' && r != '.' {
+			return false
+		}
+	}
+
+	return true
+}
+
+func redactURI(dsn string) string {
+	return redactURIUserinfo(redactQueryValues(dsn))
+}
+
+func redactURIUserinfo(dsn string) string {
+	schemeEnd := strings.Index(dsn, "://")
+	start := schemeEnd + len("://")
+	end := uriAuthorityEnd(dsn, start)
+
+	at := strings.LastIndexByte(dsn[start:end], '@')
+	if at < 0 {
+		return dsn
+	}
+
+	at += start
+
+	colon := strings.IndexByte(dsn[start:at], ':')
+	if colon < 0 {
+		return dsn
+	}
+
+	return dsn[:start+colon+1] + redactedSecret + dsn[at:]
+}
+
+func uriAuthorityEnd(dsn string, start int) int {
+	if delimiter := strings.IndexAny(dsn[start:], "/?#"); delimiter >= 0 {
+		return start + delimiter
+	}
+
+	return len(dsn)
+}
+
+func isConninfoDSN(dsn string) bool {
+	return nextConninfoAssignment(dsn, 0).key != ""
+}
+
+func redactMySQLDSN(dsn string) string {
+	return redactQueryValues(redactMySQLUserinfo(dsn))
+}
+
+func redactMySQLUserinfo(dsn string) string {
+	at := mysqlUserinfoEnd(dsn)
+	if at < 0 {
+		return dsn
+	}
+
+	colon := strings.IndexByte(dsn[:at], ':')
+	if colon < 0 {
+		return dsn
+	}
+
+	return dsn[:colon+1] + redactedSecret + dsn[at:]
+}
+
+func mysqlUserinfoEnd(dsn string) int {
+	userinfoEnd := -1
+
+	for index := range dsn {
+		if dsn[index] == '@' && isMySQLProtocolDelimiter(dsn, index+1) {
+			userinfoEnd = index
+		}
+	}
+
+	return userinfoEnd
+}
+
+func isMySQLProtocolDelimiter(dsn string, start int) bool {
+	if start == len(dsn) || dsn[start] == '/' {
+		return start < len(dsn)
+	}
+
+	end := start
+	for end < len(dsn) && (unicode.IsLetter(rune(dsn[end])) || unicode.IsDigit(rune(dsn[end]))) {
+		end++
+	}
+
+	if end == start {
+		return false
+	}
+
+	if end < len(dsn) && dsn[end] == '(' {
+		return true
+	}
+
+	protocol := dsn[start:end]
+
+	return (protocol == "tcp" || protocol == "unix") && (end == len(dsn) || dsn[end] == '/')
 }
 
 func redactQueryValues(dsn string) string {
@@ -183,7 +294,7 @@ type conninfoAssignment struct {
 	next                 int
 }
 
-func redactKeywordValues(dsn string) string {
+func redactConninfo(dsn string) string {
 	var result strings.Builder
 
 	lastRedaction := 0
@@ -269,13 +380,31 @@ func isConninfoKey(key string) bool {
 
 func conninfoValueEnd(dsn string, start int) int {
 	if start == len(dsn) || dsn[start] != '\'' {
-		for start < len(dsn) && !unicode.IsSpace(rune(dsn[start])) {
-			start++
-		}
-
-		return start
+		return unquotedConninfoValueEnd(dsn, start)
 	}
 
+	return quotedConninfoValueEnd(dsn, start)
+}
+
+func unquotedConninfoValueEnd(dsn string, start int) int {
+	for start < len(dsn) {
+		if dsn[start] == '\\' && start+1 < len(dsn) {
+			start += 2
+
+			continue
+		}
+
+		if unicode.IsSpace(rune(dsn[start])) {
+			break
+		}
+
+		start++
+	}
+
+	return start
+}
+
+func quotedConninfoValueEnd(dsn string, start int) int {
 	for index := start + 1; index < len(dsn); index++ {
 		if dsn[index] == '\\' && index+1 < len(dsn) {
 			index++
@@ -400,42 +529,4 @@ func fromHex(value byte) (byte, bool) {
 	default:
 		return 0, false
 	}
-}
-
-func redactUserinfo(dsn string) string {
-	start := 0
-	if scheme := strings.Index(dsn, "://"); scheme >= 0 {
-		start = scheme + len("://")
-	}
-
-	end := authorityEnd(dsn, start)
-	if start == 0 && strings.Contains(dsn[:end], "=") {
-		return dsn
-	}
-
-	at := strings.LastIndexByte(dsn[start:end], '@')
-	if at < 0 {
-		return dsn
-	}
-
-	at += start
-
-	userinfo := dsn[start:at]
-
-	colon := strings.LastIndexByte(userinfo, ':')
-	if colon < 0 {
-		return dsn
-	}
-
-	colon += start
-
-	return dsn[:colon+1] + redactedSecret + dsn[at:]
-}
-
-func authorityEnd(dsn string, start int) int {
-	if delimiter := strings.IndexAny(dsn[start:], "/?#"); delimiter >= 0 {
-		return start + delimiter
-	}
-
-	return len(dsn)
 }
