@@ -1,8 +1,5 @@
-// Package simple is the Go-native port of workloads/simple/simple.ts — the
-// minimal stroppy demo. Loads a small table via a typed InsertRequest, runs an
-// aggregate count plus per-row lookups, and tears down. First Go workload on
-// the typed insert path; proves Setup/Iterate/Teardown + Step + Driver.Insert
-// with a plain-Go row formula end to end.
+// Package simple provides Stroppy's minimal workload example. It owns a small
+// typed load, aggregate count, per-row lookups, and teardown lifecycle.
 package simple
 
 import (

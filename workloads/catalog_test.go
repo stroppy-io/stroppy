@@ -1,20 +1,25 @@
-package workloads
+package workloads_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stroppy-io/stroppy/workloads"
+	_ "github.com/stroppy-io/stroppy/workloads/all"
+)
 
 func TestCatalog(t *testing.T) {
-	catalog, err := Catalog()
+	catalog, err := workloads.Catalog()
 	if err != nil {
 		t.Fatalf("Catalog() error: %v", err)
 	}
 
-	if len(catalog) != len(AvailablePresets()) {
-		t.Fatalf("got %d presets, want %d", len(catalog), len(AvailablePresets()))
+	if len(catalog) != len(workloads.AvailablePresets()) {
+		t.Fatalf("got %d presets, want %d", len(catalog), len(workloads.AvailablePresets()))
 	}
 
-	byName := make(map[string]PresetInfo, len(catalog))
-	for _, p := range catalog {
-		byName[p.Name] = p
+	byName := make(map[string]workloads.PresetInfo, len(catalog))
+	for _, preset := range catalog {
+		byName[preset.Name] = preset
 	}
 
 	if len(byName["tpcc"].SQL) == 0 {

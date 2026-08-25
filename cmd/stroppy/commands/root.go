@@ -15,8 +15,8 @@ import (
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/probe"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/run"
 	"github.com/stroppy-io/stroppy/internal/version"
-	_ "github.com/stroppy-io/stroppy/internal/workloads"
 	"github.com/stroppy-io/stroppy/pkg/common/shutdown"
+	_ "github.com/stroppy-io/stroppy/workloads/all"
 )
 
 // appName is the binary / command name.

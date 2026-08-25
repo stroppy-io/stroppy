@@ -1,5 +1,5 @@
-// Package tpcc is the Go-native port of workloads/tpcc/tx.ts: the five TPC-C
-// transactions as ordered DML steps inside driver transactions, with the standard
+// Package tpcc owns Stroppy's TPC-C implementation, tests, and dialect SQL. It
+// runs five transactions as ordered DML steps inside driver transactions, with
 // 45/43/4/4/4 mix, full population, and §1.3.1 validation. Load/config/prepare are
 // shared structure ported from tpcc_common.ts. Covers pg + mysql; picodata (no
 // OFFSET) and ydb (bound IN-list) dialect branches are ported faithfully so all

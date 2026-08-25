@@ -58,7 +58,8 @@ with `go generate ./pkg/config`. There is no application protobuf generation ste
 and protobuf remains only as an indirect dependency of external SDKs. Load-time
 generation is plain Go under `pkg/gen/` (see `docs/parallelism.md`).
 
-**Embedded FS rebuild rule:** `workloads/` is `//go:embed *` (SQL/JSON/MD only).
+**Embedded FS rebuild rule:** each asset-bearing package under `workloads/<name>/`
+embeds its own SQL/JSON/README files and registers them with the shared catalog.
 If you pass a workload by short name (`tpcc/tx`), the binary serves its SQL from
 the embedded snapshot. Edits to `workloads/*.sql` on disk have **no effect** until
 `make build` reruns.
@@ -79,7 +80,8 @@ Resolution order for SQL files: **cwd → `~/.stroppy/` → embedded**.
 | `cmd/stroppy/` | entrypoint (`main.go` blank-imports the drivers) + cobra subcommands: run, probe, version |
 | `cmd/stroppy/commands/run/` | arg parsing, driver/env/step resolution, dispatch to `bench.Run` |
 | `pkg/bench/` | Go-native engine: `Workload` interface, `Run`, scenario executor, VU/Bench SDK, metrics sink + summary |
-| `internal/workloads/` | the Go workloads (simple, tpcb, tpcc, tpch, tpcds, execute_sql); aggregated by blank import |
+| `workloads/<name>/` | one package per built-in workload, containing Go implementation/tests plus owned SQL/JSON/README assets |
+| `workloads/all/` | explicit blank-import aggregation for built-in workload registration |
 | `pkg/driver/dispatcher.go` | driver registry: `RegisterDriver()` + `Dispatch()` |
 | `pkg/driver/{postgres,mysql,picodata,ydb,noop,csv}/` | driver implementations |
 | `pkg/driver/sqldriver/` | shared sql.DB-backed base (mysql, ydb use this) |
@@ -87,7 +89,7 @@ Resolution order for SQL files: **cwd → `~/.stroppy/` → embedded**.
 | `pkg/datagen/` | row-production seam: `source` (Partitionable/RowSource) + canonical TPC-DS/TPC-H generator adapters (`tpcdsgen`, `tpchgen`) |
 | `internal/runner/` | run-config merge, env override parsing, driver presets, config-file load |
 | `pkg/config/` | plain-Go application config types + strict recursive JSON normalizer; schema source for `docs/jsonschema/run.schema.json` |
-| `workloads/` | embedded SQL/JSON workloads: tpcb, tpcc, tpch, tpcds |
+| `workloads/` | shared embedded-asset registry and catalog |
 | `docs/parallelism.md` | InsertRequest parallelism contract and tuning |
 
 ## Drivers
@@ -220,8 +222,11 @@ Section layout (must be identical across dialects):
 ```
 
 Each Go workload implements the `bench.Workload` interface (`Setup`, `Iterate`,
-`Teardown`) in `internal/workloads/<name>/`. TPC-B and TPC-C each ship two
-registered variants:
+`Teardown`) in `workloads/<name>/`, beside its tests and owned assets. Asset-bearing
+packages embed only their local SQL/JSON/README files, register the filesystem with
+`workloads.Register`, and add a blank import to `workloads/all/import.go`. Contract
+tests in each package pin required files, sections, and named queries. TPC-B and
+TPC-C each ship two registered variants:
 - `procs` — calls stored procs via the `workload_procs` section; pg + mysql only
 - `tx` — runs ordered DML steps inside `driver.beginTx()`; all SQL drivers (pg/mysql/pico/ydb)
 

@@ -1,5 +1,5 @@
-// Package tpcb is the Go-native port of pgbench's canonical 5-statement TPC-B
-// transaction, shipping two registered variants:
+// Package tpcb owns Stroppy's TPC-B implementation, tests, and dialect SQL.
+// It ships two registered variants:
 //
 //   - tpcb/tx runs the five DML steps inline under one client-side transaction
 //     per iteration; supports pg/mysql/picodata/ydb.

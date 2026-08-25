@@ -1,8 +1,6 @@
-// Package execute_sql is the Go-native port of workloads/execute_sql/execute_sql.ts:
-// a generic runner that executes every query in a SQL file (or inline SQL string) once.
-// The SQL source is one of two typed workload parameters: --sql-file (a path resolved
-// cwd → workloads/execute_sql/ → embedded) or --sql-body (inline SQL text). Queries are
-// delimited by `--= name` markers, matching parse_sql.ts — a markerless source yields none.
+// Package execute_sql runs every named query from an inline or file SQL source.
+// Files resolve from cwd before embedded workload assets; markerless sources contain
+// no executable named queries.
 package execute_sql
 
 import (
