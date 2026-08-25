@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -62,11 +63,12 @@ func runTpchStroppy(t *testing.T, driverType, url string, budget time.Duration) 
 	t.Helper()
 
 	start := time.Now()
+	scaleFactor := strconv.FormatFloat(tpchMultiSF, 'g', -1, 64)
 	out := runStroppy(t, 5*time.Minute,
 		"run", "tpch/tx",
 		"-D", "url="+url,
 		"-D", "driverType="+driverType,
-		"--scale-factor", "0.01",
+		"--scale-factor", scaleFactor,
 		"--load-workers", "4",
 		"--executor", "shared-iterations",
 		"--iterations", "1",
@@ -76,7 +78,7 @@ func runTpchStroppy(t *testing.T, driverType, url string, budget time.Duration) 
 	t.Logf("stroppy TPC-H run on %s completed in %s", driverType, elapsed)
 
 	if elapsed > budget {
-		t.Errorf("run on %s took %s, exceeds the %s SF=0.01 budget", driverType, elapsed, budget)
+		t.Errorf("run on %s took %s, exceeds the %s SF=%s budget", driverType, elapsed, budget, scaleFactor)
 	}
 
 	return out
@@ -88,8 +90,9 @@ func assertTpchLoadMarkers(t *testing.T, out string) {
 	for _, table := range []string{
 		"region", "nation", "part", "supplier", "partsupp", "customer", "orders", "lineitem",
 	} {
-		if !strings.Contains(out, table) {
-			t.Errorf("missing insert progress for %q in stroppy output", table)
+		marker := fmt.Sprintf(`"event": "completed", "table": %q`, table)
+		if !strings.Contains(out, marker) {
+			t.Errorf("missing completed insert progress for %q in stroppy output", table)
 		}
 	}
 }
