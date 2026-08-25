@@ -17,6 +17,7 @@ func TestEmbeddedAssetContract(t *testing.T) {
 
 	sections := []string{"drop_schema", "create_schema"}
 	queries := make([]workloadtest.Query, 0, 22)
+
 	for number := 1; number <= 22; number++ {
 		section := "q" + strconv.Itoa(number)
 		sections = append(sections, section)
@@ -24,7 +25,6 @@ func TestEmbeddedAssetContract(t *testing.T) {
 	}
 
 	for _, dialect := range dialects {
-		dialect := dialect
 		t.Run(dialect, func(t *testing.T) {
 			workloadtest.SQL(t, files, dialect, sections, queries)
 		})

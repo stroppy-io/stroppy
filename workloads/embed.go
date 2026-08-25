@@ -31,6 +31,7 @@ func Register(preset Preset, files fs.FS) {
 	if files == nil {
 		panic(fmt.Sprintf("workloads: register %q with nil filesystem", preset))
 	}
+
 	if _, exists := registry[preset]; exists {
 		panic(fmt.Sprintf("workloads: preset %q already registered", preset))
 	}
@@ -44,6 +45,7 @@ func AvailablePresets() []string {
 	for preset := range registry {
 		presets = append(presets, string(preset))
 	}
+
 	sort.Strings(presets)
 
 	return presets
@@ -65,6 +67,7 @@ func CopyPresetToPath(targetPath string, preset Preset, perm os.FileMode) error 
 		if entry.IsDir() {
 			continue
 		}
+
 		if err := copyFileToPath(files, targetPath, entry.Name(), perm); err != nil {
 			return fmt.Errorf("preset %q file copy: %w", preset, err)
 		}

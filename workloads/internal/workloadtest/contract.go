@@ -40,6 +40,7 @@ func SQL(t *testing.T, files fs.FS, name string, sections []string, queries []Qu
 			t.Errorf("%s: missing or empty section %q", name, section)
 		}
 	}
+
 	for _, query := range queries {
 		if body, ok := parsed.Query(query.Section, query.Name); !ok || body == "" {
 			t.Errorf("%s: missing or empty query %s/%s", name, query.Section, query.Name)

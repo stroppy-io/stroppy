@@ -29,7 +29,6 @@ func TestEmbeddedAssetContract(t *testing.T) {
 		"schema.ydb.sql":   {"drop_schema", "create_schema", "create_indexes"},
 	}
 	for name, sections := range schemas {
-		name, sections := name, sections
 		t.Run(name, func(t *testing.T) {
 			workloadtest.SQL(t, files, name, sections, nil)
 		})
@@ -46,13 +45,14 @@ func TestEmbeddedAssetContract(t *testing.T) {
 		70: true,
 		86: true,
 	})
+
 	for _, name := range []string{"pg.sql", "mysql.sql", "pico.sql", "ydb.sql"} {
-		name := name
 		t.Run(name, func(t *testing.T) {
 			required := queries
 			if name == "pico.sql" {
 				required = picoQueries
 			}
+
 			workloadtest.SQL(t, files, name, nil, required)
 		})
 	}
@@ -60,6 +60,7 @@ func TestEmbeddedAssetContract(t *testing.T) {
 
 func tpcdsContractQueries(skip map[int]bool) []workloadtest.Query {
 	queries := make([]workloadtest.Query, 0, 103)
+
 	for number := 1; number <= 99; number++ {
 		if skip[number] {
 			continue

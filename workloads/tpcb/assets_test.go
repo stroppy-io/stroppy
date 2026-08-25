@@ -15,7 +15,6 @@ func TestEmbeddedAssetContract(t *testing.T) {
 	}
 
 	for _, dialect := range []string{"pg.sql", "mysql.sql", "pico.sql", "ydb.sql"} {
-		dialect := dialect
 		t.Run(dialect, func(t *testing.T) {
 			queries := txQueries
 			if dialect == "pg.sql" || dialect == "mysql.sql" {

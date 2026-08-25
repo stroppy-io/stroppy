@@ -28,9 +28,9 @@ func TestEmbeddedAssetContract(t *testing.T) {
 	}
 
 	for _, dialect := range dialects {
-		dialect := dialect
 		t.Run(dialect, func(t *testing.T) {
 			dialectSections := sections
+
 			dialectQueries := append([]workloadtest.Query(nil), queries...)
 			if dialect == "pg.sql" || dialect == "mysql.sql" {
 				dialectSections = append(append([]string(nil), sections...), "workload_procs")

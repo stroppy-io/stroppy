@@ -30,9 +30,11 @@ func TestLoadSQLUsesLocalOverrideBeforeEmbeddedFallback(t *testing.T) {
 	t.Run("local workload file", func(t *testing.T) {
 		directory := t.TempDir()
 		t.Chdir(directory)
+
 		if err := os.MkdirAll(filepath.Join("workloads", preset), 0o755); err != nil {
 			t.Fatal(err)
 		}
+
 		if err := os.WriteFile(filepath.Join("workloads", preset, fileName), []byte(localBody), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -48,6 +50,7 @@ func assertSQLBody(t *testing.T, preset, fileName, want string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if got, ok := sql.Query("query", "body"); !ok || got != want {
 		t.Fatalf("query body = %q, %v; want %q, true", got, ok, want)
 	}
