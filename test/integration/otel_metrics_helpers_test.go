@@ -78,9 +78,19 @@ func parsePrometheusSampleLine(line string) (prometheusSample, bool, error) {
 		return prometheusSample{}, false, fmt.Errorf("metric %q has no value", sample.name)
 	}
 
+	if len(fields) > 2 {
+		return prometheusSample{}, false, fmt.Errorf("metric %q has unexpected trailing fields", sample.name)
+	}
+
 	value, err := strconv.ParseFloat(fields[0], 64)
 	if err != nil {
 		return prometheusSample{}, false, fmt.Errorf("metric %q value %q: %w", sample.name, fields[0], err)
+	}
+
+	if len(fields) == 2 {
+		if _, err := strconv.ParseInt(fields[1], 10, 64); err != nil {
+			return prometheusSample{}, false, fmt.Errorf("metric %q timestamp %q: %w", sample.name, fields[1], err)
+		}
 	}
 
 	sample.value = value
@@ -271,6 +281,30 @@ func prometheusLabelsEqual(got, want labels) bool {
 	}
 
 	return true
+}
+
+func TestParsePrometheusSampleLineTrailingFields(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name    string
+		line    string
+		wantErr bool
+	}{
+		{name: "value only", line: `stroppy_metric 7`},
+		{name: "integer timestamp", line: `stroppy_metric 7 1756158000000`},
+		{name: "invalid timestamp", line: `stroppy_metric 7 invalid`, wantErr: true},
+		{name: "extra field", line: `stroppy_metric 7 1756158000000 invalid`, wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, _, err := parsePrometheusSampleLine(test.line)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("parsePrometheusSampleLine() error = %v, wantErr %t", err, test.wantErr)
+			}
+		})
+	}
 }
 
 func TestRequirePrometheusSampleMatchesExactNamesAndLabels(t *testing.T) {
