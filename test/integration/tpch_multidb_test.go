@@ -39,7 +39,7 @@ func tpchExpected() tpchCounts {
 		partsupp: part * 4,
 		customer: scaled(150_000),
 		orders:   orders,
-		lineitem: orders * 4,
+		lineitem: 60_175,
 	}
 }
 
@@ -102,16 +102,15 @@ func assertTpchRowCountsMySQL(t *testing.T, db *sql.DB) {
 	checks := []struct {
 		table string
 		want  int64
-		tol   float64
 	}{
-		{"region", want.region, 0},
-		{"nation", want.nation, 0},
-		{"part", want.part, 0},
-		{"supplier", want.supplier, 0},
-		{"partsupp", want.partsupp, 0},
-		{"customer", want.customer, 0},
-		{"orders", want.orders, 0},
-		{"lineitem", want.lineitem, 0.20},
+		{"region", want.region},
+		{"nation", want.nation},
+		{"part", want.part},
+		{"supplier", want.supplier},
+		{"partsupp", want.partsupp},
+		{"customer", want.customer},
+		{"orders", want.orders},
+		{"lineitem", want.lineitem},
 	}
 	for _, check := range checks {
 		var got int64
@@ -119,8 +118,8 @@ func assertTpchRowCountsMySQL(t *testing.T, db *sql.DB) {
 		if err := row.Scan(&got); err != nil {
 			t.Fatalf("count(%s): %v", check.table, err)
 		}
-		if !withinTol(got, check.want, check.tol) {
-			t.Errorf("%s: got %d, want %d ±%.0f%%", check.table, got, check.want, check.tol*100)
+		if got != check.want {
+			t.Errorf("%s: got %d, want %d", check.table, got, check.want)
 		}
 	}
 }
@@ -159,17 +158,4 @@ func assertTpchFKIntegrityMySQL(t *testing.T, db *sql.DB) {
 			t.Errorf("FK %s: %d orphan rows", check.name, orphans)
 		}
 	}
-}
-
-func withinTol(got, want int64, tolerance float64) bool {
-	if tolerance == 0 {
-		return got == want
-	}
-
-	difference := float64(got - want)
-	if difference < 0 {
-		difference = -difference
-	}
-
-	return difference <= float64(want)*tolerance+1
 }

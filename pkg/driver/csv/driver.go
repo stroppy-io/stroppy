@@ -69,6 +69,10 @@ var (
 // query value. The concrete per-option message wraps it.
 var ErrInvalidOption = errors.New("csv: invalid URL option")
 
+// ErrIncompleteLoad prevents final output from representing a run where any
+// insert failed, even when other worker shards completed successfully.
+var ErrIncompleteLoad = errors.New("csv: cannot finalize after insert failure")
+
 // config holds the parsed URL options for one CSV driver instance.
 type config struct {
 	// dir is the absolute output directory root. Every workload's CSVs
@@ -100,7 +104,7 @@ func init() {
 }
 
 // Driver emits generator rows to CSV files. One Driver instance is
-// scoped to one k6 run; tables accumulate under a single output
+// scoped to one benchmark run; tables accumulate under a single output
 // directory and are either merged or left as worker shards at
 // Teardown.
 type Driver struct {
@@ -116,8 +120,9 @@ type Driver struct {
 
 	// tables records the tables that had rows written during this run
 	// so Teardown can merge or finalize them. Guarded by mu.
-	mu     sync.Mutex
-	tables map[string]*tableState
+	mu           sync.Mutex
+	tables       map[string]*tableState
+	insertFailed bool
 }
 
 // tableState is the per-table bookkeeping kept during a run: how many
@@ -321,6 +326,12 @@ func (d *Driver) resolveWorkload() string {
 	return d.workloadDir
 }
 
+func (d *Driver) markInsertFailed() {
+	d.mu.Lock()
+	d.insertFailed = true
+	d.mu.Unlock()
+}
+
 // Teardown finalizes the run: merges shards when configured, or emits
 // a sidecar header when merge=false. Canceled finalization keeps source
 // shards and does not publish a manifest or partial output.
@@ -330,6 +341,12 @@ func (d *Driver) Teardown(ctx context.Context) error {
 	}
 
 	d.mu.Lock()
+
+	if d.insertFailed {
+		d.mu.Unlock()
+
+		return ErrIncompleteLoad
+	}
 
 	if d.workloadDir == "" {
 		d.mu.Unlock()
@@ -367,6 +384,12 @@ func (d *Driver) Teardown(ctx context.Context) error {
 
 	if err := writeManifest(ctx, workloadDir, workloadName, d.cfg, snapshot); err != nil {
 		return fmt.Errorf("csv: write manifest: %w", err)
+	}
+
+	if d.cfg.merge {
+		if err := cleanupShards(ctx, workloadDir); err != nil {
+			return err
+		}
 	}
 
 	if err := ctx.Err(); err != nil {

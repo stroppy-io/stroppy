@@ -110,6 +110,19 @@ func assertTpchRowCountsYDB(t *testing.T, drv *ydbsdk.Driver) {
 	}
 }
 
+func withinTol(got, want int64, tolerance float64) bool {
+	if tolerance == 0 {
+		return got == want
+	}
+
+	difference := float64(got - want)
+	if difference < 0 {
+		difference = -difference
+	}
+
+	return difference <= float64(want)*tolerance+1
+}
+
 // Picodata cannot use correlated NOT EXISTS for this integrity walk, so the
 // checks use left joins that its planner supports.
 func assertTpchFKIntegrityPico(t *testing.T, pool *pgxpool.Pool) {

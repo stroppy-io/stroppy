@@ -20,6 +20,12 @@ import (
 // squared=entity*entity, label="row". Used to exercise the typed Insert
 // path against the same expected CSV output as the InsertSpec tests.
 func typedRowsSource(total int64) *gen.IndexedSource {
+	return typedRowsSourceWithFailure(total, -1)
+}
+
+var errInjectedSource = errors.New("injected source failure")
+
+func typedRowsSourceWithFailure(total, failAt int64) *gen.IndexedSource {
 	b := gen.NewSchemaBuilder()
 	idCol := b.Int64("id")
 	sqCol := b.Int64("squared")
@@ -27,6 +33,10 @@ func typedRowsSource(total int64) *gen.IndexedSource {
 	schema := b.Build()
 
 	fn := func(r gen.Row, entity uint64) error {
+		if int64(entity) == failAt {
+			return errInjectedSource
+		}
+
 		r.SetInt64(idCol, int64(entity)+1)
 		r.SetInt64(sqCol, int64(entity)*int64(entity))
 
@@ -171,6 +181,146 @@ func TestInsertParallelMerge(t *testing.T) {
 	}
 }
 
+func TestInsertFailurePreventsFinalization(t *testing.T) {
+	t.Parallel()
+
+	d, workDir := newTestDriver(t, map[string]string{"merge": "true"})
+	if _, err := d.Insert(context.Background(), typedRowsReq("complete", 4000, 4)); err != nil {
+		t.Fatalf("complete Insert: %v", err)
+	}
+
+	failed := typedRowsReq("partial", 10_000, 1)
+
+	failed.Source = typedRowsSourceWithFailure(10_000, 5000)
+
+	if _, err := d.Insert(context.Background(), failed); !errors.Is(err, errInjectedSource) {
+		t.Fatalf("partial Insert error = %v, want injected source failure", err)
+	}
+
+	if err := d.Teardown(context.Background()); !errors.Is(err, ErrIncompleteLoad) {
+		t.Fatalf("detached Teardown error = %v, want ErrIncompleteLoad", err)
+	}
+
+	for _, name := range []string{"complete.csv", "partial.csv", "MANIFEST.json"} {
+		if _, err := os.Stat(filepath.Join(workDir, name)); !os.IsNotExist(err) {
+			t.Errorf("failed load published %s: %v", name, err)
+		}
+	}
+
+	completed, err := filepath.Glob(filepath.Join(workDir, ".shards", "complete.w*.csv"))
+	if err != nil {
+		t.Fatalf("glob completed shards: %v", err)
+	}
+
+	if len(completed) != 4 {
+		t.Fatalf("recoverable completed shards = %v, want 4", completed)
+	}
+
+	partial, err := filepath.Glob(filepath.Join(workDir, ".shards", "partial.w*.csv"))
+	if err != nil {
+		t.Fatalf("glob partial shards: %v", err)
+	}
+
+	if len(partial) != 0 {
+		t.Fatalf("partial shard was committed: %v", partial)
+	}
+
+	assertNoTemporaryOutputs(t, workDir)
+}
+
+func TestManifestFailurePreservesShards(t *testing.T) {
+	t.Parallel()
+
+	d, workDir := newTestDriver(t, map[string]string{"merge": "true"})
+	if _, err := d.Insert(context.Background(), typedRowsReq("manifest_failure", 100, 1)); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+
+	manifestPath := filepath.Join(workDir, "MANIFEST.json")
+	if err := os.Mkdir(manifestPath, dirMode); err != nil {
+		t.Fatalf("create manifest publication blocker: %v", err)
+	}
+
+	if err := d.Teardown(context.Background()); err == nil {
+		t.Fatal("Teardown succeeded despite manifest publication blocker")
+	}
+
+	info, err := os.Stat(manifestPath)
+	if err != nil {
+		t.Fatalf("stat manifest blocker: %v", err)
+	}
+
+	if !info.IsDir() {
+		t.Fatalf("manifest blocker became a completed file: mode=%s", info.Mode())
+	}
+
+	shards, err := filepath.Glob(filepath.Join(workDir, ".shards", "manifest_failure.w*.csv"))
+	if err != nil {
+		t.Fatalf("glob shards: %v", err)
+	}
+
+	if len(shards) != 1 {
+		t.Fatalf("recoverable shards = %v, want one shard", shards)
+	}
+
+	assertNoTemporaryOutputs(t, workDir)
+
+	if err := os.Remove(manifestPath); err != nil {
+		t.Fatalf("remove manifest blocker: %v", err)
+	}
+
+	if err := d.Teardown(context.Background()); err != nil {
+		t.Fatalf("retry Teardown: %v", err)
+	}
+
+	manifestInfo, err := os.Stat(manifestPath)
+	if err != nil || !manifestInfo.Mode().IsRegular() {
+		t.Fatalf("retry did not publish regular manifest: info=%v err=%v", manifestInfo, err)
+	}
+
+	if _, err := os.Stat(filepath.Join(workDir, ".shards")); !os.IsNotExist(err) {
+		t.Fatalf("retry did not clean shards: %v", err)
+	}
+}
+
+func TestManifestCancellationPreservesShards(t *testing.T) {
+	t.Parallel()
+
+	d, workDir := newTestDriver(t, map[string]string{"merge": "true"})
+	if _, err := d.Insert(context.Background(), typedRowsReq("manifest_cancel", 100, 1)); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+
+	if err := d.mergeAll(context.Background(), workDir, d.tables); err != nil {
+		t.Fatalf("mergeAll: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := writeManifest(ctx, workDir, d.workloadName, d.cfg, d.tables); !errors.Is(err, context.Canceled) {
+		t.Fatalf("writeManifest error = %v, want context.Canceled", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(workDir, "MANIFEST.json")); !os.IsNotExist(err) {
+		t.Fatalf("canceled publication exposed manifest: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(workDir, ".shards")); err != nil {
+		t.Fatalf("canceled publication removed shards: %v", err)
+	}
+
+	assertNoTemporaryOutputs(t, workDir)
+
+	if err := d.Teardown(context.Background()); err != nil {
+		t.Fatalf("retry Teardown: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(workDir, ".shards")); !os.IsNotExist(err) {
+		t.Fatalf("successful retry did not clean shards: %v", err)
+	}
+}
+
 func TestTeardownPreCanceledPreservesShards(t *testing.T) {
 	t.Parallel()
 
@@ -256,9 +406,18 @@ func (w *cancelAfterWrite) Write(p []byte) (int, error) {
 func assertNoTemporaryOutputs(t *testing.T, dir string) {
 	t.Helper()
 
-	temps, err := filepath.Glob(filepath.Join(dir, ".*.tmp-*"))
-	if err != nil {
-		t.Fatalf("glob temporary outputs: %v", err)
+	var temps []string
+
+	for _, pattern := range []string{
+		filepath.Join(dir, ".*.tmp-*"),
+		filepath.Join(dir, ".shards", ".*.tmp-*"),
+	} {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			t.Fatalf("glob temporary outputs: %v", err)
+		}
+
+		temps = append(temps, matches...)
 	}
 
 	if len(temps) != 0 {

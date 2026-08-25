@@ -38,7 +38,13 @@ var ErrUnsupportedInsertMethod = errors.New("csv: unsupported InsertSpec method"
 func (d *Driver) Insert(
 	ctx context.Context,
 	req *driver.InsertRequest,
-) (*stats.Query, error) {
+) (_ *stats.Query, retErr error) {
+	defer func() {
+		if retErr != nil {
+			d.markInsertFailed()
+		}
+	}()
+
 	if err := driver.ValidateInsert(req); err != nil {
 		return nil, err
 	}
@@ -89,40 +95,36 @@ func (d *Driver) writeShard(
 		return 0, fmt.Errorf("csv: mkdir %q: %w", filepath.Dir(shardPath), err)
 	}
 
-	file, err := os.Create(shardPath)
-	if err != nil {
-		return 0, fmt.Errorf("csv: create %q: %w", shardPath, err)
-	}
-
-	buf := bufio.NewWriterSize(file, csvBufferSize)
-	writer := stdcsv.NewWriter(buf)
-	writer.Comma = d.cfg.separator
+	var written int64
 
 	start := time.Now()
 
-	written, err := drainRows(ctx, src, writer, table)
+	err := writeAtomic(ctx, shardPath, func(file *os.File) error {
+		buf := bufio.NewWriterSize(file, csvBufferSize)
+		writer := stdcsv.NewWriter(buf)
+		writer.Comma = d.cfg.separator
+
+		var err error
+
+		written, err = drainRows(ctx, src, writer, table)
+		if err != nil {
+			return err
+		}
+
+		writer.Flush()
+
+		if err := writer.Error(); err != nil {
+			return fmt.Errorf("csv: flush %q: %w", table, err)
+		}
+
+		if err := buf.Flush(); err != nil {
+			return fmt.Errorf("csv: bufio flush %q: %w", table, err)
+		}
+
+		return ctx.Err()
+	})
 	if err != nil {
-		_ = file.Close()
-
-		return written, err
-	}
-
-	writer.Flush()
-
-	if werr := writer.Error(); werr != nil {
-		_ = file.Close()
-
-		return written, fmt.Errorf("csv: flush %q: %w", table, werr)
-	}
-
-	if ferr := buf.Flush(); ferr != nil {
-		_ = file.Close()
-
-		return written, fmt.Errorf("csv: bufio flush %q: %w", table, ferr)
-	}
-
-	if cerr := file.Close(); cerr != nil {
-		return written, fmt.Errorf("csv: close %q: %w", shardPath, cerr)
+		return written, fmt.Errorf("csv: write shard %q: %w", shardPath, err)
 	}
 
 	insertprogress.AddBatch(ctx, written, time.Since(start))

@@ -77,9 +77,10 @@ func TestOtelStroppyMetrics(t *testing.T) {
 			"pgbench_accounts": 100_000,
 		}
 		for table, count := range rows {
-			tableLabels := labels{"table_name": table, "step": "load_data"}
+			tableLabels := labels{"job": "stroppy", "table_name": table, "step": "load_data"}
 			progressLabels := labels{
 				"event":      "completed",
+				"job":        "stroppy",
 				"method":     "native",
 				"row_kind":   "confirmed",
 				"table_name": table,
@@ -90,7 +91,7 @@ func TestOtelStroppyMetrics(t *testing.T) {
 				{name: "stroppy_insert_rows_total", labels: tableLabels, value: count, exact: true},
 				{name: "stroppy_insert_progress_rows_total", labels: progressLabels, value: count, exact: true},
 				{name: "stroppy_insert_progress_rows_per_second", labels: progressLabels},
-				{name: "stroppy_insert_duration_milliseconds_count", labels: tableLabels, value: 1},
+				{name: "stroppy_insert_duration_milliseconds_count", labels: tableLabels, value: 1, exact: true},
 				{name: "stroppy_insert_operations_total", labels: tableLabels, value: 1, exact: true},
 			} {
 				if err := requirePrometheusExpectation(samples, expectation); err != nil {
@@ -100,20 +101,21 @@ func TestOtelStroppyMetrics(t *testing.T) {
 		}
 
 		txLabels := labels{
+			"job":          "stroppy",
 			"tx_action":    "commit",
 			"tx_name":      "tpcb",
 			"tx_isolation": "read_committed",
 			"step":         "workload",
 		}
 		expected := []metricExpectation{
-			{name: "stroppy_run_query_operations_total", labels: labels{"step": "workload"}, value: 5, exact: true},
-			{name: "stroppy_run_query_duration_milliseconds_count", labels: labels{"step": "workload"}, value: 1},
+			{name: "stroppy_run_query_operations_total", labels: labels{"job": "stroppy", "step": "workload"}, value: 5, exact: true},
+			{name: "stroppy_run_query_duration_milliseconds_count", labels: labels{"job": "stroppy", "step": "workload"}, value: 5, exact: true},
 			{name: "stroppy_transactions_total", labels: txLabels, value: 1, exact: true},
 			{name: "stroppy_tx_commits_total", labels: txLabels, value: 1, exact: true},
-			{name: "stroppy_tx_total_duration_milliseconds_count", labels: txLabels, value: 1},
-			{name: "stroppy_tx_queries_per_tx_count", labels: txLabels, value: 1},
-			{name: "stroppy_iterations_total", value: 1, exact: true},
-			{name: "stroppy_iteration_duration_milliseconds_count", value: 1},
+			{name: "stroppy_tx_total_duration_milliseconds_count", labels: txLabels, value: 1, exact: true},
+			{name: "stroppy_tx_queries_per_tx_count", labels: txLabels, value: 1, exact: true},
+			{name: "stroppy_iterations_total", labels: labels{"job": "stroppy"}, value: 1, exact: true},
+			{name: "stroppy_iteration_duration_milliseconds_count", labels: labels{"job": "stroppy"}, value: 1, exact: true},
 		}
 		for _, expectation := range expected {
 			if err := requirePrometheusExpectation(samples, expectation); err != nil {
@@ -217,6 +219,8 @@ func startOtelCollector(t *testing.T, docker, configPath string) (otlpEndpoint, 
 	}
 
 	name := fmt.Sprintf("stroppy-otel-test-%d", time.Now().UnixNano())
+	t.Cleanup(func() { removeOtelCollector(t, docker, name) })
+
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -235,10 +239,6 @@ func startOtelCollector(t *testing.T, docker, configPath string) (otlpEndpoint, 
 	if err != nil {
 		t.Fatalf("start OTEL collector %s: %v\n%s", image, err, string(out))
 	}
-
-	// The deterministic container name is available before ID parsing and all
-	// port/readiness checks, so every later failure still removes the container.
-	t.Cleanup(func() { removeOtelCollector(t, docker, name) })
 
 	containerID := dockerContainerID(string(out))
 	if containerID == "" {
@@ -267,8 +267,16 @@ func removeOtelCollector(t *testing.T, docker, name string) {
 		return
 	}
 	if err != nil {
+		if dockerRemoveReportsMissing(output) {
+			return
+		}
+
 		t.Errorf("remove OTEL collector %s: %v\n%s", name, err, output)
 	}
+}
+
+func dockerRemoveReportsMissing(output []byte) bool {
+	return strings.Contains(strings.ToLower(string(output)), "no such container")
 }
 
 func dockerContainerID(output string) string {
@@ -575,18 +583,17 @@ func requirePrometheusSampleEqual(
 	wantLabels labels,
 	wantValue float64,
 ) error {
-	for _, sample := range samples {
-		if sample.name == metricName &&
-			prometheusLabelsContainAll(sample.labels, wantLabels) &&
-			sample.value == wantValue {
-			return nil
-		}
+	value, matches := matchingPrometheusSample(samples, metricName, wantLabels)
+	if matches == 1 && value == wantValue {
+		return nil
 	}
 
 	return fmt.Errorf(
-		"missing exact %s sample with labels %v and value = %g",
+		"%s with exact labels %v has value %g across %d samples, want one sample equal to %g",
 		metricName,
 		wantLabels,
+		value,
+		matches,
 		wantValue,
 	)
 }
@@ -597,23 +604,46 @@ func requirePrometheusSampleAtLeast(
 	wantLabels labels,
 	minValue float64,
 ) error {
-	for _, sample := range samples {
-		if sample.name == metricName &&
-			prometheusLabelsContainAll(sample.labels, wantLabels) &&
-			sample.value >= minValue {
-			return nil
-		}
+	value, matches := matchingPrometheusSample(samples, metricName, wantLabels)
+	if matches == 1 && value >= minValue {
+		return nil
 	}
 
 	return fmt.Errorf(
-		"missing exact %s sample with labels %v and value >= %g",
+		"%s with exact labels %v has value %g across %d samples, want one sample >= %g",
 		metricName,
 		wantLabels,
+		value,
+		matches,
 		minValue,
 	)
 }
 
-func prometheusLabelsContainAll(got, want labels) bool {
+func matchingPrometheusSample(
+	samples []prometheusSample,
+	metricName string,
+	wantLabels labels,
+) (float64, int) {
+	var value float64
+	matches := 0
+
+	for _, sample := range samples {
+		if sample.name != metricName || !prometheusLabelsEqual(sample.labels, wantLabels) {
+			continue
+		}
+
+		value = sample.value
+		matches++
+	}
+
+	return value, matches
+}
+
+func prometheusLabelsEqual(got, want labels) bool {
+	if len(got) != len(want) {
+		return false
+	}
+
 	for key, value := range want {
 		if got[key] != value {
 			return false
@@ -627,9 +657,10 @@ func TestRequirePrometheusSampleMatchesExactNamesAndLabels(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		body    string
-		wantErr bool
+		name       string
+		body       string
+		wantLabels labels
+		wantErr    bool
 	}{
 		{
 			name:    "metric suffix rejected",
@@ -652,9 +683,21 @@ func TestRequirePrometheusSampleMatchesExactNamesAndLabels(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "duplicate series rejected even when sum matches",
+			body: `stroppy_metric{table_name="accounts"} 3
+stroppy_metric{table_name="accounts"} 4`,
+			wantErr: true,
+		},
+		{
+			name:    "unexpected extra label rejected",
+			body:    `stroppy_metric{table_name="accounts",extra="dimension"} 7`,
+			wantErr: true,
+		},
+		{
 			name: "exact sample accepted",
 			body: `# HELP stroppy_metric test
 stroppy_metric{table_name="accounts",escaped="a\\\"b"} 7`,
+			wantLabels: labels{"table_name": "accounts", "escaped": `a\"b`},
 		},
 	}
 
@@ -667,9 +710,62 @@ stroppy_metric{table_name="accounts",escaped="a\\\"b"} 7`,
 				t.Fatalf("parsePrometheusSamples: %v", err)
 			}
 
-			err = requirePrometheusSampleEqual(samples, "stroppy_metric", labels{"table_name": "accounts"}, 7)
+			wantLabels := test.wantLabels
+			if wantLabels == nil {
+				wantLabels = labels{"table_name": "accounts"}
+			}
+
+			err = requirePrometheusSampleEqual(samples, "stroppy_metric", wantLabels, 7)
 			if (err != nil) != test.wantErr {
 				t.Fatalf("requirePrometheusSample() error = %v, wantErr %t", err, test.wantErr)
+			}
+		})
+	}
+}
+
+func TestRequirePrometheusSampleAtLeastRejectsDuplicates(t *testing.T) {
+	t.Parallel()
+
+	samples, err := parsePrometheusSamples(`stroppy_metric{table_name="accounts"} 3
+stroppy_metric{table_name="accounts"} 4`)
+	if err != nil {
+		t.Fatalf("parsePrometheusSamples: %v", err)
+	}
+
+	err = requirePrometheusSampleAtLeast(
+		samples,
+		"stroppy_metric",
+		labels{"table_name": "accounts"},
+		1,
+	)
+	if err == nil {
+		t.Fatal("requirePrometheusSampleAtLeast accepted duplicate series")
+	}
+}
+
+func TestDockerRemoveReportsMissing(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name   string
+		output string
+		want   bool
+	}{
+		{
+			name:   "missing container is benign",
+			output: "Error response from daemon: No such container: stroppy-otel-test-1",
+			want:   true,
+		},
+		{
+			name:   "daemon failure is reported",
+			output: "Cannot connect to the Docker daemon",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := dockerRemoveReportsMissing([]byte(test.output)); got != test.want {
+				t.Fatalf("dockerRemoveReportsMissing() = %t, want %t", got, test.want)
 			}
 		})
 	}

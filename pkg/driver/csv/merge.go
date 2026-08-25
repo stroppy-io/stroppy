@@ -11,9 +11,8 @@ import (
 	"sort"
 )
 
-// mergeAll concatenates every table's worker shards into one CSV per
-// table, writing a single header row first. Shards are removed only after
-// every table has been published successfully.
+// mergeAll concatenates every table's worker shards into one CSV per table.
+// Source shards remain recoverable until Teardown also publishes the manifest.
 func (d *Driver) mergeAll(
 	ctx context.Context,
 	workloadDir string,
@@ -43,15 +42,22 @@ func (d *Driver) mergeAll(
 		}
 	}
 
+	return ctx.Err()
+}
+
+// cleanupShards removes recoverable source shards only after merged output and
+// its manifest have both been published successfully.
+func cleanupShards(ctx context.Context, workloadDir string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
+	shardDir := filepath.Join(workloadDir, ".shards")
 	if err := os.RemoveAll(shardDir); err != nil {
 		return fmt.Errorf("csv: cleanup %q: %w", shardDir, err)
 	}
 
-	return nil
+	return ctx.Err()
 }
 
 // mergeTable publishes <workloadDir>/<table>.csv atomically after every
