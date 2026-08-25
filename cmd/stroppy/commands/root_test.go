@@ -83,16 +83,42 @@ func executeTestCommand(t *testing.T, args []string) (int, string) {
 		rootCmd.SetArgs(nil)
 		rootCmd.SetOut(nil)
 		rootCmd.SetErr(nil)
+		clearCommandContexts(rootCmd)
 	})
 
 	return execute(), output.String()
 }
 
 func clearCommandContexts(cmd *cobra.Command) {
-	cmd.SetContext(context.TODO())
+	cmd.SetContext(nil) //nolint:staticcheck // nil lets ExecuteContext propagate its context to child commands.
 
 	for _, child := range cmd.Commands() {
 		clearCommandContexts(child)
+	}
+}
+
+func TestClearCommandContextsAllowsExecuteContextPropagation(t *testing.T) {
+	t.Parallel()
+
+	root := &cobra.Command{Use: "root"}
+	child := &cobra.Command{
+		Use: "child",
+		Run: func(cmd *cobra.Command, _ []string) {
+			if err := cmd.Context().Err(); !errors.Is(err, context.Canceled) {
+				t.Errorf("child context error = %v, want context.Canceled", err)
+			}
+		},
+	}
+	root.AddCommand(child)
+	root.SetArgs([]string{"child"})
+	child.SetContext(context.TODO())
+	clearCommandContexts(root)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := root.ExecuteContext(ctx); err != nil {
+		t.Fatalf("ExecuteContext() error = %v", err)
 	}
 }
 
