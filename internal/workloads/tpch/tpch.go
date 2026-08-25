@@ -182,15 +182,13 @@ func (w *workload) buildParams() map[string]map[string]any {
 
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	return b.StepSilent("workload", func() error {
-		w.runQueries(ctx, b)
-
-		return nil
+		return w.runQueries(ctx, b)
 	})
 }
 
 // runQueries executes q1..q22 once each with pinned defaults, draining rows and
 // recording per-query timing/error metrics. Rows are discarded (throughput pass).
-func (w *workload) runQueries(ctx context.Context, b *bench.Bench) {
+func (w *workload) runQueries(ctx context.Context, b *bench.Bench) error {
 	lg := b.Logger().Sugar()
 
 	for _, name := range queryNames {
@@ -207,13 +205,19 @@ func (w *workload) runQueries(ctx context.Context, b *bench.Bench) {
 		w.recordAttempt(name, float64(elapsed), err != nil)
 
 		if err != nil {
-			lg.Infof("[tpch] %s: error in %dms %v", name, elapsed, err)
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+
+			b.RecordQueryError(name, err)
 
 			continue
 		}
 
 		lg.Infof("[tpch] %s: ok in %dms", name, elapsed)
 	}
+
+	return nil
 }
 
 func (w *workload) recordAttempt(name string, elapsedMs float64, failed bool) {

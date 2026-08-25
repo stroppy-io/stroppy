@@ -95,8 +95,13 @@ Example stroppy-config.json:
     (default 10000). With no endpoint, metrics still appear in the local summary.
 
   Driver types: postgres, mysql, picodata, ydb, noop, csv
-  Error modes:  silent, log, throw, fail, abort
   Insert methods: native, plain_bulk, plain_query (selected by workload InsertRequest)
+
+  The unused driver errorMode field has been removed. Delete it from migrated
+  config files and raw driver JSON; stroppy now rejects both errorMode and its
+  error_mode alias as unknown fields. Error behavior is workload-owned; see
+  'stroppy help drivers' for transaction, query-set, retry, fatal, cancellation,
+  summary, and exit-status behavior.
 
 PRECEDENCE (highest to lowest)
 

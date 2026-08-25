@@ -14,14 +14,6 @@
         {
           "not": {
             "required": [
-              "errorMode",
-              "error_mode"
-            ]
-          }
-        },
-        {
-          "not": {
-            "required": [
               "bulkSize",
               "bulk_size"
             ]
@@ -242,26 +234,6 @@
           ]
         },
         "driver_type": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "errorMode": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "error_mode": {
           "anyOf": [
             {
               "type": "string"

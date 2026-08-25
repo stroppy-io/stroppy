@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"slices"
@@ -220,6 +221,7 @@ func Run(
 
 	defer root.shutdownMetrics()
 	defer sum.print()
+	defer root.errorReporter.stopAndWait()
 	defer func() { _ = root.Teardown() }()
 
 	cfg := drivers[0]
@@ -241,6 +243,15 @@ func Run(
 	if err != nil {
 		return fmt.Errorf("driver dispatch: %w", err)
 	}
+
+	defer func() {
+		teardownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
+		defer cancel()
+
+		if err := drv.Teardown(teardownCtx); err != nil {
+			retErr = errors.Join(retErr, fmt.Errorf("driver teardown: %w", err))
+		}
+	}()
 
 	setupVU := &VU{root: root, vuid: 1, initPhase: true, ctx: ctx}
 	setupBench := &Bench{
@@ -273,6 +284,8 @@ func Run(
 		}
 
 		return wl.Iterate(vu.Context(), b)
+	}, func(vu *VU, err error) {
+		root.errorReporter.record(vu, terminalErrorIteration, "iteration", err, drv.ClassifyError)
 	}); err != nil {
 		return fmt.Errorf("scenario %q: %w", sc.name, err)
 	}
@@ -414,7 +427,12 @@ func (params *scenarioParams) spec(lg *zap.Logger) (scenarioSpec, error) {
 
 // --- executor (shared-iterations + constant-vus) ---
 
-func runScenario(ctx context.Context, sc scenarioSpec, iterate func(*VU) error) error {
+func runScenario(
+	ctx context.Context,
+	sc scenarioSpec,
+	iterate func(*VU) error,
+	onIterationError func(*VU, error),
+) error {
 	scenarioCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -424,7 +442,7 @@ func runScenario(ctx context.Context, sc scenarioSpec, iterate func(*VU) error) 
 
 	startWorker := func(vuid int, keep func() bool) {
 		wg.Go(func() {
-			if err := runWorker(scenarioCtx, vuid, iterate, keep); IsFatalError(err) {
+			if err := runWorker(scenarioCtx, vuid, iterate, keep, onIterationError); IsFatalError(err) {
 				select {
 				case fatalErrors <- err:
 					cancel()
@@ -464,7 +482,13 @@ func runScenario(ctx context.Context, sc scenarioSpec, iterate func(*VU) error) 
 	return ctx.Err()
 }
 
-func runWorker(ctx context.Context, vuid int, iterate func(*VU) error, keep func() bool) error {
+func runWorker(
+	ctx context.Context,
+	vuid int,
+	iterate func(*VU) error,
+	keep func() bool,
+	onIterationError func(*VU, error),
+) error {
 	vu := &VU{root: root, vuid: uint64(vuid), ctx: ctx} //nolint:gosec // G115: scale-bound, no overflow
 	for keep() {
 		if err := ctx.Err(); err != nil {
@@ -478,18 +502,20 @@ func runWorker(ctx context.Context, vuid int, iterate func(*VU) error, keep func
 		err := iterate(vu)
 		root.txMetrics.recordIteration(vu, time.Since(start))
 
-		if err != nil {
-			if IsFatalError(err) {
-				return err
-			}
+		if err == nil {
+			continue
+		}
 
-			if ctx.Err() != nil && errors.Is(err, ctx.Err()) {
-				return ctx.Err()
-			}
+		if IsFatalError(err) {
+			return err
+		}
 
-			root.lg.Error("iteration failed", zap.Int("vu", vuid), zap.Error(err))
+		if canceledError(ctx, err) {
+			return ctx.Err()
+		}
 
-			return nil
+		if onIterationError != nil {
+			onIterationError(vu, err)
 		}
 	}
 
@@ -530,9 +556,17 @@ type summary struct {
 func newSummary(root *RootState) *summary { return &summary{root: root} }
 
 func (s *summary) print() {
+	s.printTo(os.Stderr)
+}
+
+func (s *summary) printTo(out io.Writer) {
+	if s.root.errorReporter != nil {
+		defer s.root.errorReporter.writeSummary(out)
+	}
+
 	var data metricdata.ResourceMetrics
 	if err := s.root.manualReader.Collect(context.Background(), &data); err != nil {
-		fmt.Fprintf(os.Stderr, "bench: collect metrics: %v\n", err)
+		fmt.Fprintf(out, "bench: collect metrics: %v\n", err)
 
 		return
 	}
@@ -559,15 +593,15 @@ func (s *summary) print() {
 	}
 
 	if len(lines) == 0 {
-		fmt.Fprintln(os.Stderr, "bench: no metrics recorded")
+		fmt.Fprintln(out, "bench: no metrics recorded")
 
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, "\n=== bench summary ===")
+	fmt.Fprintln(out, "\n=== bench summary ===")
 
 	for _, line := range lines {
-		fmt.Fprintln(os.Stderr, line)
+		fmt.Fprintln(out, line)
 	}
 }
 

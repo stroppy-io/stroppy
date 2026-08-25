@@ -60,6 +60,9 @@ func (d *Driver) Begin(_ context.Context, _ stroppyconfig.TxIsolationLevel) (dri
 // successive runs do not accumulate stale shards. A missing dir is
 // not an error.
 func (d *Driver) wipeWorkloadDir() error {
+	d.lifecycleMu.Lock()
+	defer d.lifecycleMu.Unlock()
+
 	dir := d.resolveWorkload()
 
 	if err := os.RemoveAll(dir); err != nil {
@@ -68,6 +71,7 @@ func (d *Driver) wipeWorkloadDir() error {
 
 	d.mu.Lock()
 	d.tables = make(map[string]*tableState)
+	d.insertFailed = false
 	d.mu.Unlock()
 
 	return nil

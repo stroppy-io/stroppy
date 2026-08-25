@@ -3,12 +3,8 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	"math"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,82 +12,36 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// TestTpccWorkloadEndToEnd drives the rewritten `workloads/tpcc/tx.ts`
-// through the stroppy binary end to end at WAREHOUSES=1: drop + create
-// schema, then load all nine TPC-C tables via `driver.insertSpec`.
-//
-// This is the TS-side companion to `tpcc_test.go` (the Go-level spec
-// test). It proves the datagen framework composes through the TS Rel /
-// Attr / Draw / Dict / Expr wrappers when driven from a real workload.
-//
-// Post-Stage-E: the load is spec-compliant modulo o_ol_cnt (fixed at 10
-// instead of Uniform(5,15) — deferred per the workload header). This
-// test enforces the §4.3.3.1 distribution rules on o_carrier_id,
-// ol_delivery_d, ol_amount, c_last, i_data, s_data in addition to the
-// pre-existing row-count / FK-integrity checks.
+// TestTpccWorkloadEndToEnd loads one warehouse through the registered Go
+// workload and validates cardinality, key relationships, and TPC-C distributions.
 func TestTpccWorkloadEndToEnd(t *testing.T) {
-	if os.Getenv(envSkip) == "1" {
-		t.Skipf("skipping integration test: %s=1", envSkip)
-	}
-
-	repoRoot := findRepoRoot(t)
-	binary := filepath.Join(repoRoot, "build", "stroppy")
-	if _, err := os.Stat(binary); err != nil {
-		t.Fatalf("stroppy binary not found at %s (run `make build` first): %v", binary, err)
-	}
-
 	pool := NewTmpfsPG(t)
 	ResetSchema(t, pool)
 
-	url := os.Getenv(envTmpfsURL)
-	if url == "" {
-		url = defaultTmpfsURL
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
+	url := envOr(envTmpfsURL, defaultTmpfsURL)
 	start := time.Now()
-	// STROPPY_NO_DEFAULT=true short-circuits the transaction body in the
-	// workload's default() export. k6 forces one default iteration per run;
-	// without this flag that iteration mutates new_order / orders / stock /
-	// history via a random tx, breaking the post-populate assertions.
-	cmd := exec.CommandContext(ctx, binary,
-		"run", "./workloads/tpcc/tx.ts",
+	out := runStroppy(t, 5*time.Minute,
+		"run", "tpcc/tx",
+		"-d", "pg",
 		"-D", "url="+url,
-		"-e", "WAREHOUSES=1",
-		"-e", "STROPPY_NO_DEFAULT=true",
+		"--scale-factor", "1",
+		"--load-workers", "4",
+		"--executor", "shared-iterations",
+		"--iterations", "1",
 		"--steps", "drop_schema,create_schema,load_data",
 	)
-	cmd.Dir = repoRoot
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("stroppy run failed: %v\n--- stdout ---\n%s\n--- stderr ---\n%s",
-			err, stdout.String(), stderr.String())
-	}
 	loadElapsed := time.Since(start)
 	t.Logf("stroppy load_data completed in %s", loadElapsed)
 
 	if loadElapsed > 3*time.Minute {
-		t.Errorf("load took %s, exceeds the 3m WAREHOUSES=1 budget", loadElapsed)
+		t.Errorf("load took %s, exceeds the 3m warehouse=1 budget", loadElapsed)
 	}
 
-	out := stdout.String() + stderr.String()
-	for _, marker := range []string{
-		"InsertSpec into 'warehouse'",
-		"InsertSpec into 'district'",
-		"InsertSpec into 'customer'",
-		"InsertSpec into 'item'",
-		"InsertSpec into 'stock'",
-		"InsertSpec into 'orders'",
-		"InsertSpec into 'order_line'",
-		"InsertSpec into 'new_order'",
+	for _, table := range []string{
+		"warehouse", "district", "customer", "item", "stock", "orders", "order_line", "new_order",
 	} {
-		if !strings.Contains(out, marker) {
-			t.Errorf("missing log marker %q in stroppy output", marker)
+		if !strings.Contains(out, table) {
+			t.Errorf("missing insert progress for %q in stroppy output", table)
 		}
 	}
 
@@ -107,7 +57,7 @@ func TestTpccWorkloadEndToEnd(t *testing.T) {
 	assertTpccWorkloadSpecCompliance(t, pool)
 }
 
-// Spec §4.3.3.1 cardinalities at WAREHOUSES=1.
+// Spec §4.3.3.1 cardinalities for one warehouse.
 const (
 	twW           = int64(1)
 	twDistricts   = int64(10)

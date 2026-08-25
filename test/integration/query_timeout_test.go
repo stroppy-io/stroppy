@@ -187,8 +187,6 @@ func assertMySQLServerTimeout(
 // statement is classified as a timeout rather than a parent cancel, and that
 // the pooled connection is reusable afterward.
 func TestQueryTimeoutPostgres(t *testing.T) {
-	skipIfRequested(t)
-
 	url := envOr(envTmpfsURL, defaultTmpfsURL)
 	drv := dispatchQueryTimeout(t, config.DriverTypePostgres, url, 150*time.Millisecond)
 
@@ -221,8 +219,6 @@ func TestQueryTimeoutPostgres(t *testing.T) {
 // TestQueryTimeoutMySQL verifies an eligible SELECT receives a server-side
 // MAX_EXECUTION_TIME hint and reports MySQL error 3024 near the configured bound.
 func TestQueryTimeoutMySQL(t *testing.T) {
-	skipIfRequested(t)
-
 	const timeout = 150 * time.Millisecond
 
 	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
@@ -235,8 +231,6 @@ func TestQueryTimeoutMySQL(t *testing.T) {
 }
 
 func TestQueryTimeoutMySQLMergesOptimizerHints(t *testing.T) {
-	skipIfRequested(t)
-
 	const timeout = 150 * time.Millisecond
 
 	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
@@ -263,8 +257,6 @@ func TestQueryTimeoutMySQLMergesOptimizerHints(t *testing.T) {
 }
 
 func TestQueryTimeoutMySQLSelectSleep(t *testing.T) {
-	skipIfRequested(t)
-
 	const timeout = 150 * time.Millisecond
 
 	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
@@ -274,8 +266,6 @@ func TestQueryTimeoutMySQLSelectSleep(t *testing.T) {
 }
 
 func TestQueryTimeoutMySQLUnrepresentableDuration(t *testing.T) {
-	skipIfRequested(t)
-
 	const timeout = time.Millisecond - time.Nanosecond
 
 	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
@@ -288,8 +278,6 @@ func TestQueryTimeoutMySQLUnrepresentableDuration(t *testing.T) {
 }
 
 func TestQueryTimeoutMySQLUnhintedStatements(t *testing.T) {
-	skipIfRequested(t)
-
 	const timeout = 150 * time.Millisecond
 
 	url := envOr(envMySQLAllURL, defaultMySQLAllURL)

@@ -1,7 +1,7 @@
 //go:build integration
 
-// Package integration provides helpers for running end-to-end tests against
-// a tmpfs-backed Postgres instance managed by test/compose.tmpfs.yml.
+// Package integration provides end-to-end helpers for the PostgreSQL and
+// MySQL services managed by test/compose.tmpfs.yml.
 package integration
 
 import (
@@ -17,18 +17,12 @@ import (
 const (
 	defaultTmpfsURL = "postgres://postgres:postgres@localhost:5434/stroppy"
 	envTmpfsURL     = "STROPPY_TMPFS_URL"
-	envSkip         = "STROPPY_SKIP_INTEGRATION"
 )
 
-// NewTmpfsPG connects to the tmpfs Postgres instance and returns a scoped pool
-// that is closed via t.Cleanup. Honors STROPPY_TMPFS_URL override and skips
-// when STROPPY_SKIP_INTEGRATION=1.
+// NewTmpfsPG connects to the baseline PostgreSQL service and returns a scoped pool.
+// STROPPY_TMPFS_URL overrides the local compose URL.
 func NewTmpfsPG(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-
-	if os.Getenv(envSkip) == "1" {
-		t.Skipf("skipping integration test: %s=1", envSkip)
-	}
 
 	url := os.Getenv(envTmpfsURL)
 	if url == "" {

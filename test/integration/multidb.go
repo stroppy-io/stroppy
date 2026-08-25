@@ -1,7 +1,7 @@
 //go:build integration
 
-// Per-driver connection fixtures for the multi-DB tmpfs harness defined in
-// test/compose.tmpfs-all.yml. Each NewX helper returns a driver-appropriate
+// Per-driver connection fixtures for the baseline and optional tmpfs harnesses.
+// Each NewX helper returns a driver-appropriate
 // handle and registers a Cleanup. Schema-reset helpers per driver handle
 // dialect-specific DDL (MySQL lacks DROP SCHEMA CASCADE; YDB/picodata use
 // DROP TABLE IF EXISTS).
@@ -54,12 +54,10 @@ func AllKnownTables() []string {
 	return out
 }
 
-// NewPG connects to the multi-DB harness's postgres instance (port 5434)
+// NewPG connects to the baseline harness's PostgreSQL instance (port 5434)
 // and returns a pgx pool scoped to the test.
 func NewPG(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	skipIfRequested(t)
-
 	url := envOr(envPGAllURL, defaultPGAllURL)
 
 	ctx := context.Background()
@@ -69,19 +67,17 @@ func NewPG(t *testing.T) *pgxpool.Pool {
 	}
 	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
-		t.Fatalf("pg.Ping: %v (is `make tmpfs-all-up` running?)", err)
+		t.Fatalf("pg.Ping: %v (is the documented integration harness running?)", err)
 	}
 	t.Cleanup(pool.Close)
 	return pool
 }
 
-// NewMySQL connects to the harness's mysql instance (port 3307) and returns
+// NewMySQL connects to the baseline harness's MySQL instance (port 3307) and returns
 // a *sql.DB scoped to the test. MySQL lacks DROP SCHEMA CASCADE; callers
 // reset via ResetMySQL.
 func NewMySQL(t *testing.T) *sql.DB {
 	t.Helper()
-	skipIfRequested(t)
-
 	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
 
 	db, err := sql.Open("mysql", url)
@@ -93,7 +89,7 @@ func NewMySQL(t *testing.T) *sql.DB {
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
 		db.Close()
-		t.Fatalf("mysql.Ping: %v (is `make tmpfs-all-up` running?)", err)
+		t.Fatalf("mysql.Ping: %v (is the documented integration harness running?)", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	return db
@@ -107,8 +103,6 @@ func NewMySQL(t *testing.T) *sql.DB {
 // probe liveness with `SELECT 1` on a one-off connection instead.
 func NewPicodata(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	skipIfRequested(t)
-
 	url := envOr(envPicoAllURL, defaultPicoAllURL)
 
 	ctx := context.Background()
@@ -119,7 +113,7 @@ func NewPicodata(t *testing.T) *pgxpool.Pool {
 	var one int
 	if err := pool.QueryRow(ctx, "SELECT 1").Scan(&one); err != nil {
 		pool.Close()
-		t.Fatalf("picodata probe: %v (is `make tmpfs-all-up` running?)", err)
+		t.Fatalf("picodata probe: %v (is the documented integration harness running?)", err)
 	}
 	t.Cleanup(pool.Close)
 	return pool
@@ -129,8 +123,6 @@ func NewPicodata(t *testing.T) *pgxpool.Pool {
 // returns the driver handle scoped to the test.
 func NewYDB(t *testing.T) *ydbsdk.Driver {
 	t.Helper()
-	skipIfRequested(t)
-
 	url := envOr(envYDBAllURL, defaultYDBAllURL)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -138,7 +130,7 @@ func NewYDB(t *testing.T) *ydbsdk.Driver {
 
 	drv, err := ydbsdk.Open(ctx, url)
 	if err != nil {
-		t.Fatalf("ydb.Open(%q): %v (is `make tmpfs-all-up` running?)", url, err)
+		t.Fatalf("ydb.Open(%q): %v (is the documented integration harness running?)", url, err)
 	}
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -216,13 +208,6 @@ func ResetYDB(t *testing.T, drv *ydbsdk.Driver, tables []string) {
 			}
 			t.Fatalf("ResetYDB: %s: %v", stmt, err)
 		}
-	}
-}
-
-func skipIfRequested(t *testing.T) {
-	t.Helper()
-	if os.Getenv(envSkip) == "1" {
-		t.Skipf("skipping integration test: %s=1", envSkip)
 	}
 }
 

@@ -5,7 +5,11 @@ import (
 	"errors"
 	"testing"
 
+	"go.uber.org/zap"
+
+	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
+	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
 )
 
 func TestDefaultErrorActions(t *testing.T) {
@@ -101,6 +105,67 @@ func TestRetryWithPolicyRetriesClassifiedError(t *testing.T) {
 
 	if len(retried) != 2 || retried[0] != 2 || retried[1] != 3 {
 		t.Fatalf("retry attempts = %v, want [2 3]", retried)
+	}
+}
+
+func TestBenchRetryPolicyCountsOnlyScheduledRetries(t *testing.T) {
+	rootState, err := newRootState(zap.NewNop(), context.Background(), nil, nil, &MetricsConfig{})
+	if err != nil {
+		t.Fatalf("newRootState() error = %v", err)
+	}
+
+	t.Cleanup(func() {
+		rootState.errorReporter.stopAndWait()
+		rootState.shutdownMetrics()
+	})
+
+	drv, err := driver.Dispatch(context.Background(), driver.Options{
+		Config: &config.DriverConfig{DriverType: config.DriverTypeNoop},
+		Logger: zap.NewNop(),
+	})
+	if err != nil {
+		t.Fatalf("driver.Dispatch() error = %v", err)
+	}
+
+	vu := &VU{root: rootState, vuid: 1, ctx: context.Background()}
+	b := &Bench{root: rootState, vu: vu, drv: drv}
+	attempts := 0
+
+	var callbacks []int
+
+	policy := b.TxRetryPolicy(TxRetryPolicyOptions{
+		MaxAttempts: 3,
+		Actions: ErrorActionMap{ //nolint:exhaustive // test overrides one kind
+			driver.ErrorKindUnknown: ErrorActionRetry,
+		},
+		OnRetry: func(attempt int, _ error, _ RetryDecision) {
+			callbacks = append(callbacks, attempt)
+		},
+	})
+
+	err = Retry0(context.Background(), policy, func() error {
+		attempts++
+		if attempts < 3 {
+			return errors.New("retry")
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Retry0() error = %v", err)
+	}
+
+	if attempts != 3 {
+		t.Fatalf("attempts = %d, want 3", attempts)
+	}
+
+	if len(callbacks) != 2 || callbacks[0] != 2 || callbacks[1] != 3 {
+		t.Fatalf("workload callbacks = %v, want [2 3]", callbacks)
+	}
+
+	snapshot := rootState.errorReporter.snapshot()
+	if snapshot.retryAttempts != 2 || snapshot.terminalErrors != 0 {
+		t.Fatalf("retry summary = %#v, want two retries and no terminal errors", snapshot)
 	}
 }
 

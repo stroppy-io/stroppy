@@ -30,7 +30,8 @@ type RootState struct {
 	manualReader  *sdkmetric.ManualReader
 	metricsPrefix string
 
-	txMetrics *txMetrics
+	txMetrics     *txMetrics
+	errorReporter *errorReporter
 
 	sharedMu    sync.Mutex
 	sharedSlots map[uint64]*sharedDriverSlot
@@ -53,7 +54,7 @@ func newRootState(
 		return nil, err
 	}
 
-	return &RootState{
+	state := &RootState{
 		lg:            lg,
 		ctx:           ctx,
 		dialer:        &net.Dialer{},
@@ -64,7 +65,10 @@ func newRootState(
 		txMetrics:     &txMetrics{},
 		sharedSlots:   make(map[uint64]*sharedDriverSlot),
 		stepFilter:    newStepFilter(steps, noSteps),
-	}, nil
+	}
+	state.errorReporter = newErrorReporter(lg, errorReportInterval)
+
+	return state, nil
 }
 
 // NotifyStep is a no-op at the floor (cloud notification deferred).

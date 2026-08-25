@@ -75,7 +75,6 @@ DRIVER OPTIONS (-D / --driver-opt)
     url                    string    Database connection URL
     driverType             string    postgres | mysql | picodata | ydb |
                                      noop | csv
-    errorMode              string    silent | log | throw | fail | abort
     bulkSize               int       Rows per bulk INSERT (default: 2500)
     insertProgress.enabled bool      Enable load progress watcher
     insertProgress.interval duration Progress log/metric cadence (default: 10s)
@@ -115,6 +114,37 @@ HOW IT WORKS
   2. Each DriverConfig is passed directly to the Go-native bench engine,
      which dispatches to the registered driver implementation.
 
+  Drivers classify backend errors into bounded, database-independent facts.
+  Workloads—not driver configuration—choose whether each transaction fact is
+  retried, returned as an error, ignored, or made fatal. The former errorMode
+  driver field has been removed; config files, raw driver JSON, and -D reject it.
+
+ERROR AND EXIT BEHAVIOR
+
+  Transaction errors follow the workload's retry policy. A retry attempt is
+  counted separately; if a later attempt succeeds, the iteration succeeds and
+  the run is not marked as completed with errors. A terminal nonfatal error
+  fails that iteration, increments terminal/failed-iteration metrics, and the
+  VU continues with its next iteration.
+
+  Query-set workloads (TPC-H, TPC-DS, and execute_sql) continue with the next
+  query after a nonfatal query error. They increment terminal/failed-query
+  metrics without logging every duplicate event.
+
+  The first occurrence of each bounded operation/error-class group is logged
+  at WARN, recurring events are reported periodically as aggregates, and the
+  final summary prints "completed with errors" with terminal errors, failed
+  iterations, failed queries, retries, and representative groups. Nonfatal
+  errors leave the process exit status at 0.
+
+  Setup failures, workload or driver teardown failures, and fatal workload
+  actions return a nonzero status. TPC-H and TPC-DS SF=1 answer comparison
+  remains diagnostic: query errors and answer differences are logged but do not
+  change exit status. A fatal action stops the whole scenario and is reported
+  once. SIGINT/SIGTERM cancellation stops the scenario, runs teardown, and keeps
+  its signal-derived exit status (130/143; a forced second signal is 2).
+  Cancellation is not reported as a nonfatal benchmark error.
+
   To inspect the driver insert methods each driver supports:
 
     stroppy probe
@@ -130,9 +160,6 @@ EXAMPLES
   # Two drivers: PostgreSQL and MySQL
   stroppy run tpcc/tx -d pg -d1 mysql
 
-  # Override a field without specifying a preset
-  stroppy run tpcc/tx -D errorMode=throw
-
   # Dump generated TPC-B data to CSV and stop before the workload phase
   stroppy run tpcb/tx -D driverType=csv \
     -D url='/tmp/tpcb-csv?merge=true&workload=tpcb' \
@@ -146,7 +173,7 @@ EXAMPLES
     -D insertProgress.stallAfter=2m
 
   # Full JSON config instead of preset
-  stroppy run tpcc/tx -d '{"url":"postgres://prod:5432","driverType":"postgres","errorMode":"throw"}'
+  stroppy run tpcc/tx -d '{"url":"postgres://prod:5432","driverType":"postgres"}'
 
   # YDB with TLS and token auth (grpc:// or grpcs:// scheme)
   stroppy run tpcc/tx -d ydb -D url=grpcs://host:2135/db \

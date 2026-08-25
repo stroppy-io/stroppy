@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: stroppy
     ports:
-      - "5434:5432"   # non-default port; avoids colliding with local pg
+      - "5434:5432"
     tmpfs:
       - /var/lib/postgresql/data:size=8g,uid=999,gid=999
     command: >
@@ -26,3 +26,27 @@ services:
       interval: 2s
       timeout: 1s
       retries: 30
+
+  mysql-tmpfs:
+    image: mysql:8.0
+    container_name: stroppy-mysql-tmpfs
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_USER: myuser
+      MYSQL_PASSWORD: mypassword
+      MYSQL_DATABASE: mydb
+    ports:
+      - "3307:3306"
+    tmpfs:
+      - /var/lib/mysql:size=2g,uid=999,gid=999
+    command:
+      - --innodb-flush-log-at-trx-commit=0
+      - --innodb-doublewrite=0
+      - --sync-binlog=0
+      - --skip-log-bin
+      - --max-connections=300
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -prootpassword --silent"]
+      interval: 3s
+      timeout: 2s
+      retries: 40

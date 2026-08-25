@@ -59,18 +59,6 @@ func DriverTypeValues() []DriverType {
 	}
 }
 
-// ErrorMode selects how query and insert errors are handled.
-type ErrorMode int32
-
-const (
-	ErrorModeUnspecified ErrorMode = 0
-	ErrorModeSilent      ErrorMode = 1
-	ErrorModeLog         ErrorMode = 2
-	ErrorModeThrow       ErrorMode = 3
-	ErrorModeFail        ErrorMode = 4
-	ErrorModeAbort       ErrorMode = 5
-)
-
 // TxIsolationLevel is the isolation level of a database transaction.
 type TxIsolationLevel int32
 
@@ -379,7 +367,6 @@ type DriverRunConfig struct {
 	DriverType            *string               `json:"driverType,omitempty"`
 	URL                   *string               `json:"url,omitempty"`
 	Pool                  *PoolConfig           `json:"pool,omitempty"`
-	ErrorMode             *string               `json:"errorMode,omitempty"`
 	BulkSize              *int32                `json:"bulkSize,omitempty"`
 	CaCertFile            *string               `json:"caCertFile,omitempty"`
 	AuthToken             *string               `json:"authToken,omitempty"`
@@ -403,14 +390,6 @@ func (c *DriverRunConfig) GetDriverType() string {
 func (c *DriverRunConfig) GetURL() string {
 	if c != nil && c.URL != nil {
 		return *c.URL
-	}
-
-	return ""
-}
-
-func (c *DriverRunConfig) GetErrorMode() string {
-	if c != nil && c.ErrorMode != nil {
-		return *c.ErrorMode
 	}
 
 	return ""
@@ -603,7 +582,6 @@ type DriverConfig struct {
 	// InsertRequest.Method unset.
 	DefaultInsertMethod   string                `json:"defaultInsertMethod,omitempty"`
 	BulkSize              *int32                `json:"bulkSize,omitempty"`
-	ErrorMode             ErrorMode             `json:"errorMode,omitempty"`
 	Postgres              *PostgresConfig       `json:"postgres,omitempty"`
 	SQL                   *SQLConfig            `json:"sql,omitempty"`
 	CaCertFile            *string               `json:"caCertFile,omitempty"`

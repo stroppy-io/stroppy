@@ -7,6 +7,8 @@ on:
 jobs:
   integration:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     services:
       postgres:
         image: postgres:17
@@ -21,6 +23,21 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_USER: myuser
+          MYSQL_PASSWORD: mypassword
+          MYSQL_DATABASE: mydb
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -prootpassword --silent"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout code
@@ -68,6 +85,13 @@ jobs:
       # Tier 1: real-Postgres smoke of both scenario branches for every workload.
       - name: Run workload branch tests (Postgres)
         run: make run-workload-branches
+
+      - name: Run tagged baseline integration suite
+        env:
+          STROPPY_TMPFS_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
+          STROPPY_PG_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
+          STROPPY_MYSQL_URL: myuser:mypassword@tcp(127.0.0.1:3306)/mydb?parseTime=true&multiStatements=true
+        run: make integration
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v7

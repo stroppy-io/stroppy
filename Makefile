@@ -63,6 +63,20 @@ linter_fix: # Start linter with possible fixes (NEVER run casually — rewrites 
 tests: # Run tests with coverage; pass TEST_FLAGS=-short for the CI-sized suite
 	go test -race $(TEST_FLAGS) ./... -coverprofile=coverage.out
 
+.PHONY: integration integration-optional integration-sf1
+
+integration: # Run mandatory tagged PostgreSQL, MySQL, CSV, and OTEL integration tests
+	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
+	go test -tags=integration -count=1 -timeout=15m ./test/integration
+
+integration-optional: # Run optional Picodata and YDB tagged integration tests
+	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
+	go test -tags='integration integration_optional' -count=1 -timeout=30m -run 'TestTpchLoadOn(Picodata|YDB)' ./test/integration
+
+integration-sf1: # Run the explicit heavy TPC-H SF=1 answer validation
+	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
+	go test -tags='integration integration_sf1' -count=1 -timeout=75m -run TestTpchAnswersSpotCheck ./test/integration
+
 
 ##
 ## Reference-data JSON regeneration (build-time, run with upstream inputs)
@@ -133,39 +147,41 @@ revision: # Recreate git tag with version tag=<semver>
 ## Smoke runs (Go-native workloads)
 ##
 
-# Gate one smoke run: fail on a non-zero exit OR any `level=error` line.
-# stroppy exits 0 even when every iteration errors (e.g. a failed GlobalOnce
-# load), so the exit code alone is not a reliable signal; default error mode
-# logs every error at level=error, which this catches.
+# Gate one smoke run: fail on a non-zero exit, an error log, or the final
+# completed-with-errors marker. Nonfatal iteration/query errors intentionally
+# exit 0, so the summary marker keeps smoke runs strict.
 # $(1)=label, rest=command.
 define smoke_run
 	echo "== $(1) =="; \
 	out=$$($(2) 2>&1); code=$$?; printf '%s\n' "$$out"; \
-	if [ $$code -ne 0 ] || printf '%s' "$$out" | grep -q 'level=error'; then \
+	if [ $$code -ne 0 ] || printf '%s' "$$out" | grep -Eq 'level=error|completed with errors'; then \
 		echo "FAIL ($(1)): exit=$$code"; rc=1; \
 	fi
 endef
 
 # Scenario-branch smoke on the noop driver (NO database). Every workload has
 # two executor archetypes — constant-vus (DURATION set, throughput) and
-# shared-iterations (power test). The noop driver runs the full lifecycle
-# without a DB, so this catches executor/options regressions for ~free. The
-# VUS=2/ITER=1 case also guards the shared-iterations "iterations < VUs" floor.
-# Third field skips each workload's data-validation step (noop has no data to
-# check); "-" means nothing to skip.
+# shared-iterations (power test). Setup still runs against noop, while the
+# database-dependent workload step is excluded: noop cannot return rows required
+# by transactions such as TPC-C new_order. This still exercises each executor,
+# typed options, setup lifecycle, and iteration scheduling without manufacturing
+# expected query failures. The VUS=2/ITER=1 case also guards the
+# shared-iterations "iterations < VUs" floor. Third field names any additional
+# data-validation step to exclude; "-" means no additional step.
 .PHONY: run-scenario-smoke
 run-scenario-smoke: # Tier 0: scenario-branch smoke on noop (no DB), all workloads x both branches
 	@rc=0;                                                                          \
 	for spec in "tpcb/tx 1 -" "tpcc/tx 1 validate_population" "tpcds 0.01 -" "tpch/tx 0.01 validate_answers"; do \
-		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns=""; [ "$$skip" = "-" ] || ns="--no-steps $$skip"; \
+		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns="--no-steps workload"; [ "$$skip" = "-" ] || ns="--no-steps workload,$$skip"; \
 		$(call smoke_run,noop constant-vus: $$wl,./build/stroppy run $$wl -d noop -e SCALE_FACTOR=$$sf -e DURATION=2s -e VUS=2 $$ns); \
 		$(call smoke_run,noop shared-iters: $$wl,./build/stroppy run $$wl -d noop -e SCALE_FACTOR=$$sf -e VUS=2 -e ITER=1 $$ns); \
 	done;                                                                           \
 	exit $$rc
 
 # Real-Postgres smoke of BOTH scenario branches for the light workloads at tiny
-# scale (default pg preset = localhost:5432). Complements run-scenario-smoke by
-# exercising the actual DB path (load + run) in throughput and power modes.
+# scale (default pg preset = localhost:5432). Constant-vus uses one VU so this
+# scenario-shape gate does not become a contention/retry test; shared-iterations
+# keeps VUS=2/ITER=1 to guard the iterations-below-VUs floor.
 # tpch's validate_answers golden set is SF=1 only, so it is skipped at smoke
 # scale; validate_population stays on for tpcc since it passes at SF=1.
 # tpcds is intentionally NOT here: its fixed-cardinality dimensions do not
@@ -177,36 +193,36 @@ run-workload-branches: # Tier 1: real-Postgres smoke of both branches (tpcb/tpcc
 	@rc=0;                                                                          \
 	for spec in "tpcb/tx 1 -" "tpcc/tx 1 -" "tpch/tx 0.01 validate_answers"; do \
 		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns=""; [ "$$skip" = "-" ] || ns="--no-steps $$skip"; \
-		$(call smoke_run,pg constant-vus: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e DURATION=2s -e VUS=2 $$ns); \
+		$(call smoke_run,pg constant-vus: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e DURATION=2s -e VUS=1 $$ns); \
 		$(call smoke_run,pg shared-iters: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e VUS=2 -e ITER=1 $$ns); \
 	done;                                                                           \
 	exit $$rc
 
 ##
-## Tmpfs Postgres integration harness
+## Baseline PostgreSQL + MySQL integration harness
 ##
 
 .PHONY: tmpfs-up tmpfs-down tmpfs-clean tmpfs-psql
 
-tmpfs-up: # Start tmpfs Postgres container for integration tests
+tmpfs-up: # Start baseline tmpfs PostgreSQL and MySQL services
 	docker compose -f test/compose.tmpfs.yml up -d --wait
 
-tmpfs-down: # Stop and remove tmpfs Postgres container and volumes
+tmpfs-down: # Stop baseline integration services and remove their volumes
 	docker compose -f test/compose.tmpfs.yml down -v
 
-tmpfs-clean: # Recycle the tmpfs Postgres container; discards all data
+tmpfs-clean: # Recycle baseline integration services; discard all data
 	$(MAKE) tmpfs-down && $(MAKE) tmpfs-up
 
 tmpfs-psql: # Open psql shell into the tmpfs Postgres container
 	docker exec -it stroppy-pg-tmpfs psql -U postgres -d stroppy
 
 ##
-## Multi-DB tmpfs integration harness (postgres + mysql + picodata + ydb)
+## Optional multi-DB tmpfs integration harness
 ##
 
 .PHONY: tmpfs-all-up tmpfs-all-down tmpfs-all-clean
 
-tmpfs-all-up: # Start all 4 DBs (pg, mysql, picodata, ydb) on non-default ports
+tmpfs-all-up: # Start optional PostgreSQL, MySQL, Picodata, and YDB harness
 	docker compose -f test/compose.tmpfs-all.yml up -d --wait pg-tmpfs-all mysql-tmpfs-all picodata-tmpfs-all ydb-tmpfs-all
 	docker compose -f test/compose.tmpfs-all.yml up picodata-init
 

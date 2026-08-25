@@ -3,294 +3,383 @@
 package integration
 
 import (
-	"bytes"
-	"context"
 	"crypto/sha256"
 	stdcsv "encoding/csv"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 )
 
-// TestCsvDriverTpcbSF001 drives workloads/tpcb/tx.ts end-to-end with
-// the CSV driver at SF=1, writes every row to CSV shards, merges them
-// at teardown, and reads the resulting files back to assert:
-//   - one MANIFEST.json alongside the merged CSVs
-//   - expected per-table row counts (SF=1 TPC-B: 1/10/100000)
-//   - header row present as first line of every .csv
-//
-// The binary path and stroppy repo root resolution match the tpcb /
-// tpcc workload tests.
-func TestCsvDriverTpcbSF001(t *testing.T) {
-	if os.Getenv(envSkip) == "1" {
-		t.Skipf("skipping integration test: %s=1", envSkip)
-	}
+type csvManifest struct {
+	Workload         string                      `json:"workload"`
+	Generated        string                      `json:"generated"`
+	FrameworkVersion string                      `json:"framework_version"`
+	InsertMethod     string                      `json:"insert_method"`
+	Config           csvManifestConfig           `json:"config"`
+	Tables           map[string]csvManifestTable `json:"tables"`
+}
 
-	repoRoot := findRepoRoot(t)
+type csvManifestConfig struct {
+	Dir       string  `json:"dir"`
+	Separator string  `json:"separator"`
+	Header    bool    `json:"header"`
+	Merge     bool    `json:"merge"`
+	NullValue *string `json:"null_value"`
+}
 
-	binary := filepath.Join(repoRoot, "build", "stroppy")
-	if _, err := os.Stat(binary); err != nil {
-		t.Fatalf("stroppy binary not found at %s (run `make build` first): %v", binary, err)
-	}
+type csvManifestTable struct {
+	Rows    int64    `json:"rows"`
+	Shards  int      `json:"shards"`
+	Columns []string `json:"columns"`
+}
 
+var tpcbCSVColumns = map[string][]string{
+	"pgbench_branches": {"bid", "bbalance", "filler"},
+	"pgbench_tellers":  {"tid", "bid", "tbalance", "filler"},
+	"pgbench_accounts": {"aid", "bid", "abalance", "filler"},
+}
+
+var tpcbCSVRows = map[string]int64{
+	"pgbench_branches": 1,
+	"pgbench_tellers":  10,
+	"pgbench_accounts": 100_000,
+}
+
+// TestCSVDriverMergedOutput validates the merged files, row counts, manifest,
+// and removal of temporary shards after driver teardown.
+func TestCSVDriverMergedOutput(t *testing.T) {
 	outDir := t.TempDir()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
-	runCsvTpcb(t, ctx, repoRoot, binary, outDir, "tpcb", "true", "1")
+	runCSVTPCB(t, outDir, "tpcb", true, 4)
 
 	workloadDir := filepath.Join(outDir, "tpcb")
+	assertDirectoryEntries(t, workloadDir, []string{
+		"MANIFEST.json",
+		"pgbench_accounts.csv",
+		"pgbench_branches.csv",
+		"pgbench_tellers.csv",
+	})
 
-	// MANIFEST should land alongside the merged CSVs.
-	if _, err := os.Stat(filepath.Join(workloadDir, "MANIFEST.json")); err != nil {
-		t.Fatalf("MANIFEST.json missing: %v", err)
-	}
-
-	expected := map[string]int64{
+	manifest := readCSVManifest(t, workloadDir)
+	assertCSVManifest(t, manifest, outDir, "tpcb", true, map[string]int{
 		"pgbench_branches": 1,
-		"pgbench_tellers":  10,
-		"pgbench_accounts": 100_000,
+		"pgbench_tellers":  4,
+		"pgbench_accounts": 4,
+	})
+
+	for table, wantRows := range tpcbCSVRows {
+		records := readCSVRecords(t, filepath.Join(workloadDir, table+".csv"))
+		if len(records) == 0 {
+			t.Fatalf("%s.csv is empty", table)
+		}
+		if !slices.Equal(records[0], tpcbCSVColumns[table]) {
+			t.Errorf("%s header = %v, want %v", table, records[0], tpcbCSVColumns[table])
+		}
+		if got := int64(len(records) - 1); got != wantRows {
+			t.Errorf("%s rows = %d, want %d", table, got, wantRows)
+		}
 	}
 
-	for table, want := range expected {
-		path := filepath.Join(workloadDir, table+".csv")
-
-		got, header := csvRowCount(t, path)
-		if got != want {
-			t.Errorf("%s rows = %d, want %d", table, got, want)
-		}
-
-		if header == "" {
-			t.Errorf("%s missing header row", table)
-		}
-	}
-
-	// merge=true must clean up the shards dir.
 	if _, err := os.Stat(filepath.Join(workloadDir, ".shards")); !os.IsNotExist(err) {
-		t.Errorf(".shards dir still exists post-merge: %v", err)
+		t.Errorf("merge=true left .shards behind: %v", err)
 	}
 }
 
-// TestCsvDriverGoldenTpcbSF1 pins the byte-for-byte content of the
-// CSV driver's output against committed SHA-256 hashes. A failure
-// means either (a) seed derivation changed, (b) CSV encoding changed,
-// or (c) tpcb spec changed. Any of these is load-bearing; the fix is
-// to validate manually and update testdata/csv/tpcb_sf1/*.sha256.
-func TestCsvDriverGoldenTpcbSF1(t *testing.T) {
-	if os.Getenv(envSkip) == "1" {
-		t.Skipf("skipping integration test: %s=1", envSkip)
-	}
-
-	repoRoot := findRepoRoot(t)
-
-	binary := filepath.Join(repoRoot, "build", "stroppy")
-	if _, err := os.Stat(binary); err != nil {
-		t.Fatalf("stroppy binary not found: %v", err)
-	}
-
+// TestCSVDriverUnmergedShards validates shard names, header sidecars, content,
+// row totals, and the unmerged manifest layout.
+func TestCSVDriverUnmergedShards(t *testing.T) {
 	outDir := t.TempDir()
+	runCSVTPCB(t, outDir, "tpcb_sharded", false, 3)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
+	workloadDir := filepath.Join(outDir, "tpcb_sharded")
+	assertDirectoryEntries(t, workloadDir, []string{
+		"MANIFEST.json",
+		"pgbench_accounts.header.csv",
+		"pgbench_accounts.w000.csv",
+		"pgbench_accounts.w001.csv",
+		"pgbench_accounts.w002.csv",
+		"pgbench_branches.header.csv",
+		"pgbench_branches.w000.csv",
+		"pgbench_tellers.header.csv",
+		"pgbench_tellers.w000.csv",
+		"pgbench_tellers.w001.csv",
+		"pgbench_tellers.w002.csv",
+	})
 
-	runCsvTpcb(t, ctx, repoRoot, binary, outDir, "tpcb_sf1", "true", "1")
+	manifest := readCSVManifest(t, workloadDir)
+	assertCSVManifest(t, manifest, outDir, "tpcb_sharded", false, map[string]int{
+		"pgbench_branches": 1,
+		"pgbench_tellers":  3,
+		"pgbench_accounts": 3,
+	})
+
+	for table, wantRows := range tpcbCSVRows {
+		header := readCSVRecords(t, filepath.Join(workloadDir, table+".header.csv"))
+		if len(header) != 1 || !slices.Equal(header[0], tpcbCSVColumns[table]) {
+			t.Errorf("%s header sidecar = %v, want one %v row", table, header, tpcbCSVColumns[table])
+		}
+
+		shards, err := filepath.Glob(filepath.Join(workloadDir, table+".w*.csv"))
+		if err != nil {
+			t.Fatalf("glob %s shards: %v", table, err)
+		}
+		if len(shards) != manifest.Tables[table].Shards {
+			t.Errorf("%s shard files = %d, manifest = %d", table, len(shards), manifest.Tables[table].Shards)
+		}
+
+		var rows int64
+		for _, shard := range shards {
+			records := readCSVRecords(t, shard)
+			if len(records) == 0 {
+				t.Errorf("shard %s is empty", filepath.Base(shard))
+				continue
+			}
+			if slices.Equal(records[0], tpcbCSVColumns[table]) {
+				t.Errorf("shard %s unexpectedly contains a header", filepath.Base(shard))
+			}
+			for rowIndex, record := range records {
+				if len(record) != len(tpcbCSVColumns[table]) {
+					t.Errorf("%s row %d has %d fields, want %d", filepath.Base(shard), rowIndex, len(record), len(tpcbCSVColumns[table]))
+				}
+			}
+			rows += int64(len(records))
+		}
+		if rows != wantRows {
+			t.Errorf("%s shard rows = %d, want %d", table, rows, wantRows)
+		}
+		if _, err := os.Stat(filepath.Join(workloadDir, table+".csv")); !os.IsNotExist(err) {
+			t.Errorf("merge=false produced merged %s.csv: %v", table, err)
+		}
+	}
+}
+
+// TestCSVDriverGoldenTPCB pins the byte-for-byte merged Go workload output.
+func TestCSVDriverGoldenTPCB(t *testing.T) {
+	repoRoot := findRepoRoot(t)
+	outDir := t.TempDir()
+	runCSVTPCB(t, outDir, "tpcb_sf1", true, 1)
 
 	workloadDir := filepath.Join(outDir, "tpcb_sf1")
 	goldenDir := filepath.Join(repoRoot, "testdata", "csv", "tpcb_sf1")
-
-	for _, table := range []string{
-		"pgbench_branches",
-		"pgbench_tellers",
-		"pgbench_accounts",
-	} {
+	for table := range tpcbCSVRows {
 		got := sha256OfFile(t, filepath.Join(workloadDir, table+".csv"))
 		want := readGolden(t, filepath.Join(goldenDir, table+".csv.sha256"))
-
 		if got != want {
 			t.Errorf("%s SHA mismatch\n  got  %s\n  want %s", table, got, want)
 		}
 	}
 }
 
-// TestCsvDriverDeterminismAcrossWorkers runs the tpcb workload at
-// LOAD_WORKERS ∈ {1, 4, 16} with ?merge=true, sorts every emitted
-// table's lines, and asserts all three workers produce identical
-// sorted multisets. This is the CLAUDE.md §Parallelism §1 contract.
-func TestCsvDriverDeterminismAcrossWorkers(t *testing.T) {
-	if os.Getenv(envSkip) == "1" {
-		t.Skipf("skipping integration test: %s=1", envSkip)
-	}
-
-	repoRoot := findRepoRoot(t)
-
-	binary := filepath.Join(repoRoot, "build", "stroppy")
-	if _, err := os.Stat(binary); err != nil {
-		t.Fatalf("stroppy binary not found: %v", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	defer cancel()
-
+// TestCSVDriverDeterminismAcrossWorkers checks worker-count invariance.
+func TestCSVDriverDeterminismAcrossWorkers(t *testing.T) {
 	hashes := make(map[string][3]string)
-
-	for i, workers := range []string{"1", "4", "16"} {
+	for i, workers := range []int{1, 4, 16} {
 		outDir := t.TempDir()
+		runCSVTPCB(t, outDir, "tpcb", true, workers)
 
-		runCsvTpcb(t, ctx, repoRoot, binary, outDir, "tpcb", "true", workers)
-
-		workloadDir := filepath.Join(outDir, "tpcb")
-
-		for _, table := range []string{"pgbench_branches", "pgbench_tellers", "pgbench_accounts"} {
-			h := sha256OfSortedBody(t, filepath.Join(workloadDir, table+".csv"))
-
-			snap := hashes[table]
-			snap[i] = h
-			hashes[table] = snap
+		for table := range tpcbCSVRows {
+			hash := sha256OfSortedBody(t, filepath.Join(outDir, "tpcb", table+".csv"))
+			tableHashes := hashes[table]
+			tableHashes[i] = hash
+			hashes[table] = tableHashes
 		}
 	}
 
-	for table, tri := range hashes {
-		if !(tri[0] == tri[1] && tri[1] == tri[2]) {
-			t.Errorf("%s: non-deterministic across workers {1,4,16}: %v", table, tri)
+	for table, tableHashes := range hashes {
+		if tableHashes[0] != tableHashes[1] || tableHashes[1] != tableHashes[2] {
+			t.Errorf("%s is non-deterministic across workers {1,4,16}: %v", table, tableHashes)
 		}
 	}
 }
 
-// runCsvTpcb invokes `./build/stroppy run` against the tpcb workload
-// with the CSV driver, the given URL-encoded merge flag, and the
-// chosen LOAD_WORKERS count. Output goes to outDir/<workload>/.
-func runCsvTpcb(
+func runCSVTPCB(t *testing.T, outDir, workload string, merge bool, workers int) {
+	t.Helper()
+
+	url := fmt.Sprintf("%s?merge=%t&workload=%s", outDir, merge, workload)
+	runStroppy(t, 2*time.Minute,
+		"run", "tpcb/tx",
+		"-D", "driverType=csv",
+		"-D", "url="+url,
+		"--scale-factor", "1",
+		"--load-workers", fmt.Sprint(workers),
+		"--executor", "shared-iterations",
+		"--iterations", "1",
+		"--steps", "drop_schema,create_schema,load_data",
+	)
+}
+
+func readCSVManifest(t *testing.T, workloadDir string) csvManifest {
+	t.Helper()
+
+	data, err := os.ReadFile(filepath.Join(workloadDir, "MANIFEST.json"))
+	if err != nil {
+		t.Fatalf("read MANIFEST.json: %v", err)
+	}
+
+	var manifest csvManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("decode MANIFEST.json: %v", err)
+	}
+
+	return manifest
+}
+
+func assertCSVManifest(
 	t *testing.T,
-	ctx context.Context,
-	repoRoot, binary, outDir, workload, merge, workers string,
+	manifest csvManifest,
+	outDir, workload string,
+	merge bool,
+	shards map[string]int,
 ) {
 	t.Helper()
 
-	url := fmt.Sprintf("%s?merge=%s&workload=%s", outDir, merge, workload)
+	if manifest.Workload != workload {
+		t.Errorf("manifest workload = %q, want %q", manifest.Workload, workload)
+	}
+	if _, err := time.Parse(time.RFC3339, manifest.Generated); err != nil {
+		t.Errorf("manifest generated = %q, want RFC3339 timestamp: %v", manifest.Generated, err)
+	}
+	if want := testedStroppyVersion(t); manifest.FrameworkVersion != want {
+		t.Errorf("manifest framework_version = %q, want tested binary version %q", manifest.FrameworkVersion, want)
+	}
+	if manifest.InsertMethod != "NATIVE" {
+		t.Errorf("manifest insert_method = %q, want NATIVE", manifest.InsertMethod)
+	}
+	if manifest.Config.Dir != outDir || manifest.Config.Separator != "," ||
+		!manifest.Config.Header || manifest.Config.Merge != merge {
+		t.Errorf("manifest config = %+v, want dir=%q separator=comma header=true merge=%t", manifest.Config, outDir, merge)
+	}
+	if manifest.Config.NullValue == nil {
+		t.Error("manifest config is missing required null_value")
+	} else if *manifest.Config.NullValue != "" {
+		t.Errorf("manifest null_value = %q, want empty string", *manifest.Config.NullValue)
+	}
+	if len(manifest.Tables) != len(tpcbCSVRows) {
+		t.Errorf("manifest tables = %d, want %d", len(manifest.Tables), len(tpcbCSVRows))
+	}
 
-	cmd := exec.CommandContext(ctx, binary,
-		"run", "./workloads/tpcb/tx.ts",
-		"-D", "url="+url,
-		"-D", "driverType=csv",
-		"-e", "SCALE_FACTOR=1",
-		"-e", "LOAD_WORKERS="+workers,
-		"--steps", "drop_schema,create_schema,load_data",
-	)
-	cmd.Dir = repoRoot
-
-	var stdout, stderr bytes.Buffer
-
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("stroppy run (csv, workers=%s) failed: %v\n--- stdout ---\n%s\n--- stderr ---\n%s",
-			workers, err, stdout.String(), stderr.String())
+	for table, wantRows := range tpcbCSVRows {
+		got, ok := manifest.Tables[table]
+		if !ok {
+			t.Errorf("manifest missing table %s", table)
+			continue
+		}
+		if got.Rows != wantRows || got.Shards != shards[table] || !slices.Equal(got.Columns, tpcbCSVColumns[table]) {
+			t.Errorf("manifest %s = %+v, want rows=%d shards=%d columns=%v", table, got, wantRows, shards[table], tpcbCSVColumns[table])
+		}
 	}
 }
 
-// csvRowCount returns (rowsExcludingHeader, headerString) for the
-// given CSV file. Fails the test if the file does not exist or is
-// empty.
-func csvRowCount(t *testing.T, path string) (int64, string) {
+func testedStroppyVersion(t *testing.T) string {
 	t.Helper()
 
-	f, err := os.Open(path)
+	_, binary := stroppyBinary(t)
+	output, err := exec.Command(binary, "version", "--json").Output()
+	if err != nil {
+		t.Fatalf("stroppy version --json: %v", err)
+	}
+
+	var version struct {
+		Stroppy string `json:"stroppy"`
+	}
+	if err := json.Unmarshal(output, &version); err != nil {
+		t.Fatalf("decode stroppy version --json: %v", err)
+	}
+	if version.Stroppy == "" {
+		t.Fatal("stroppy version --json returned an empty stroppy version")
+	}
+
+	return version.Stroppy
+}
+
+func assertDirectoryEntries(t *testing.T, dir string, want []string) {
+	t.Helper()
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read directory %q: %v", dir, err)
+	}
+
+	got := make([]string, len(entries))
+	for i, entry := range entries {
+		got[i] = entry.Name()
+	}
+	sort.Strings(got)
+	sort.Strings(want)
+	if !slices.Equal(got, want) {
+		t.Errorf("directory %s entries = %v, want %v", dir, got, want)
+	}
+}
+
+func readCSVRecords(t *testing.T, path string) [][]string {
+	t.Helper()
+
+	file, err := os.Open(path)
 	if err != nil {
 		t.Fatalf("open %q: %v", path, err)
 	}
+	defer file.Close()
 
-	defer f.Close()
-
-	r := stdcsv.NewReader(f)
-	r.FieldsPerRecord = -1
-
-	all, err := r.ReadAll()
+	reader := stdcsv.NewReader(file)
+	reader.FieldsPerRecord = -1
+	records, err := reader.ReadAll()
 	if err != nil {
 		t.Fatalf("read %q: %v", path, err)
 	}
 
-	if len(all) == 0 {
-		return 0, ""
-	}
-
-	return int64(len(all) - 1), strings.Join(all[0], ",")
+	return records
 }
 
-// sha256OfFile returns the SHA-256 hex digest of the file at path.
-// Used by the golden-hash test to compare against committed digests.
 func sha256OfFile(t *testing.T, path string) string {
 	t.Helper()
 
-	b, err := os.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read %q: %v", path, err)
 	}
 
-	sum := sha256.Sum256(b)
+	sum := sha256.Sum256(data)
 
 	return hex.EncodeToString(sum[:])
 }
 
-// readGolden reads a single-line hex SHA-256 from path, trimmed of
-// surrounding whitespace. Committed hashes are one-per-file so the
-// lineage to `sha256sum` output stays obvious.
 func readGolden(t *testing.T, path string) string {
 	t.Helper()
 
-	b, err := os.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read golden %q: %v", path, err)
 	}
 
-	return strings.TrimSpace(string(b))
+	return strings.TrimSpace(string(data))
 }
 
-// sha256OfSortedBody returns the SHA-256 of the file's rows, excluding
-// the header, after sorting them lexicographically. Two runs of the
-// same workload with different worker counts must match on this hash.
 func sha256OfSortedBody(t *testing.T, path string) string {
 	t.Helper()
 
-	f, err := os.Open(path)
-	if err != nil {
-		t.Fatalf("open %q: %v", path, err)
-	}
-
-	defer f.Close()
-
-	r := stdcsv.NewReader(f)
-	r.FieldsPerRecord = -1
-
-	all, err := r.ReadAll()
-	if err != nil {
-		t.Fatalf("read %q: %v", path, err)
-	}
-
-	if len(all) < 1 {
+	records := readCSVRecords(t, path)
+	if len(records) == 0 {
 		return ""
 	}
 
-	body := make([]string, 0, len(all)-1)
-	for _, rec := range all[1:] {
-		body = append(body, strings.Join(rec, ""))
+	body := make([]string, 0, len(records)-1)
+	for _, record := range records[1:] {
+		body = append(body, strings.Join(record, "\x1f"))
 	}
-
 	sort.Strings(body)
 
-	h := sha256.New()
-
+	hash := sha256.New()
 	for _, line := range body {
-		_, _ = h.Write([]byte(line))
-		_, _ = h.Write([]byte{'\n'})
+		_, _ = hash.Write([]byte(line))
+		_, _ = hash.Write([]byte{'\n'})
 	}
 
-	return hex.EncodeToString(h.Sum(nil))
+	return hex.EncodeToString(hash.Sum(nil))
 }

@@ -115,8 +115,13 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 			err := b.Exec(ctx, body, nil)
 
 			ms := time.Since(start).Milliseconds()
+
 			if err != nil {
-				lg.Infof("[execute_sql] %s: error in %dms %v", name, ms, err)
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+
+				b.RecordQueryError(name, err)
 
 				continue
 			}

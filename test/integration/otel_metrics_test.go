@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -27,143 +26,90 @@ const (
 
 var dockerContainerIDRe = regexp.MustCompile(`^[0-9a-f]{12,64}$`)
 
-type labels map[string]string
-
 type metricExpectation struct {
-	prefix   string
-	labels   labels
-	minValue float64
+	name   string
+	labels labels
+	value  float64
+	exact  bool
 }
 
-// TestOtelStroppyMetricsNoop proves all Stroppy-owned metrics leave k6 through
-// the configured OTEL exporter. It uses the noop driver so the test validates
-// the stroppy/k6 metrics plumbing without depending on a database.
-func TestOtelStroppyMetricsNoop(t *testing.T) {
-	if os.Getenv(envSkip) == "1" {
-		t.Skipf("skipping integration test: %s=1", envSkip)
-	}
-
+// TestOtelStroppyMetrics exports native TPC-B load, query, and transaction
+// metrics through OTLP and validates their Prometheus representation.
+func TestOtelStroppyMetrics(t *testing.T) {
 	docker := requireDocker(t)
-	repoRoot := findRepoRoot(t)
-
-	binary := filepath.Join(repoRoot, "build", "stroppy")
-	if _, err := os.Stat(binary); err != nil {
-		t.Fatalf("stroppy binary not found at %s (run `make build` first): %v", binary, err)
-	}
+	pool := NewTmpfsPG(t)
+	ResetSchema(t, pool)
 
 	collectorConfig := writeOtelCollectorConfig(t)
 	otlpEndpoint, prometheusURL := startOtelCollector(t, docker, collectorConfig)
 	stroppyConfig := writeStroppyOtelConfig(t, otlpEndpoint)
+	url := envOr(envTmpfsURL, defaultTmpfsURL)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, binary,
-		"run", "./test/integration/testdata/otel_metrics.ts",
+	runStroppy(t, 2*time.Minute,
+		"run", "tpcb/tx",
 		"-f", stroppyConfig,
-		"-D", "driverType=noop",
-		"-D", "url=noop://metrics",
-		"-e", "ROWS=100",
-		"--steps", "load_data",
-		"--", "--quiet",
+		"-d", "pg",
+		"-D", "url="+url,
+		"--scale-factor", "1",
+		"--load-workers", "2",
+		"--executor", "shared-iterations",
+		"--iterations", "1",
 	)
-	cmd.Dir = repoRoot
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("stroppy run failed: %v\n--- stdout ---\n%s\n--- stderr ---\n%s",
-			err, stdout.String(), stderr.String())
-	}
 
 	body := waitForMetrics(t, prometheusURL, func(body string) error {
-		for _, table := range []string{"numbers_a", "numbers_b"} {
-			if err := requirePrometheusSample(body, "stroppy_insert_rows_total", labels{
-				"table_name": table,
-				"step":       "load_data",
-			}, 100); err != nil {
-				return err
-			}
-			if err := requirePrometheusSample(body, "stroppy_insert_progress_rows_total", labels{
+		samples, err := parsePrometheusSamples(body)
+		if err != nil {
+			return err
+		}
+
+		rows := map[string]float64{
+			"pgbench_branches": 1,
+			"pgbench_tellers":  10,
+			"pgbench_accounts": 100_000,
+		}
+		for table, count := range rows {
+			tableLabels := labels{"job": "stroppy", "table_name": table, "step": "load_data"}
+			progressLabels := labels{
 				"event":      "completed",
+				"job":        "stroppy",
 				"method":     "native",
 				"row_kind":   "confirmed",
 				"table_name": table,
 				"step":       "load_data",
-			}, 100); err != nil {
-				return err
 			}
-			if err := requirePrometheusSample(body, "stroppy_insert_duration", labels{
-				"table_name": table,
-				"step":       "load_data",
-			}, 0); err != nil {
-				return err
-			}
-			if err := requirePrometheusSample(body, "stroppy_insert_error_rate", labels{
-				"table_name": table,
-				"step":       "load_data",
-			}, 0); err != nil {
-				return err
+
+			for _, expectation := range []metricExpectation{
+				{name: "stroppy_insert_rows_total", labels: tableLabels, value: count, exact: true},
+				{name: "stroppy_insert_progress_rows_total", labels: progressLabels, value: count, exact: true},
+				{name: "stroppy_insert_progress_rows_per_second", labels: progressLabels},
+				{name: "stroppy_insert_duration_milliseconds_count", labels: tableLabels, value: 1, exact: true},
+				{name: "stroppy_insert_operations_total", labels: tableLabels, value: 1, exact: true},
+			} {
+				if err := requirePrometheusExpectation(samples, expectation); err != nil {
+					return err
+				}
 			}
 		}
 
-		expected := []metricExpectation{
-			{prefix: "stroppy_run_query_duration", labels: labels{
-				"name": "outside_query",
-				"type": "metrics",
-				"step": "workload",
-			}},
-			{prefix: "stroppy_run_query_count", labels: labels{
-				"name": "outside_query",
-				"type": "metrics",
-				"step": "workload",
-			}, minValue: 1},
-			{prefix: "stroppy_run_query_error_rate", labels: labels{
-				"name": "outside_query",
-				"type": "metrics",
-				"step": "workload",
-			}},
-			{prefix: "stroppy_run_query_qps"},
-			{prefix: "stroppy_tx_count", labels: labels{
-				"tx_action":    "commit",
-				"tx_name":      "metrics_tx",
-				"tx_isolation": "none",
-				"step":         "workload",
-			}, minValue: 1},
-			{prefix: "stroppy_tx_tps"},
-			{prefix: "stroppy_tx_total_duration", labels: labels{
-				"tx_action":    "commit",
-				"tx_name":      "metrics_tx",
-				"tx_isolation": "none",
-				"step":         "workload",
-			}},
-			{prefix: "stroppy_tx_clean_duration", labels: labels{
-				"tx_action":    "commit",
-				"tx_name":      "metrics_tx",
-				"tx_isolation": "none",
-				"step":         "workload",
-			}},
-			{prefix: "stroppy_tx_commit_rate", labels: labels{
-				"tx_action":    "commit",
-				"tx_name":      "metrics_tx",
-				"tx_isolation": "none",
-				"step":         "workload",
-			}},
-			{prefix: "stroppy_tx_error_rate", labels: labels{
-				"name": "metrics_tx",
-				"step": "workload",
-			}},
-			{prefix: "stroppy_tx_queries_per_tx", labels: labels{
-				"tx_action":    "commit",
-				"tx_name":      "metrics_tx",
-				"tx_isolation": "none",
-				"step":         "workload",
-			}, minValue: 1},
+		txLabels := labels{
+			"job":          "stroppy",
+			"tx_action":    "commit",
+			"tx_name":      "tpcb",
+			"tx_isolation": "read_committed",
+			"step":         "workload",
 		}
-		for _, exp := range expected {
-			if err := requirePrometheusSample(body, exp.prefix, exp.labels, exp.minValue); err != nil {
+		expected := []metricExpectation{
+			{name: "stroppy_run_query_operations_total", labels: labels{"job": "stroppy", "step": "workload"}, value: 5, exact: true},
+			{name: "stroppy_run_query_duration_milliseconds_count", labels: labels{"job": "stroppy", "step": "workload"}, value: 5, exact: true},
+			{name: "stroppy_transactions_total", labels: txLabels, value: 1, exact: true},
+			{name: "stroppy_tx_commits_total", labels: txLabels, value: 1, exact: true},
+			{name: "stroppy_tx_total_duration_milliseconds_count", labels: txLabels, value: 1, exact: true},
+			{name: "stroppy_tx_queries_per_tx_count", labels: txLabels, value: 1, exact: true},
+			{name: "stroppy_iterations_total", labels: labels{"job": "stroppy"}, value: 1, exact: true},
+			{name: "stroppy_iteration_duration_milliseconds_count", labels: labels{"job": "stroppy"}, value: 1, exact: true},
+		}
+		for _, expectation := range expected {
+			if err := requirePrometheusExpectation(samples, expectation); err != nil {
 				return err
 			}
 		}
@@ -179,7 +125,7 @@ func requireDocker(t *testing.T) string {
 
 	docker, err := exec.LookPath("docker")
 	if err != nil {
-		t.Skipf("docker not found; required for OTEL collector integration test: %v", err)
+		t.Fatalf("docker not found; required for OTEL collector integration test: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -187,7 +133,7 @@ func requireDocker(t *testing.T) string {
 
 	cmd := exec.CommandContext(ctx, docker, "info")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Skipf("docker daemon unavailable; required for OTEL collector integration test: %v\n%s", err, string(out))
+		t.Fatalf("docker daemon unavailable; required for OTEL collector integration test: %v\n%s", err, string(out))
 	}
 
 	return docker
@@ -264,6 +210,8 @@ func startOtelCollector(t *testing.T, docker, configPath string) (otlpEndpoint, 
 	}
 
 	name := fmt.Sprintf("stroppy-otel-test-%d", time.Now().UnixNano())
+	t.Cleanup(func() { removeOtelCollector(t, docker, name) })
+
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -288,12 +236,6 @@ func startOtelCollector(t *testing.T, docker, configPath string) (otlpEndpoint, 
 		t.Fatalf("docker run returned no container id\n%s", string(out))
 	}
 
-	t.Cleanup(func() {
-		rmCtx, rmCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer rmCancel()
-		_ = exec.CommandContext(rmCtx, docker, "rm", "-f", containerID).Run()
-	})
-
 	otlpPort := dockerHostPort(t, docker, containerID, "4318/tcp")
 	prometheusPort := dockerHostPort(t, docker, containerID, "8889/tcp")
 	prometheusURL = "http://127.0.0.1:" + prometheusPort + "/metrics"
@@ -301,6 +243,27 @@ func startOtelCollector(t *testing.T, docker, configPath string) (otlpEndpoint, 
 	waitForMetricsEndpoint(t, docker, containerID, prometheusURL)
 
 	return "127.0.0.1:" + otlpPort, prometheusURL
+}
+
+func removeOtelCollector(t *testing.T, docker, name string) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	output, err := exec.CommandContext(ctx, docker, "rm", "-f", name).CombinedOutput()
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		t.Errorf("remove OTEL collector %s timed out: %v\n%s", name, ctxErr, output)
+
+		return
+	}
+	if err != nil {
+		if dockerRemoveReportsMissing(output) {
+			return
+		}
+
+		t.Errorf("remove OTEL collector %s: %v\n%s", name, err, output)
+	}
 }
 
 func dockerContainerID(output string) string {
@@ -425,36 +388,14 @@ func waitForMetrics(t *testing.T, url string, check func(string) error) string {
 	return ""
 }
 
-func requirePrometheusSample(body, metricPrefix string, wantLabels labels, minValue float64) error {
-	re := regexp.MustCompile(`(?m)^(` + regexp.QuoteMeta(metricPrefix) + `[A-Za-z0-9_:]*)(?:\{([^}]*)\})?\s+([-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?)$`)
-	matches := re.FindAllStringSubmatch(body, -1)
-	for _, match := range matches {
-		if !prometheusLabelsContainAll(match[2], wantLabels) {
-			continue
-		}
-		value, err := strconv.ParseFloat(match[3], 64)
-		if err != nil {
-			continue
-		}
-		if value >= minValue {
-			return nil
-		}
+func requirePrometheusExpectation(samples []prometheusSample, expectation metricExpectation) error {
+	if expectation.exact {
+		return requirePrometheusSampleEqual(
+			samples, expectation.name, expectation.labels, expectation.value,
+		)
 	}
-	return fmt.Errorf("missing %s sample with labels %v and value >= %g", metricPrefix, wantLabels, minValue)
-}
 
-func prometheusLabelsContainAll(got string, want labels) bool {
-	if len(want) == 0 {
-		return true
-	}
-	if got == "" {
-		return false
-	}
-	for key, value := range want {
-		needle := key + `="` + value + `"`
-		if !strings.Contains(got, needle) {
-			return false
-		}
-	}
-	return true
+	return requirePrometheusSampleAtLeast(
+		samples, expectation.name, expectation.labels, expectation.value,
+	)
 }
