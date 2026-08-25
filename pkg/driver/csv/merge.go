@@ -22,14 +22,13 @@ func (d *Driver) mergeAll(
 		return err
 	}
 
-	shardDir := filepath.Join(workloadDir, ".shards")
+	shardDir, alreadyPublished, err := mergeShardDir(workloadDir, tables)
+	if err != nil {
+		return err
+	}
 
-	if _, err := os.Stat(shardDir); err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-
-		return fmt.Errorf("csv: stat shards %q: %w", shardDir, err)
+	if alreadyPublished {
+		return nil
 	}
 
 	for _, name := range sortedTableNames(tables) {
@@ -38,6 +37,88 @@ func (d *Driver) mergeAll(
 		}
 
 		if err := d.mergeTable(ctx, shardDir, workloadDir, name, tables[name]); err != nil {
+			return err
+		}
+	}
+
+	return ctx.Err()
+}
+
+func mergeShardDir(
+	workloadDir string,
+	tables map[string]*tableState,
+) (shardDir string, alreadyPublished bool, retErr error) {
+	shardDir = filepath.Join(workloadDir, ".shards")
+	_, err := os.Stat(shardDir)
+
+	switch {
+	case err == nil:
+		return shardDir, false, nil
+	case !os.IsNotExist(err):
+		return "", false, fmt.Errorf("csv: stat shards %q: %w", shardDir, err)
+	case len(tables) == 0:
+		return shardDir, false, nil
+	}
+
+	published, err := manifestPublished(workloadDir)
+	if err != nil {
+		return "", false, err
+	}
+
+	if published {
+		return shardDir, true, nil
+	}
+
+	return "", false, fmt.Errorf("%w: shard directory %q is missing", ErrIncompleteLoad, shardDir)
+}
+
+func shardFiles(dir, table string) ([]string, error) {
+	pattern := filepath.Join(dir, table+".w*.csv")
+
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("csv: glob shards %q: %w", pattern, err)
+	}
+
+	sort.Strings(matches)
+
+	return matches, nil
+}
+
+func validateShardCount(table string, found, expected int) error {
+	if found != expected {
+		return fmt.Errorf(
+			"%w: table %q has %d shard files, expected %d",
+			ErrIncompleteLoad,
+			table,
+			found,
+			expected,
+		)
+	}
+
+	return nil
+}
+
+func validatedShardFiles(dir, table string, expected int) ([]string, error) {
+	matches, err := shardFiles(dir, table)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateShardCount(table, len(matches), expected); err != nil {
+		return nil, err
+	}
+
+	return matches, nil
+}
+
+func validateShards(ctx context.Context, dir string, tables map[string]*tableState) error {
+	for _, table := range sortedTableNames(tables) {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		if _, err := validatedShardFiles(dir, table, tables[table].shards); err != nil {
 			return err
 		}
 	}
@@ -72,14 +153,10 @@ func (d *Driver) mergeTable(
 		return err
 	}
 
-	pattern := filepath.Join(shardDir, table+".w*.csv")
-
-	matches, err := filepath.Glob(pattern)
+	matches, err := validatedShardFiles(shardDir, table, ts.shards)
 	if err != nil {
-		return fmt.Errorf("csv: glob shards %q: %w", pattern, err)
+		return err
 	}
-
-	sort.Strings(matches)
 
 	outPath := filepath.Join(workloadDir, table+".csv")
 

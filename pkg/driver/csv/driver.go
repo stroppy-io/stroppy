@@ -11,7 +11,7 @@
 // supported knobs: ?merge=true|false, ?separator=comma|tab,
 // ?header=true|false.
 //
-// The driver implements only the relational InsertSpec NATIVE path.
+// The driver implements only the typed InsertRequest NATIVE path.
 // Every other InsertMethod is rejected with ErrUnsupportedInsertMethod;
 // runtime query execution is rejected with ErrCsvDriverNoQuery. DDL
 // emitted by the drop_schema and create_schema workload steps is
@@ -69,9 +69,9 @@ var (
 // query value. The concrete per-option message wraps it.
 var ErrInvalidOption = errors.New("csv: invalid URL option")
 
-// ErrIncompleteLoad prevents final output from representing a run where any
-// insert failed, even when other worker shards completed successfully.
-var ErrIncompleteLoad = errors.New("csv: cannot finalize after insert failure")
+// ErrIncompleteLoad prevents final output from representing an incomplete CSV
+// generation.
+var ErrIncompleteLoad = errors.New("csv: output generation is incomplete")
 
 // config holds the parsed URL options for one CSV driver instance.
 type config struct {
@@ -111,12 +111,16 @@ type Driver struct {
 	logger *zap.Logger
 	cfg    config
 
-	// workloadDir is computed at first InsertSpec or DDL observation
+	// workloadDir is computed at first InsertRequest or DDL observation
 	// and kept stable for the life of the driver. Filesystem layout:
 	// <cfg.dir>/<workload>/.shards/<table>.w%03d.csv when merge=true,
 	// or <cfg.dir>/<workload>/<table>.w%03d.csv when merge=false.
 	workloadDir  string
 	workloadName string
+
+	// lifecycleMu keeps insert, reset, and finalization filesystem mutations
+	// from overlapping.
+	lifecycleMu sync.Mutex
 
 	// tables records the tables that had rows written during this run
 	// so Teardown can merge or finalize them. Guarded by mu.
@@ -340,6 +344,13 @@ func (d *Driver) Teardown(ctx context.Context) error {
 		return err
 	}
 
+	d.lifecycleMu.Lock()
+	defer d.lifecycleMu.Unlock()
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	d.mu.Lock()
 
 	if d.insertFailed {
@@ -377,6 +388,10 @@ func (d *Driver) Teardown(ctx context.Context) error {
 			return err
 		}
 	} else {
+		if err := validateShards(ctx, workloadDir, snapshot); err != nil {
+			return err
+		}
+
 		if err := d.emitHeaderSidecars(ctx, workloadDir, snapshot); err != nil {
 			return err
 		}

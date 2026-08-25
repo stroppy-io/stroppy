@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
 
@@ -23,22 +24,27 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
-// ErrUnsupportedInsertMethod is returned when an InsertSpec requests
+// ErrUnsupportedInsertMethod is returned when an InsertRequest requests
 // anything other than NATIVE. CSV is write-only: PLAIN_BULK and
 // PLAIN_QUERY imply SQL-shaped emission, which the CSV driver does
 // not synthesize. Matches the rejection pattern used by the other
 // drivers.
-var ErrUnsupportedInsertMethod = errors.New("csv: unsupported InsertSpec method")
+var (
+	ErrUnsupportedInsertMethod = fmt.Errorf("csv: %w", driver.ErrInsertMethodNotSupported)
+	errColumnLayoutChanged     = errors.New("csv: table column layout changed")
+	errTableNotPrepared        = errors.New("csv: table was not prepared")
+)
 
 // Insert runs a typed [driver.InsertRequest] through the CSV driver by
-// draining each worker's [gen.Cursor] partition into one file per
-// worker, mirroring the legacy InsertSpec shard layout. NATIVE is the
-// only method: CSV is write-only and does not synthesize SQL-shaped
-// emission for PLAIN_BULK/PLAIN_QUERY.
+// draining each worker's [gen.Cursor] partition into a distinct shard file.
+// NATIVE is the only method: CSV is write-only and does not synthesize
+// SQL-shaped emission for PLAIN_BULK/PLAIN_QUERY.
 func (d *Driver) Insert(
 	ctx context.Context,
 	req *driver.InsertRequest,
 ) (_ *stats.Query, retErr error) {
+	d.lifecycleMu.Lock()
+	defer d.lifecycleMu.Unlock()
 	defer func() {
 		if retErr != nil {
 			d.markInsertFailed()
@@ -50,7 +56,7 @@ func (d *Driver) Insert(
 	}
 
 	if req.Method != driver.InsertNative {
-		return nil, fmt.Errorf("%w: %s", driver.ErrInsertMethodNotSupported, req.Method)
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedInsertMethod, req.Method)
 	}
 
 	workers := req.Workers
@@ -59,20 +65,24 @@ func (d *Driver) Insert(
 	}
 
 	columns := req.Source.Schema().ColumnNames()
+
+	startShard, err := d.prepareTable(ctx, req.Table, columns)
+	if err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 
 	rows, err := common.RunParallelBatch(ctx, req.Source, workers, csvBatchRows,
 		func(workerCtx context.Context, chunk common.Chunk, cur gen.Cursor) error {
 			src := common.NewBatchRowSource(cur, columns, len(columns))
 
-			rowCount, err := d.writeShard(workerCtx, req.Table, src, chunk.Index)
+			rowCount, err := d.writeShard(workerCtx, req.Table, src, startShard+chunk.Index)
 			if err != nil {
 				return err
 			}
 
-			d.recordShards(req.Table, columns, 1, rowCount)
-
-			return nil
+			return d.recordShard(req.Table, rowCount)
 		})
 	if err != nil {
 		return nil, err
@@ -208,26 +218,80 @@ func (d *Driver) shardPath(table string, workerIdx int) string {
 	return filepath.Join(dir, name)
 }
 
-// recordShards accumulates shard and row counts for the given table,
-// lazily installing a tableState on first observation. Column order
-// is captured on first non-empty input and never overwritten — every
-// shard in a single InsertSpec run reports the same column order.
-func (d *Driver) recordShards(table string, columns []string, shards int, rows int64) {
+// prepareTable invalidates any prior completed generation, clears stale shards
+// on first use of a table, and returns the first unused shard index.
+func (d *Driver) prepareTable(ctx context.Context, table string, columns []string) (int, error) {
+	workloadDir := d.resolveWorkload()
+	if err := invalidateManifest(ctx, workloadDir); err != nil {
+		return 0, fmt.Errorf("csv: invalidate manifest: %w", err)
+	}
+
+	d.mu.Lock()
+
+	ts := d.tables[table]
+	if ts != nil {
+		defer d.mu.Unlock()
+
+		if !slices.Equal(ts.columns, columns) {
+			return 0, fmt.Errorf("%w for %q: %v to %v", errColumnLayoutChanged, table, ts.columns, columns)
+		}
+
+		return ts.shards, nil
+	}
+	d.mu.Unlock()
+
+	if err := removeTableArtifacts(ctx, workloadDir, table); err != nil {
+		return 0, err
+	}
+
+	d.mu.Lock()
+	d.tables[table] = &tableState{columns: append([]string(nil), columns...)}
+	d.mu.Unlock()
+
+	return 0, ctx.Err()
+}
+
+func removeTableArtifacts(ctx context.Context, workloadDir, table string) error {
+	paths := []string{
+		filepath.Join(workloadDir, table+".csv"),
+		filepath.Join(workloadDir, table+".header.csv"),
+	}
+
+	for _, dir := range []string{workloadDir, filepath.Join(workloadDir, ".shards")} {
+		shards, err := shardFiles(dir, table)
+		if err != nil {
+			return err
+		}
+
+		paths = append(paths, shards...)
+	}
+
+	for _, path := range paths {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("csv: remove stale artifact %q: %w", path, err)
+		}
+	}
+
+	return ctx.Err()
+}
+
+func (d *Driver) recordShard(table string, rows int64) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	ts, ok := d.tables[table]
-	if !ok {
-		ts = &tableState{columns: append([]string(nil), columns...)}
-		d.tables[table] = ts
+	ts := d.tables[table]
+	if ts == nil {
+		return fmt.Errorf("%w: %q", errTableNotPrepared, table)
 	}
 
-	if len(ts.columns) == 0 && len(columns) > 0 {
-		ts.columns = append([]string(nil), columns...)
-	}
-
-	ts.shards += shards
+	ts.shards++
 	ts.rowCount += rows
+
+	return nil
 }
 
 // encodeValue converts a runtime-produced value into its CSV field

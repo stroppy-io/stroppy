@@ -3,6 +3,7 @@ package csv
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,6 +38,38 @@ type manifestTable struct {
 	Rows    int64    `json:"rows"`
 	Shards  int      `json:"shards"`
 	Columns []string `json:"columns"`
+}
+
+const manifestFilename = "MANIFEST.json"
+
+// invalidateManifest removes the completion marker before any output from a
+// new generation can replace files from an earlier run.
+func invalidateManifest(ctx context.Context, workloadDir string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	path := filepath.Join(workloadDir, manifestFilename)
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove prior manifest %q: %w", path, err)
+	}
+
+	return ctx.Err()
+}
+
+func manifestPublished(workloadDir string) (bool, error) {
+	path := filepath.Join(workloadDir, manifestFilename)
+
+	info, err := os.Stat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, fmt.Errorf("stat manifest %q: %w", path, err)
+	}
+
+	return info.Mode().IsRegular(), nil
 }
 
 // writeManifest publishes MANIFEST.json only after finalization succeeds.
@@ -90,7 +123,7 @@ func writeManifest(
 		return err
 	}
 
-	path := filepath.Join(workloadDir, "MANIFEST.json")
+	path := filepath.Join(workloadDir, manifestFilename)
 
 	err = writeAtomic(ctx, path, func(out *os.File) error {
 		_, writeErr := out.Write(blob)
