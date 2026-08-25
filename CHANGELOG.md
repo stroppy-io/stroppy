@@ -47,7 +47,6 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 ### Fixed
 
 - CSV output now publishes shards, merged files, and manifests atomically across fresh and repeated loads, so canceled or failed loads retain recoverable shards and never expose partial output as complete. ([#157](https://github.com/stroppy-io/stroppy/pull/157))
-- The tagged integration suite now exercises the current Go workloads against PostgreSQL and MySQL and validates CSV and OpenTelemetry output end to end. ([#157](https://github.com/stroppy-io/stroppy/pull/157))
 - Query helpers now return an empty result instead of panicking when a driver supplies no result set, and query timeouts that surface while closing result sets are reported once instead of repeating the same error. ([#153](https://github.com/stroppy-io/stroppy/pull/153))
 - Empty, whitespace-only, or comma-only step filters no longer conflict with a real opposite filter; `--steps=` still clears configured steps before `--no-steps` is applied. ([#149](https://github.com/stroppy-io/stroppy/pull/149))
 - The `workload` step is silent on the console again (no `Start`/`End` record per transaction), while setup/load/schema steps still log a single start/end and the `simple` workload now honors `--steps`/`--no-steps` like the other workloads. ([#149](https://github.com/stroppy-io/stroppy/pull/149))
