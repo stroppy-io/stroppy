@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"strings"
 	"testing"
 	"time"
 )
@@ -25,7 +24,7 @@ func TestTpchAnswersSpotCheck(t *testing.T) {
 		"--steps", "drop_schema,create_schema,load_data,create_indexes,analyze,validate_answers",
 	)
 
-	if !strings.Contains(out, "TPC-H query validation vs answers_sf1.json") {
-		t.Error("answers summary line missing from run output")
+	if err := validateTpchSF1Summary(out); err != nil {
+		t.Fatal(err)
 	}
 }

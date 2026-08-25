@@ -4,6 +4,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -432,16 +433,126 @@ func assertTpchTotalpriceFinalized(t *testing.T, pool *pgxpool.Pool) {
 	}
 }
 
-// assertTpchQueriesLogged verifies the workload-phase `queries` step made
-// visible progress and emitted the consolidated timing report.
+// assertTpchQueriesLogged verifies that the workload step executed each of
+// q1-q22 exactly once and did not silently skip a missing SQL body.
 func assertTpchQueriesLogged(t *testing.T, out string) {
 	t.Helper()
 
-	// These queries cover a full-scan aggregate, a three-way join, a ranged
-	// filter, an outer join, and a percentage aggregation.
-	for _, query := range []string{"q1", "q3", "q6", "q13", "q14"} {
-		if !strings.Contains(out, "[tpch] "+query+": ok in ") {
-			t.Errorf("missing success marker for %s in stroppy output", query)
+	if err := validateTpchQueryLogs(out); err != nil {
+		t.Error(err)
+	}
+}
+
+func validateTpchQueryLogs(out string) error {
+	for number := 1; number <= 22; number++ {
+		query := fmt.Sprintf("q%d", number)
+		if skipped := "[tpch] " + query + ": skipped"; strings.Contains(out, skipped) {
+			return fmt.Errorf("%s was skipped", query)
 		}
+
+		success := "[tpch] " + query + ": ok in "
+		if count := strings.Count(out, success); count != 1 {
+			return fmt.Errorf("%s success markers = %d, want 1", query, count)
+		}
+	}
+
+	return nil
+}
+
+func TestValidateTpchQueryLogs(t *testing.T) {
+	t.Parallel()
+
+	var complete strings.Builder
+	for number := 1; number <= 22; number++ {
+		fmt.Fprintf(&complete, "[tpch] q%d: ok in 1ms\n", number)
+	}
+
+	valid := complete.String()
+	tests := []struct {
+		name    string
+		output  string
+		wantErr bool
+	}{
+		{name: "all queries", output: valid},
+		{
+			name:    "missing q22",
+			output:  strings.Replace(valid, "[tpch] q22: ok in 1ms\n", "", 1),
+			wantErr: true,
+		},
+		{
+			name: "skipped q22",
+			output: strings.Replace(
+				valid,
+				"[tpch] q22: ok in 1ms\n",
+				"[tpch] q22: skipped (no body in SQL file)\n",
+				1,
+			),
+			wantErr: true,
+		},
+		{name: "duplicate q1", output: valid + "[tpch] q1: ok in 2ms\n", wantErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateTpchQueryLogs(test.output)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("validateTpchQueryLogs() error = %v, wantErr %t", err, test.wantErr)
+			}
+		})
+	}
+}
+
+const tpchSF1Summary = "  total=22  ok=22  diff=0  skipped=0  error=0"
+
+func validateTpchSF1Summary(out string) error {
+	if count := strings.Count(out, "===== TPC-H query validation vs answers_sf1.json ====="); count != 1 {
+		return fmt.Errorf("validation headings = %d, want 1", count)
+	}
+	summaryCount := 0
+	for _, line := range strings.Split(out, "\n") {
+		if line == tpchSF1Summary {
+			summaryCount++
+		}
+	}
+	if summaryCount != 1 {
+		return fmt.Errorf("successful validation summaries = %d, want 1 exact %q", summaryCount, tpchSF1Summary)
+	}
+
+	for _, failed := range []string{": DIFF", ": SKIP", ": ERROR"} {
+		if strings.Contains(out, failed) {
+			return fmt.Errorf("validation output contains %q", failed)
+		}
+	}
+
+	return nil
+}
+
+func TestValidateTpchSF1Summary(t *testing.T) {
+	t.Parallel()
+
+	heading := "===== TPC-H query validation vs answers_sf1.json =====\n"
+	tests := []struct {
+		name    string
+		output  string
+		wantErr bool
+	}{
+		{name: "all answers match", output: heading + "  q1  : OK      rows=4 (want 4)\n" + tpchSF1Summary},
+		{name: "missing heading", output: tpchSF1Summary, wantErr: true},
+		{name: "diff total", output: heading + "  total=22  ok=21  diff=1  skipped=0  error=0", wantErr: true},
+		{name: "skipped total", output: heading + "  total=22  ok=21  diff=0  skipped=1  error=0", wantErr: true},
+		{name: "error detail", output: heading + "  q22 : ERROR   failed\n" + tpchSF1Summary, wantErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateTpchSF1Summary(test.output)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("validateTpchSF1Summary() error = %v, wantErr %t", err, test.wantErr)
+			}
+		})
 	}
 }

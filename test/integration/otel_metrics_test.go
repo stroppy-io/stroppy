@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -29,9 +30,16 @@ var dockerContainerIDRe = regexp.MustCompile(`^[0-9a-f]{12,64}$`)
 type labels map[string]string
 
 type metricExpectation struct {
-	prefix   string
-	labels   labels
-	minValue float64
+	name   string
+	labels labels
+	value  float64
+	exact  bool
+}
+
+type prometheusSample struct {
+	name   string
+	labels labels
+	value  float64
 }
 
 // TestOtelStroppyMetrics exports native TPC-B load, query, and transaction
@@ -58,38 +66,36 @@ func TestOtelStroppyMetrics(t *testing.T) {
 	)
 
 	body := waitForMetrics(t, prometheusURL, func(body string) error {
+		samples, err := parsePrometheusSamples(body)
+		if err != nil {
+			return err
+		}
+
 		rows := map[string]float64{
 			"pgbench_branches": 1,
 			"pgbench_tellers":  10,
 			"pgbench_accounts": 100_000,
 		}
 		for table, count := range rows {
-			if err := requirePrometheusSample(body, "stroppy_insert_rows_total", labels{
-				"table_name": table,
-				"step":       "load_data",
-			}, count); err != nil {
-				return err
-			}
-			if err := requirePrometheusSample(body, "stroppy_insert_progress_rows_total", labels{
+			tableLabels := labels{"table_name": table, "step": "load_data"}
+			progressLabels := labels{
 				"event":      "completed",
 				"method":     "native",
 				"row_kind":   "confirmed",
 				"table_name": table,
 				"step":       "load_data",
-			}, count); err != nil {
-				return err
 			}
-			if err := requirePrometheusSample(body, "stroppy_insert_duration", labels{
-				"table_name": table,
-				"step":       "load_data",
-			}, 0); err != nil {
-				return err
-			}
-			if err := requirePrometheusSample(body, "stroppy_insert_operations_total", labels{
-				"table_name": table,
-				"step":       "load_data",
-			}, 1); err != nil {
-				return err
+
+			for _, expectation := range []metricExpectation{
+				{name: "stroppy_insert_rows_total", labels: tableLabels, value: count, exact: true},
+				{name: "stroppy_insert_progress_rows_total", labels: progressLabels, value: count, exact: true},
+				{name: "stroppy_insert_progress_rows_per_second", labels: progressLabels},
+				{name: "stroppy_insert_duration_milliseconds_count", labels: tableLabels, value: 1},
+				{name: "stroppy_insert_operations_total", labels: tableLabels, value: 1, exact: true},
+			} {
+				if err := requirePrometheusExpectation(samples, expectation); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -100,18 +106,17 @@ func TestOtelStroppyMetrics(t *testing.T) {
 			"step":         "workload",
 		}
 		expected := []metricExpectation{
-			{prefix: "stroppy_run_query_operations_total", labels: labels{"step": "workload"}, minValue: 5},
-			{prefix: "stroppy_run_query_duration", labels: labels{"step": "workload"}},
-			{prefix: "stroppy_transactions_total", labels: txLabels, minValue: 1},
-			{prefix: "stroppy_tx_commits_total", labels: txLabels, minValue: 1},
-			{prefix: "stroppy_tx_total_duration", labels: txLabels},
-			{prefix: "stroppy_tx_queries_per_tx", labels: txLabels, minValue: 5},
-			{prefix: "stroppy_iterations_total", minValue: 1},
+			{name: "stroppy_run_query_operations_total", labels: labels{"step": "workload"}, value: 5, exact: true},
+			{name: "stroppy_run_query_duration_milliseconds_count", labels: labels{"step": "workload"}, value: 1},
+			{name: "stroppy_transactions_total", labels: txLabels, value: 1, exact: true},
+			{name: "stroppy_tx_commits_total", labels: txLabels, value: 1, exact: true},
+			{name: "stroppy_tx_total_duration_milliseconds_count", labels: txLabels, value: 1},
+			{name: "stroppy_tx_queries_per_tx_count", labels: txLabels, value: 1},
+			{name: "stroppy_iterations_total", value: 1, exact: true},
+			{name: "stroppy_iteration_duration_milliseconds_count", value: 1},
 		}
 		for _, expectation := range expected {
-			if err := requirePrometheusSample(
-				body, expectation.prefix, expectation.labels, expectation.minValue,
-			); err != nil {
+			if err := requirePrometheusExpectation(samples, expectation); err != nil {
 				return err
 			}
 		}
@@ -231,16 +236,14 @@ func startOtelCollector(t *testing.T, docker, configPath string) (otlpEndpoint, 
 		t.Fatalf("start OTEL collector %s: %v\n%s", image, err, string(out))
 	}
 
+	// The deterministic container name is available before ID parsing and all
+	// port/readiness checks, so every later failure still removes the container.
+	t.Cleanup(func() { removeOtelCollector(t, docker, name) })
+
 	containerID := dockerContainerID(string(out))
 	if containerID == "" {
 		t.Fatalf("docker run returned no container id\n%s", string(out))
 	}
-
-	t.Cleanup(func() {
-		rmCtx, rmCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer rmCancel()
-		_ = exec.CommandContext(rmCtx, docker, "rm", "-f", containerID).Run()
-	})
 
 	otlpPort := dockerHostPort(t, docker, containerID, "4318/tcp")
 	prometheusPort := dockerHostPort(t, docker, containerID, "8889/tcp")
@@ -249,6 +252,23 @@ func startOtelCollector(t *testing.T, docker, configPath string) (otlpEndpoint, 
 	waitForMetricsEndpoint(t, docker, containerID, prometheusURL)
 
 	return "127.0.0.1:" + otlpPort, prometheusURL
+}
+
+func removeOtelCollector(t *testing.T, docker, name string) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	output, err := exec.CommandContext(ctx, docker, "rm", "-f", name).CombinedOutput()
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		t.Errorf("remove OTEL collector %s timed out: %v\n%s", name, ctxErr, output)
+
+		return
+	}
+	if err != nil {
+		t.Errorf("remove OTEL collector %s: %v\n%s", name, err, output)
+	}
 }
 
 func dockerContainerID(output string) string {
@@ -373,36 +393,284 @@ func waitForMetrics(t *testing.T, url string, check func(string) error) string {
 	return ""
 }
 
-func requirePrometheusSample(body, metricPrefix string, wantLabels labels, minValue float64) error {
-	re := regexp.MustCompile(`(?m)^(` + regexp.QuoteMeta(metricPrefix) + `[A-Za-z0-9_:]*)(?:\{([^}]*)\})?\s+([-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?)$`)
-	matches := re.FindAllStringSubmatch(body, -1)
-	for _, match := range matches {
-		if !prometheusLabelsContainAll(match[2], wantLabels) {
-			continue
-		}
-		value, err := strconv.ParseFloat(match[3], 64)
+func parsePrometheusSamples(body string) ([]prometheusSample, error) {
+	scanner := bufio.NewScanner(strings.NewReader(body))
+	scanner.Buffer(make([]byte, 4096), 1024*1024)
+
+	var samples []prometheusSample
+	for lineNumber := 1; scanner.Scan(); lineNumber++ {
+		sample, ok, err := parsePrometheusSampleLine(scanner.Text())
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("parse Prometheus line %d: %w", lineNumber, err)
 		}
-		if value >= minValue {
+		if ok {
+			samples = append(samples, sample)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scan Prometheus metrics: %w", err)
+	}
+
+	return samples, nil
+}
+
+func parsePrometheusSampleLine(line string) (prometheusSample, bool, error) {
+	line = strings.TrimSpace(line)
+	if line == "" || strings.HasPrefix(line, "#") {
+		return prometheusSample{}, false, nil
+	}
+
+	nameEnd := strings.IndexAny(line, "{ \t")
+	if nameEnd <= 0 {
+		return prometheusSample{}, false, fmt.Errorf("missing metric value in %q", line)
+	}
+
+	sample := prometheusSample{name: line[:nameEnd], labels: labels{}}
+	remainder := strings.TrimSpace(line[nameEnd:])
+	if strings.HasPrefix(remainder, "{") {
+		labelEnd, err := prometheusLabelSetEnd(remainder)
+		if err != nil {
+			return prometheusSample{}, false, err
+		}
+
+		sample.labels, err = parsePrometheusLabels(remainder[1:labelEnd])
+		if err != nil {
+			return prometheusSample{}, false, err
+		}
+		remainder = strings.TrimSpace(remainder[labelEnd+1:])
+	}
+
+	fields := strings.Fields(remainder)
+	if len(fields) == 0 {
+		return prometheusSample{}, false, fmt.Errorf("metric %q has no value", sample.name)
+	}
+
+	value, err := strconv.ParseFloat(fields[0], 64)
+	if err != nil {
+		return prometheusSample{}, false, fmt.Errorf("metric %q value %q: %w", sample.name, fields[0], err)
+	}
+	sample.value = value
+
+	return sample, true, nil
+}
+
+func prometheusLabelSetEnd(input string) (int, error) {
+	quoted := false
+	escaped := false
+
+	for index := 1; index < len(input); index++ {
+		switch {
+		case escaped:
+			escaped = false
+		case quoted && input[index] == '\\':
+			escaped = true
+		case input[index] == '"':
+			quoted = !quoted
+		case input[index] == '}' && !quoted:
+			return index, nil
+		}
+	}
+
+	return 0, fmt.Errorf("unterminated label set")
+}
+
+func parsePrometheusLabels(input string) (labels, error) {
+	parsed := labels{}
+	position := skipPrometheusLabelSpace(input, 0)
+
+	for position < len(input) {
+		key, value, next, err := parsePrometheusLabel(input, position)
+		if err != nil {
+			return nil, err
+		}
+		if _, exists := parsed[key]; exists {
+			return nil, fmt.Errorf("duplicate label %q", key)
+		}
+
+		parsed[key] = value
+		position = skipPrometheusLabelSpace(input, next)
+		if position == len(input) {
+			break
+		}
+		if input[position] != ',' {
+			return nil, fmt.Errorf("label %q is not followed by a comma", key)
+		}
+
+		position = skipPrometheusLabelSpace(input, position+1)
+	}
+
+	return parsed, nil
+}
+
+func parsePrometheusLabel(input string, position int) (string, string, int, error) {
+	equals := strings.IndexByte(input[position:], '=')
+	if equals < 0 {
+		return "", "", 0, fmt.Errorf("label %q has no value", input[position:])
+	}
+
+	equals += position
+	key := strings.TrimSpace(input[position:equals])
+	if key == "" {
+		return "", "", 0, fmt.Errorf("empty label name")
+	}
+
+	valueStart := equals + 1
+	if valueStart >= len(input) || input[valueStart] != '"' {
+		return "", "", 0, fmt.Errorf("label %q value is not quoted", key)
+	}
+
+	valueEnd, err := prometheusQuotedValueEnd(input, valueStart)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("label %q: %w", key, err)
+	}
+
+	value, err := strconv.Unquote(input[valueStart : valueEnd+1])
+	if err != nil {
+		return "", "", 0, fmt.Errorf("label %q: %w", key, err)
+	}
+
+	return key, value, valueEnd + 1, nil
+}
+
+func prometheusQuotedValueEnd(input string, start int) (int, error) {
+	escaped := false
+
+	for position := start + 1; position < len(input); position++ {
+		switch {
+		case escaped:
+			escaped = false
+		case input[position] == '\\':
+			escaped = true
+		case input[position] == '"':
+			return position, nil
+		}
+	}
+
+	return 0, fmt.Errorf("unterminated quoted value")
+}
+
+func skipPrometheusLabelSpace(input string, position int) int {
+	for position < len(input) && (input[position] == ' ' || input[position] == '\t') {
+		position++
+	}
+
+	return position
+}
+
+func requirePrometheusExpectation(samples []prometheusSample, expectation metricExpectation) error {
+	if expectation.exact {
+		return requirePrometheusSampleEqual(
+			samples, expectation.name, expectation.labels, expectation.value,
+		)
+	}
+
+	return requirePrometheusSampleAtLeast(
+		samples, expectation.name, expectation.labels, expectation.value,
+	)
+}
+
+func requirePrometheusSampleEqual(
+	samples []prometheusSample,
+	metricName string,
+	wantLabels labels,
+	wantValue float64,
+) error {
+	for _, sample := range samples {
+		if sample.name == metricName &&
+			prometheusLabelsContainAll(sample.labels, wantLabels) &&
+			sample.value == wantValue {
 			return nil
 		}
 	}
-	return fmt.Errorf("missing %s sample with labels %v and value >= %g", metricPrefix, wantLabels, minValue)
+
+	return fmt.Errorf(
+		"missing exact %s sample with labels %v and value = %g",
+		metricName,
+		wantLabels,
+		wantValue,
+	)
 }
 
-func prometheusLabelsContainAll(got string, want labels) bool {
-	if len(want) == 0 {
-		return true
+func requirePrometheusSampleAtLeast(
+	samples []prometheusSample,
+	metricName string,
+	wantLabels labels,
+	minValue float64,
+) error {
+	for _, sample := range samples {
+		if sample.name == metricName &&
+			prometheusLabelsContainAll(sample.labels, wantLabels) &&
+			sample.value >= minValue {
+			return nil
+		}
 	}
-	if got == "" {
-		return false
-	}
+
+	return fmt.Errorf(
+		"missing exact %s sample with labels %v and value >= %g",
+		metricName,
+		wantLabels,
+		minValue,
+	)
+}
+
+func prometheusLabelsContainAll(got, want labels) bool {
 	for key, value := range want {
-		needle := key + `="` + value + `"`
-		if !strings.Contains(got, needle) {
+		if got[key] != value {
 			return false
 		}
 	}
+
 	return true
+}
+
+func TestRequirePrometheusSampleMatchesExactNamesAndLabels(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		body    string
+		wantErr bool
+	}{
+		{
+			name:    "metric suffix rejected",
+			body:    `stroppy_metric_suffix{table_name="accounts"} 7`,
+			wantErr: true,
+		},
+		{
+			name:    "wrong label name rejected",
+			body:    `stroppy_metric{other_table_name="accounts"} 7`,
+			wantErr: true,
+		},
+		{
+			name:    "wrong label value rejected",
+			body:    `stroppy_metric{table_name="tellers"} 7`,
+			wantErr: true,
+		},
+		{
+			name:    "doubled value rejected",
+			body:    `stroppy_metric{table_name="accounts"} 14`,
+			wantErr: true,
+		},
+		{
+			name: "exact sample accepted",
+			body: `# HELP stroppy_metric test
+stroppy_metric{table_name="accounts",escaped="a\\\"b"} 7`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			samples, err := parsePrometheusSamples(test.body)
+			if err != nil {
+				t.Fatalf("parsePrometheusSamples: %v", err)
+			}
+
+			err = requirePrometheusSampleEqual(samples, "stroppy_metric", labels{"table_name": "accounts"}, 7)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("requirePrometheusSample() error = %v, wantErr %t", err, test.wantErr)
+			}
+		})
+	}
 }

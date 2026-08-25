@@ -106,11 +106,11 @@ func assertTpchRowCountsMySQL(t *testing.T, db *sql.DB) {
 	}{
 		{"region", want.region, 0},
 		{"nation", want.nation, 0},
-		{"part", want.part, 0.05},
-		{"supplier", want.supplier, 0.05},
-		{"partsupp", want.partsupp, 0.05},
-		{"customer", want.customer, 0.05},
-		{"orders", want.orders, 0.05},
+		{"part", want.part, 0},
+		{"supplier", want.supplier, 0},
+		{"partsupp", want.partsupp, 0},
+		{"customer", want.customer, 0},
+		{"orders", want.orders, 0},
 		{"lineitem", want.lineitem, 0.20},
 	}
 	for _, check := range checks {
@@ -145,6 +145,10 @@ func assertTpchFKIntegrityMySQL(t *testing.T, db *sql.DB) {
 		 WHERE NOT EXISTS (SELECT 1 FROM customer c WHERE c.c_custkey = o.o_custkey)`},
 		{"lineitem.l_orderkey → orders", `SELECT COUNT(*) FROM lineitem l
 		 WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.o_orderkey = l.l_orderkey)`},
+		{"lineitem.l_partkey → part", `SELECT COUNT(*) FROM lineitem l
+			 WHERE NOT EXISTS (SELECT 1 FROM part p WHERE p.p_partkey = l.l_partkey)`},
+		{"lineitem.l_suppkey → supplier", `SELECT COUNT(*) FROM lineitem l
+			 WHERE NOT EXISTS (SELECT 1 FROM supplier s WHERE s.s_suppkey = l.l_suppkey)`},
 	}
 	for _, check := range checks {
 		var orphans int64

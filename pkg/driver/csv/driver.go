@@ -322,9 +322,13 @@ func (d *Driver) resolveWorkload() string {
 }
 
 // Teardown finalizes the run: merges shards when configured, or emits
-// a sidecar header when merge=false. Safe to call multiple times; all
-// operations are idempotent.
-func (d *Driver) Teardown(_ context.Context) error {
+// a sidecar header when merge=false. Canceled finalization keeps source
+// shards and does not publish a manifest or partial output.
+func (d *Driver) Teardown(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	d.mu.Lock()
 
 	if d.workloadDir == "" {
@@ -335,9 +339,15 @@ func (d *Driver) Teardown(_ context.Context) error {
 
 	snapshot := make(map[string]*tableState, len(d.tables))
 
-	for name, ts := range d.tables {
-		cp := *ts
-		snapshot[name] = &cp
+	for name, state := range d.tables {
+		if err := ctx.Err(); err != nil {
+			d.mu.Unlock()
+
+			return err
+		}
+
+		copyState := *state
+		snapshot[name] = &copyState
 	}
 
 	workloadDir := d.workloadDir
@@ -346,17 +356,21 @@ func (d *Driver) Teardown(_ context.Context) error {
 	d.mu.Unlock()
 
 	if d.cfg.merge {
-		if err := d.mergeAll(workloadDir, snapshot); err != nil {
+		if err := d.mergeAll(ctx, workloadDir, snapshot); err != nil {
 			return err
 		}
 	} else {
-		if err := d.emitHeaderSidecars(workloadDir, snapshot); err != nil {
+		if err := d.emitHeaderSidecars(ctx, workloadDir, snapshot); err != nil {
 			return err
 		}
 	}
 
-	if err := writeManifest(workloadDir, workloadName, d.cfg, snapshot); err != nil {
+	if err := writeManifest(ctx, workloadDir, workloadName, d.cfg, snapshot); err != nil {
 		return fmt.Errorf("csv: write manifest: %w", err)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	d.logger.Debug("csv teardown complete",

@@ -1,9 +1,11 @@
 package csv
 
 import (
+	"bytes"
 	"context"
 	stdcsv "encoding/csv"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -110,10 +112,17 @@ func TestInsertSingleShardMerge(t *testing.T) {
 		t.Fatalf("records[43][2] = %q, want row", row42[2])
 	}
 
-	// .shards/ must be cleaned up by the merge pass.
+	// Successful finalization publishes both artifacts, removes shards, and
+	// leaves no temporary output behind.
+	if _, err := os.Stat(filepath.Join(workDir, "MANIFEST.json")); err != nil {
+		t.Fatalf("MANIFEST.json missing after merge: %v", err)
+	}
+
 	if _, err := os.Stat(filepath.Join(workDir, ".shards")); !os.IsNotExist(err) {
 		t.Fatalf(".shards dir still present after merge: %v", err)
 	}
+
+	assertNoTemporaryOutputs(t, workDir)
 }
 
 func TestInsertParallelMerge(t *testing.T) {
@@ -159,6 +168,101 @@ func TestInsertParallelMerge(t *testing.T) {
 		if rec[2] != "row" {
 			t.Fatalf("label = %q, want row", rec[2])
 		}
+	}
+}
+
+func TestTeardownPreCanceledPreservesShards(t *testing.T) {
+	t.Parallel()
+
+	d, workDir := newTestDriver(t, map[string]string{"merge": "true"})
+	if _, err := d.Insert(context.Background(), typedRowsReq("canceled", 100, 1)); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := d.Teardown(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Teardown error = %v, want context.Canceled", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(workDir, "canceled.csv")); !os.IsNotExist(err) {
+		t.Fatalf("canceled teardown published merged output: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(workDir, "MANIFEST.json")); !os.IsNotExist(err) {
+		t.Fatalf("canceled teardown published manifest: %v", err)
+	}
+
+	shards, err := filepath.Glob(filepath.Join(workDir, ".shards", "canceled.w*.csv"))
+	if err != nil {
+		t.Fatalf("glob shards: %v", err)
+	}
+
+	if len(shards) != 1 {
+		t.Fatalf("recoverable shards = %v, want one shard", shards)
+	}
+
+	assertNoTemporaryOutputs(t, workDir)
+
+	if err := d.Teardown(context.Background()); err != nil {
+		t.Fatalf("retry Teardown: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(workDir, "canceled.csv")); err != nil {
+		t.Fatalf("retry did not publish merged output: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(workDir, "MANIFEST.json")); err != nil {
+		t.Fatalf("retry did not publish manifest: %v", err)
+	}
+}
+
+func TestAtomicOutputCancellationDuringCopy(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	outPath := filepath.Join(t.TempDir(), "merged.csv")
+	payload := bytes.Repeat([]byte("x"), csvBufferSize*3)
+
+	err := writeAtomic(ctx, outPath, func(out *os.File) error {
+		dst := &cancelAfterWrite{dst: out, cancel: cancel}
+
+		return copyContext(ctx, dst, bytes.NewReader(payload))
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("writeAtomic error = %v, want context.Canceled", err)
+	}
+
+	if _, err := os.Stat(outPath); !os.IsNotExist(err) {
+		t.Fatalf("canceled copy published final output: %v", err)
+	}
+
+	assertNoTemporaryOutputs(t, filepath.Dir(outPath))
+}
+
+type cancelAfterWrite struct {
+	dst    io.Writer
+	cancel context.CancelFunc
+}
+
+func (w *cancelAfterWrite) Write(p []byte) (int, error) {
+	written, err := w.dst.Write(p)
+	w.cancel()
+
+	return written, err
+}
+
+func assertNoTemporaryOutputs(t *testing.T, dir string) {
+	t.Helper()
+
+	temps, err := filepath.Glob(filepath.Join(dir, ".*.tmp-*"))
+	if err != nil {
+		t.Fatalf("glob temporary outputs: %v", err)
+	}
+
+	if len(temps) != 0 {
+		t.Fatalf("temporary outputs remain: %v", temps)
 	}
 }
 

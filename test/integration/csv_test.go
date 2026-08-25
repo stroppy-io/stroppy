@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -18,18 +19,20 @@ import (
 )
 
 type csvManifest struct {
-	Workload     string                      `json:"workload"`
-	InsertMethod string                      `json:"insert_method"`
-	Config       csvManifestConfig           `json:"config"`
-	Tables       map[string]csvManifestTable `json:"tables"`
+	Workload         string                      `json:"workload"`
+	Generated        string                      `json:"generated"`
+	FrameworkVersion string                      `json:"framework_version"`
+	InsertMethod     string                      `json:"insert_method"`
+	Config           csvManifestConfig           `json:"config"`
+	Tables           map[string]csvManifestTable `json:"tables"`
 }
 
 type csvManifestConfig struct {
-	Dir       string `json:"dir"`
-	Separator string `json:"separator"`
-	Header    bool   `json:"header"`
-	Merge     bool   `json:"merge"`
-	NullValue string `json:"null_value"`
+	Dir       string  `json:"dir"`
+	Separator string  `json:"separator"`
+	Header    bool    `json:"header"`
+	Merge     bool    `json:"merge"`
+	NullValue *string `json:"null_value"`
 }
 
 type csvManifestTable struct {
@@ -240,12 +243,23 @@ func assertCSVManifest(
 	if manifest.Workload != workload {
 		t.Errorf("manifest workload = %q, want %q", manifest.Workload, workload)
 	}
+	if _, err := time.Parse(time.RFC3339, manifest.Generated); err != nil {
+		t.Errorf("manifest generated = %q, want RFC3339 timestamp: %v", manifest.Generated, err)
+	}
+	if want := testedStroppyVersion(t); manifest.FrameworkVersion != want {
+		t.Errorf("manifest framework_version = %q, want tested binary version %q", manifest.FrameworkVersion, want)
+	}
 	if manifest.InsertMethod != "NATIVE" {
 		t.Errorf("manifest insert_method = %q, want NATIVE", manifest.InsertMethod)
 	}
 	if manifest.Config.Dir != outDir || manifest.Config.Separator != "," ||
-		!manifest.Config.Header || manifest.Config.Merge != merge || manifest.Config.NullValue != "" {
+		!manifest.Config.Header || manifest.Config.Merge != merge {
 		t.Errorf("manifest config = %+v, want dir=%q separator=comma header=true merge=%t", manifest.Config, outDir, merge)
+	}
+	if manifest.Config.NullValue == nil {
+		t.Error("manifest config is missing required null_value")
+	} else if *manifest.Config.NullValue != "" {
+		t.Errorf("manifest null_value = %q, want empty string", *manifest.Config.NullValue)
 	}
 	if len(manifest.Tables) != len(tpcbCSVRows) {
 		t.Errorf("manifest tables = %d, want %d", len(manifest.Tables), len(tpcbCSVRows))
@@ -261,6 +275,28 @@ func assertCSVManifest(
 			t.Errorf("manifest %s = %+v, want rows=%d shards=%d columns=%v", table, got, wantRows, shards[table], tpcbCSVColumns[table])
 		}
 	}
+}
+
+func testedStroppyVersion(t *testing.T) string {
+	t.Helper()
+
+	_, binary := stroppyBinary(t)
+	output, err := exec.Command(binary, "version", "--json").Output()
+	if err != nil {
+		t.Fatalf("stroppy version --json: %v", err)
+	}
+
+	var version struct {
+		Stroppy string `json:"stroppy"`
+	}
+	if err := json.Unmarshal(output, &version); err != nil {
+		t.Fatalf("decode stroppy version --json: %v", err)
+	}
+	if version.Stroppy == "" {
+		t.Fatal("stroppy version --json returned an empty stroppy version")
+	}
+
+	return version.Stroppy
 }
 
 func assertDirectoryEntries(t *testing.T, dir string, want []string) {
