@@ -14,7 +14,9 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/pkg/driver"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
+	"github.com/stroppy-io/stroppy/pkg/driver/stats"
 )
 
 func TestRunScenarioReturnsFatalErrorAndCancelsWorkers(t *testing.T) {
@@ -242,6 +244,169 @@ func (w *fatalContextWorkload) Iterate(ctx context.Context, _ *Bench) error {
 }
 
 func (*fatalContextWorkload) Teardown(context.Context, *Bench) error { return nil }
+
+const teardownLifecycleDriverType config.DriverType = 1000
+
+type driverTeardownContextKey struct{}
+
+var (
+	registerTeardownLifecycleOnce sync.Once
+	teardownLifecycleDriverRun    *teardownLifecycleDriver
+	teardownLifecycleWorkloadRun  *teardownLifecycleWorkload
+	errTeardownLifecycleBegin     = errors.New("test driver does not support transactions")
+)
+
+func registerTeardownLifecycleTest() {
+	registerTeardownLifecycleOnce.Do(func() {
+		driver.RegisterDriver(teardownLifecycleDriverType, func(context.Context, driver.Options) (driver.Driver, error) {
+			if teardownLifecycleDriverRun == nil {
+				return &teardownLifecycleDriver{}, nil
+			}
+
+			return teardownLifecycleDriverRun, nil
+		})
+		Register(func() Workload {
+			if teardownLifecycleWorkloadRun == nil {
+				return &teardownLifecycleWorkload{}
+			}
+
+			return teardownLifecycleWorkloadRun
+		})
+	})
+}
+
+func TestRunFinalizesDriverAfterWorkload(t *testing.T) {
+	registerTeardownLifecycleTest()
+
+	setupErr := errors.New("setup sentinel")
+	workloadErr := errors.New("workload teardown sentinel")
+	driverErr := errors.New("driver teardown sentinel")
+	recorder := &teardownLifecycleRecorder{}
+
+	teardownLifecycleWorkloadRun = &teardownLifecycleWorkload{
+		recorder:    recorder,
+		setupErr:    setupErr,
+		teardownErr: workloadErr,
+	}
+	teardownLifecycleDriverRun = &teardownLifecycleDriver{
+		recorder:    recorder,
+		teardownErr: driverErr,
+	}
+
+	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), driverTeardownContextKey{}, "retained"))
+	cancel()
+
+	err := Run(
+		ctx,
+		"test/driver-teardown-lifecycle",
+		map[int]*config.DriverConfig{0: {DriverType: teardownLifecycleDriverType}},
+		ParamInputs{},
+		nil,
+		nil,
+		zap.NewNop(),
+		&MetricsConfig{},
+	)
+	for _, want := range []error{setupErr, workloadErr, driverErr} {
+		if !errors.Is(err, want) {
+			t.Errorf("Run() error = %v, want joined %v", err, want)
+		}
+	}
+
+	if got := strings.Join(recorder.order, ","); got != "workload,driver" {
+		t.Fatalf("teardown order = %q, want workload,driver", got)
+	}
+
+	if recorder.workloadCalls != 1 || recorder.driverCalls != 1 {
+		t.Fatalf("teardown calls = workload:%d driver:%d, want one each", recorder.workloadCalls, recorder.driverCalls)
+	}
+
+	if !recorder.workloadDetached || !recorder.driverDetached {
+		t.Fatalf("detached contexts = workload:%t driver:%t, want true", recorder.workloadDetached, recorder.driverDetached)
+	}
+
+	if !recorder.workloadDeadline || !recorder.driverDeadline {
+		t.Fatalf("deadline contexts = workload:%t driver:%t, want true", recorder.workloadDeadline, recorder.driverDeadline)
+	}
+
+	if teardownLifecycleWorkloadRun.contextValue != "retained" || teardownLifecycleDriverRun.contextValue != "retained" {
+		t.Fatalf(
+			"teardown context values = workload:%v driver:%v, want retained",
+			teardownLifecycleWorkloadRun.contextValue,
+			teardownLifecycleDriverRun.contextValue,
+		)
+	}
+}
+
+type teardownLifecycleRecorder struct {
+	order            []string
+	workloadCalls    int
+	driverCalls      int
+	workloadDetached bool
+	driverDetached   bool
+	workloadDeadline bool
+	driverDeadline   bool
+}
+
+type teardownLifecycleWorkload struct {
+	recorder     *teardownLifecycleRecorder
+	setupErr     error
+	teardownErr  error
+	contextValue any
+}
+
+func (*teardownLifecycleWorkload) Name() string                          { return "test/driver-teardown-lifecycle" }
+func (*teardownLifecycleWorkload) Define(*Def) error                     { return nil }
+func (w *teardownLifecycleWorkload) Setup(context.Context, *Bench) error { return w.setupErr }
+func (*teardownLifecycleWorkload) Iterate(context.Context, *Bench) error { return nil }
+func (w *teardownLifecycleWorkload) Teardown(ctx context.Context, _ *Bench) error {
+	if w.recorder == nil {
+		return w.teardownErr
+	}
+
+	w.recorder.order = append(w.recorder.order, "workload")
+	w.recorder.workloadCalls++
+	w.recorder.workloadDetached = ctx.Err() == nil
+	_, w.recorder.workloadDeadline = ctx.Deadline()
+	w.contextValue = ctx.Value(driverTeardownContextKey{})
+
+	return w.teardownErr
+}
+
+type teardownLifecycleDriver struct {
+	recorder     *teardownLifecycleRecorder
+	teardownErr  error
+	contextValue any
+}
+
+func (*teardownLifecycleDriver) Insert(context.Context, *driver.InsertRequest) (*stats.Query, error) {
+	return &stats.Query{}, nil
+}
+
+func (*teardownLifecycleDriver) RunQuery(context.Context, string, map[string]any) (*driver.QueryResult, error) {
+	return &driver.QueryResult{}, nil
+}
+
+func (*teardownLifecycleDriver) Begin(context.Context, config.TxIsolationLevel) (driver.Tx, error) {
+	return nil, errTeardownLifecycleBegin
+}
+
+func (*teardownLifecycleDriver) ClassifyError(err error) driver.ErrorFacts {
+	return driver.DefaultErrorFacts(err)
+}
+
+func (d *teardownLifecycleDriver) Teardown(ctx context.Context) error {
+	if d.recorder == nil {
+		return d.teardownErr
+	}
+
+	d.recorder.order = append(d.recorder.order, "driver")
+	d.recorder.driverCalls++
+	d.recorder.driverDetached = ctx.Err() == nil
+	_, d.recorder.driverDeadline = ctx.Deadline()
+	d.contextValue = ctx.Value(driverTeardownContextKey{})
+
+	return d.teardownErr
+}
 
 func installRuntimeTestRoot(t *testing.T) {
 	t.Helper()

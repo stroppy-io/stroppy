@@ -137,13 +137,13 @@ ERROR AND EXIT BEHAVIOR
   iterations, failed queries, retries, and representative groups. Nonfatal
   errors leave the process exit status at 0.
 
-  Setup failures, workload teardown failures, and fatal workload actions return
-  a nonzero status. TPC-H and TPC-DS SF=1 answer comparison remains diagnostic:
-  query errors and answer differences are logged but do not change exit status.
-  A fatal action stops the whole scenario and is reported once. SIGINT/SIGTERM
-  cancellation stops the scenario, runs teardown, and keeps its signal-derived
-  exit status (130/143; a forced second signal is 2). Cancellation is not
-  reported as a nonfatal benchmark error.
+  Setup failures, workload or driver teardown failures, and fatal workload
+  actions return a nonzero status. TPC-H and TPC-DS SF=1 answer comparison
+  remains diagnostic: query errors and answer differences are logged but do not
+  change exit status. A fatal action stops the whole scenario and is reported
+  once. SIGINT/SIGTERM cancellation stops the scenario, runs teardown, and keeps
+  its signal-derived exit status (130/143; a forced second signal is 2).
+  Cancellation is not reported as a nonfatal benchmark error.
 
   To inspect the driver insert methods each driver supports:
 

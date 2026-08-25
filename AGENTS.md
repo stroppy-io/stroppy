@@ -123,10 +123,10 @@ Nonfatal terminal transaction errors fail one iteration and the VU continues;
 query-set workloads count the failed query and continue. Both exit 0 but produce
 bounded WARN aggregates and a prominent final completed-with-errors summary.
 Scheduled retries are counted separately and do not mark a run failed when a
-later attempt succeeds. Setup, workload teardown, fatal, and cancellation retain
-their nonzero or signal-derived semantics; fatal stops the scenario and is
-reported once. TPC-H/TPC-DS SF=1 answer comparison remains diagnostic-only.
-The removed `errorMode` driver field and alias are rejected.
+later attempt succeeds. Setup, workload or driver teardown, fatal, and
+cancellation retain their nonzero or signal-derived semantics; fatal stops the
+scenario and is reported once. TPC-H/TPC-DS SF=1 answer comparison remains
+diagnostic-only. The removed `errorMode` driver field and alias are rejected.
 
 ## CLI Usage
 
