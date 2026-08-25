@@ -264,7 +264,8 @@ func prometheusLabelsEqual(got, want labels) bool {
 	}
 
 	for key, value := range want {
-		if got[key] != value {
+		gotValue, exists := got[key]
+		if !exists || gotValue != value {
 			return false
 		}
 	}
@@ -290,6 +291,12 @@ func TestRequirePrometheusSampleMatchesExactNamesAndLabels(t *testing.T) {
 			name:    "wrong label name rejected",
 			body:    `stroppy_metric{other_table_name="accounts"} 7`,
 			wantErr: true,
+		},
+		{
+			name:       "missing empty label rejected",
+			body:       `stroppy_metric{other=""} 7`,
+			wantLabels: labels{"expected": ""},
+			wantErr:    true,
 		},
 		{
 			name:    "wrong label value rejected",
