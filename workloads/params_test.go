@@ -1,4 +1,4 @@
-package workloads
+package workloads_test
 
 import (
 	"go/ast"
@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/stroppy-io/stroppy/pkg/bench"
+	_ "github.com/stroppy-io/stroppy/workloads/all"
 )
 
 func TestBuiltInWorkloadParameterSchemas(t *testing.T) {

@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stroppy-io/stroppy/internal/runner"
-	_ "github.com/stroppy-io/stroppy/internal/workloads/simple"
 	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/pkg/config"
 	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
+	_ "github.com/stroppy-io/stroppy/workloads/simple"
 )
 
 func unsetLoggerEnv(t *testing.T) {

@@ -1,16 +1,17 @@
-// Package workloads provides embedded SQL/JSON workload files.
+// Package workloads provides workload-owned embedded SQL, JSON, and documentation files.
 package workloads
 
 import (
-	"embed"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
-	"path"
+	"path/filepath"
+	"sort"
 )
 
-// Preset represents an available example preset.
+// Preset identifies an embedded workload asset set.
 type Preset string
 
 const (
@@ -23,24 +24,43 @@ const (
 // ErrUnknownPreset is returned when an unknown preset name is requested.
 var ErrUnknownPreset = errors.New("unknown preset")
 
-//go:embed *
-var Content embed.FS
+var registry = make(map[Preset]fs.FS)
 
-// AvailablePresets returns list of available preset names.
-func AvailablePresets() []string {
-	return []string{
-		string(PresetTPCC),
-		string(PresetTPCB),
-		string(PresetTPCDS),
-		string(PresetTPCH),
+// Register associates a preset with assets embedded during package initialization.
+func Register(preset Preset, files fs.FS) {
+	if files == nil {
+		panic(fmt.Sprintf("workloads: register %q with nil filesystem", preset))
 	}
+
+	if _, exists := registry[preset]; exists {
+		panic(fmt.Sprintf("workloads: preset %q already registered", preset))
+	}
+
+	registry[preset] = files
 }
 
-// CopyPresetToPath copies preset files to the target directory.
+// AvailablePresets returns registered preset names in sorted order.
+func AvailablePresets() []string {
+	presets := make([]string, 0, len(registry))
+	for preset := range registry {
+		presets = append(presets, string(preset))
+	}
+
+	sort.Strings(presets)
+
+	return presets
+}
+
+// CopyPresetToPath copies preset files to target directory.
 func CopyPresetToPath(targetPath string, preset Preset, perm os.FileMode) error {
-	entries, err := Content.ReadDir(string(preset))
+	files, err := presetFiles(preset)
 	if err != nil {
-		return fmt.Errorf("%w: %s", ErrUnknownPreset, preset)
+		return err
+	}
+
+	entries, err := fs.ReadDir(files, ".")
+	if err != nil {
+		return fmt.Errorf("read preset %q: %w", preset, err)
 	}
 
 	for _, entry := range entries {
@@ -48,42 +68,52 @@ func CopyPresetToPath(targetPath string, preset Preset, perm os.FileMode) error 
 			continue
 		}
 
-		err = copyFileToPath(targetPath, string(preset), entry.Name(), perm)
-		if err != nil {
-			return fmt.Errorf("preset '%s' file copy error: %w", preset, err)
+		if err := copyFileToPath(files, targetPath, entry.Name(), perm); err != nil {
+			return fmt.Errorf("preset %q file copy: %w", preset, err)
 		}
 	}
 
 	return nil
 }
 
-// ReadPresetFile reads a single file from an embedded preset.
-// presetName is the preset directory (e.g., "tpcc"), fileName is the file within it (e.g., "tpcc.ts").
+// ReadPresetFile reads one file embedded by a workload package.
 func ReadPresetFile(presetName, fileName string) ([]byte, error) {
-	return Content.ReadFile(path.Join(presetName, fileName))
+	files, err := presetFiles(Preset(presetName))
+	if err != nil {
+		return nil, err
+	}
+
+	return fs.ReadFile(files, fileName)
 }
 
-// copyFileToPath copies a single file from examples to the target directory.
-func copyFileToPath(targetPath, preset, fileName string, perm os.FileMode) error {
-	file, err := Content.Open(path.Join(preset, fileName))
-	if err != nil {
-		return fmt.Errorf("failed to open file %s: %w", fileName, err)
+func presetFiles(preset Preset) (fs.FS, error) {
+	files, exists := registry[preset]
+	if !exists {
+		return nil, fmt.Errorf("%w: %s", ErrUnknownPreset, preset)
 	}
-	defer file.Close()
 
-	destFile, err := os.OpenFile(
-		path.Join(targetPath, fileName),
+	return files, nil
+}
+
+func copyFileToPath(files fs.FS, targetPath, fileName string, perm os.FileMode) error {
+	source, err := files.Open(fileName)
+	if err != nil {
+		return fmt.Errorf("open %s: %w", fileName, err)
+	}
+	defer source.Close()
+
+	destination, err := os.OpenFile(
+		filepath.Join(targetPath, fileName),
 		os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
 		perm,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to open file %s: %w", fileName, err)
+		return fmt.Errorf("open %s: %w", fileName, err)
 	}
-	defer destFile.Close()
+	defer destination.Close()
 
-	_, err = io.Copy(destFile, file)
-	if err != nil {
-		return fmt.Errorf("failed to copy file %s to %s: %w", fileName, targetPath, err)
+	if _, err := io.Copy(destination, source); err != nil {
+		return fmt.Errorf("copy %s to %s: %w", fileName, targetPath, err)
 	}
 
 	return nil

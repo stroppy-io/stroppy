@@ -2,6 +2,7 @@ package workloads
 
 import (
 	"fmt"
+	"io/fs"
 	"sort"
 	"strings"
 )
@@ -22,9 +23,14 @@ func Catalog() ([]PresetInfo, error) {
 	out := make([]PresetInfo, 0, len(presets))
 
 	for _, name := range presets {
-		entries, err := Content.ReadDir(name)
+		files, err := presetFiles(Preset(name))
 		if err != nil {
-			return nil, fmt.Errorf("%w: %s", ErrUnknownPreset, name)
+			return nil, err
+		}
+
+		entries, err := fs.ReadDir(files, ".")
+		if err != nil {
+			return nil, fmt.Errorf("read preset %q: %w", name, err)
 		}
 
 		info := PresetInfo{Name: name}

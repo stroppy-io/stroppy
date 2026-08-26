@@ -211,7 +211,7 @@ linters:
         path: _test\.go
       - linters:
           - mnd
-        path: ^internal/workloads/
+        path: ^workloads/(execute_sql|simple|tpcb|tpcc|tpcds|tpch)/
       - linters:
           - unused
         path: bind.go

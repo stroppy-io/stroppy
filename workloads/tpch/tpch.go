@@ -1,6 +1,6 @@
-// Package tpch is the Go-native port of workloads/tpch/tx.ts: the relational load of
-// the 8 TPC-H tables via the ported dbgen generator (bench.InsertTpch) plus the q1–q22
-// business queries run once with §2.4 pinned defaults, and SF=1 answer validation
+// Package tpch owns Stroppy's TPC-H implementation, tests, dialect SQL, and
+// answer data. It loads eight tables through the canonical generator and runs
+// q1–q22 once with §2.4 pinned defaults, and SF=1 answer validation
 // (postgres only). Supports pg/mysql/pico/ydb dialect files; date shifts for pico/ydb
 // are precomputed client-side.
 package tpch

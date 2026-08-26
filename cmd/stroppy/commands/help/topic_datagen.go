@@ -58,9 +58,9 @@ CSV OUTPUT
 REFERENCES
 
   docs/parallelism.md         InsertRequest parallelism contract and tuning
-  internal/workloads/simple/  Minimal Go workload
-  internal/workloads/tpcb/    Small relational workload
-  internal/workloads/tpch/    Stateful canonical generator
+  workloads/simple/           Minimal Go workload
+  workloads/tpcb/             Small relational workload
+  workloads/tpch/             Stateful canonical generator
   pkg/gen/                    Deterministic generation primitives
   pkg/bench/query.go          b.Insert entrypoint
 `,

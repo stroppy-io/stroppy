@@ -1,5 +1,5 @@
-// Package tpcds is the Go-native port of workloads/tpcds/tpcds.ts: the relational load
-// of the 24 TPC-DS tables via the ported dsdgen generator (bench.InsertTpcds) plus the
+// Package tpcds owns Stroppy's TPC-DS implementation, tests, dialect SQL, and
+// answer data. It loads 24 tables through the canonical generator and runs the
 // 99 business queries, run either from the baked canonical qualification set or from an
 // in-process generated stream (throughput test). SF=1 answer validation (pg/mysql) is
 // ported from tpcds_validate.ts as a multiset comparison against answers_sf1.json.
