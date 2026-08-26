@@ -26,7 +26,7 @@ func TestEmbeddedAssetContract(t *testing.T) {
 		"schema.pg.sql":    {"create_schema", "create_indexes"},
 		"schema.mysql.sql": {"create_schema", "create_indexes"},
 		"schema.pico.sql":  {"drop_schema", "create_schema", "create_indexes"},
-		"schema.ydb.sql":   {"drop_schema", "create_schema", "create_indexes"},
+		"schema.ydb.sql":   {"drop_schema", "create_schema", "create_schema_column", "create_indexes"},
 	}
 	for name, sections := range schemas {
 		t.Run(name, func(t *testing.T) {
