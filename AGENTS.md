@@ -61,7 +61,7 @@ generation is plain Go under `pkg/gen/` (see `docs/parallelism.md`).
 **Embedded FS rebuild rule:** each asset-bearing package under `workloads/<name>/`
 embeds its own SQL/JSON/README files and registers them with the shared catalog.
 If you pass a workload by short name (`tpcc/tx`), the binary serves its SQL from
-the embedded snapshot. Edits to `workloads/*.sql` on disk have **no effect** until
+the embedded snapshot. Edits to `workloads/<name>/*.sql` on disk have **no effect** until
 `make build` reruns.
 
 **Local path bypass:** If you pass an explicit local `.sql` path

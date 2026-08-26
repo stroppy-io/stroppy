@@ -191,7 +191,7 @@ func (w *workload) procDelivery(ctx context.Context, b *bench.Bench, vs *vuState
 	start := time.Now()
 	defer func() { w.m.deliveryDur.Add(float64(time.Since(start).Milliseconds())) }()
 
-	carrierID := vs.ri(vs.dCarrier, 1, districtsPerWarehouse)
+	carrierID := vs.ri(vs.dCarrier, 1, 10)
 	args := map[string]any{"d_w_id": vs.homeWID, "d_o_carrier_id": carrierID}
 
 	return bench.Retry0(ctx, w.retryPolicy, func() error {

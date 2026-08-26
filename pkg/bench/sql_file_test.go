@@ -3,11 +3,14 @@ package bench
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"testing/fstest"
 
 	"github.com/stroppy-io/stroppy/workloads"
 )
+
+var registerSQLResolutionPreset sync.Once
 
 func TestLoadSQLUsesLocalOverrideBeforeEmbeddedFallback(t *testing.T) {
 	const (
@@ -17,8 +20,10 @@ func TestLoadSQLUsesLocalOverrideBeforeEmbeddedFallback(t *testing.T) {
 		localBody    = "--+ query\n--= body\nSELECT 'local';\n"
 	)
 
-	workloads.Register(preset, fstest.MapFS{
-		fileName: &fstest.MapFile{Data: []byte(embeddedBody)},
+	registerSQLResolutionPreset.Do(func() {
+		workloads.Register(preset, fstest.MapFS{
+			fileName: &fstest.MapFile{Data: []byte(embeddedBody)},
+		})
 	})
 
 	t.Run("embedded fallback", func(t *testing.T) {
