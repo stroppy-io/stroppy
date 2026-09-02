@@ -1,6 +1,7 @@
 package pgnoop
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -22,18 +23,27 @@ const (
 )
 
 var (
-	errSidecarEmpty     = errors.New("pgnoop: empty sha256 sidecar")
-	errSidecarMalformed = errors.New("pgnoop: malformed sha256 sidecar")
-	errDigestMismatch   = errors.New("pgnoop: sha256 digest mismatch")
+	errDigestMalformed = errors.New("pgnoop: malformed pinned sha256 digest")
+	errDigestMismatch  = errors.New("pgnoop: sha256 digest mismatch")
 )
 
 // fetchAsset downloads one URL; tests swap it for a local source.
 var fetchAsset = fetch
 
-// download fetches the pinned release asset with its sha256 sidecar, verifies
-// and extracts it, and installs the binary at cachePath.
+// assetDigest resolves the expected digest for an asset; tests swap it.
+var assetDigest = AssetDigest
+
+// download fetches the pinned release asset and verifies it against the
+// digest compiled into stroppy's own source, then installs the binary at
+// cachePath. The digest is intentionally not fetched from the release
+// source, so a tampered release cannot pass verification.
 func download(cachePath string, opts Options) (string, error) {
 	asset, err := AssetName(runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		return "", err
+	}
+
+	pinnedDigest, err := assetDigest(asset)
 	if err != nil {
 		return "", err
 	}
@@ -63,12 +73,7 @@ func download(cachePath string, opts Options) (string, error) {
 		return "", err
 	}
 
-	sidecar, err := fetchAsset(ReleaseURL(asset + ".sha256"))
-	if err != nil {
-		return "", err
-	}
-
-	if err := verifySHA256(tarball, sidecar, asset); err != nil {
+	if err := verifySHA256(tarball, pinnedDigest, asset); err != nil {
 		return "", err
 	}
 
@@ -113,21 +118,17 @@ func fetch(url string) ([]byte, error) {
 	return data, nil
 }
 
-// verifySHA256 checks data against a sha256 sidecar file whose first token is
-// the hex digest ("<hex> *<filename>").
-func verifySHA256(data, sidecar []byte, name string) error {
-	fields := strings.Fields(string(sidecar))
-	if len(fields) == 0 {
-		return fmt.Errorf("%w: %s", errSidecarEmpty, name)
-	}
-
-	want, err := hex.DecodeString(fields[0])
-	if err != nil {
-		return fmt.Errorf("%w: %s: %w", errSidecarMalformed, name, err)
+// verifySHA256 checks data against a pinned hex digest. Wrong-length digests
+// are rejected before the fixed-size comparison so a short digest cannot
+// panic the conversion.
+func verifySHA256(data []byte, wantHex, name string) error {
+	want, err := hex.DecodeString(wantHex)
+	if err != nil || len(want) != sha256.Size {
+		return fmt.Errorf("%w: %s", errDigestMalformed, name)
 	}
 
 	got := sha256.Sum256(data)
-	if got != [sha256.Size]byte(want) {
+	if !bytes.Equal(got[:], want) {
 		return fmt.Errorf("%w: %s", errDigestMismatch, name)
 	}
 

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,6 +24,8 @@ const (
 	historyDirPerm = 0o755
 	historyPerm    = 0o644
 
+	maxReportSuffix = 1000
+
 	statusOK   = "ok"
 	statusWarn = "warn"
 
@@ -33,6 +36,10 @@ const (
 	msPerSecond  = 1000.0
 	percentScale = 100.0
 )
+
+// errReportNameExhausted reports that a second produced more collision
+// suffixes than the naming scheme allows.
+var errReportNameExhausted = errors.New("report filename suffixes exhausted")
 
 // HostInfo fingerprints the machine a report was measured on.
 type HostInfo struct {
@@ -331,23 +338,53 @@ func saveReport(report *Report) (string, error) {
 		return "", fmt.Errorf("create history dir: %w", err)
 	}
 
-	name := report.Time.UTC().Format("2006-01-02T15-04-05Z") + ".json"
-	path := filepath.Join(dir, name)
-
 	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("marshal report: %w", err)
 	}
 
-	//nolint:gosec // G306: user-readable history file
-	if err := os.WriteFile(path, append(data, '\n'), historyPerm); err != nil {
-		return "", fmt.Errorf("write report: %w", err)
-	}
+	name := report.Time.UTC().Format("2006-01-02T15-04-05Z")
 
-	return path, nil
+	//nolint:gosec // G306: user-readable history file
+	return writeReportFile(dir, name, append(data, '\n'))
 }
 
-// loadPrevious returns the newest saved report older than the current run.
+// writeReportFile creates <name>.json exclusively; runs saved within the same
+// second get a numeric suffix instead of overwriting each other.
+func writeReportFile(dir, name string, data []byte) (string, error) {
+	for suffix := 1; suffix <= maxReportSuffix; suffix++ {
+		fileName := name + ".json"
+		if suffix > 1 {
+			fileName = fmt.Sprintf("%s-%d.json", name, suffix)
+		}
+
+		path := filepath.Join(dir, fileName)
+
+		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, historyPerm)
+		if errors.Is(err, fs.ErrExist) {
+			continue
+		}
+
+		if err != nil {
+			return "", fmt.Errorf("create report file: %w", err)
+		}
+
+		_, writeErr := file.Write(data)
+		closeErr := file.Close()
+
+		if writeErr != nil || closeErr != nil {
+			return "", fmt.Errorf("write report: %w", errors.Join(writeErr, closeErr))
+		}
+
+		return path, nil
+	}
+
+	return "", fmt.Errorf("%w: %s", errReportNameExhausted, name)
+}
+
+// loadPrevious returns the newest saved report strictly older than the
+// current run. Filenames carry their run time (plus a collision suffix), so
+// the current run's own file never matches.
 func loadPrevious(current time.Time) (*Report, error) {
 	dir, err := historyDir()
 	if err != nil {
@@ -373,10 +410,9 @@ func loadPrevious(current time.Time) (*Report, error) {
 
 	sort.Sort(sort.Reverse(sort.StringSlice(names)))
 
-	currentName := current.UTC().Format("2006-01-02T15-04-05Z") + ".json"
-
 	for _, name := range names {
-		if name == currentName {
+		reportTime, ok := reportFileTime(name)
+		if !ok || !reportTime.Before(current) {
 			continue
 		}
 
@@ -395,4 +431,23 @@ func loadPrevious(current time.Time) (*Report, error) {
 
 	//nolint:nilnil // no previous report is a valid state
 	return nil, nil
+}
+
+// reportFileTime parses the run timestamp encoded in a report filename:
+// 2026-09-02T15-04-05Z.json, optionally with a -N collision suffix.
+func reportFileTime(name string) (time.Time, bool) {
+	name = strings.TrimSuffix(name, ".json")
+
+	if idx := strings.LastIndex(name, "-"); idx > 0 {
+		if _, err := strconv.Atoi(name[idx+1:]); err == nil {
+			name = name[:idx]
+		}
+	}
+
+	ts, err := time.Parse("2006-01-02T15-04-05Z", name)
+	if err != nil {
+		return time.Time{}, false
+	}
+
+	return ts, true
 }

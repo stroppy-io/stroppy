@@ -72,7 +72,7 @@ func Start(ctx context.Context, binary string, port int) (*Server, error) {
 	go announceListening(stdout, s.readySignal)
 	go func() { _, _ = io.Copy(io.Discard, stderr) }()
 
-	if err := s.waitReady(); err != nil {
+	if err := s.waitReady(ctx); err != nil {
 		_ = s.Stop()
 
 		return nil, err
@@ -81,28 +81,38 @@ func Start(ctx context.Context, binary string, port int) (*Server, error) {
 	return s, nil
 }
 
-func (s *Server) waitReady() error {
+// waitReady polls until the server accepts connections, prints its listening
+// line, the context is canceled, or the readiness window expires.
+func (s *Server) waitReady(ctx context.Context) error {
 	deadline := time.Now().Add(readyTimeout)
 	dialer := &net.Dialer{Timeout: readyPollTick}
 
-	for time.Now().Before(deadline) {
+	for {
 		select {
+		case <-ctx.Done():
+			return ctx.Err() //nolint:wrapcheck // caller reports the cancellation directly
 		case <-s.readySignal:
 			return nil
 		default:
 		}
 
-		conn, err := dialer.Dial("tcp", s.Addr())
+		conn, err := dialer.DialContext(ctx, "tcp", s.Addr())
 		if err == nil {
 			_ = conn.Close()
 
 			return nil
 		}
 
-		time.Sleep(readyPollTick)
-	}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("%w at %s", ErrServerNotReady, s.Addr())
+		}
 
-	return fmt.Errorf("%w at %s", ErrServerNotReady, s.Addr())
+		select {
+		case <-time.After(readyPollTick):
+		case <-ctx.Done():
+			return ctx.Err() //nolint:wrapcheck // caller reports the cancellation directly
+		}
+	}
 }
 
 // Stop terminates the server: SIGTERM first, SIGKILL after a grace period.

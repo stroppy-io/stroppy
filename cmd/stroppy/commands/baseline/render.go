@@ -95,21 +95,24 @@ func renderDiff(out io.Writer, previous, current *Report) {
 			})
 		}
 
-		deltas = append(deltas,
-			diffEntry{
-				label: tier.Name + " tx 1VU", current: tier.TxSingle.TxPerSec, previous: prev.TxSingle.TxPerSec,
-			},
-			diffEntry{
+		deltas = append(deltas, diffEntry{
+			label: tier.Name + " tx 1VU", current: tier.TxSingle.TxPerSec, previous: prev.TxSingle.TxPerSec,
+		})
+
+		// Parallel phases only compare at equal VU counts: different
+		// concurrency changes the number, not the machine.
+		if tier.ParallelVUs == prev.ParallelVUs {
+			deltas = append(deltas, diffEntry{
 				label:    fmt.Sprintf("%s tx %dVU", tier.Name, tier.ParallelVUs),
 				current:  tier.TxParallel.TxPerSec,
 				previous: prev.TxParallel.TxPerSec,
-			},
-		)
-
-		if tier.Name == tierWire {
-			deltas = append(deltas, diffEntry{
-				label: "wire p99", current: tier.TxParallel.P99Ms, previous: prev.TxParallel.P99Ms,
 			})
+
+			if tier.Name == tierWire {
+				deltas = append(deltas, diffEntry{
+					label: "wire p99", current: tier.TxParallel.P99Ms, previous: prev.TxParallel.P99Ms,
+				})
+			}
 		}
 	}
 

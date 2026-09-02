@@ -1,6 +1,9 @@
 package baseline
 
 import (
+	"encoding/json"
+	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -208,6 +211,73 @@ func TestLoadPreviousMissesCleanly(t *testing.T) {
 	}
 }
 
+func TestSaveReportSameSecondCollision(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	report := &Report{
+		Schema: reportSchema,
+		Time:   time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC),
+	}
+
+	first, err := saveReport(report)
+	if err != nil {
+		t.Fatalf("saveReport() first error = %v", err)
+	}
+
+	second, err := saveReport(report)
+	if err != nil {
+		t.Fatalf("saveReport() second error = %v", err)
+	}
+
+	if first == second {
+		t.Fatalf("same-second saves collided on %s", first)
+	}
+
+	// The suffixed file is a valid previous run for a later report.
+	previous, err := loadPrevious(report.Time.Add(time.Minute))
+	if err != nil || previous == nil {
+		t.Fatalf("loadPrevious() after collision = %+v, %v", previous, err)
+	}
+}
+
+func TestReportFileTime(t *testing.T) {
+	for name, want := range map[string]bool{
+		"2026-09-02T15-04-05Z.json":     true,
+		"2026-09-02T15-04-05Z-2.json":   true,
+		"2026-09-02T15-04-05Z-abc.json": false,
+		"not-a-report.json":             false,
+	} {
+		if _, ok := reportFileTime(name); ok != want {
+			t.Fatalf("reportFileTime(%q) ok = %v, want %v", name, ok, want)
+		}
+	}
+}
+
+func TestRenderDiffSkipsMismatchedVUs(t *testing.T) {
+	previous := &Report{Time: time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)}
+	current := &Report{}
+
+	prevTier := tierFixture(tierWire)
+	currTier := tierFixture(tierWire)
+	currTier.ParallelVUs = prevTier.ParallelVUs + 4
+
+	previous.Tiers = []TierResult{prevTier}
+	current.Tiers = []TierResult{currTier}
+
+	var out strings.Builder
+
+	renderDiff(&out, previous, current)
+
+	rendered := out.String()
+	if strings.Contains(rendered, "tx 8VU") || strings.Contains(rendered, "wire p99") {
+		t.Fatalf("renderDiff() compared parallel phases across VU counts:\n%s", rendered)
+	}
+
+	if !strings.Contains(rendered, "tx 1VU") {
+		t.Fatalf("renderDiff() dropped the single-VU comparison:\n%s", rendered)
+	}
+}
+
 func TestFormatRate(t *testing.T) {
 	for _, tc := range []struct {
 		value float64
@@ -249,5 +319,55 @@ func TestTxStatAndLoadStat(t *testing.T) {
 	load := loadStat(&m)
 	if load.Rows != 500 || load.RowsPerSec != 2000 || load.DurationMs != 250 {
 		t.Fatalf("loadStat() = %+v", load)
+	}
+}
+
+func TestPlanRunRejectsOutOfRangeVUs(t *testing.T) {
+	saved := opts
+	opts = options{tiers: []string{tierNoop}, download: "ask"}
+
+	t.Cleanup(func() { opts = saved })
+
+	opts.vus = math.MaxInt32 + 1
+
+	if _, err := planRun(); err == nil {
+		t.Fatal("planRun() accepted a VU count above the int32 range")
+	}
+
+	opts.vus = 0
+
+	if _, err := planRun(); err == nil {
+		t.Fatal("planRun() accepted a zero VU count")
+	}
+
+	opts.vus = 4
+
+	if _, err := planRun(); err != nil {
+		t.Fatalf("planRun() rejected valid VU count: %v", err)
+	}
+}
+
+func TestEmitReportKeepsJSONPure(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	saved := opts
+	opts = options{jsonOut: true}
+
+	t.Cleanup(func() { opts = saved })
+
+	report := &Report{
+		Schema:  reportSchema,
+		Stroppy: "test",
+		Time:    time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC),
+	}
+
+	var out strings.Builder
+	if err := emitReport(&out, report); err != nil {
+		t.Fatalf("emitReport() error = %v", err)
+	}
+
+	var decoded Report
+	if err := json.Unmarshal([]byte(out.String()), &decoded); err != nil {
+		t.Fatalf("stdout is not valid JSON in --json mode: %v\noutput: %q", err, out.String())
 	}
 }

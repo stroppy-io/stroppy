@@ -26,6 +26,30 @@ const (
 // the host platform.
 var ErrUnsupportedPlatform = errors.New("pgnoop: no release asset for this platform")
 
+// releaseDigests pins the expected sha256 of every v0.1.2 release asset in
+// stroppy's own source, so a tampered release cannot pass verification by
+// replacing the archive and its sidecar together. Keep in sync with Version
+// when upgrading.
+var releaseDigests = map[string]string{
+	"pg-noop-x86_64-unknown-linux-musl.tar.xz":  "1bc328a8b484694aeba0cc4d988887acb6e58c6848addc6f242655358ca8d893",
+	"pg-noop-aarch64-unknown-linux-musl.tar.xz": "a374f608292050ecee00e2c30dd264f1e227326059ab44a2ec68023a3e68fd48",
+	"pg-noop-x86_64-apple-darwin.tar.xz":        "a5fa61402f428281a580d793c6398bea14ee143a57b4772c718b3d55a2d84aaa",
+	"pg-noop-aarch64-apple-darwin.tar.xz":       "45eead14239a1ba32a29c949de1c997e47db1076ebd6e87f54e1d25d04218ad1",
+}
+
+// ErrUnknownDigest is returned when a pinned asset has no compiled-in digest.
+var ErrUnknownDigest = errors.New("pgnoop: no pinned digest for asset")
+
+// AssetDigest returns the pinned sha256 hex digest for a release asset.
+func AssetDigest(asset string) (string, error) {
+	digest, ok := releaseDigests[asset]
+	if !ok {
+		return "", fmt.Errorf("%w: %s", ErrUnknownDigest, asset)
+	}
+
+	return digest, nil
+}
+
 // AssetName returns the release asset for a GOOS/GOARCH pair.
 func AssetName(goos, goarch string) (string, error) {
 	switch {

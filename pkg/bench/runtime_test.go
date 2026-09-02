@@ -432,7 +432,9 @@ func installRuntimeTestRoot(t *testing.T) {
 }
 
 func TestRunQuietSummaryDeliversMetricsSilently(t *testing.T) {
-	Register(func() Workload { return &noopIterateWorkload{} })
+	registerQuietSummaryWorkloadOnce.Do(func() {
+		Register(func() Workload { return &noopIterateWorkload{} })
+	})
 
 	var captured metricdata.ResourceMetrics
 
@@ -503,6 +505,8 @@ func TestRunQuietSummaryDeliversMetricsSilently(t *testing.T) {
 }
 
 type noopIterateWorkload struct{}
+
+var registerQuietSummaryWorkloadOnce sync.Once
 
 func (*noopIterateWorkload) Name() string                        { return "test/quiet-summary" }
 func (*noopIterateWorkload) Define(*Def) error                   { return nil }

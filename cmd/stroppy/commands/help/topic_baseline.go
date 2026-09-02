@@ -79,8 +79,9 @@ SERVER BINARY
     1. embedded copy (release builds carrying the server binary)
     2. cache: ~/.stroppy/bin/pg-noop/<version>/pgnoop
     3. download from the pinned github.com/stroppy-io/pg-noop release,
-       verified against its sha256 sidecar; interactive consent is required
-       on a terminal (--download always|never controls this)
+       verified against a digest compiled into stroppy itself (a tampered
+       release cannot pass); interactive consent is required on a terminal
+       (--download always|never controls this)
   --server-path PATH or STROPPY_PG_NOOP_PATH supply a binary directly, which
   also serves air-gapped machines and CI.
 

@@ -71,8 +71,12 @@ func checkBinary(path string) error {
 		return err
 	}
 
-	if info.IsDir() {
-		return fmt.Errorf("%w: %s is a directory", ErrNoServerBinary, path)
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("%w: %s is not a regular file", ErrNoServerBinary, path)
+	}
+
+	if info.Mode().Perm()&0o111 == 0 {
+		return fmt.Errorf("%w: %s is not executable", ErrNoServerBinary, path)
 	}
 
 	return nil

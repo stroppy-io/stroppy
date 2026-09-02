@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"os"
 	"runtime"
@@ -49,6 +50,7 @@ var (
 	errUnknownDownload   = errors.New("unknown --download value; expected ask, always, or never")
 	errMarshalReportFail = errors.New("marshal report")
 	errFreePortNotTCP    = errors.New("free port listener address is not TCP")
+	errVUsOutOfRange     = errors.New("vus out of range")
 )
 
 type options struct {
@@ -160,12 +162,17 @@ func planRun() (runPlan, error) {
 		}
 	}
 
+	// VU counts convert to int32 pool sizing; reject values that would wrap.
+	if opts.vus < 1 || opts.vus > math.MaxInt32 {
+		return runPlan{}, fmt.Errorf("%w: got %d, want 1..%d", errVUsOutOfRange, opts.vus, math.MaxInt32)
+	}
+
 	return runPlan{
 		tiers:    tiers,
 		consent:  consent,
 		duration: duration,
 		rows:     rows,
-		vus:      max(opts.vus, 1),
+		vus:      opts.vus,
 	}, nil
 }
 
@@ -261,10 +268,16 @@ func emitReport(out io.Writer, report *Report) error {
 		return err
 	}
 
-	fmt.Fprintf(out, "\nhistory: saved %s\n", path)
+	// stdout stays a valid JSON document in --json mode; status goes to stderr.
+	statusOut := out
+	if opts.jsonOut {
+		statusOut = os.Stderr
+	}
 
-	if previous != nil && !opts.jsonOut {
-		renderDiff(out, previous, report)
+	fmt.Fprintf(statusOut, "\nhistory: saved %s\n", path)
+
+	if previous != nil {
+		renderDiff(statusOut, previous, report)
 	}
 
 	return nil

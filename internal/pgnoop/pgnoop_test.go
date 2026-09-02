@@ -53,22 +53,21 @@ func TestReleaseURLPinsVersion(t *testing.T) {
 func TestVerifySHA256(t *testing.T) {
 	data := []byte("payload")
 	sum := sha256.Sum256(data)
-	sidecar := []byte(hex.EncodeToString(sum[:]) + " *asset.tar.xz\n")
+	valid := hex.EncodeToString(sum[:])
 
-	if err := verifySHA256(data, sidecar, "asset"); err != nil {
-		t.Fatalf("verifySHA256() valid sidecar error = %v", err)
+	if err := verifySHA256(data, valid, "asset"); err != nil {
+		t.Fatalf("verifySHA256() valid digest error = %v", err)
 	}
 
-	if err := verifySHA256([]byte("tampered"), sidecar, "asset"); err == nil {
-		t.Fatal("verifySHA256() accepted a mismatched digest")
+	if err := verifySHA256([]byte("tampered"), valid, "asset"); !errors.Is(err, errDigestMismatch) {
+		t.Fatalf("verifySHA256() mismatch error = %v, want errDigestMismatch", err)
 	}
 
-	if err := verifySHA256(data, []byte("not-hex\n"), "asset"); err == nil {
-		t.Fatal("verifySHA256() accepted a malformed sidecar")
-	}
-
-	if err := verifySHA256(data, []byte(""), "asset"); err == nil {
-		t.Fatal("verifySHA256() accepted an empty sidecar")
+	// Short and malformed digests must be rejected without panicking.
+	for _, bad := range []string{"00", "not-hex", ""} {
+		if err := verifySHA256(data, bad, "asset"); !errors.Is(err, errDigestMalformed) {
+			t.Fatalf("verifySHA256(%q) error = %v, want errDigestMalformed", bad, err)
+		}
 	}
 }
 
@@ -199,15 +198,13 @@ func TestResolveDownloadsAndVerifies(t *testing.T) {
 	})
 	sum := sha256.Sum256(tarball)
 
-	fetchAsset = func(url string) ([]byte, error) {
-		if strings.HasSuffix(url, ".sha256") {
-			return []byte(hex.EncodeToString(sum[:]) + " *asset\n"), nil
-		}
+	fetchAsset = func(string) ([]byte, error) { return tarball, nil }
+	assetDigest = func(string) (string, error) { return hex.EncodeToString(sum[:]), nil }
 
-		return tarball, nil
-	}
-
-	t.Cleanup(func() { fetchAsset = fetch })
+	t.Cleanup(func() {
+		fetchAsset = fetch
+		assetDigest = AssetDigest
+	})
 
 	got, err := Resolve(Options{Consent: ConsentAlways})
 	if err != nil {
@@ -230,18 +227,16 @@ func TestResolveRefusesBadDigest(t *testing.T) {
 
 	tarball := buildTarXz(t, map[string][]byte{"pg-noop-test-target/pgnoop": []byte("x")})
 
-	fetchAsset = func(url string) ([]byte, error) {
-		if strings.HasSuffix(url, ".sha256") {
-			return []byte(strings.Repeat("0", 64) + " *asset\n"), nil
-		}
+	fetchAsset = func(string) ([]byte, error) { return tarball, nil }
+	assetDigest = func(string) (string, error) { return strings.Repeat("0", 64), nil }
 
-		return tarball, nil
-	}
+	t.Cleanup(func() {
+		fetchAsset = fetch
+		assetDigest = AssetDigest
+	})
 
-	t.Cleanup(func() { fetchAsset = fetch })
-
-	if _, err := Resolve(Options{Consent: ConsentAlways}); err == nil {
-		t.Fatal("Resolve() installed a binary with a mismatched digest")
+	if _, err := Resolve(Options{Consent: ConsentAlways}); !errors.Is(err, errDigestMismatch) {
+		t.Fatalf("Resolve() error = %v, want errDigestMismatch", err)
 	}
 }
 
