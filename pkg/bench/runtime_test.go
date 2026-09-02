@@ -3,12 +3,15 @@ package bench
 import (
 	"context"
 	"errors"
+	"io"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
@@ -427,3 +430,88 @@ func installRuntimeTestRoot(t *testing.T) {
 		root = oldRoot
 	})
 }
+
+func TestRunQuietSummaryDeliversMetricsSilently(t *testing.T) {
+	registerQuietSummaryWorkloadOnce.Do(func() {
+		Register(func() Workload { return &noopIterateWorkload{} })
+	})
+
+	var captured metricdata.ResourceMetrics
+
+	oldStderr := os.Stderr
+
+	pipeRead, pipeWrite, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+
+	os.Stderr = pipeWrite
+
+	runErr := Run(
+		context.Background(),
+		"test/quiet-summary",
+		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
+		ParamInputs{CLI: map[string]string{"iterations": "7", "vus": "1"}},
+		nil,
+		nil,
+		zap.NewNop(),
+		&MetricsConfig{
+			Quiet: true,
+			OnSummary: func(data metricdata.ResourceMetrics) {
+				captured = data
+			},
+		},
+	)
+
+	pipeWrite.Close()
+
+	os.Stderr = oldStderr
+
+	printed, _ := io.ReadAll(pipeRead)
+
+	pipeRead.Close()
+
+	if runErr != nil {
+		t.Fatalf("Run() error = %v", runErr)
+	}
+
+	if len(printed) != 0 {
+		t.Fatalf("quiet run printed %q to stderr, want silence", printed)
+	}
+
+	if captured.ScopeMetrics == nil {
+		t.Fatal("OnSummary did not receive the final snapshot")
+	}
+
+	var iterations float64
+
+	for _, scope := range captured.ScopeMetrics {
+		for _, metric := range scope.Metrics {
+			if metric.Name != "stroppy_iterations_total" {
+				continue
+			}
+
+			if sum, ok := metric.Data.(metricdata.Sum[float64]); ok {
+				for _, point := range sum.DataPoints {
+					iterations += point.Value
+				}
+			}
+		}
+	}
+
+	if iterations != 7 {
+		t.Fatalf("iterations_total = %v, want 7", iterations)
+	}
+}
+
+type noopIterateWorkload struct{}
+
+var registerQuietSummaryWorkloadOnce sync.Once
+
+func (*noopIterateWorkload) Name() string                        { return "test/quiet-summary" }
+func (*noopIterateWorkload) Define(*Def) error                   { return nil }
+func (*noopIterateWorkload) Setup(context.Context, *Bench) error { return nil }
+func (*noopIterateWorkload) Iterate(context.Context, *Bench) error {
+	return nil
+}
+func (*noopIterateWorkload) Teardown(context.Context, *Bench) error { return nil }

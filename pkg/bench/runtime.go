@@ -560,14 +560,24 @@ func (s *summary) print() {
 }
 
 func (s *summary) printTo(out io.Writer) {
-	if s.root.errorReporter != nil {
+	if s.root.errorReporter != nil && !s.root.quietSummary {
 		defer s.root.errorReporter.writeSummary(out)
 	}
 
 	var data metricdata.ResourceMetrics
 	if err := s.root.manualReader.Collect(context.Background(), &data); err != nil {
-		fmt.Fprintf(out, "bench: collect metrics: %v\n", err)
+		if !s.root.quietSummary {
+			fmt.Fprintf(out, "bench: collect metrics: %v\n", err)
+		}
 
+		return
+	}
+
+	if s.root.onSummary != nil {
+		s.root.onSummary(data)
+	}
+
+	if s.root.quietSummary {
 		return
 	}
 
