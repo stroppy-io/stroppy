@@ -77,8 +77,10 @@ Resolution order for SQL files: **cwd → `~/.stroppy/` → embedded**.
 
 | Path | Role |
 |------|------|
-| `cmd/stroppy/` | entrypoint (`main.go` blank-imports the drivers) + cobra subcommands: run, probe, version |
+| `cmd/stroppy/` | entrypoint (`main.go` blank-imports the drivers) + cobra subcommands: run, baseline, probe, version |
 | `cmd/stroppy/commands/run/` | arg parsing, driver/env/step resolution, dispatch to `bench.Run` |
+| `cmd/stroppy/commands/baseline/` | machine-baseline command: two-tier orchestration, verdicts, history reports |
+| `internal/pgnoop/` | pg-noop server resolution (embed/cache/download) + process lifecycle |
 | `pkg/bench/` | Go-native engine: `Workload` interface, `Run`, scenario executor, VU/Bench SDK, metrics sink + summary |
 | `workloads/<name>/` | one package per built-in workload, containing Go implementation/tests plus owned SQL/JSON/README assets |
 | `workloads/all/` | explicit blank-import aggregation for built-in workload registration |
@@ -202,7 +204,28 @@ There is **no** `--` k6-args passthrough. Select the executor explicitly with
 
 # Probe: list workload schemas, embedded presets, and driver insert methods
 ./build/stroppy probe
+
+# Baseline: stroppy's own performance ceiling, no database needed
+./build/stroppy baseline
 ```
+
+## Baseline
+
+`stroppy baseline` measures stroppy itself: a noop-driver framework tier and
+a pg-wire tier against the [pg-noop](https://github.com/stroppy-io/pg-noop)
+blackhole server on loopback. It runs the registered `baseline` workload
+(no result validation, so stub rows never fail iterations), prints sanity
+verdicts on hardware-independent invariants, and saves a versioned JSON
+report under `~/.stroppy/baselines/` (delta vs the previous run included).
+
+The pg-noop binary resolves embedded (release builds carry it via
+`-tags pgnoop_embed`; `make build-pgnoop` builds one locally) →
+`~/.stroppy/bin/pg-noop/<version>/` cache → sha256-verified download with
+consent. `--server-path` / `STROPPY_PG_NOOP_PATH` bypass resolution.
+
+Known stroppy-bound ceiling: the OTel metric pipeline contends at high VU
+counts, so parallel tx phases plateau well below linear on fast machines —
+baseline surfaces this as a scaling verdict, it is not a machine fault.
 
 ## Workload Structure
 

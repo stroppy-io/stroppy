@@ -112,11 +112,19 @@ gen-tpch-json: # Regenerate workloads/tpch/distributions.json and answers_sf1.js
 
 # Stroppy build section
 
-.PHONY: build build-debug build-all
+.PHONY: build build-debug build-all pgnoop-fetch
 
 STROPPY_BIN_NAME=stroppy
 STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
 STROPPY_LDFLAGS=-ldflags "-s -w -X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'"
+
+# Extra go build tags (release builds pass -tags=pgnoop_embed to carry the
+# pg-noop baseline server inside the stroppy binary).
+GO_BUILD_TAGS ?=
+
+# Keep in sync with internal/pgnoop.Version.
+PGNOOP_VERSION=v0.1.2
+PGNOOP_EMBED_DIR=$(CURDIR)/internal/pgnoop/embedded
 
 build-debug: # Build binary stroppy (with symbols)
 	@mkdir -p $(CURDIR)/build
@@ -126,9 +134,37 @@ build-debug: # Build binary stroppy (with symbols)
 build: # Build binary stroppy
 	@mkdir -p $(CURDIR)/build
 	echo $(VERSION)
-	CGO_ENABLED=0 go build -trimpath $(STROPPY_LDFLAGS) -o $(STROPPY_OUT_FILE) ./cmd/stroppy
+	CGO_ENABLED=0 go build -trimpath $(GO_BUILD_TAGS) $(STROPPY_LDFLAGS) -o $(STROPPY_OUT_FILE) ./cmd/stroppy
 
 build-all: build
+
+pgnoop-fetch: # Fetch the host-matching pg-noop server for -tags pgnoop_embed builds
+	@mkdir -p $(PGNOOP_EMBED_DIR)
+	@os=$$(uname -s | tr '[:upper:]' '[:lower:]'); arch=$$(uname -m); \
+	case "$$os/$$arch" in \
+		linux/x86_64)  asset=pg-noop-x86_64-unknown-linux-musl.tar.xz ;; \
+		linux/aarch64) asset=pg-noop-aarch64-unknown-linux-musl.tar.xz ;; \
+		darwin/x86_64) asset=pg-noop-x86_64-apple-darwin.tar.xz ;; \
+		darwin/arm64)  asset=pg-noop-aarch64-apple-darwin.tar.xz ;; \
+		*) echo "error: no pg-noop release asset for $$os/$$arch"; exit 1 ;; \
+	esac; \
+	base="https://github.com/stroppy-io/pg-noop/releases/download/$(PGNOOP_VERSION)"; \
+	tmp=$$(mktemp -d); \
+	curl -sSfL -o "$$tmp/$$asset" "$$base/$$asset" || exit 1; \
+	curl -sSfL -o "$$tmp/$$asset.sha256" "$$base/$$asset.sha256" || exit 1; \
+	if command -v sha256sum >/dev/null 2>&1; then \
+		( cd "$$tmp" && sha256sum -c "$$asset.sha256" ) || exit 1; \
+	else \
+		( cd "$$tmp" && shasum -a 256 -c "$$asset.sha256" ) || exit 1; \
+	fi; \
+	tar -xf "$$tmp/$$asset" -C "$$tmp" || exit 1; \
+	bin=$$(find "$$tmp" -name pgnoop -type f | head -1); \
+	install -m 0755 "$$bin" $(PGNOOP_EMBED_DIR)/pgnoop || exit 1; \
+	rm -rf "$$tmp"; \
+	echo "installed $(PGNOOP_EMBED_DIR)/pgnoop"
+
+build-pgnoop: pgnoop-fetch # Build stroppy with the pg-noop baseline server embedded
+	$(MAKE) build GO_BUILD_TAGS="-tags=pgnoop_embed"
 
 branch=main
 .PHONY: revision

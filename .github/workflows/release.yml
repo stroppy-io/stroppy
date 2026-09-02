@@ -50,6 +50,31 @@ jobs:
           echo "outdir=${OUTDIR}" >> $GITHUB_OUTPUT
           echo "archive=${ARCHIVE}" >> $GITHUB_OUTPUT
 
+      # Release builds carry the pg-noop baseline server inside the stroppy
+      # binary (build tag pgnoop_embed), so `stroppy baseline` works without
+      # any download on the released platforms.
+      - name: Fetch pg-noop server for embedding
+        env:
+          # Keep in sync with internal/pgnoop.Version.
+          PGNOOP_VERSION: v0.1.2
+        run: |
+          case "${{ matrix.os }}_${{ matrix.arch }}" in
+            linux_amd64)  asset="pg-noop-x86_64-unknown-linux-musl.tar.xz" ;;
+            linux_arm64)  asset="pg-noop-aarch64-unknown-linux-musl.tar.xz" ;;
+            darwin_amd64) asset="pg-noop-x86_64-apple-darwin.tar.xz" ;;
+            darwin_arm64) asset="pg-noop-aarch64-apple-darwin.tar.xz" ;;
+          esac
+          base="https://github.com/stroppy-io/pg-noop/releases/download/${PGNOOP_VERSION}"
+          tmp="$(mktemp -d)"
+          curl -sSfL -o "${tmp}/${asset}" "${base}/${asset}"
+          curl -sSfL -o "${tmp}/${asset}.sha256" "${base}/${asset}.sha256"
+          ( cd "${tmp}" && sha256sum -c "${asset}.sha256" )
+          mkdir -p internal/pgnoop/embedded
+          tar -xf "${tmp}/${asset}" -C "${tmp}"
+          bin="$(find "${tmp}" -name pgnoop -type f | head -1)"
+          install -m 0755 "${bin}" internal/pgnoop/embedded/pgnoop
+          rm -rf "${tmp}"
+
       - name: Build
         env:
           CGO_ENABLED: "0"
@@ -57,7 +82,7 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           VERSION: ${{ github.ref_name }}
         run: |
-          make build
+          make build GO_BUILD_TAGS="-tags=pgnoop_embed"
           mkdir -p "${{ steps.names.outputs.outdir }}"
           cp build/stroppy "${{ steps.names.outputs.outdir }}/${{ steps.names.outputs.bin }}"
 
