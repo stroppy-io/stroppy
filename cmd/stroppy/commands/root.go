@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/baseline"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/help"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/probe"
 	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/run"
@@ -119,5 +120,5 @@ func init() {
 	rootCmd.SetVersionTemplate(`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "%s" .Version}}`)
 
 	versionCmd.Flags().BoolVar(&versionJSON, "json", false, "output versions as JSON")
-	rootCmd.AddCommand(versionCmd, run.Cmd, probe.Cmd, help.Cmd)
+	rootCmd.AddCommand(versionCmd, run.Cmd, baseline.Cmd, probe.Cmd, help.Cmd)
 }
