@@ -33,6 +33,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
+- Benchmark duration histograms add sub-100µs buckets (5–50µs) so loopback-scale latencies are no longer clamped to the coarsest 100µs bucket.
 - Nonfatal transaction and query-set errors now keep virtual users running, exit successfully, and appear in bounded warnings, terminal-error metrics, and a prominent final summary; the unused driver `errorMode` option has been removed and is now rejected. ([#156](https://github.com/stroppy-io/stroppy/pull/156))
 - Logging now uses one safely replaceable process-wide logger, with configurable level and output mode precedence plus redacted database connection diagnostics. ([#154](https://github.com/stroppy-io/stroppy/pull/154))
 - Driver insert-method defaults now fill only load requests that leave their method unset, preserving methods selected by workloads. ([#152](https://github.com/stroppy-io/stroppy/pull/152))
