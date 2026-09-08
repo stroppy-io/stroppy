@@ -53,12 +53,12 @@ func (d *recordingDriver) ClassifyError(error) driver.ErrorFacts { return driver
 func (d *recordingDriver) Teardown(context.Context) error { return nil }
 
 func TestInsertUsesDriverFallbackWithoutMutatingRequest(t *testing.T) {
-	installRuntimeTestRoot(t)
+	rootState := newRuntimeTestRoot(t)
 
 	drv := &recordingDriver{}
 	b := &Bench{
-		root: root,
-		vu:   &VU{root: root, vuid: 1, ctx: context.Background()},
+		root: rootState,
+		vu:   &VU{root: rootState, vuid: 1, ctx: context.Background()},
 		lg:   zap.NewNop(),
 		drv:  drv,
 		cfg: &config.DriverConfig{
@@ -90,12 +90,12 @@ func TestInsertUsesDriverFallbackWithoutMutatingRequest(t *testing.T) {
 }
 
 func TestInsertWorkloadMethodOverridesDriverFallback(t *testing.T) {
-	installRuntimeTestRoot(t)
+	rootState := newRuntimeTestRoot(t)
 
 	drv := &recordingDriver{}
 	b := &Bench{
-		root: root,
-		vu:   &VU{root: root, vuid: 1, ctx: context.Background()},
+		root: rootState,
+		vu:   &VU{root: rootState, vuid: 1, ctx: context.Background()},
 		lg:   zap.NewNop(),
 		drv:  drv,
 		cfg: &config.DriverConfig{
@@ -151,12 +151,12 @@ func TestInsertRejectsMissingOrUnsupportedEffectiveMethod(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			installRuntimeTestRoot(t)
+			rootState := newRuntimeTestRoot(t)
 
 			drv := &recordingDriver{}
 			b := &Bench{
-				root: root,
-				vu:   &VU{root: root, vuid: 1, ctx: context.Background()},
+				root: rootState,
+				vu:   &VU{root: rootState, vuid: 1, ctx: context.Background()},
 				lg:   zap.NewNop(),
 				drv:  drv,
 				cfg:  tc.cfg,

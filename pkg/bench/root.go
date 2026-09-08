@@ -8,6 +8,7 @@ import (
 	"time"
 
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/pkg/driver"
@@ -15,10 +16,7 @@ import (
 
 const metricsShutdownTimeout = 10 * time.Second
 
-// root is the process-wide engine state for the Go-native runner. Set once by Run.
-var root *RootState
-
-// RootState is the engine-wide singleton for the Go-workload run.
+// RootState holds engine state for one Go-workload run.
 type RootState struct {
 	lg  *zap.Logger
 	ctx context.Context //nolint:containedctx // engine lifecycle ctx stored for async teardown/cancellation
@@ -29,6 +27,8 @@ type RootState struct {
 	meterProvider *sdkmetric.MeterProvider
 	manualReader  *sdkmetric.ManualReader
 	metricsPrefix string
+	onSummary     func(metricdata.ResourceMetrics)
+	quietSummary  bool
 
 	txMetrics     *txMetrics
 	errorReporter *errorReporter
@@ -54,6 +54,15 @@ func newRootState(
 		return nil, err
 	}
 
+	var onSummary func(metricdata.ResourceMetrics)
+
+	var quiet bool
+
+	if metricsConfig != nil {
+		onSummary = metricsConfig.OnSummary
+		quiet = metricsConfig.Quiet
+	}
+
 	state := &RootState{
 		lg:            lg,
 		ctx:           ctx,
@@ -62,6 +71,8 @@ func newRootState(
 		meterProvider: provider,
 		manualReader:  reader,
 		metricsPrefix: prefix,
+		onSummary:     onSummary,
+		quietSummary:  quiet,
 		txMetrics:     &txMetrics{},
 		sharedSlots:   make(map[uint64]*sharedDriverSlot),
 		stepFilter:    newStepFilter(steps, noSteps),

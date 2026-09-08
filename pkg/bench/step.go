@@ -83,8 +83,8 @@ func (b *Bench) step(name string, fn func() error, silent bool) error {
 
 func stepBegin(b *Bench, name string, silent bool) {
 	b.vu.stepTag = name
-	if root != nil {
-		root.NotifyStep(name, statusRunning)
+	if b.root != nil {
+		b.root.NotifyStep(name, statusRunning)
 	}
 
 	if silent {
@@ -102,8 +102,8 @@ func stepEnd(b *Bench, name string, silent bool) {
 
 	b.vu.stepTag = ""
 
-	if root != nil {
-		root.NotifyStep(name, statusCompleted)
+	if b.root != nil {
+		b.root.NotifyStep(name, statusCompleted)
 	}
 }
 

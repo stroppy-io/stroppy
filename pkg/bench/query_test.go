@@ -209,11 +209,6 @@ func TestQueryNilRowsUseNoRowSemantics(t *testing.T) {
 		for _, operation := range operations {
 			t.Run(path.name+"/"+operation.name, func(t *testing.T) {
 				fx := newTestBenchFixture(t)
-				previousRoot := root
-				root = fx.rootState
-
-				t.Cleanup(func() { root = previousRoot })
-
 				drv := &queryTestDriver{result: &driver.QueryResult{}}
 				target := newQueryTestTarget(t, fx.b, drv, path.isolation)
 
@@ -288,11 +283,6 @@ func TestQueryTerminalErrorsAndMetrics(t *testing.T) {
 		for _, operation := range operations {
 			t.Run(path.name+"/"+operation.name+"/terminal", func(t *testing.T) {
 				fx := newTestBenchFixture(t)
-				previousRoot := root
-				root = fx.rootState
-
-				t.Cleanup(func() { root = previousRoot })
-
 				metricsRecordedBeforeClose := false
 				rows := &lazyCloseErrorRows{
 					rowErr:   rowErr,
@@ -321,11 +311,6 @@ func TestQueryTerminalErrorsAndMetrics(t *testing.T) {
 
 			t.Run(path.name+"/"+operation.name+"/early", func(t *testing.T) {
 				fx := newTestBenchFixture(t)
-				previousRoot := root
-				root = fx.rootState
-
-				t.Cleanup(func() { root = previousRoot })
-
 				drv := &queryTestDriver{runErr: runErr}
 				target := newQueryTestTarget(t, fx.b, drv, path.isolation)
 
@@ -466,11 +451,6 @@ func TestMySQLCallTimeoutIsReportedOnce(t *testing.T) {
 	t.Cleanup(func() { execFixture("DROP PROCEDURE IF EXISTS " + procedure) })
 
 	fx := newTestBenchFixture(t)
-	previousRoot := root
-	root = fx.rootState
-
-	t.Cleanup(func() { root = previousRoot })
-
 	countingDriver := &closeCountingDriver{Driver: mysqlDriver}
 	fx.b.drv = countingDriver
 

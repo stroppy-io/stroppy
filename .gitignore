@@ -117,3 +117,6 @@ internal/static/node_modules
 internal/static/package-lock.json
 .codex
 .claude/worktrees/
+
+# CI-fetched pg-noop binary for -tags pgnoop_embed builds
+internal/pgnoop/embedded/

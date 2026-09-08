@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- New `stroppy baseline` command measures stroppy's own performance ceiling on the current machine without a database: a noop-driver framework tier and a pg-wire protocol tier against the pg-noop blackhole server, each reporting load throughput plus single-VU and parallel transaction rates. Verdicts check hardware-independent invariants (parallel scaling, loopback latency floor, measurement sanity), every run saves a versioned JSON report under `~/.stroppy/baselines/` with a delta versus the previous run, and the pg-noop server ships embedded in release builds or downloads with consent (sha256-verified) otherwise. ([#162](https://github.com/stroppy-io/stroppy/pull/162))
 - `--query-timeout` (also `QUERY_TIMEOUT` and config `run.queryTimeout`) bounds each executed statement with a per-statement deadline; `0` (the default) disables it. Timed-out statements are reported distinctly from a canceled run, and MySQL adds a server-side `MAX_EXECUTION_TIME` hint so a timed-out query keeps its pooled connection. ([#153](https://github.com/stroppy-io/stroppy/pull/153))
 - All TPC-C runs now emit text and JSON reports with per-transaction count, mix, throughput, and p50/p90/p95/p99 response times; paced runs additionally receive §5.2.5 response-time and transaction-mix verdicts, statistical-validity status, and a steady-state assessment, while unpaced runs mark compliance not applicable. ([#147](https://github.com/stroppy-io/stroppy/pull/147))
 - Restored the `tpcb/procs` workload: TPC-B ships both `tx` and `procs` variants again, with `tpcb/procs` running each transaction as one server-side stored-procedure call (`tpcb_transaction`) on PostgreSQL and MySQL. ([#146](https://github.com/stroppy-io/stroppy/pull/146))
@@ -33,6 +34,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
+- Benchmark duration histograms add sub-100µs buckets (5–50µs) so loopback-scale latencies are no longer clamped to the coarsest 100µs bucket. ([#162](https://github.com/stroppy-io/stroppy/pull/162))
 - Nonfatal transaction and query-set errors now keep virtual users running, exit successfully, and appear in bounded warnings, terminal-error metrics, and a prominent final summary; the unused driver `errorMode` option has been removed and is now rejected. ([#156](https://github.com/stroppy-io/stroppy/pull/156))
 - Logging now uses one safely replaceable process-wide logger, with configurable level and output mode precedence plus redacted database connection diagnostics. ([#154](https://github.com/stroppy-io/stroppy/pull/154))
 - Driver insert-method defaults now fill only load requests that leave their method unset, preserving methods selected by workloads. ([#152](https://github.com/stroppy-io/stroppy/pull/152))
@@ -46,6 +48,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Baseline runs now reject empty measurements and invalid negative inputs, isolate concurrent benchmark state, cancel and bound pg-noop downloads, use target-specific authoritative server caches, verify embedded release assets against Stroppy-pinned checksums, and preserve report output and history integrity. ([#162](https://github.com/stroppy-io/stroppy/pull/162))
 - CSV output now publishes shards, merged files, and manifests atomically across fresh and repeated loads, so canceled or failed loads retain recoverable shards and never expose partial output as complete. ([#157](https://github.com/stroppy-io/stroppy/pull/157))
 - Query helpers now return an empty result instead of panicking when a driver supplies no result set, and query timeouts that surface while closing result sets are reported once instead of repeating the same error. ([#153](https://github.com/stroppy-io/stroppy/pull/153))
 - Empty, whitespace-only, or comma-only step filters no longer conflict with a real opposite filter; `--steps=` still clears configured steps before `--no-steps` is applied. ([#149](https://github.com/stroppy-io/stroppy/pull/149))

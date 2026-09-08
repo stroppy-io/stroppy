@@ -74,13 +74,6 @@ func TestStepLogsStartAndEnd(t *testing.T) {
 func TestStepSilentKeepsMetricTagWithoutLogging(t *testing.T) {
 	fx := newTestBenchFixture(t)
 
-	// stepBegin/stepEnd read the package-global root for NotifyStep (a no-op), so
-	// install the test root the same way metrics_test.go does.
-	previousRoot := root
-	root = fx.rootState
-
-	t.Cleanup(func() { root = previousRoot })
-
 	var tagDuring string
 
 	err := fx.b.StepSilent("workload", func() error {

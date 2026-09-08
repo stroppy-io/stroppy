@@ -12,6 +12,7 @@ require (
 	github.com/shopspring/decimal v1.4.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
+	github.com/ulikunitz/xz v0.5.16
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.141.2
 	github.com/ydb-platform/ydb-go-yc-metadata v0.6.1
 	go.opentelemetry.io/otel v1.44.0
