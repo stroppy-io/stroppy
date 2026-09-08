@@ -10,9 +10,8 @@ import (
 )
 
 // SQL is a parsed SQL file split into named sections and the named/anonymous
-// queries within each. Ports the subset of parse_sql.ts the workloads use: the
-// node-sql-parser type detection is unused (drivers bind :params themselves), so
-// only section (#+) / query (#=) markers and full-line comment stripping remain.
+// queries within each. Drivers bind :name parameters, so parsing keeps only
+// section/query markers and full-line comment stripping.
 type SQL struct {
 	sections map[string][]sqlQuery
 }
@@ -94,7 +93,7 @@ func parseSQL(content string) *SQL {
 
 // parseQueries splits one section into queries. A `--= name` line starts a new
 // query (anonymous when name is empty); full-line `--` comments are stripped.
-// SQL before the first `--=` (none in practice) is dropped, matching parse_sql.ts.
+// SQL before the first `--=` (none in current assets) is dropped.
 func parseQueries(lines []string) []sqlQuery {
 	var queries []sqlQuery
 

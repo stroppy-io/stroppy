@@ -1,4 +1,3 @@
-//nolint:revive // package path `pkg/driver/common` is fixed by the plan (§B8).
 package common
 
 import "testing"

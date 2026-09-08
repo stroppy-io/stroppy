@@ -15,7 +15,7 @@ import (
 
 type (
 	Options struct {
-		// Allows to pass k6 DialFunc to driver for proper network metrics.
+		// DialFunc lets the runner observe or customize driver network dials.
 		DialFunc func(ctx context.Context, network, addr string) (net.Conn, error)
 		Logger   *zap.Logger
 		Config   *config.DriverConfig

@@ -119,8 +119,8 @@ func prepareConnector(
 	return connector, nil
 }
 
-// applySecurityOverrides applies proto-level security fields to the mysql
-// config. DSN-derived values take precedence: overrides are applied only
+// applySecurityOverrides applies explicit security fields to the MySQL config.
+// DSN-derived values take precedence: overrides are applied only
 // when the DSN did not already set the corresponding field.
 func applySecurityOverrides(
 	lg *zap.Logger,
@@ -129,7 +129,7 @@ func applySecurityOverrides(
 ) {
 	// auth_user / auth_password — override only when DSN had no user.
 	if u := driverCfg.GetAuthUser(); u != "" && mysqlCfg.User == "" {
-		lg.Debug("Using auth_user from proto config", zap.String("user", u))
+		lg.Debug("Using auth_user from driver config", zap.String("user", u))
 
 		mysqlCfg.User = u
 		mysqlCfg.Passwd = driverCfg.GetAuthPassword()
@@ -145,7 +145,7 @@ func applySecurityOverrides(
 	}
 
 	if mysqlCfg.TLSConfig != "" || mysqlCfg.TLS != nil {
-		lg.Debug("TLS already configured via DSN, skipping proto TLS overrides")
+		lg.Debug("TLS already configured via DSN, skipping driver TLS overrides")
 
 		return
 	}

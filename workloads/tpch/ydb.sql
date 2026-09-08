@@ -1,9 +1,8 @@
 -- TPC-H workload for YDB (YQL via the native driver). Schema follows the
 -- TPC-H spec §1.4 shape with YQL type substitutions:
 --   - CHAR(N) / VARCHAR(N) → Utf8 (YDB has no fixed-width CHAR).
---   - Currency columns → Double. Framework emits float64 from Draw.decimal;
---     Expr.lit(0.0) needs litDouble() in tx.ts to keep zero-initialized
---     o_totalprice on the Double wire (see workloads/tpch/tx.ts).
+--   - Currency columns → Double; the canonical generator supplies float64
+--     values, including o_totalprice computed at generation time.
 --   - No FOREIGN KEY support; PRIMARY KEY only.
 --   - DATE literals: `DATE '1998-12-01'` → `CAST('1998-12-01' AS Timestamp)`.
 --
@@ -282,10 +281,6 @@ WITH (
 --= create_orders
 CREATE TABLE orders (
     o_orderkey      Int64           NOT NULL,
-    -- Non-key columns are nullable in column mode so finalize_totals can partial
-    -- UPSERT only o_orderkey/o_totalprice. YDB 25.2 column-store full-row
-    -- UPSERT/UPDATE over an aggregate can hit BlockCoalesce on non-Optional
-    -- values.
     o_custkey       Int64,
     o_orderstatus   Utf8,
     o_totalprice    Double,
@@ -333,32 +328,6 @@ WITH (
 -- The spec lists indexes as auxiliary, not required.
 --= noop
 SELECT 1
-
---+ finalize_totals
--- Spec §4.2.3 o_totalprice = Σ l_extendedprice × (1 + l_tax) × (1 - l_discount).
--- Split into disjoint order-key range batches from tx.ts so larger scale
--- factors stay below DQ limits. Avoid modulo filters here: YDB 25.2
--- column-store aggregation can lower them through BlockCoalesce incorrectly.
--- Every generated TPC-H order has 1-7 lineitems. Column-store orders has
--- nullable non-key columns so this can be a partial UPSERT. Avoid full-row
--- UPSERT/UPDATE here: YDB 25.2 can lower that path through BlockCoalesce and
--- reject non-Optional aggregate values.
---= update_totalprice_bucket
-$per_order = (
-    SELECT l_orderkey,
-           SUM(Just(l_extendedprice * (1.0 + l_tax) * (1.0 - l_discount))) AS tot
-    FROM   lineitem
-    WHERE  l_orderkey >= CAST(:min_orderkey AS Int64)
-      AND  l_orderkey <= CAST(:max_orderkey AS Int64)
-    GROUP  BY l_orderkey
-);
-UPSERT INTO orders (
-       o_orderkey,
-       o_totalprice
-)
-SELECT p.l_orderkey AS o_orderkey,
-       p.tot AS o_totalprice
-FROM   $per_order AS p
 
 -- ==========================================================================
 -- 22 TPC-H queries, YQL port. Permissible deviations per §2.2.3.3.

@@ -656,7 +656,7 @@ UPDATE customer SET c_balance = c_balance + :amount, c_delivery_cnt = c_delivery
 SELECT d_next_o_id FROM district WHERE d_w_id = :w_id AND d_id = :d_id
 --= get_window_items
 -- Two-step stock_level scan — see pg.sql for the rationale. Same shape on
--- every dialect so the TypeScript has no driver-specific branches.
+-- every dialect so the Go transaction body has no driver-specific branch.
 SELECT DISTINCT ol_i_id FROM order_line
 WHERE ol_w_id = :w_id
   AND ol_d_id = :d_id

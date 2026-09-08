@@ -49,7 +49,7 @@ func (s *stepFilterState) enabled(name string) bool {
 // Step runs fn as a named phase: skips if filtered out (logging the skip), otherwise
 // tags metrics, notifies, logs start/end timing, clears the tag, and returns fn's
 // error. Use it for one-shot setup/load/schema steps, which should each emit one
-// start/end record. Mirrors helpers.ts Step.
+// start/end record.
 func (b *Bench) Step(name string, fn func() error) error {
 	return b.step(name, fn, false)
 }

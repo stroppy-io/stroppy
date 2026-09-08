@@ -15,7 +15,6 @@ import (
 // COLUMNAR is a single-array-per-column protocol (e.g. unnest).
 type InsertMethod int
 
-//nolint:revive // method enum starts at 1 so the zero value is "unspecified".
 const (
 	InsertPlainQuery InsertMethod = iota + 1
 	InsertPlainBulk

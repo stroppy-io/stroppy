@@ -20,9 +20,9 @@ DROP TABLE IF EXISTS item
 
 --+ create_schema
 /* Partitioning: warehouse-keyed tables get one tablet per warehouse via
-   PARTITION_AT_KEYS, rendered from {partition_keys}/{partition_count} in
-   tx.ts. history is h_id-keyed (uniform) and populated only by workload
-   tx, so UNIFORM_PARTITIONS suffices. warehouse and item are small enough
+   PARTITION_AT_KEYS, rendered from {partition_keys}/{partition_count} during
+   workload setup. history is h_id-keyed (uniform) and populated only by
+   transactions, so UNIFORM_PARTITIONS suffices. warehouse and item are small enough
    to live on a single tablet. Secondary indexes are built post-load (see
    the create indexes section below) to keep index-write amplification
    out of the bulk-load path. */
@@ -287,8 +287,8 @@ SELECT COUNT(*) FROM customer VIEW idx_customer_name WHERE c_w_id = :w_id AND c_
 /* TPC-C 2.5.2.2: pick row ceil(n/2) ordered by c_first — zero-indexed
    OFFSET is (n - 1) / 2, computed client-side and passed in.
    Trailing c_data supports the BC-credit append path (§1.8).
-   Note: YDB OFFSET requires Uint64; JS Number arrives as Int64 via
-   AutoDeclare, so wrap in CAST to satisfy the type checker. */
+   YDB OFFSET requires Uint64; the bound offset is Int64 under AutoDeclare,
+   so CAST satisfies the type checker. */
 SELECT c_id, c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since, c_data
 FROM customer VIEW idx_customer_name WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
 ORDER BY c_first
@@ -297,8 +297,8 @@ LIMIT 1 OFFSET CAST(:offset AS Uint64)
 UPDATE customer SET c_balance = c_balance - :amount, c_ytd_payment = c_ytd_payment + :amount, c_payment_cnt = c_payment_cnt + 1
 WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
 --= update_customer_bc
-/* TPC-C 2.5.2.2: BC-credit path. c_data_new is built AND clamped to
-   500 chars on the JS side, so this UPDATE just assigns it raw —
+/* TPC-C 2.5.2.2: BC-credit path. The Go workload builds and clamps
+   c_data_new to 500 characters, so this UPDATE assigns it directly and
    sidesteps YDB's Substring(String) vs Utf8 type mismatch. */
 UPDATE customer
    SET c_balance     = c_balance - :amount,

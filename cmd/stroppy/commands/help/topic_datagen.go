@@ -9,8 +9,7 @@ func init() {
   Stroppy's load path is deterministic Go data generation. A workload builds a
   schema (gen.SchemaBuilder), fills reusable typed batches from per-field
   primitives (pkg/gen), and streams them to the driver through driver.Insert.
-  There is no TypeScript surface, no k6, and no relational expression AST: the
-  generator, the batch, and the driver are all ordinary Go.
+  The generator, reusable batch, and driver are all ordinary Go.
 
 LOAD FLOW
 

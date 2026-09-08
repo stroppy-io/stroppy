@@ -1,7 +1,3 @@
-proto/easyp_vendor
-easyp_vendor
-proto/build
-proto/bin
 # binary
 /bin
 # ide
@@ -18,16 +14,12 @@ cpu.out
 mem.out
 #
 venv
-*node_modules
-internal/static/package-lock.json
 # env files
 .env
 # logs
 *.log
 ./stroppy
 dexample
-config.schema.yaml
-internal/static/stroppy-xk6
 
 dev
 
@@ -111,10 +103,6 @@ fabric.properties
 http-client.private.env.json
 /.netrc
 /xexample
-internal/static/stroppy-k6
-
-internal/static/node_modules
-internal/static/package-lock.json
 .codex
 .claude/worktrees/
 

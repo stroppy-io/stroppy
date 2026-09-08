@@ -1,9 +1,7 @@
 // Package tpcc owns Stroppy's TPC-C implementation, tests, and dialect SQL. It
 // runs five transactions as ordered DML steps inside driver transactions, with
-// 45/43/4/4/4 mix, full population, and §1.3.1 validation. Load/config/prepare are
-// shared structure ported from tpcc_common.ts. Covers pg + mysql; picodata (no
-// OFFSET) and ydb (bound IN-list) dialect branches are ported faithfully so all
-// four drivers work, but validation is exercised on postgres.
+// 45/43/4/4/4 mix, full population, and §1.3.1 validation. PostgreSQL,
+// MySQL, Picodata, and YDB dialect branches are supported.
 package tpcc
 
 import (
@@ -115,8 +113,7 @@ func (w *workload) Define(d *bench.Def) error {
 
 // renderDDL expands the ydb.sql {partition_keys}/{partition_count} tablet-split
 // placeholders from the warehouse range (one tablet per warehouse in
-// [warehouseStart, wIDMax]). No-op on dialects whose .sql lacks the tokens.
-// Ports tpcc_common.ts renderDDL/ydbPartitionKeys.
+// [warehouseStart, wIDMax]). No-op on dialects whose SQL lacks the tokens.
 func (w *workload) renderDDL(s string) string {
 	if !strings.Contains(s, "{partition_") {
 		return s
@@ -178,8 +175,8 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	addStep("drop_schema", func() error { return runSection("drop_schema") })
 	addStep("create_schema", func() error {
 		// ydb.sql DDL carries {partition_keys}/{partition_count} tablet-split
-		// placeholders that tx.ts renders from the warehouse range; expand them
-		// here. No-op on dialects whose .sql lacks the tokens.
+		// placeholders rendered here from the warehouse range. Other dialects
+		// do not carry these tokens.
 		for _, q := range w.sql.Section("create_schema") {
 			if err := b.Exec(ctx, w.renderDDL(q), nil); err != nil {
 				return fmt.Errorf("create_schema: %w", err)
@@ -907,7 +904,7 @@ func (w *workload) customerByName(
 
 // --- order_status (read-only) ---
 
-//nolint:gocognit,cyclop // TPC-C spec transaction; complexity is inherent to the spec.
+//nolint:gocognit // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.orderStatusTotal.Add(1)
 
@@ -1000,7 +997,7 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 
 // --- delivery ---
 
-//nolint:gocognit,cyclop // TPC-C spec transaction; complexity is inherent to the spec.
+//nolint:gocognit // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.deliveryTotal.Add(1)
 
@@ -1082,7 +1079,7 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) er
 
 // --- stock_level (read-only) ---
 
-//nolint:gocognit,cyclop // TPC-C spec transaction; complexity is inherent to the spec.
+//nolint:gocognit // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.stockLevelTotal.Add(1)
 
@@ -1182,7 +1179,7 @@ type vuState struct {
 
 func (w *workload) vuState(vuid uint64, warehouseStart, warehouses int64) *vuState {
 	if v, ok := w.vuStates.Load(vuid); ok {
-		vs, _ := v.(*vuState) //nolint:errcheck // vuStates only stores *vuState values
+		vs, _ := v.(*vuState)
 
 		return vs
 	}
@@ -1227,7 +1224,7 @@ func (w *workload) vuState(vuid uint64, warehouseStart, warehouses int64) *vuSta
 	}
 	vs.hid.Store(int64(vuid) * 10_000_000) //nolint:gosec // G115: value bounded by scale factor, no overflow path
 	actual, _ := w.vuStates.LoadOrStore(vuid, vs)
-	stored, _ := actual.(*vuState) //nolint:errcheck // vuStates only stores *vuState values
+	stored, _ := actual.(*vuState)
 
 	return stored
 }
@@ -1333,7 +1330,7 @@ func toStr(v any) string {
 }
 
 func fmtAmount(amount float64) string {
-	// tx.ts used amount.toFixed(2) on the float draw; mirror the 2-decimal form.
+	// Keep the transaction amount at the schema's two-decimal scale.
 	return fmt.Sprintf("%.2f", amount)
 }
 

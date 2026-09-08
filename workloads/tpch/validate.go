@@ -13,9 +13,9 @@ import (
 	"github.com/stroppy-io/stroppy/workloads"
 )
 
-// SF=1 answer comparator (port of tpch_validate.ts). Best-effort: logs deltas, never
-// aborts — the simplified generation drifts some answer magnitudes beyond spec tolerance,
-// so the step proves queries parse/execute/return type-shaped rows rather than gating.
+// The SF=1 answer comparator logs diagnostic deltas without aborting the run.
+// Rows are normalized by the comparison helpers below so backend formatting
+// differences do not create false mismatches.
 
 type answerBlock struct {
 	Columns []string   `json:"columns"`

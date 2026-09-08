@@ -12,8 +12,8 @@ var (
 	errUnknownTxIsolation = errors.New("unknown tx isolation")
 )
 
-// String-typed enums a Go workload authors with; resolved to the config enums
-// the driver layer consumes. Ports helpers.ts string<->enum maps.
+// String-typed enums authored by Go workloads and resolved to the config enums
+// consumed by the driver layer.
 
 type DriverTypeName string
 

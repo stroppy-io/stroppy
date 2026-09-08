@@ -7,7 +7,8 @@ func init() {
 		Long: `RESOLUTION
 
   The first positional argument to 'stroppy run' selects the input mode.
-  There is no TypeScript and no .ts search — stroppy is a Go binary.
+  Registered workloads execute in the Go benchmark engine; SQL files and inline
+  SQL use the built-in execute_sql workload.
 
 INPUT MODES
 

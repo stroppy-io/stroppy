@@ -25,9 +25,8 @@ import (
 
 // Insert runs a typed [driver.InsertRequest] through the ydb driver.
 // Each worker prepares a [gen.Cursor] partition, adapts it to a
-// source.RowSource, and drains it through the same runInsertChunk the
-// legacy path uses. COLUMNAR redirects to NATIVE BulkUpsert (already
-// struct-of-arrays), matching the legacy path.
+// source.RowSource, and drains it through runInsertChunk. COLUMNAR redirects
+// to NATIVE BulkUpsert, which already uses a struct-of-arrays representation.
 func (d *Driver) Insert(
 	ctx context.Context,
 	req *driver.InsertRequest,
@@ -529,7 +528,7 @@ func effectiveColumnTypesInto(dest, cached, fallback []types.Type, batch [][]any
 // inferYDBType returns the ydb Type that matches the Go value shape used
 // by toYDBValue. Kept in lockstep with toYDBValue's switch — adding a
 // case there requires a matching case here.
-func inferYDBType(val any) (types.Type, bool) { //nolint:cyclop // flat type switch
+func inferYDBType(val any) (types.Type, bool) {
 	switch val.(type) {
 	case bool:
 		return types.TypeBool, true

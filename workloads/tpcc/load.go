@@ -67,9 +67,7 @@ var originalMarker = []byte("ORIGINAL")
 // fillDataWithOriginal fills col with [min, max] alphabet bytes, then for
 // ~10% of rows (chanceField) overwrites 8 bytes at a random offset with
 // the ORIGINAL marker. The marker lands somewhere within [0, n-8]. Length
-// stays in [min, max]; only 10% carry the marker, matching the spec's
-// observable invariant (the legacy generator's exact byte placement is not
-// preserved, only the marker's presence and frequency).
+// stays in [min, max]; only 10% carry the marker, matching the specification.
 func fillDataWithOriginal(
 	r gen.Row, col gen.Column, entity uint64, minLen, maxLen int,
 	lenField, fillField, chanceField, posField gen.Field, alphabet gen.Alphabet,
@@ -94,12 +92,11 @@ func fillDataWithOriginal(
 
 const originalFraction = 0.1
 
-// secondsPerDay is the epoch-day invariant (UTC, no leap seconds), so the
-// typed date columns land on the same UTC midnight the legacy generator
-// produced.
+// secondsPerDay is the epoch-day invariant (UTC, no leap seconds) used by
+// typed date columns.
 const secondsPerDay int64 = 86_400
 
-// Fixed-value load constants (the legacy literals from the proto builders).
+// Fixed-value TPC-C load constants.
 const (
 	warehouseYTD                   = 300000.0
 	districtYTD                    = 30000.0
@@ -115,8 +112,8 @@ const (
 	customerCreditBCFraction       = 0.1 // 10% "BC", 90% "GC"
 )
 
-// NURand parameters for the c_last load-time draw (TPC-C §2.1.6). Match the
-// legacy DrawNURand and helpers.nurand so by-name lookups find populated rows.
+// NURand parameters for the c_last load-time draw (TPC-C §2.1.6). They match
+// the transaction-time NURand draw so by-name lookups find populated rows.
 const (
 	nurandA              = 255
 	nurandY              = 999
@@ -137,8 +134,6 @@ func warehouseRequest(scale, warehouseStart int64, workers int) *driver.InsertRe
 // the warehouse's global 1-based id (entity + warehouseStart); the address
 // fields are variable-length [A-Za-z]; w_state is 2 [A-Z]; w_zip is 9 [0-9];
 // w_tax is a 4-scale decimal in [0, 0.2]; w_ytd is the fixed 300000.
-//
-//nolint:dupl // per-table load formula kept explicit for readability
 func warehouseSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSource {
 	d := root.Domain("tpcc/warehouse@1")
 
@@ -220,8 +215,6 @@ func districtRequest(scale, warehouseStart int64, workers int) *driver.InsertReq
 // floor(entity / districtsPerWarehouse) + warehouseStart; d_next_o_id is the
 // fixed 3001; the rest mirror the warehouse address layout. totalRows =
 // scale * districtsPerWarehouse.
-//
-//nolint:dupl // per-table load formula kept explicit for readability
 func districtSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSource {
 	d := root.Domain("tpcc/district@1")
 
@@ -248,7 +241,7 @@ func districtSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSour
 	schema := b.Build()
 
 	fn := func(r gen.Row, entity uint64) error {
-		r.SetInt64(dID, int64(entity%uint64(districtsPerWarehouse))+1)               //nolint:gosec // G115: bounded
+		r.SetInt64(dID, int64(entity%uint64(districtsPerWarehouse))+1)
 		r.SetInt64(dWID, int64(entity/uint64(districtsPerWarehouse))+warehouseStart) //nolint:gosec // G115: bounded
 		r.SetFloat64(dYtd, districtYTD)
 		r.SetInt64(dNextOID, districtNextOID)
@@ -305,7 +298,7 @@ func customerRequest(scale, warehouseStart, loadDays int64, workers int) *driver
 // by-name lookups find a populated row. c_credit is "BC" for ~10% and "GC"
 // otherwise. totalRows = scale * customersPerWh.
 //
-//nolint:dupl,funlen,gocognit // per-table load formula kept explicit for readability
+//nolint:funlen,gocognit // per-table load formula kept explicit for readability
 func customerSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.IndexedSource {
 	d := root.Domain("tpcc/customer@1")
 
@@ -354,9 +347,7 @@ func customerSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.I
 	sinceDate := loadDayUTC(loadDays)
 
 	fn := func(r gen.Row, entity uint64) error {
-		//nolint:gosec // G115: ids bounded by scale; fit int64
 		cIDVal := int64(entity%uint64(customersPerDistrict)) + 1
-		//nolint:gosec // G115: ids bounded by scale; fit int64
 		cDIDVal := int64(entity/uint64(customersPerDistrict)%uint64(districtsPerWarehouse)) + 1
 		//nolint:gosec // G115: ids bounded by scale; fit int64
 		cWIDVal := int64(entity/uint64(customersPerWh)) + warehouseStart
@@ -384,7 +375,7 @@ func customerSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.I
 			cLastIdx = ((aDraw | yDraw) + paramC) % int64(len(cLastDict))
 		}
 
-		lastName := cLast(int(cLastIdx)) //nolint:gosec // G115: idx bounded by %1000
+		lastName := cLast(int(cLastIdx))
 		if err := setText(r, cLastCol, lastName); err != nil {
 			return err
 		}
@@ -453,8 +444,6 @@ func itemRequest(workers int) *driver.InsertRequest {
 // 1-based entity index; i_im_id is uniform [1, 10000]; i_name is [A-Za-z]
 // in [14, 24]; i_price is a 2-scale decimal in [1, 100]; i_data is [A-Za-z]
 // in [26, 50] with ~10% carrying the ORIGINAL marker. totalRows = items.
-//
-//nolint:dupl // per-table load formula kept explicit for readability
 func itemSource(root gen.Root) *gen.IndexedSource {
 	d := root.Domain("tpcc/item@1")
 
@@ -505,8 +494,6 @@ func stockRequest(scale, warehouseStart int64, workers int) *driver.InsertReques
 // floor(entity / itemsPerWh) + warehouseStart; s_quantity is uniform [10,100];
 // the 10 s_dist_NN columns are fixed 24-byte [A-Za-z]; s_data carries the
 // ~10% ORIGINAL marker. totalRows = scale * itemsPerWh.
-//
-//nolint:dupl // per-table load formula kept explicit for readability
 func stockSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSource {
 	d := root.Domain("tpcc/stock@1")
 
@@ -537,7 +524,6 @@ func stockSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSource 
 	schema := b.Build()
 
 	fn := func(r gen.Row, entity uint64) error {
-		//nolint:gosec // G115: ids bounded by scale; fit int64
 		r.SetInt64(sIID, int64(entity%uint64(itemsPerWh))+1)
 		//nolint:gosec // G115: ids bounded by scale; fit int64
 		r.SetInt64(sWID, int64(entity/uint64(itemsPerWh))+warehouseStart)
@@ -577,8 +563,6 @@ func ordersRequest(scale, warehouseStart, loadDays int64, workers int) *driver.I
 // (preserving the legacy per-district customer permutation). o_carrier_id is NULL for
 // undelivered orders (o_id > ordersDelivered), else uniform [1,10]. totalRows =
 // scale * customersPerWh.
-//
-//nolint:dupl // per-table load formula kept explicit for readability
 func ordersSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.IndexedSource {
 	d := root.Domain("tpcc/orders@1")
 	carrier := d.Field("o_carrier_id")
@@ -597,9 +581,7 @@ func ordersSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.Ind
 	entryDate := loadDayUTC(loadDays)
 
 	fn := func(r gen.Row, entity uint64) error {
-		//nolint:gosec // G115: ids bounded by scale; fit int64
 		oIDVal := int64(entity%uint64(customersPerDistrict)) + 1
-		//nolint:gosec // G115: ids bounded by scale; fit int64
 		oDIDVal := int64(entity/uint64(customersPerDistrict)%uint64(districtsPerWarehouse)) + 1
 		//nolint:gosec // G115: ids bounded by scale; fit int64
 		oWIDVal := int64(entity/uint64(customersPerWh)) + warehouseStart
@@ -653,8 +635,6 @@ func orderLineRequest(scale, warehouseStart, loadDays int64, workers int) *drive
 // (entity mod olCnt) + 1. ol_i_id is uniform [1, items]; ol_quantity uniform
 // [1,5]; ol_delivery_d and ol_amount are NULL/0 for undelivered orders.
 // totalRows = scale * customersPerWh * olCntFixed.
-//
-//nolint:dupl // per-table load formula kept explicit for readability
 func orderLineSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.IndexedSource {
 	const (
 		perD   = int64(customersPerDistrict) * olCntFixed // 30000
@@ -683,9 +663,7 @@ func orderLineSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.
 	entryDate := loadDayUTC(loadDays)
 
 	fn := func(r gen.Row, entity uint64) error {
-		//nolint:gosec // G115: ids bounded by scale; fit int64
 		olOIDVal := int64(entity/uint64(olCntFixed)%uint64(customersPerDistrict)) + 1
-		//nolint:gosec // G115: ids bounded by scale; fit int64
 		olDIDVal := int64(entity/uint64(perD)%uint64(districtsPerWarehouse)) + 1
 		//nolint:gosec // G115: ids bounded by scale; fit int64
 		olWIDVal := int64(entity/uint64(perDWh)) + warehouseStart
@@ -693,7 +671,6 @@ func orderLineSource(root gen.Root, scale, warehouseStart, loadDays int64) *gen.
 		r.SetInt64(olOID, olOIDVal)
 		r.SetInt64(olDID, olDIDVal)
 		r.SetInt64(olWID, olWIDVal)
-		//nolint:gosec // G115: bounded by olCnt
 		r.SetInt64(olNumber, int64(entity%uint64(olCntFixed))+1)
 		r.SetInt64(olIID, iID.Int64(entity, 1, items))
 		r.SetInt64(olSupplyWID, olWIDVal)
@@ -734,8 +711,6 @@ func newOrderRequest(scale, warehouseStart int64, workers int) *driver.InsertReq
 // ordersUndelivered + ordersDelivered + 1); no_d_id cycles 1..districtsPerWarehouse;
 // no_w_id fans out as floor(entity / perWh) + warehouseStart. totalRows =
 // scale * perWh.
-//
-//nolint:dupl // per-table load formula kept explicit for readability
 func newOrderSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSource {
 	const perWh = int64(ordersUndelivered) * districtsPerWarehouse
 
@@ -746,9 +721,7 @@ func newOrderSource(root gen.Root, scale, warehouseStart int64) *gen.IndexedSour
 	schema := b.Build()
 
 	fn := func(r gen.Row, entity uint64) error {
-		//nolint:gosec // G115: ids bounded by scale; fits int64
 		r.SetInt64(noOID, int64(entity%uint64(ordersUndelivered))+ordersDelivered+1)
-		//nolint:gosec // G115: ids bounded by scale; fits int64
 		r.SetInt64(noDID, int64(entity/uint64(ordersUndelivered)%uint64(districtsPerWarehouse))+1)
 		//nolint:gosec // G115: ids bounded by scale; fits int64
 		r.SetInt64(noWID, int64(entity/uint64(perWh))+warehouseStart)

@@ -17,7 +17,7 @@ func init() {
     stroppy run -f prod.json ./local.sql   # config file + override SQL file
 
   Config objects are strict recursively. Use exact lower-camel field names or
-  their former snake_case ProtoJSON aliases; duplicates, canonical/alias
+  their established v5 snake_case aliases; duplicates, canonical/alias
   collisions, wrong case, unknown fields, null container members, and trailing
   JSON are rejected. The "run" and "params" objects retain non-null scalar JSON
   values for typed scenario and workload parameters; unknown names are rejected
@@ -127,9 +127,8 @@ PRECEDENCE (highest to lowest)
   Database URLs in configuration diagnostics are redacted: passwords, tokens,
   secrets, credentials, and API keys never appear in logs.
 
-  There is no "--" k6-args passthrough. Use typed
-  executor/vus/iterations/duration/queryTimeout parameters. The
-  VUS/DURATION/ITER/QUERY_TIMEOUT environment values remain compatible. A
+  Pass typed executor/vus/iterations/duration/queryTimeout parameters directly.
+  The VUS/DURATION/ITER/QUERY_TIMEOUT environment values remain compatible. A
   queryTimeout of "0" disables the per-statement deadline. Legacy DURATION
   without an explicit executor infers constant-vus and emits a warning; prefer
   an explicit "run.executor" value.

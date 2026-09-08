@@ -13,8 +13,7 @@
 --     '1998-12-01' (DATETIME columns compare fine against a string).
 --   - `interval` arithmetic is unsupported → q1's `date - interval` cutoff
 --     is precomputed client-side and bound as :shipdate_cutoff; the other
---     window ends are shifted client-side and bound as :date_1m/_3m/_1y
---     (tx.ts NEEDS_END_DATES).
+--     window ends are shifted in Go and bound as :date_1m/_3m/_1y.
 --   - `extract(year FROM col)` is rejected → substring(cast(col AS string)
 --     FROM 1 FOR 4) in q7/q8/q9.
 --   - `NOT LIKE` is rejected (even `x NOT LIKE 'literal'`) → NOT (x LIKE …)
@@ -24,8 +23,8 @@
 --     decorrelated via JOIN-on-aggregate CTEs; q4/q22 swap correlated
 --     EXISTS/NOT EXISTS for uncorrelated IN / NOT IN.
 -- The post-load totalprice recompute (UPDATE-with-correlated-subquery) has
--- no sbroad equivalent, but the datagen runtime emits the real o_totalprice
--- per spec §4.2.3 at load time, so q18 sees correct values without it.
+-- no sbroad equivalent, but the canonical generator emits the real
+-- o_totalprice per spec §4.2.3 at load time, so q18 sees correct values.
 --
 -- sbroad resource caps: the multi-join aggregates (q3, q10, q21) fan out
 -- large intermediate rows and need sql_vdbe_opcode_max and
@@ -168,15 +167,6 @@ CREATE INDEX idx_nation_regionkey    ON nation   (n_regionkey)
 CREATE INDEX idx_lineitem_shipdate   ON lineitem (l_shipdate)
 --= idx_orders_orderdate
 CREATE INDEX idx_orders_orderdate    ON orders   (o_orderdate)
-
---+ finalize_totals
--- The spec §4.2.3 recompute is an UPDATE-with-correlated-subquery, which
--- sbroad cannot plan. It is unnecessary here: the datagen runtime emits the
--- real o_totalprice (Σ l_extendedprice × (1+l_tax) × (1-l_discount)) at
--- orders-emit time, so q18 sees correct values without a post-load UPDATE.
--- Placeholder step body kept so `--steps finalize_totals` runs cleanly.
---= noop
-SELECT 1 FROM region WHERE r_regionkey = -1
 
 -- ==========================================================================
 -- 22 TPC-H queries, picodata port. Parameters follow §2.4.x defaults.

@@ -13,9 +13,8 @@ import (
 )
 
 // typedIntSource returns an indexed source over one int64 column "id" =
-// entity+1, for `total` rows. It is the typed counterpart of specOf's
-// 1-column proto source, used to prove the shared SQL helper drains
-// typed batches exactly like legacy RowSources.
+// entity+1 for `total` rows. It proves the shared SQL helper drains typed
+// batches exactly like any source.RowSource.
 func typedIntSource(total int64) (*gen.IndexedSource, []string) {
 	b := gen.NewSchemaBuilder()
 	idCol := b.Int64("id")
@@ -124,8 +123,8 @@ func TestRunBulkInsertTypedPlainBulk(t *testing.T) {
 	}
 }
 
-// TestRunBulkInsertTypedRemainder proves the typed path batches the same
-// way the proto path does: 501 rows at batchSize=500 → 500 then 1.
+// TestRunBulkInsertTypedRemainder proves batching handles a remainder:
+// 501 rows at batchSize=500 produce batches of 500 and 1.
 func TestRunBulkInsertTypedRemainder(t *testing.T) {
 	ctx := context.Background()
 
@@ -157,8 +156,7 @@ func TestRunBulkInsertTypedRemainder(t *testing.T) {
 	}
 }
 
-// TestRunBulkInsertTypedClampsByColumns proves the typed path is
-// protected by the same 65535 bound-parameter cap as the proto path:
+// TestRunBulkInsertTypedClampsByColumns proves the 65535 bound-parameter cap:
 // a wide table with a large batchSize never exceeds the ceiling per
 // statement. 40 columns × 2000 rows = 80000 > 65535 → clamp to
 // floor(65535/40) = 1638 rows per batch.

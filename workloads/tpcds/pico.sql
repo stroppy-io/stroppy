@@ -36,8 +36,8 @@
 -- TPC-DS query workload for PostgreSQL.
 -- 99 queries (queries 14/23/24/39 have two parts: _a/_b), generated from the
 -- official TPC-DS query templates at the canonical qualification parameters
--- (RNGSEED 19620718, SCALE 1). Each query is one named --= section, parsed by
--- parse_sql(). See workloads/tpcds/tpcds.ts.
+-- (RNGSEED 19620718, SCALE 1). Each query is one named --= entry parsed by
+-- the workload SQL loader.
 
 
 --= query_1

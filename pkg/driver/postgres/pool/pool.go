@@ -244,8 +244,8 @@ func parseDefaultQueryExecMode(modeStr string) (pgx.QueryExecMode, error) {
 	)
 }
 
-// applySecurityOverrides applies proto-level security fields to the pgx
-// connection config. DSN-derived values take precedence: overrides are
+// applySecurityOverrides applies explicit security fields to the pgx connection
+// config. DSN-derived values take precedence: overrides are
 // applied only when the DSN did not already set the corresponding field.
 func applySecurityOverrides(
 	lg *zap.Logger,
@@ -254,7 +254,7 @@ func applySecurityOverrides(
 ) {
 	// auth_user / auth_password — override only when DSN had no user.
 	if u := driverCfg.GetAuthUser(); u != "" && connCfg.User == "" {
-		lg.Debug("Using auth_user from proto config", zap.String("user", u))
+		lg.Debug("Using auth_user from driver config", zap.String("user", u))
 
 		connCfg.User = u
 		connCfg.Password = driverCfg.GetAuthPassword()
@@ -270,7 +270,7 @@ func applySecurityOverrides(
 	}
 
 	if connCfg.TLSConfig != nil {
-		lg.Debug("TLS already configured via DSN, skipping proto TLS overrides")
+		lg.Debug("TLS already configured via DSN, skipping driver TLS overrides")
 
 		return
 	}

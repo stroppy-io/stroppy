@@ -17,19 +17,18 @@ import (
 // an INSERT without columns is not a valid target for the bulk path.
 var ErrEmptyColumnOrder = errors.New("sqldriver: source reports zero columns")
 
-// ErrUnsupportedInsertMethod is returned by RunInsertSpec when the spec
-// requests a method this generic helper cannot serve (today: NATIVE).
-// NATIVE is driver-specific and must be handled by each driver before
-// delegating here.
-var ErrUnsupportedInsertMethod = errors.New("sqldriver: unsupported InsertSpec method")
+// ErrUnsupportedInsertMethod is returned when the shared SQL helper receives
+// a driver-specific method (currently NATIVE). Drivers handle that method
+// before delegating here.
+var ErrUnsupportedInsertMethod = errors.New("sqldriver: unsupported insert method")
 
 // RunBulkInsert drains src into multi-row INSERTs against table, batching
 // by batchSize rows. src is drained to io.EOF; its row range is already
 // bounded by the partition. batchSize ≤ 0 is clamped to 1.
 //
-// Exposed separately from RunInsertSpec so callers that already run
-// their own InsertMethod switch (for example, to call a driver-native
-// path for NATIVE) can reuse the bulk implementation directly.
+// Exported separately so drivers that run their own InsertMethod switch (for
+// example, to call a driver-native path for NATIVE) can reuse the bulk
+// implementation directly.
 // maxBoundParameters is the per-statement bound-parameter cap shared by the
 // pgwire extended protocol (picodata, postgres) and MySQL's prepared-statement
 // path (Error 1390 "too many placeholders"): 65535. A multi-row bulk INSERT

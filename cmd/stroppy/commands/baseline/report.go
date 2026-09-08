@@ -193,7 +193,7 @@ func (h histogram) quantile(q float64) float64 {
 		return 0
 	}
 
-	target := uint64(float64(h.count-1)*q) + 1 //nolint:gosec // G115: count-bound
+	target := uint64(float64(h.count-1)*q) + 1
 
 	var cumulative uint64
 
@@ -223,7 +223,6 @@ const (
 	maxNoiseRatio        = 10.0
 )
 
-//nolint:funlen // one function keeps every invariant's threshold beside its check
 func evaluate(tiers []TierResult) []Verdict {
 	var verdicts []Verdict
 
@@ -369,7 +368,6 @@ func saveReport(report *Report) (string, error) {
 
 	name := report.Time.UTC().Format("2006-01-02T15-04-05Z")
 
-	//nolint:gosec // G306: user-readable history file
 	return writeReportFile(dir, name, append(data, '\n'))
 }
 
@@ -424,7 +422,7 @@ func loadPrevious(current time.Time) (*Report, error) {
 	}
 
 	if err != nil {
-		return nil, err //nolint:wrapcheck // absent history is surfaced as a plain miss
+		return nil, err
 	}
 
 	files := make([]reportFile, 0, len(entries))

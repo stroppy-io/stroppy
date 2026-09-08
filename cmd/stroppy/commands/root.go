@@ -29,8 +29,8 @@ var rootCmd = &cobra.Command{
 }
 
 // versionJSON controls whether `stroppy version` outputs machine-readable JSON.
-// When more component versions are added (k6, drivers, etc.), --json gives
-// programmatic consumers a stable format to parse instead of scraping text lines.
+// When more component versions are added, --json gives programmatic consumers
+// a stable format to parse instead of scraping text lines.
 var versionJSON bool
 
 var versionCmd = &cobra.Command{

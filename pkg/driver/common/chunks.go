@@ -2,8 +2,6 @@
 // Stroppy database driver. The within-table parallel insert orchestrator
 // lives here so pg, mysql, native, and future drivers stay free of their
 // own chunking and worker lifecycle logic.
-//
-//nolint:revive // package path `pkg/driver/common` is fixed by the plan (§B8).
 package common
 
 // Chunk describes one worker's slice of a population's row range.

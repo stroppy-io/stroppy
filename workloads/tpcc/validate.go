@@ -12,8 +12,8 @@ import (
 
 var errValidatePopulation = errors.New("validate_population")
 
-// validatePopulation runs the §1.3.1 consistency/cardinality checks and aborts
-// (returns an error) if any fail, mirroring validatePopulation in tpcc_common.ts.
+// validatePopulation runs the §1.3.1 consistency and cardinality checks and
+// returns an error if any fail.
 func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehouseStart, wIDMax int64) error {
 	wRange := fmt.Sprintf("BETWEEN %d AND %d", warehouseStart, wIDMax)
 	wWhere := func(col string) string { return "WHERE " + col + " " + wRange }

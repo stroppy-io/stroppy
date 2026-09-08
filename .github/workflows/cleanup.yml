@@ -24,7 +24,7 @@ jobs:
           set -e
           gh release list -R "$GITHUB_REPOSITORY" --limit 200 \
             --json tagName,isPrerelease,publishedAt \
-            -q '.[] | select(.isPrerelease) | "\(.publishedAt) \(.tagName)"' \
+            -q '.[] | select(.isPrerelease and (.tagName | startswith("nightly-"))) | "\(.publishedAt) \(.tagName)"' \
             | sort -r | tail -n +11 | awk '{print $2}' \
             | xargs -r -I{} gh release delete {} -R "$GITHUB_REPOSITORY" --cleanup-tag --yes
 

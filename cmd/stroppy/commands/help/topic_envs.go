@@ -59,7 +59,7 @@ SOURCES AND PRECEDENCE
 
   Legacy DURATION without an explicit executor still infers constant-vus and
   emits a warning. Prefer --executor constant-vus, or "run.executor" in config,
-  so the run shape is unambiguous. There are no k6 shortflags or "--" passthrough.
+  so the run shape is unambiguous. Arguments after "--" are not supported.
 
 DISCOVERY
 

@@ -1,210 +1,117 @@
 # TPC-DS workload
 
-TPC-DS load + 99-query suite. Data is produced by the ported `dsdgen`
-generator (see `third_party/gotpcds/dsdgen` and `pkg/datagen/tpcdsgen`);
-the queries are generated per dialect from the official TPC-DS query
-templates at the canonical qualification parameters.
+The registered `tpcds` workload loads all 24 TPC-DS tables and runs the
+99-query suite (103 SQL statements because queries 14, 23, 24, and 39 have two
+parts). Canonical dsdgen rows stream through the `pkg/datagen/tpcdsgen` batch
+adapter and `Bench.InsertTpcds`.
 
 ## Run it
 
 ```bash
-# PostgreSQL
 ./build/stroppy run tpcds -d pg \
-    -D url=postgres://postgres:postgres@localhost:5432 \
-    --scale-factor 0.01
+  -D url=postgres://postgres:postgres@localhost:5432/stroppy \
+  --scale-factor 0.01
 
-# MySQL — note the go-sql-driver DSN form (NOT a mysql:// URL):
 ./build/stroppy run tpcds -d mysql \
-    -D "url=root:pass@tcp(127.0.0.1:3306)/stroppy?charset=utf8mb4&parseTime=True&loc=Local" \
-    --scale-factor 0.01 --load-workers 4
+  -D 'url=root:pass@tcp(127.0.0.1:3306)/stroppy?charset=utf8mb4&parseTime=true' \
+  --scale-factor 0.01 --load-workers 4
 
-# YDB (YQL via the native driver):
 ./build/stroppy run tpcds -d ydb \
-    -D url=grpc://localhost:2136/local \
-    --scale-factor 0.01
+  -D url=grpc://localhost:2136/local --scale-factor 0.01
 
-# Picodata (pgwire) — LOAD ONLY. Query execution is not yet supported on
-# picodata (see Status); run the prep steps without the workload:
+# Picodata supports loading only; query execution is not yet supported.
 ./build/stroppy run tpcds -d pico \
-    -D url=postgres://admin:T0psecret@localhost:1331/admin \
-    --scale-factor 0.01 --no-steps workload
+  -D url=postgres://admin:T0psecret@localhost:1331/admin --scale-factor 0.01 \
+  --no-steps workload
 ```
 
-Typed parameters (`stroppy run tpcds --help` lists the full schema):
+Typed workload parameters are listed by `stroppy run tpcds --help`:
+
+- `--scale-factor` accepts any positive value.
+- `--load-workers` sets the workers used to load each table.
+- `--pg-unlogged` uses PostgreSQL unlogged tables during the load.
+- `--ydb-store-mode` selects `column` (default) or `row` tables on YDB.
+- `--streams` selects the number of generated query streams.
+- `--query-stream` explicitly selects one generated stream; when omitted, the
+  checked-in canonical query set is used.
+- `--query-seed` seeds generated streams.
+- `--schema-file` and `--sql-file` override the dialect schema and query files.
+- `--validate-force` compares reference answers outside SF=1 on PostgreSQL or
+  MySQL; comparison remains diagnostic.
+
+Some static dimensions do not shrink with the scale factor.
+`customer_demographics`, for example, always has about 1.9 million rows, so
+small-scale loads are still substantial.
+
+## Setup and execution
+
+Setup runs these gatable steps in order:
+
+1. `drop_schema`
+2. `create_schema` (or `create_schema_column` for YDB column storage)
+3. `set_unlogged` when requested on PostgreSQL
+4. `load_data`, streaming all 24 tables through `driver.InsertRequest`
+5. `create_indexes`
+6. `set_logged` when unlogged loading was enabled
+7. `analyze`
+8. `validate_answers` for the baked query set on PostgreSQL or MySQL
+
+On supported query dialects, each `workload` iteration resolves the selected
+stream and executes every query in order. The default is the checked-in
+canonical qualification set. On PostgreSQL and MySQL, `--query-stream`
+generates a reproducible stream in process, while `--streams N` assigns
+generated streams to virtual users for a throughput run.
 
 ```bash
---scale-factor 0.01      # any positive float; fractional for smoke tests
---load-workers 4         # parallel workers per table during load
---ydb-store-mode column  # ydb only: column (default) or row storage
---streams 4              # number of query streams
---query-stream 0         # generated stream N (omit for the baked set)
---query-seed 42          # generated-stream seed
---sql-file ./pg.sql      # override the per-driver query file
-```
-
-Note: the static tables (`date_dim`, `time_dim`, `customer_demographics`)
-do not scale down — `customer_demographics` is always ~1.9M rows — so load
-time at small scale factors is dominated by them, especially on MySQL whose
-parameterized bulk INSERT is slower than Postgres COPY (increase `--load-workers`).
-
-## Steps
-
-1. `create_schema` — applies `schema.<dialect>.sql` (DROP + CREATE, no
-   constraints; load is bulk, queries are read-only).
-2. `load_data` — generates and bulk-loads all 24 tables via
-   `driver.insertTpcds(table, scale, workers)`.
-3. `queries` — runs the 99 queries (`query_1` … `query_99`; queries
-   14/23/24/39 are two-part and split into `_a`/`_b`, so 103 statements).
-
-## Query generation and dialects
-
-Queries are generated from the official kit's templates (`query1..99.tpl`)
-with the C `dsqgen` at `RNGSEED 19620718`, `SCALE 1`, `QUALIFY` (the
-canonical qualification parameter set), then transformed per dialect. The
-checked-in per-dialect files are selected by `driverType` in `tpcds.ts`
-(`_sqlByDriver` / `_schemaByDriver`); `SQL_FILE` overrides.
-
-Universal fixes (all dialects):
-
-- `c_last_review_date_sk` → `c_last_review_date` (query 30; the official
-  template references a column that does not exist — our schema has the
-  canonical `c_last_review_date`).
-- `lochierarchy` (queries 36/70/86): the `grouping(...)+grouping(...)` alias
-  cannot be referenced inside an expression in `ORDER BY`, so it is inlined.
-- query 90 division guarded with `nullif(divisor, 0)` (the ratio divides by
-  an empty bucket on sparse data; identical at benchmark scale).
-
-PostgreSQL (`pg.sql`): `limit N`; date arithmetic as `<date> ± N` (Postgres
-adds integer days to a date directly).
-
-YDB (`ydb.sql` + `schema.ydb.sql`, YQL via the native driver): schema types map
-`integer→Int64`, `char/varchar→Utf8`, `decimal→Double`, and `date→Utf8` (ISO
-strings — TPC-DS `date_dim` spans 1900–2100, outside YDB's unsigned
-`Timestamp`/`Date` epoch; ISO strings compare lexicographically so `between`/`=`
-date filters hold). Tables carry a `PRIMARY KEY` (no FK); only key columns are
-`NOT NULL` since TPC-DS fact foreign keys are genuinely nullable. Two storage
-layouts ship as sections `create_schema_column` (column, default, auto-partitioned
-by size) and `create_schema` (row), selected by `YDB_STORE_MODE`; column store is
-the OLAP-correct layout for these scan-heavy queries and runs the full suite
-(window functions, rollup, grouping sets all verified on it). Secondary indexes
-are omitted — YDB column tables support only local bloom/min-max indexes, not
-global secondary indexes, and the spec lists indexes as auxiliary for this
-full-scan workload. Query
-rewrites vs `pg.sql`: every statement opens with `PRAGMA AnsiImplicitCrossJoin`
-(TPC-DS uses comma joins); ANSI `WITH` CTEs become YQL `$named` subqueries;
-GROUP BY / SELECT / ORDER BY columns in multi-source blocks are qualified with a
-correlation name (YQL requires it); correlated subqueries and `EXISTS` are
-decorrelated into `IN` / grouped joins (YQL has no correlated subqueries); date
-literals drop the `cast(… as date)` and `date + N days` arithmetic is baked to a
-literal string; `cast(… as decimal)`→`Double`, `substring`→`Unicode::Substring`.
-The ported generator emits every cell as text; the YDB driver's bulk-upsert path
-parses those strings into each column's declared type. Answer-set validation and
-the in-process query-stream generator (`STREAMS>1`, `QUERY_STREAM`) stay
-PostgreSQL/MySQL-only, so YDB runs the baked power test.
-
-MySQL (`mysql.sql`, MySQL 8.0): date arithmetic as `± interval N day`;
-`group by rollup(...)` → `group by ... with rollup`; `||` string concat →
-`concat(...)`; no space between a function name and `(`; `cast(x as int)` →
-`cast(x as signed)`; every derived table in `FROM` gets an alias (MySQL
-requires it, Postgres 16 does not); `full outer join` (queries 51/97) is
-emulated with `left join UNION ALL right join` + an anti-join filter; query 6's
-correlated per-category `avg(i_current_price)` is decorrelated into a grouped
-join (MySQL re-evaluates the correlated subquery per row — O(n²) — where
-Postgres does not; the rewrite is semantically identical).
-
-## Query streams (generated, in-process)
-
-The default run uses the baked, verified `pg.sql` / `mysql.sql` (the canonical
-qualification parameters). For throughput-style runs that vary parameters,
-set `--query-stream N` and the workload generates that stream's queries **in-process**
-during the run — no offline step:
-
-```bash
-./build/stroppy run tpcds -d pg \
-    -D url=postgres://postgres:postgres@localhost:5432 \
-    --scale-factor 1 --query-stream 0 --query-seed 42
-```
-
-- `--query-stream=N` selects stream N (omit it for the baked canonical set).
-- `--query-seed` seeds the generator (reproducible per seed).
-
-The generator parses the official query templates' `define` headers and produces
-valid, scale-correct parameter values with its own seeded RNG (it does NOT
-reproduce the C `dsqgen`'s exact value stream — query generation is independent
-of data generation; it only needs the same parameter domains so filters hit real
-rows). Postgres streams cover all 99 queries; MySQL streams cover 96 (query88's
-syllable-generated store names and queries 51/97's full-outer-join are not
-regenerated — those are correct in the baked `mysql.sql`). The same generator is
-available as a standalone CLI (`third_party/gotpcds/dsqgen/cmd/dsqgen`, or
-`make gen-tpcds-streams`) for writing stream `.sql` files offline.
-
-## TPC-DS spec phases (Clause 7)
-
-The full benchmark is Load + Power + Throughput1 + DataMaint1 + Throughput2 +
-DataMaint2, scored as QphDS@SF. This workload covers:
-
-- **Database Load Test** — `load_data` step. ✅
-- **Power Test** (1 stream, 99 queries serially) — default run (`--streams=1`). ✅
-- **Throughput Test** (concurrent generated streams) — `--streams=Sq` enables
-  per-VU generated streams; run concurrency is controlled separately by `--vus`.
-  Use the constant-VUs executor for overlapping streams. (Sq should be even ≥ 4
-  for a compliant run; this workload does not yet implement the complete scored
-  phase sequencing.)
-- **Data Maintenance Test** (sequential refresh runs: fact insert/delete +
-  inventory delete over dsdgen refresh data) — not implemented.
-- **QphDS@SF metric** — not computed (per-step timings are reported by k6).
-
-```bash
-# Throughput-style run: 4 concurrent generated streams for 10 minutes
-./build/stroppy run tpcds -d pg -D url=... --scale-factor 1 --streams 4 \
+./build/stroppy run tpcds -d pg --scale-factor 1 \
+  --query-stream 0 --query-seed 42
+./build/stroppy run tpcds -d pg --scale-factor 1 --streams 4 \
   --executor constant-vus --vus 4 --duration 10m
 ```
 
-## Status / TODO
+YDB supports only the baked power-test query set; generated streams are
+rejected. Answer comparison is available only on PostgreSQL and MySQL and uses
+the SF=1 reference set by default.
 
-- PostgreSQL, MySQL, and YDB: load + all 103 statements verified on a local
-  instance at scale factor 0.01.
-- Picodata: **load supported** (schema + all 24-table bulk load verified at
-  scale factor 0.01). **Query execution is not yet supported** — see the
-  picodata query blockers note below.
-- Not yet done: the Data Maintenance phase (refresh-data generation + insert/
-  delete DM functions) and the QphDS@SF metric; SF=1 answer-set validation
-  against the kit's `answer_sets/`.
+## Dialect status
 
-### Picodata query blockers
+- **PostgreSQL:** all 103 baked statements, generated streams, and answer
+  comparison are supported.
+- **MySQL:** all 103 baked statements and answer comparison are supported.
+  Generated streams omit queries 51, 88, and 97; those queries remain available
+  in the baked set.
+- **YDB:** all 103 baked statements run on the YQL port. Column storage is the
+  default; row storage is optional. Dates are ISO text because TPC-DS spans
+  years outside YDB's date epoch. Generated streams and answer comparison are
+  not supported.
+- **Picodata:** loading is supported. Query execution is not supported yet;
+  use `--no-steps workload` for load-only runs.
 
-The picodata schema and data-load path ship today; the 99-query suite does
-not yet run on picodata. sbroad (picodata 26.3) accepts only explicit
-`INNER JOIN ... ON` and has no comma-join, no `CROSS JOIN`, and no
-implicit-cross-join pragma/session setting (YDB has `AnsiImplicitCrossJoin`;
-sbroad does not). TPC-DS query templates use comma joins pervasively, so
-~88 of 95 queries fail at parse time. Secondary gaps behind that one:
-`rollup`/`grouping sets`, `INTERSECT`, `FULL OUTER JOIN`,
-`rank()`/`dense_rank()`/`lag()`/`lead()`, correlated subqueries,
-`datetime+int`, and `round()`. `pico.sql` carries the mechanical-transform
-skeleton (date/char/cast fixes, date+N baked) as the port starting point;
-the workload step is expected to fail until the comma-join rewrite lands.
-Load picodata with `--no-steps workload`.
+The SQL ports also account for each engine's date arithmetic, grouping,
+correlated-subquery, join, and type restrictions. See the headers of the
+checked-in dialect files for the exact rewrites.
 
-## Run shapes and the two-run flow
+## Benchmark coverage
 
-All TPC workloads share typed run flags:
+This workload provides the database load, serial power-query, and concurrent
+query-stream building blocks. It does not implement the TPC-DS data-maintenance
+phases or compute QphDS@SF.
 
-- `--executor shared-iterations --iterations N` runs a fixed iteration count.
-- `--executor constant-vus --vus N --duration 1h` runs a throughput test.
-- `--pg-unlogged` enables the PostgreSQL `UNLOGGED` bulk-load dance.
-
-Select the executor explicitly. Legacy `DURATION` without an executor remains
-compatible, infers `constant-vus`, and emits a warning.
-
-The measured workload is a single gatable `workload` step, so prep and measurement
-can run as two passes for a throughput number uncontaminated by load time:
+## Run shapes and two-pass runs
 
 ```bash
-# 1. load only (drop / create / load / create_indexes / analyze), no workload
-./build/stroppy run <workload> --scale-factor 10 --no-steps workload
-# 2. measure only, against the already-loaded data
-./build/stroppy run <workload> --executor constant-vus --vus 64 --duration 1h --steps workload
+./build/stroppy run tpcds --executor shared-iterations --iterations 1
+./build/stroppy run tpcds --executor constant-vus --vus 4 --duration 10m
+
+# Load first, then measure the existing data.
+./build/stroppy run tpcds --scale-factor 1 --no-steps workload
+./build/stroppy run tpcds --executor constant-vus --vus 4 --duration 10m \
+  --steps workload
 ```
 
-A normal single run (no `--steps`) loads and measures in one pass.
+A normal run with no step filter performs setup and measurement together.
+Environment variables and `-e` remain compatibility inputs; direct flags and
+typed config are preferred.
+
+The standalone query-stream generator remains available through
+`make gen-tpcds-streams`.

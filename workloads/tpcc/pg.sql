@@ -172,13 +172,11 @@ ALTER TABLE stock      SET UNLOGGED;
       ERROR: SET TRANSACTION ISOLATION LEVEL must be called before
              any query
 
-   Verified live on pg17. So the raise is enforced CLIENT-SIDE in
-   procs.ts: each proc call is wrapped in `driver.beginTx({ isolation:
-   "repeatable_read" }, tx => tx.exec(...))`. The k6 stroppy driver
-   emits `BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ` before
-   the `SELECT FUNCNAME(...)`, so the proc body runs at Level 3 for
-   every dialect that honours the statement. mysql InnoDB's default
-   is already REPEATABLE READ (spec-compliant), so the wrap is a
+   Verified live on pg17. Each procedure call is wrapped in a client-side
+   repeatable-read transaction. The PostgreSQL driver emits `BEGIN
+   TRANSACTION ISOLATION LEVEL REPEATABLE READ` before the procedure call,
+   so the procedure body runs at Level 3 for every dialect that honours the
+   statement. MySQL InnoDB's default is already REPEATABLE READ, so this is a
    no-op on that dialect but keeps the code path uniform. */
 --= neword
 CREATE OR REPLACE FUNCTION NEWORD (
@@ -653,7 +651,7 @@ UPDATE warehouse SET w_ytd = w_ytd + :amount WHERE w_id = :w_id
 SELECT w_name, w_street_1, w_street_2, w_city, w_state, w_zip FROM warehouse WHERE w_id = :w_id
 --= update_get_warehouse
 /* Layer 1: merge UPDATE + SELECT into one round-trip via RETURNING.
-   Column order matches get_warehouse so tx.ts indexing is unchanged. */
+   Column order matches get_warehouse for the Go transaction body. */
 UPDATE warehouse SET w_ytd = w_ytd + :amount WHERE w_id = :w_id
 RETURNING w_name, w_street_1, w_street_2, w_city, w_state, w_zip
 --= update_district
@@ -748,9 +746,9 @@ WHERE ol_w_id = :w_id
   AND ol_o_id >= :min_o_id
   AND ol_o_id < :next_o_id
 --= stock_count_in
--- Step 2: count low-stock items. The {ids} placeholder is replaced in
--- TypeScript with an integer list built from step 1's result — stroppy's
--- :name substitution doesn't touch IN list contents.
+-- Step 2: count low-stock items. The Go workload replaces {ids} with an
+-- integer list built from step 1's result; :name parameter binding leaves
+-- IN-list contents unchanged.
 SELECT COUNT(*) FROM stock
 WHERE s_w_id = :w_id
   AND s_quantity < :threshold

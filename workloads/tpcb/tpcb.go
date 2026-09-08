@@ -364,7 +364,7 @@ type vuState struct {
 
 func (w *workload) vuState(vuid uint64) *vuState {
 	if v, ok := w.vuStates.Load(vuid); ok {
-		vs, _ := v.(*vuState) //nolint:errcheck // vuStates only stores *vuState values
+		vs, _ := v.(*vuState)
 
 		return vs
 	}
@@ -377,7 +377,7 @@ func (w *workload) vuState(vuid uint64) *vuState {
 	}
 	vs.hid.Store(int64(vuid) * 1_000_000_000) //nolint:gosec // G115: value bounded by scale factor, no overflow path
 	actual, _ := w.vuStates.LoadOrStore(vuid, vs)
-	stored, _ := actual.(*vuState) //nolint:errcheck // vuStates only stores *vuState values
+	stored, _ := actual.(*vuState)
 
 	return stored
 }
@@ -447,8 +447,6 @@ func accountsRequest(scale int64, workers int) *driver.InsertRequest {
 // branchesSource returns the indexed source for pgbench_branches. Each
 // row's bid is its 1-based entity index; the filler column is the only
 // random field, so it owns its own gen.Field under the versioned domain.
-//
-//nolint:dupl // each table's load formula is kept explicit for readability
 func branchesSource(root gen.Root, totalRows int64) *gen.IndexedSource {
 	fillerField := root.Domain("tpcb/branches@1").Field("filler")
 

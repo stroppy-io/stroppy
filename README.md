@@ -4,13 +4,13 @@
 [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/2mSSrkBkHm)
 [![Docs](https://img.shields.io/badge/docs-stroppy--io.github.io-blue)](https://stroppy-io.github.io)
 
-Database stress testing CLI. A single self-contained Go binary — no k6, no
-Node, no runtime dependencies.
+Database stress testing CLI. A single self-contained Go binary with no external
+runtime dependencies.
 
 ## Features
 
 - Built-in TPC-B, TPC-C, TPC-H, and TPC-DS workload tests
-- Deterministic relational data generation with `driver.insertSpec`
+- Deterministic typed Go generation and loading through `driver.InsertRequest`
 - PostgreSQL, MySQL, YDB, Picodata, CSV, and noop drivers
 - Transaction support with configurable isolation levels
 - Go-native load generation and metrics

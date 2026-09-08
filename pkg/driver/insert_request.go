@@ -8,8 +8,8 @@ import (
 
 // InsertRequest carries a driver-owned [InsertMethod], a worker count, and a
 // [gen.BatchSource] whose prepared partitions fill reusable typed batches.
-// Workloads hand their source straight to the driver, so generation avoids
-// intermediate protobuf values.
+// Workloads hand their source straight to the driver, avoiding intermediate
+// row representations.
 //
 // Source, Method, and Workers are the driver's full input; the table
 // name is carried separately because generation is table-agnostic.
@@ -29,7 +29,6 @@ var ErrNilInsertSource = errors.New("driver: nil insert source")
 
 // ErrInsertMethodNotSupported is returned by a driver's Insert when the
 // request's method is not one the driver serves (see [InsertCapabilities]).
-// It is the typed-path sibling of the per-driver InsertSpec sentinels.
 var ErrInsertMethodNotSupported = errors.New("driver: insert method not supported")
 
 // ValidateInsert checks the request shape shared by every driver's

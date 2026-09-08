@@ -15,8 +15,8 @@ import (
 	"github.com/stroppy-io/stroppy/workloads"
 )
 
-// SF=1 answer comparator (port of tpcds_validate.ts). Multiset comparison: rows are
-// sorted by a rounded key before a positional compare, so legitimate row-ordering
+// The SF=1 answer comparator treats results as multisets. Rows are sorted by a
+// rounded key before a positional compare, so legitimate row-ordering
 // differences (NULLS FIRST vs LAST, tie order) never read as mismatches. Numeric cells
 // compare within a small tolerance; everything else compares exact. Best-effort: deltas
 // are logged, not thrown. The generated data is byte-identical to the C dsdgen oracle,

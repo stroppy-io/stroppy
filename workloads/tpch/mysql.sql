@@ -145,22 +145,8 @@ CREATE INDEX idx_orders_orderdate    ON orders   (o_orderdate)
 --=
 ANALYZE TABLE region, nation, part, supplier, partsupp, customer, orders, lineitem
 
---+ finalize_totals
--- Spec §4.2.3 o_totalprice = Σ lineitem l_extendedprice × (1 + l_tax) × (1 - l_discount).
--- Post-load UPDATE; see pg.sql header for the rationale.
---= update_totalprice
-UPDATE orders o
-   SET o_totalprice = COALESCE((
-         SELECT SUM(l_extendedprice * (1 + l_tax) * (1 - l_discount))
-           FROM lineitem
-          WHERE l_orderkey = o.o_orderkey
-       ), 0)
---= analyze_orders
-ANALYZE TABLE orders
-
 -- ==========================================================================
--- 22 TPC-H queries, MySQL port. Parameters follow §2.4.x defaults — see
--- workloads/tpch/tx.ts for the bound values.
+-- 22 TPC-H queries, MySQL port. Parameters use the workload's §2.4 defaults.
 -- ==========================================================================
 
 --+ q1

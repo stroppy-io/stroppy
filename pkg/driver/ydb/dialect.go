@@ -38,7 +38,7 @@ func (ydbDialect) Convert(val any) (any, error) {
 		return v.String(), nil
 	case time.Time:
 		// Promote to *time.Time so toYDBValue's addressable-time case fires.
-		// stdlib/std.daysToDate and Draw.date both return time.Time by value;
+		// Workload parameters and generated rows may carry time.Time by value;
 		// without this promotion the native BulkUpsert path would reject the
 		// unaddressable value. Timestamp columns get TimestampValueFromTime;
 		// Date columns accept it via YDB's implicit cast.
@@ -54,10 +54,9 @@ func (ydbDialect) Convert(val any) (any, error) {
 	}
 }
 
-// convertAnySlice promotes JS-shaped arrays into types the YDB SDK can declare
-// natively for query parameters. Sobek delivers JS Arrays to Go as []any with
-// elements typed individually (Number -> int64 when integral, else float64;
-// String -> string). The YDB SDK's reflect-based parameter binder cannot
+// convertAnySlice converts heterogeneous parameter slices into types the YDB SDK
+// can declare natively. Workloads build lists as []any with individually typed
+// elements. The SDK's reflect-based parameter binder cannot
 // resolve interface{} as a list element type, so we collapse []any to a
 // concrete typed slice here. WithAutoDeclare can then emit stable declarations
 // such as `DECLARE $pN AS List<Int64>;`, which preserves server plan-cache hits.
@@ -95,10 +94,8 @@ func convertAnySlice(arr []any) (any, error) {
 			case int32:
 				out[i] = int64(ev)
 			case float64:
-				// JS Numbers arrive as float64 when goja can't fit them
-				// into int64 (or chooses not to). For TPC-C IN-lists the
-				// values are always integral; truncate so the typed slice
-				// stays []int64.
+				// TPC-C list values are integral; convert them so the typed
+				// slice stays []int64.
 				out[i] = int64(ev)
 			default:
 				return nil, fmt.Errorf(

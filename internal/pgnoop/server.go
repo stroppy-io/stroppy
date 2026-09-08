@@ -147,7 +147,7 @@ func (s *Server) waitReady(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err() //nolint:wrapcheck // caller reports the cancellation directly
+			return ctx.Err()
 		case port := <-s.readySignal:
 			if port == s.port {
 				return nil
@@ -168,7 +168,7 @@ func (s *Server) waitReady(ctx context.Context) error {
 			case err := <-s.done:
 				return serverExitError(s, err)
 			case <-ctx.Done():
-				return ctx.Err() //nolint:wrapcheck // caller reports the cancellation directly
+				return ctx.Err()
 			case <-time.After(readyPollTick):
 				return nil
 			}
@@ -205,7 +205,7 @@ func (s *Server) Stop() error {
 		case <-time.After(stopGrace):
 		}
 
-		return nil //nolint:nilerr // process exit is the desired end state
+		return nil
 	}
 
 	select {
