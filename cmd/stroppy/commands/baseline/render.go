@@ -18,6 +18,10 @@ func tierTitle(name string, report *Report) string {
 	case tierNoop:
 		return "noop — framework ceiling (noop driver)"
 	case tierWire:
+		if report.PGNoop == "" {
+			return "wire — protocol ceiling (pg wire via external pg-noop, loopback)"
+		}
+
 		return fmt.Sprintf("wire — protocol ceiling (pg wire via pg-noop %s, loopback)", report.PGNoop)
 	default:
 		return name

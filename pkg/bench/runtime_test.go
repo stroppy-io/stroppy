@@ -23,13 +23,13 @@ import (
 )
 
 func TestRunScenarioReturnsFatalErrorAndCancelsWorkers(t *testing.T) {
-	installRuntimeTestRoot(t)
+	rootState := newRuntimeTestRoot(t)
 
 	sentinel := errors.New("fatal")
 
 	var calls atomic.Int64
 
-	err := runScenario(context.Background(), scenarioSpec{
+	err := runScenario(context.Background(), rootState, scenarioSpec{
 		executor:   "shared-iterations",
 		vus:        4,
 		iterations: 100,
@@ -53,14 +53,14 @@ func TestRunScenarioReturnsFatalErrorAndCancelsWorkers(t *testing.T) {
 }
 
 func TestRunScenarioContinuesAfterOrdinaryErrors(t *testing.T) {
-	installRuntimeTestRoot(t)
+	rootState := newRuntimeTestRoot(t)
 
 	var (
 		calls    atomic.Int64
 		failures atomic.Int64
 	)
 
-	err := runScenario(context.Background(), scenarioSpec{
+	err := runScenario(context.Background(), rootState, scenarioSpec{
 		executor:   "shared-iterations",
 		vus:        1,
 		iterations: 5,
@@ -85,6 +85,8 @@ func TestRunContinuesAndSummarizesOrdinaryErrors(t *testing.T) {
 
 	core, logs := observer.New(zapcore.WarnLevel)
 
+	var captured metricdata.ResourceMetrics
+
 	err := Run(
 		context.Background(),
 		"test/ordinary-errors-continue",
@@ -93,7 +95,7 @@ func TestRunContinuesAndSummarizesOrdinaryErrors(t *testing.T) {
 		nil,
 		nil,
 		zap.New(core),
-		&MetricsConfig{},
+		&MetricsConfig{OnSummary: func(data metricdata.ResourceMetrics) { captured = data }},
 	)
 	if err != nil {
 		t.Fatalf("Run() error = %v, want nil", err)
@@ -103,9 +105,12 @@ func TestRunContinuesAndSummarizesOrdinaryErrors(t *testing.T) {
 		t.Fatalf("iteration calls = %d, want 6", ordinaryErrorWorkloadRun.calls.Load())
 	}
 
-	snapshot := root.errorReporter.snapshot()
-	if snapshot.terminalErrors != 6 || snapshot.failedIterations != 6 || snapshot.failedQueries != 0 {
-		t.Fatalf("error summary = %#v, want six failed iterations", snapshot)
+	if terminal := findSum(t, captured, "stroppy_terminal_errors_total"); terminal != 6 {
+		t.Fatalf("terminal errors = %v, want 6", terminal)
+	}
+
+	if failed := findSum(t, captured, "stroppy_failed_iterations_total"); failed != 6 {
+		t.Fatalf("failed iterations = %v, want 6", failed)
 	}
 
 	if got := logs.FilterMessage("nonfatal error; continuing").Len(); got != 1 {
@@ -147,8 +152,6 @@ func (w *ordinaryErrorWorkload) Iterate(context.Context, *Bench) error {
 func (*ordinaryErrorWorkload) Teardown(context.Context, *Bench) error { return nil }
 
 func TestRunRejectsNegativeQueryTimeout(t *testing.T) {
-	installRuntimeTestRoot(t)
-
 	Register(func() Workload { return &paramTestWorkload{name: "test/query-timeout-negative"} })
 
 	err := Run(
@@ -167,12 +170,12 @@ func TestRunRejectsNegativeQueryTimeout(t *testing.T) {
 }
 
 func TestRunScenarioReturnsParentCancellation(t *testing.T) {
-	installRuntimeTestRoot(t)
+	rootState := newRuntimeTestRoot(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := runScenario(ctx, scenarioSpec{
+	err := runScenario(ctx, rootState, scenarioSpec{
 		executor:   "shared-iterations",
 		vus:        1,
 		iterations: 1,
@@ -411,24 +414,20 @@ func (d *teardownLifecycleDriver) Teardown(ctx context.Context) error {
 	return d.teardownErr
 }
 
-func installRuntimeTestRoot(t *testing.T) {
+func newRuntimeTestRoot(t *testing.T) *RootState {
 	t.Helper()
-
-	oldRoot := root
 
 	testRoot, err := newRootState(zap.NewNop(), context.Background(), nil, nil, &MetricsConfig{})
 	if err != nil {
 		t.Fatalf("newRootState() error = %v", err)
 	}
 
-	root = testRoot
-
 	t.Cleanup(func() {
 		testRoot.errorReporter.stopAndWait()
 		testRoot.shutdownMetrics()
-
-		root = oldRoot
 	})
+
+	return testRoot
 }
 
 func TestRunQuietSummaryDeliversMetricsSilently(t *testing.T) {
@@ -515,3 +514,84 @@ func (*noopIterateWorkload) Iterate(context.Context, *Bench) error {
 	return nil
 }
 func (*noopIterateWorkload) Teardown(context.Context, *Bench) error { return nil }
+
+type concurrentRunGate struct {
+	ready   chan struct{}
+	release chan struct{}
+}
+
+type concurrentRunWorkload struct {
+	gate *concurrentRunGate
+}
+
+func (*concurrentRunWorkload) Name() string      { return "test/concurrent-runs" }
+func (*concurrentRunWorkload) Define(*Def) error { return nil }
+func (w *concurrentRunWorkload) Setup(context.Context, *Bench) error {
+	w.gate.ready <- struct{}{}
+
+	<-w.gate.release
+
+	return nil
+}
+func (*concurrentRunWorkload) Iterate(context.Context, *Bench) error  { return nil }
+func (*concurrentRunWorkload) Teardown(context.Context, *Bench) error { return nil }
+
+func TestConcurrentRunsKeepMetricsIsolated(t *testing.T) {
+	gate := &concurrentRunGate{ready: make(chan struct{}, 2), release: make(chan struct{})}
+
+	Register(func() Workload { return &concurrentRunWorkload{gate: gate} })
+
+	type result struct {
+		metrics metricdata.ResourceMetrics
+		err     error
+	}
+
+	run := func(iterations string) <-chan result {
+		done := make(chan result, 1)
+
+		go func() {
+			var captured metricdata.ResourceMetrics
+
+			err := Run(
+				context.Background(),
+				"test/concurrent-runs",
+				map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
+				ParamInputs{CLI: map[string]string{"iterations": iterations, "vus": "2"}},
+				nil,
+				nil,
+				zap.NewNop(),
+				&MetricsConfig{Quiet: true, OnSummary: func(data metricdata.ResourceMetrics) { captured = data }},
+			)
+			done <- result{metrics: captured, err: err}
+		}()
+
+		return done
+	}
+
+	first := run("37")
+	second := run("53")
+
+	for range 2 {
+		select {
+		case <-gate.ready:
+		case <-time.After(time.Second):
+			t.Fatal("concurrent runs did not reach setup barrier")
+		}
+	}
+
+	close(gate.release)
+
+	for _, test := range []struct {
+		result <-chan result
+		want   float64
+	}{{first, 37}, {second, 53}} {
+		got := <-test.result
+		if got.err != nil {
+			t.Fatalf("Run() error = %v", got.err)
+		}
+
+		if iterations := findSum(t, got.metrics, "stroppy_iterations_total"); iterations != test.want {
+			t.Fatalf("iterations = %v, want %v", iterations, test.want)
+		}
+	}
+}

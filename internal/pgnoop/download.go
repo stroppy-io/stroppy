@@ -18,6 +18,7 @@ import (
 
 const (
 	downloadTimeout = 5 * time.Minute
+	maxAssetBytes   = 32 << 20
 	binaryPerm      = 0o700
 	dirPerm         = 0o755
 )
@@ -25,6 +26,7 @@ const (
 var (
 	errDigestMalformed = errors.New("pgnoop: malformed pinned sha256 digest")
 	errDigestMismatch  = errors.New("pgnoop: sha256 digest mismatch")
+	errAssetTooLarge   = errors.New("pgnoop: release asset exceeds size limit")
 )
 
 // fetchAsset downloads one URL; tests swap it for a local source.
@@ -37,7 +39,7 @@ var assetDigest = AssetDigest
 // digest compiled into stroppy's own source, then installs the binary at
 // cachePath. The digest is intentionally not fetched from the release
 // source, so a tampered release cannot pass verification.
-func download(cachePath string, opts Options) (string, error) {
+func download(ctx context.Context, cachePath string, opts Options) (string, error) {
 	asset, err := AssetName(runtime.GOOS, runtime.GOARCH)
 	if err != nil {
 		return "", err
@@ -68,7 +70,7 @@ func download(cachePath string, opts Options) (string, error) {
 
 	logf(opts, "downloading %s", ReleaseURL(asset))
 
-	tarball, err := fetchAsset(ReleaseURL(asset))
+	tarball, err := fetchAsset(ctx, ReleaseURL(asset))
 	if err != nil {
 		return "", err
 	}
@@ -91,8 +93,8 @@ func download(cachePath string, opts Options) (string, error) {
 	return cachePath, nil
 }
 
-func fetch(url string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), downloadTimeout)
+func fetch(ctx context.Context, url string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, downloadTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
@@ -110,9 +112,18 @@ func fetch(url string) ([]byte, error) {
 		return nil, fmt.Errorf("pgnoop: fetch %s: %s", url, resp.Status) //nolint:err113 // status text is dynamic
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	if resp.ContentLength > maxAssetBytes {
+		return nil, fmt.Errorf("%w: %s is %d bytes (limit %d)",
+			errAssetTooLarge, url, resp.ContentLength, maxAssetBytes)
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxAssetBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("pgnoop: read %s: %w", url, err)
+	}
+
+	if len(data) > maxAssetBytes {
+		return nil, fmt.Errorf("%w: %s (limit %d bytes)", errAssetTooLarge, url, maxAssetBytes)
 	}
 
 	return data, nil

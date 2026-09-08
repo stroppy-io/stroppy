@@ -65,10 +65,11 @@ jobs:
             darwin_arm64) asset="pg-noop-aarch64-apple-darwin.tar.xz" ;;
           esac
           base="https://github.com/stroppy-io/pg-noop/releases/download/${PGNOOP_VERSION}"
+          expected="$(grep -F "  ${asset}" internal/pgnoop/release.sha256 | cut -d ' ' -f1)"
+          test -n "${expected}"
           tmp="$(mktemp -d)"
           curl -sSfL -o "${tmp}/${asset}" "${base}/${asset}"
-          curl -sSfL -o "${tmp}/${asset}.sha256" "${base}/${asset}.sha256"
-          ( cd "${tmp}" && sha256sum -c "${asset}.sha256" )
+          printf '%s  %s\n' "${expected}" "${tmp}/${asset}" | sha256sum -c -
           mkdir -p internal/pgnoop/embedded
           tar -xf "${tmp}/${asset}" -C "${tmp}"
           bin="$(find "${tmp}" -name pgnoop -type f | head -1)"

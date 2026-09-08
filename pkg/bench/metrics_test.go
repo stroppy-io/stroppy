@@ -170,11 +170,6 @@ func TestTransactionEndKeepsActionAndIsolationAttributes(t *testing.T) {
 		txMetrics: &txMetrics{},
 	}
 	vu := &VU{root: rootState, ctx: context.Background(), stepTag: "workload"}
-	previousRoot := root
-	root = rootState
-
-	t.Cleanup(func() { root = previousRoot })
-
 	rootState.txMetrics.recordTxEnd(
 		vu, "commit", "payment", config.TxIsolationLevelReadCommitted, time.Millisecond, 3, true,
 	)

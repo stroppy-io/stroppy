@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"net"
 	"os"
 	"runtime"
 	"slices"
@@ -45,12 +44,13 @@ const (
 )
 
 var (
-	errUnknownTier       = errors.New("unknown tier; expected noop or wire")
-	errNoTiers           = errors.New("no tiers selected")
-	errUnknownDownload   = errors.New("unknown --download value; expected ask, always, or never")
-	errMarshalReportFail = errors.New("marshal report")
-	errFreePortNotTCP    = errors.New("free port listener address is not TCP")
-	errVUsOutOfRange     = errors.New("vus out of range")
+	errUnknownTier        = errors.New("unknown tier; expected noop or wire")
+	errNoTiers            = errors.New("no tiers selected")
+	errUnknownDownload    = errors.New("unknown --download value; expected ask, always, or never")
+	errMarshalReportFail  = errors.New("marshal report")
+	errVUsOutOfRange      = errors.New("vus out of range")
+	errDurationOutOfRange = errors.New("duration must not be negative")
+	errRowsOutOfRange     = errors.New("rows must not be negative")
 )
 
 type options struct {
@@ -142,22 +142,30 @@ func planRun() (runPlan, error) {
 		return runPlan{}, err
 	}
 
+	if opts.duration < 0 {
+		return runPlan{}, fmt.Errorf("%w: got %s", errDurationOutOfRange, opts.duration)
+	}
+
 	duration := opts.duration
-	if duration <= 0 {
+	if duration == 0 {
 		duration = defaultDuration
 	}
 
+	if opts.rows < 0 {
+		return runPlan{}, fmt.Errorf("%w: got %d", errRowsOutOfRange, opts.rows)
+	}
+
 	rows := opts.rows
-	if rows <= 0 {
+	if rows == 0 {
 		rows = defaultRows
 	}
 
 	if opts.quick {
-		if opts.duration <= 0 {
+		if opts.duration == 0 {
 			duration = quickDuration
 		}
 
-		if opts.rows <= 0 {
+		if opts.rows == 0 {
 			rows = quickRows
 		}
 	}
@@ -207,8 +215,10 @@ func measureTiers(ctx context.Context, plan runPlan, report *Report) error {
 	var serverBinary string
 
 	if slices.Contains(plan.tiers, tierWire) {
-		resolved, err := pgnoop.Resolve(pgnoop.Options{
-			Path:    serverPathOrEnv(),
+		externalPath := serverPathOrEnv()
+
+		resolved, err := pgnoop.Resolve(ctx, pgnoop.Options{
+			Path:    externalPath,
 			Consent: plan.consent,
 			Log: func(format string, args ...any) {
 				fmt.Fprintf(os.Stderr, format+"\n", args...)
@@ -219,7 +229,10 @@ func measureTiers(ctx context.Context, plan runPlan, report *Report) error {
 		}
 
 		serverBinary = resolved
-		report.PGNoop = pgnoop.Version
+
+		if externalPath == "" {
+			report.PGNoop = pgnoop.Version
+		}
 	}
 
 	for _, name := range plan.tiers {
@@ -248,15 +261,22 @@ func measureTiers(ctx context.Context, plan runPlan, report *Report) error {
 func emitReport(out io.Writer, report *Report) error {
 	previous, _ := loadPrevious(report.Time) //nolint:errcheck // a missing history is not a failure
 
+	var rendered strings.Builder
+
 	if opts.jsonOut {
 		data, err := json.MarshalIndent(report, "", "  ")
 		if err != nil {
 			return fmt.Errorf("%w: %w", errMarshalReportFail, err)
 		}
 
-		fmt.Fprintln(out, string(data))
+		rendered.Write(data)
+		rendered.WriteByte('\n')
 	} else {
-		renderText(out, report)
+		renderText(&rendered, report)
+	}
+
+	if err := writeOutput(out, rendered.String()); err != nil {
+		return err
 	}
 
 	if opts.noSave {
@@ -268,34 +288,38 @@ func emitReport(out io.Writer, report *Report) error {
 		return err
 	}
 
+	var status strings.Builder
+	fmt.Fprintf(&status, "\nhistory: saved %s\n", path)
+
+	if previous != nil {
+		renderDiff(&status, previous, report)
+	}
+
 	// stdout stays a valid JSON document in --json mode; status goes to stderr.
 	statusOut := out
 	if opts.jsonOut {
 		statusOut = os.Stderr
 	}
 
-	fmt.Fprintf(statusOut, "\nhistory: saved %s\n", path)
+	return writeOutput(statusOut, status.String())
+}
 
-	if previous != nil {
-		renderDiff(statusOut, previous, report)
+func writeOutput(out io.Writer, content string) error {
+	if _, err := io.Copy(out, strings.NewReader(content)); err != nil {
+		return fmt.Errorf("write report output: %w", err)
 	}
 
 	return nil
 }
 
 func measureWireTier(ctx context.Context, binary string, plan runPlan) (TierResult, error) {
-	port, err := freePort(ctx)
-	if err != nil {
-		return TierResult{}, err
-	}
-
-	server, err := pgnoop.Start(ctx, binary, port)
+	server, err := pgnoop.Start(ctx, binary, 0)
 	if err != nil {
 		return TierResult{}, err
 	}
 	defer func() { _ = server.Stop() }()
 
-	fmt.Fprintf(os.Stderr, "pg-noop %s ready on %s\n", pgnoop.Version, server.Addr())
+	fmt.Fprintf(os.Stderr, "pg-noop ready on %s\n", server.Addr())
 
 	return measureTier(ctx, tierWire, wireDriver(server.Addr(), plan.vus), plan)
 }
@@ -446,21 +470,6 @@ func wireDriver(addr string, vus int) *config.DriverConfig {
 		URL:        fmt.Sprintf("postgres://stroppy@%s/postgres?sslmode=disable", addr),
 		Postgres:   &config.PostgresConfig{MaxConns: &maxConns},
 	}
-}
-
-func freePort(ctx context.Context) (int, error) {
-	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:0")
-	if err != nil {
-		return 0, fmt.Errorf("find free port: %w", err)
-	}
-	defer func() { _ = listener.Close() }()
-
-	addr, ok := listener.Addr().(*net.TCPAddr)
-	if !ok {
-		return 0, errFreePortNotTCP
-	}
-
-	return addr.Port, nil
 }
 
 func consentFrom(name string) (pgnoop.Consent, error) {

@@ -212,7 +212,7 @@ func Run(
 		return fmt.Errorf("scenario: %w", err)
 	}
 
-	root, err = newRootState(lg, ctx, steps, noSteps, metricsConfig)
+	root, err := newRootState(lg, ctx, steps, noSteps, metricsConfig)
 	if err != nil {
 		return fmt.Errorf("initialize metrics: %w", err)
 	}
@@ -276,7 +276,7 @@ func Run(
 		return fmt.Errorf("setup: %w", err)
 	}
 
-	if err := runScenario(ctx, sc, func(vu *VU) error {
+	if err := runScenario(ctx, root, sc, func(vu *VU) error {
 		b := &Bench{
 			root: root, vu: vu,
 			lg:  lg.Named("workload").With(zap.String("workload", name), zap.Uint64("VUID", vu.VUID())),
@@ -429,6 +429,7 @@ func (params *scenarioParams) spec(lg *zap.Logger) (scenarioSpec, error) {
 
 func runScenario(
 	ctx context.Context,
+	root *RootState,
 	sc scenarioSpec,
 	iterate func(*VU) error,
 	onIterationError func(*VU, error),
@@ -442,7 +443,7 @@ func runScenario(
 
 	startWorker := func(vuid int, keep func() bool) {
 		wg.Go(func() {
-			if err := runWorker(scenarioCtx, vuid, iterate, keep, onIterationError); IsFatalError(err) {
+			if err := runWorker(scenarioCtx, root, vuid, iterate, keep, onIterationError); IsFatalError(err) {
 				select {
 				case fatalErrors <- err:
 					cancel()
@@ -484,6 +485,7 @@ func runScenario(
 
 func runWorker(
 	ctx context.Context,
+	root *RootState,
 	vuid int,
 	iterate func(*VU) error,
 	keep func() bool,

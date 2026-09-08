@@ -1,6 +1,7 @@
 package pgnoop
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -36,7 +37,7 @@ type Options struct {
 
 // Resolve locates a ready-to-run pg-noop binary: explicit path, embedded
 // copy, local cache, or a verified release download.
-func Resolve(opts Options) (string, error) {
+func Resolve(ctx context.Context, opts Options) (string, error) {
 	if opts.Path != "" {
 		if err := checkBinary(opts.Path); err != nil {
 			return "", fmt.Errorf("pgnoop: explicit server path: %w", err)
@@ -62,7 +63,7 @@ func Resolve(opts Options) (string, error) {
 		return cachePath, nil
 	}
 
-	return download(cachePath, opts)
+	return download(ctx, cachePath, opts)
 }
 
 func checkBinary(path string) error {
@@ -82,12 +83,8 @@ func checkBinary(path string) error {
 	return nil
 }
 
-// materialize writes data to path when missing, making it executable.
+// materialize installs the embedded binary atomically, replacing any cache entry.
 func materialize(path string, data []byte) error {
-	if err := checkBinary(path); err == nil {
-		return nil
-	}
-
 	return writeBinary(path, data)
 }
 

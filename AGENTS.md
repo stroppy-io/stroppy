@@ -220,7 +220,7 @@ report under `~/.stroppy/baselines/` (delta vs the previous run included).
 
 The pg-noop binary resolves embedded (release builds carry it via
 `-tags pgnoop_embed`; `make build-pgnoop` builds one locally) →
-`~/.stroppy/bin/pg-noop/<version>/` cache → sha256-verified download with
+`~/.stroppy/bin/pg-noop/<version>/<os>-<arch>/` cache → sha256-verified download with
 consent. `--server-path` / `STROPPY_PG_NOOP_PATH` bypass resolution.
 
 Known stroppy-bound ceiling: the OTel metric pipeline contends at high VU

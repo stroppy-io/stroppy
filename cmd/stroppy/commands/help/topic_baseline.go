@@ -77,7 +77,7 @@ SERVER BINARY
 
   The wire tier needs the pg-noop binary, resolved in order:
     1. embedded copy (release builds carrying the server binary)
-    2. cache: ~/.stroppy/bin/pg-noop/<version>/pgnoop
+    2. cache: ~/.stroppy/bin/pg-noop/<version>/<os>-<arch>/pgnoop
     3. download from the pinned github.com/stroppy-io/pg-noop release,
        verified against a digest compiled into stroppy itself (a tampered
        release cannot pass); interactive consent is required on a terminal

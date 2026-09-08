@@ -16,10 +16,7 @@ import (
 
 const metricsShutdownTimeout = 10 * time.Second
 
-// root is the process-wide engine state for the Go-native runner. Set once by Run.
-var root *RootState
-
-// RootState is the engine-wide singleton for the Go-workload run.
+// RootState holds engine state for one Go-workload run.
 type RootState struct {
 	lg  *zap.Logger
 	ctx context.Context //nolint:containedctx // engine lifecycle ctx stored for async teardown/cancellation

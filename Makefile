@@ -125,6 +125,7 @@ GO_BUILD_TAGS ?=
 # Keep in sync with internal/pgnoop.Version.
 PGNOOP_VERSION=v0.1.2
 PGNOOP_EMBED_DIR=$(CURDIR)/internal/pgnoop/embedded
+PGNOOP_CHECKSUMS=$(CURDIR)/internal/pgnoop/release.sha256
 
 build-debug: # Build binary stroppy (with symbols)
 	@mkdir -p $(CURDIR)/build
@@ -149,13 +150,14 @@ pgnoop-fetch: # Fetch the host-matching pg-noop server for -tags pgnoop_embed bu
 		*) echo "error: no pg-noop release asset for $$os/$$arch"; exit 1 ;; \
 	esac; \
 	base="https://github.com/stroppy-io/pg-noop/releases/download/$(PGNOOP_VERSION)"; \
+	expected=$$(grep -F "  $$asset" $(PGNOOP_CHECKSUMS) | cut -d ' ' -f1); \
+	[ -n "$$expected" ] || { echo "error: no pinned checksum for $$asset"; exit 1; }; \
 	tmp=$$(mktemp -d); \
 	curl -sSfL -o "$$tmp/$$asset" "$$base/$$asset" || exit 1; \
-	curl -sSfL -o "$$tmp/$$asset.sha256" "$$base/$$asset.sha256" || exit 1; \
 	if command -v sha256sum >/dev/null 2>&1; then \
-		( cd "$$tmp" && sha256sum -c "$$asset.sha256" ) || exit 1; \
+		printf '%s  %s\n' "$$expected" "$$tmp/$$asset" | sha256sum -c - || exit 1; \
 	else \
-		( cd "$$tmp" && shasum -a 256 -c "$$asset.sha256" ) || exit 1; \
+		printf '%s  %s\n' "$$expected" "$$tmp/$$asset" | shasum -a 256 -c - || exit 1; \
 	fi; \
 	tar -xf "$$tmp/$$asset" -C "$$tmp" || exit 1; \
 	bin=$$(find "$$tmp" -name pgnoop -type f | head -1); \

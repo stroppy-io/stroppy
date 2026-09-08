@@ -2,6 +2,7 @@ package baseline
 
 import (
 	"encoding/json"
+	"errors"
 	"math"
 	"strings"
 	"testing"
@@ -89,9 +90,9 @@ func tierFixture(name string) TierResult {
 	return TierResult{
 		Name:        name,
 		ParallelVUs: 8,
-		TxSingle:    TxStat{TxPerSec: 1000},
-		TxParallel:  TxStat{TxPerSec: 5600, P50Ms: 0.5, P99Ms: 1.0},
-		Load:        LoadStat{RowsPerSec: 100},
+		TxSingle:    TxStat{Iterations: 1000, TxPerSec: 1000},
+		TxParallel:  TxStat{Iterations: 5600, TxPerSec: 5600, P50Ms: 0.5, P99Ms: 1.0},
+		Load:        LoadStat{Rows: 100, RowsPerSec: 100},
 	}
 }
 
@@ -148,6 +149,22 @@ func TestEvaluateWarns(t *testing.T) {
 		status, found := verdictStatus(verdicts, check)
 		if !found || status != statusWarn {
 			t.Fatalf("check %q = %q (found %v), want warn", check, status, found)
+		}
+	}
+}
+
+func TestEvaluateWarnsWhenNoWorkWasMeasured(t *testing.T) {
+	tier := TierResult{Name: tierWire, ParallelVUs: 8}
+	verdicts := evaluate([]TierResult{tier})
+
+	status, found := verdictStatus(verdicts, tierWire+" measurements")
+	if !found || status != statusWarn {
+		t.Fatalf("measurement verdict = %q (found %v), want warn", status, found)
+	}
+
+	for _, check := range []string{tierWire + " errors", "loopback latency floor"} {
+		if _, exists := verdictStatus(verdicts, check); exists {
+			t.Fatalf("success-only verdict %q emitted without measurements", check)
 		}
 	}
 }
@@ -237,6 +254,27 @@ func TestSaveReportSameSecondCollision(t *testing.T) {
 	previous, err := loadPrevious(report.Time.Add(time.Minute))
 	if err != nil || previous == nil {
 		t.Fatalf("loadPrevious() after collision = %+v, %v", previous, err)
+	}
+}
+
+func TestLoadPreviousUsesNewestSameSecondReport(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	report := &Report{Schema: reportSchema, Time: time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)}
+	for _, version := range []string{"first", "second", "third"} {
+		report.Stroppy = version
+		if _, err := saveReport(report); err != nil {
+			t.Fatalf("saveReport(%s): %v", version, err)
+		}
+	}
+
+	previous, err := loadPrevious(report.Time.Add(time.Second))
+	if err != nil {
+		t.Fatalf("loadPrevious() error = %v", err)
+	}
+
+	if previous == nil || previous.Stroppy != "third" {
+		t.Fatalf("loadPrevious() = %+v, want third same-second report", previous)
 	}
 }
 
@@ -347,6 +385,31 @@ func TestPlanRunRejectsOutOfRangeVUs(t *testing.T) {
 	}
 }
 
+func TestPlanRunRejectsNegativeDurationAndRows(t *testing.T) {
+	saved := opts
+
+	t.Cleanup(func() { opts = saved })
+
+	for _, test := range []struct {
+		name string
+		set  func()
+		want error
+	}{
+		{name: "duration", set: func() { opts.duration = -time.Second }, want: errDurationOutOfRange},
+		{name: "rows", set: func() { opts.rows = -1 }, want: errRowsOutOfRange},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			opts = options{tiers: []string{tierNoop}, download: "ask", vus: 1}
+
+			test.set()
+
+			if _, err := planRun(); !errors.Is(err, test.want) {
+				t.Fatalf("planRun() error = %v, want %v", err, test.want)
+			}
+		})
+	}
+}
+
 func TestEmitReportKeepsJSONPure(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
@@ -369,5 +432,67 @@ func TestEmitReportKeepsJSONPure(t *testing.T) {
 	var decoded Report
 	if err := json.Unmarshal([]byte(out.String()), &decoded); err != nil {
 		t.Fatalf("stdout is not valid JSON in --json mode: %v\noutput: %q", err, out.String())
+	}
+}
+
+var errOutputSink = errors.New("output sink failed")
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errOutputSink }
+
+type failAfterWriter struct {
+	writes int
+}
+
+func (w *failAfterWriter) Write(data []byte) (int, error) {
+	w.writes++
+	if w.writes > 1 {
+		return 0, errOutputSink
+	}
+
+	return len(data), nil
+}
+
+func TestEmitReportPropagatesOutputErrors(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	saved := opts
+
+	t.Cleanup(func() { opts = saved })
+
+	report := &Report{Schema: reportSchema, Time: time.Now().UTC()}
+
+	for _, jsonOut := range []bool{false, true} {
+		opts = options{jsonOut: jsonOut, noSave: true}
+		if err := emitReport(failingWriter{}, report); !errors.Is(err, errOutputSink) {
+			t.Fatalf("emitReport(json=%t) error = %v, want output failure", jsonOut, err)
+		}
+	}
+}
+
+func TestEmitReportPropagatesStatusOutputError(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	saved := opts
+	opts = options{}
+
+	t.Cleanup(func() { opts = saved })
+
+	writer := &failAfterWriter{}
+
+	report := &Report{Schema: reportSchema, Time: time.Now().UTC()}
+	if err := emitReport(writer, report); !errors.Is(err, errOutputSink) {
+		t.Fatalf("emitReport() error = %v, want status output failure", err)
+	}
+}
+
+func TestTierTitleLabelsExternalPGNoop(t *testing.T) {
+	if title := tierTitle(tierWire, &Report{}); !strings.Contains(title, "external pg-noop") {
+		t.Fatalf("tierTitle() = %q, want external pg-noop", title)
+	}
+
+	if title := tierTitle(tierWire, &Report{PGNoop: "v1"}); !strings.Contains(title, "pg-noop v1") {
+		t.Fatalf("tierTitle() = %q, want pinned version", title)
 	}
 }

@@ -8,8 +8,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -40,6 +44,44 @@ func TestAssetName(t *testing.T) {
 		if err != nil || got != tc.want {
 			t.Fatalf("AssetName(%s, %s) = %q, %v; want %q", tc.goos, tc.goarch, got, err, tc.want)
 		}
+	}
+}
+
+func TestAssetDigestsCoverSupportedTargets(t *testing.T) {
+	for _, target := range [][2]string{
+		{"linux", "amd64"},
+		{"linux", "arm64"},
+		{"darwin", "amd64"},
+		{"darwin", "arm64"},
+	} {
+		asset, err := AssetName(target[0], target[1])
+		if err != nil {
+			t.Fatalf("AssetName(%s, %s): %v", target[0], target[1], err)
+		}
+
+		digest, err := AssetDigest(asset)
+		if err != nil {
+			t.Fatalf("AssetDigest(%s): %v", asset, err)
+		}
+
+		decoded, err := hex.DecodeString(digest)
+		if err != nil || len(decoded) != sha256.Size {
+			t.Fatalf("AssetDigest(%s) = %q, want sha256 hex", asset, digest)
+		}
+	}
+}
+
+func TestCachePathIncludesHostTarget(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	path, err := CachePath()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantSuffix := filepath.Join(Version, runtime.GOOS+"-"+runtime.GOARCH, binaryName)
+	if !strings.HasSuffix(path, wantSuffix) {
+		t.Fatalf("CachePath() = %q, want suffix %q", path, wantSuffix)
 	}
 }
 
@@ -149,12 +191,13 @@ func TestResolveExplicitPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Resolve(Options{Path: binary, Consent: ConsentNever})
+	got, err := Resolve(context.Background(), Options{Path: binary, Consent: ConsentNever})
 	if err != nil || got != binary {
 		t.Fatalf("Resolve() = %q, %v; want explicit path", got, err)
 	}
 
-	if _, err := Resolve(Options{Path: filepath.Join(t.TempDir(), "missing"), Consent: ConsentNever}); err == nil {
+	missing := filepath.Join(t.TempDir(), "missing")
+	if _, err := Resolve(context.Background(), Options{Path: missing, Consent: ConsentNever}); err == nil {
 		t.Fatal("Resolve() accepted a missing explicit path")
 	}
 }
@@ -175,7 +218,7 @@ func TestResolveCacheHitSkipsDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fetchAsset = func(string) ([]byte, error) {
+	fetchAsset = func(context.Context, string) ([]byte, error) {
 		t.Fatal("download attempted despite cache hit")
 
 		return nil, nil
@@ -183,9 +226,41 @@ func TestResolveCacheHitSkipsDownload(t *testing.T) {
 
 	t.Cleanup(func() { fetchAsset = fetch })
 
-	got, err := Resolve(Options{Consent: ConsentNever})
+	got, err := Resolve(context.Background(), Options{Consent: ConsentNever})
 	if err != nil || got != cache {
 		t.Fatalf("Resolve() = %q, %v; want cache path", got, err)
+	}
+}
+
+func TestResolveEmbeddedReplacesCache(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	cache, err := CachePath()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(cache), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(cache, []byte("stale"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	previousEmbedded := embeddedBinary
+	embeddedBinary = []byte("embedded")
+
+	t.Cleanup(func() { embeddedBinary = previousEmbedded })
+
+	got, err := Resolve(context.Background(), Options{Consent: ConsentNever})
+	if err != nil || got != cache {
+		t.Fatalf("Resolve() = %q, %v; want embedded cache path", got, err)
+	}
+
+	content, err := os.ReadFile(cache)
+	if err != nil || string(content) != "embedded" {
+		t.Fatalf("cache content = %q, %v; want embedded", content, err)
 	}
 }
 
@@ -198,7 +273,7 @@ func TestResolveDownloadsAndVerifies(t *testing.T) {
 	})
 	sum := sha256.Sum256(tarball)
 
-	fetchAsset = func(string) ([]byte, error) { return tarball, nil }
+	fetchAsset = func(context.Context, string) ([]byte, error) { return tarball, nil }
 	assetDigest = func(string) (string, error) { return hex.EncodeToString(sum[:]), nil }
 
 	t.Cleanup(func() {
@@ -206,7 +281,7 @@ func TestResolveDownloadsAndVerifies(t *testing.T) {
 		assetDigest = AssetDigest
 	})
 
-	got, err := Resolve(Options{Consent: ConsentAlways})
+	got, err := Resolve(context.Background(), Options{Consent: ConsentAlways})
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -227,7 +302,7 @@ func TestResolveRefusesBadDigest(t *testing.T) {
 
 	tarball := buildTarXz(t, map[string][]byte{"pg-noop-test-target/pgnoop": []byte("x")})
 
-	fetchAsset = func(string) ([]byte, error) { return tarball, nil }
+	fetchAsset = func(context.Context, string) ([]byte, error) { return tarball, nil }
 	assetDigest = func(string) (string, error) { return strings.Repeat("0", 64), nil }
 
 	t.Cleanup(func() {
@@ -235,7 +310,7 @@ func TestResolveRefusesBadDigest(t *testing.T) {
 		assetDigest = AssetDigest
 	})
 
-	if _, err := Resolve(Options{Consent: ConsentAlways}); !errors.Is(err, errDigestMismatch) {
+	if _, err := Resolve(context.Background(), Options{Consent: ConsentAlways}); !errors.Is(err, errDigestMismatch) {
 		t.Fatalf("Resolve() error = %v, want errDigestMismatch", err)
 	}
 }
@@ -243,7 +318,7 @@ func TestResolveRefusesBadDigest(t *testing.T) {
 func TestResolveRefusesWithoutConsent(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
-	fetchAsset = func(string) ([]byte, error) {
+	fetchAsset = func(context.Context, string) ([]byte, error) {
 		t.Fatal("download attempted despite ConsentNever")
 
 		return nil, nil
@@ -251,7 +326,7 @@ func TestResolveRefusesWithoutConsent(t *testing.T) {
 
 	t.Cleanup(func() { fetchAsset = fetch })
 
-	_, err := Resolve(Options{Consent: ConsentNever})
+	_, err := Resolve(context.Background(), Options{Consent: ConsentNever})
 	if !errors.Is(err, ErrNoServerBinary) {
 		t.Fatalf("Resolve() error = %v, want ErrNoServerBinary", err)
 	}
@@ -262,7 +337,7 @@ func TestResolvePromptDeclined(t *testing.T) {
 
 	declined := false
 
-	_, err := Resolve(Options{
+	_, err := Resolve(context.Background(), Options{
 		Consent: ConsentAsk,
 		Prompt: func(string) bool {
 			declined = true
@@ -276,6 +351,64 @@ func TestResolvePromptDeclined(t *testing.T) {
 	}
 }
 
+func TestFetchHonorsCancellation(t *testing.T) {
+	started := make(chan struct{})
+
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+		close(started)
+		<-req.Context().Done()
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+
+	go func() {
+		_, err := fetch(ctx, server.URL)
+		done <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("fetch did not reach test server")
+	}
+
+	cancel()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("fetch error = %v, want context.Canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("fetch did not stop after cancellation")
+	}
+}
+
+func TestFetchRejectsOversizedResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(out http.ResponseWriter, _ *http.Request) {
+		out.Header().Set("Content-Length", strconv.Itoa(maxAssetBytes+1))
+		out.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	if _, err := fetch(context.Background(), server.URL); !errors.Is(err, errAssetTooLarge) {
+		t.Fatalf("fetch error = %v, want errAssetTooLarge", err)
+	}
+}
+
+func TestListeningPort(t *testing.T) {
+	port, ok := listeningPort("pgnoop listening on 127.0.0.1:43210")
+	if !ok || port != 43210 {
+		t.Fatalf("listeningPort() = %d, %t; want 43210, true", port, ok)
+	}
+
+	if _, parsed := listeningPort("not ready"); parsed {
+		t.Fatal("listeningPort() accepted unrelated output")
+	}
+}
+
 // TestServerLifecycle drives a real pg-noop binary when STROPPY_PG_NOOP_PATH
 // points at one; unit environments without the binary skip it.
 func TestServerLifecycle(t *testing.T) {
@@ -284,15 +417,13 @@ func TestServerLifecycle(t *testing.T) {
 		t.Skip("STROPPY_PG_NOOP_PATH not set")
 	}
 
-	port := freeTestPort(t)
-
-	server, err := Start(context.Background(), binary, port)
+	server, err := Start(context.Background(), binary, 0)
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
 
-	if server.Port() != port {
-		t.Fatalf("Port() = %d, want %d", server.Port(), port)
+	if server.Port() < 1 {
+		t.Fatalf("Port() = %d, want assigned port", server.Port())
 	}
 
 	conn, err := net.DialTimeout("tcp", server.Addr(), 2*time.Second)
@@ -309,16 +440,4 @@ func TestServerLifecycle(t *testing.T) {
 	if _, err := net.DialTimeout("tcp", server.Addr(), 200*time.Millisecond); err == nil {
 		t.Fatal("server still accepting after Stop")
 	}
-}
-
-func freeTestPort(t *testing.T) int {
-	t.Helper()
-
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("free port: %v", err)
-	}
-	defer listener.Close()
-
-	return listener.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert // loopback addr is TCP
 }

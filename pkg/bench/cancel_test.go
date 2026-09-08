@@ -58,7 +58,7 @@ func TestRunCancelsSetup(t *testing.T) {
 // once its per-VU context is canceled, so a leak would hang runScenario and trip
 // the timeout guard.
 func TestRunScenarioConstantVUsCancellation(t *testing.T) {
-	installRuntimeTestRoot(t)
+	rootState := newRuntimeTestRoot(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -69,7 +69,7 @@ func TestRunScenarioConstantVUsCancellation(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- runScenario(ctx, scenarioSpec{
+		done <- runScenario(ctx, rootState, scenarioSpec{
 			executor: "constant-vus",
 			vus:      4,
 			duration: 10 * time.Second,

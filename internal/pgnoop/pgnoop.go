@@ -9,10 +9,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
+
+	_ "embed"
 )
 
-// Version is the pg-noop release stroppy pins. Bump together with the release
-// asset names below when upgrading.
+// Version is the pg-noop release stroppy pins. Bump together with
+// release.sha256 and the asset mapping below when upgrading.
 const Version = "v0.1.2"
 
 const (
@@ -26,28 +29,25 @@ const (
 // the host platform.
 var ErrUnsupportedPlatform = errors.New("pgnoop: no release asset for this platform")
 
-// releaseDigests pins the expected sha256 of every v0.1.2 release asset in
-// stroppy's own source, so a tampered release cannot pass verification by
-// replacing the archive and its sidecar together. Keep in sync with Version
-// when upgrading.
-var releaseDigests = map[string]string{
-	"pg-noop-x86_64-unknown-linux-musl.tar.xz":  "1bc328a8b484694aeba0cc4d988887acb6e58c6848addc6f242655358ca8d893",
-	"pg-noop-aarch64-unknown-linux-musl.tar.xz": "a374f608292050ecee00e2c30dd264f1e227326059ab44a2ec68023a3e68fd48",
-	"pg-noop-x86_64-apple-darwin.tar.xz":        "a5fa61402f428281a580d793c6398bea14ee143a57b4772c718b3d55a2d84aaa",
-	"pg-noop-aarch64-apple-darwin.tar.xz":       "45eead14239a1ba32a29c949de1c997e47db1076ebd6e87f54e1d25d04218ad1",
-}
+// releaseChecksums pins every release asset digest in stroppy's own source.
+// Release and local embed builds consume the same manifest.
+//
+//go:embed release.sha256
+var releaseChecksums string
 
 // ErrUnknownDigest is returned when a pinned asset has no compiled-in digest.
 var ErrUnknownDigest = errors.New("pgnoop: no pinned digest for asset")
 
 // AssetDigest returns the pinned sha256 hex digest for a release asset.
 func AssetDigest(asset string) (string, error) {
-	digest, ok := releaseDigests[asset]
-	if !ok {
-		return "", fmt.Errorf("%w: %s", ErrUnknownDigest, asset)
+	fields := strings.Fields(releaseChecksums)
+	for idx := 0; idx+1 < len(fields); idx += 2 {
+		if fields[idx+1] == asset {
+			return fields[idx], nil
+		}
 	}
 
-	return digest, nil
+	return "", fmt.Errorf("%w: %s", ErrUnknownDigest, asset)
 }
 
 // AssetName returns the release asset for a GOOS/GOARCH pair.
@@ -71,14 +71,16 @@ func ReleaseURL(asset string) string {
 	return releaseBase + Version + "/" + asset
 }
 
-// CachePath returns ~/.stroppy/bin/pg-noop/<version>/pgnoop for the host.
+// CachePath returns ~/.stroppy/bin/pg-noop/<version>/<os>-<arch>/pgnoop for the host.
 func CachePath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("pgnoop: resolve home dir: %w", err)
 	}
 
-	return filepath.Join(home, ".stroppy", cacheSubDir, "pg-noop", Version, binaryName), nil
+	target := runtime.GOOS + "-" + runtime.GOARCH
+
+	return filepath.Join(home, ".stroppy", cacheSubDir, "pg-noop", Version, target, binaryName), nil
 }
 
 // ExtractBinary reads a pg-noop release tarball (tar.xz) and returns the raw

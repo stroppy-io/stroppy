@@ -239,14 +239,14 @@ func evaluate(tiers []TierResult) []Verdict {
 	noop, noopOK := byName[tierNoop]
 	wire, wireOK := byName[tierWire]
 
-	if wireOK && wire.TxParallel.P99Ms > maxLoopbackP99Ms {
+	if wireOK && wire.TxParallel.Iterations > 0 && wire.TxParallel.P99Ms > maxLoopbackP99Ms {
 		verdicts = append(verdicts, Verdict{
 			Check:  "loopback latency floor",
 			Status: statusWarn,
 			Detail: fmt.Sprintf("wire p99 %.2fms above %.0fms — VM steal, power saving, or a busy host",
 				wire.TxParallel.P99Ms, maxLoopbackP99Ms),
 		})
-	} else if wireOK {
+	} else if wireOK && wire.TxParallel.Iterations > 0 {
 		verdicts = append(verdicts, Verdict{
 			Check:  "loopback latency floor",
 			Status: statusOK,
@@ -254,7 +254,8 @@ func evaluate(tiers []TierResult) []Verdict {
 		})
 	}
 
-	if noopOK && wireOK && noop.TxParallel.TxPerSec < wire.TxParallel.TxPerSec {
+	if noopOK && wireOK && noop.TxParallel.Iterations > 0 && wire.TxParallel.Iterations > 0 &&
+		noop.TxParallel.TxPerSec < wire.TxParallel.TxPerSec {
 		verdicts = append(verdicts, Verdict{
 			Check:  "tier ordering",
 			Status: statusWarn,
@@ -268,6 +269,29 @@ func evaluate(tiers []TierResult) []Verdict {
 func tierVerdicts(tier *TierResult) []Verdict {
 	var verdicts []Verdict
 
+	var missing []string
+	if tier.Load.Rows <= 0 {
+		missing = append(missing, "load")
+	}
+
+	if tier.TxSingle.Iterations <= 0 {
+		missing = append(missing, "single-VU tx")
+	}
+
+	if tier.TxParallel.Iterations <= 0 {
+		missing = append(missing, "parallel tx")
+	}
+
+	if len(missing) > 0 {
+		verdicts = append(verdicts, Verdict{
+			Check:  tier.Name + " measurements",
+			Status: statusWarn,
+			Detail: "no work measured for " + strings.Join(missing, ", "),
+		})
+	}
+
+	hasTxMeasurements := tier.TxSingle.Iterations > 0 && tier.TxParallel.Iterations > 0
+
 	failed := tier.TxSingle.Failed + tier.TxParallel.Failed
 	if failed > 0 {
 		verdicts = append(verdicts, Verdict{
@@ -275,7 +299,7 @@ func tierVerdicts(tier *TierResult) []Verdict {
 			Status: statusWarn,
 			Detail: fmt.Sprintf("%.0f failed iterations taint the %s tier numbers", failed, tier.Name),
 		})
-	} else {
+	} else if hasTxMeasurements {
 		verdicts = append(verdicts, Verdict{
 			Check:  tier.Name + " errors",
 			Status: statusOK,
@@ -283,7 +307,7 @@ func tierVerdicts(tier *TierResult) []Verdict {
 		})
 	}
 
-	if tier.ParallelVUs > 1 && tier.TxSingle.TxPerSec > 0 {
+	if hasTxMeasurements && tier.ParallelVUs > 1 && tier.TxSingle.TxPerSec > 0 {
 		efficiency := tier.TxParallel.TxPerSec / (tier.TxSingle.TxPerSec * float64(tier.ParallelVUs))
 		if efficiency < minScalingEfficiency {
 			verdicts = append(verdicts, Verdict{
@@ -304,7 +328,7 @@ func tierVerdicts(tier *TierResult) []Verdict {
 
 	// Noise quantiles are only meaningful for the wire tier: at noop speeds
 	// microsecond quantization drowns the scheduling signal.
-	if tier.Name == tierWire && tier.TxParallel.P50Ms > 0 &&
+	if hasTxMeasurements && tier.Name == tierWire && tier.TxParallel.P50Ms > 0 &&
 		tier.TxParallel.P99Ms/tier.TxParallel.P50Ms > maxNoiseRatio {
 		verdicts = append(verdicts, Verdict{
 			Check:  tier.Name + " latency noise",
@@ -373,7 +397,9 @@ func writeReportFile(dir, name string, data []byte) (string, error) {
 		closeErr := file.Close()
 
 		if writeErr != nil || closeErr != nil {
-			return "", fmt.Errorf("write report: %w", errors.Join(writeErr, closeErr))
+			removeErr := os.Remove(path)
+
+			return "", fmt.Errorf("write report: %w", errors.Join(writeErr, closeErr, removeErr))
 		}
 
 		return path, nil
@@ -401,22 +427,32 @@ func loadPrevious(current time.Time) (*Report, error) {
 		return nil, err //nolint:wrapcheck // absent history is surfaced as a plain miss
 	}
 
-	names := make([]string, 0, len(entries))
+	files := make([]reportFile, 0, len(entries))
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".json") {
-			names = append(names, entry.Name())
-		}
-	}
-
-	sort.Sort(sort.Reverse(sort.StringSlice(names)))
-
-	for _, name := range names {
-		reportTime, ok := reportFileTime(name)
-		if !ok || !reportTime.Before(current) {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
 
-		data, readErr := os.ReadFile(filepath.Join(dir, name))
+		file, ok := parseReportFile(entry.Name())
+		if ok {
+			files = append(files, file)
+		}
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		if files[i].time.Equal(files[j].time) {
+			return files[i].suffix > files[j].suffix
+		}
+
+		return files[i].time.After(files[j].time)
+	})
+
+	for _, file := range files {
+		if !file.time.Before(current) {
+			continue
+		}
+
+		data, readErr := os.ReadFile(filepath.Join(dir, file.name))
 		if readErr != nil {
 			continue
 		}
@@ -433,21 +469,37 @@ func loadPrevious(current time.Time) (*Report, error) {
 	return nil, nil
 }
 
-// reportFileTime parses the run timestamp encoded in a report filename:
-// 2026-09-02T15-04-05Z.json, optionally with a -N collision suffix.
-func reportFileTime(name string) (time.Time, bool) {
-	name = strings.TrimSuffix(name, ".json")
+type reportFile struct {
+	name   string
+	time   time.Time
+	suffix int
+}
 
-	if idx := strings.LastIndex(name, "-"); idx > 0 {
-		if _, err := strconv.Atoi(name[idx+1:]); err == nil {
-			name = name[:idx]
+func parseReportFile(name string) (reportFile, bool) {
+	file := reportFile{name: name, suffix: 1}
+	base := strings.TrimSuffix(name, ".json")
+
+	if idx := strings.LastIndex(base, "-"); idx > 0 {
+		if suffix, err := strconv.Atoi(base[idx+1:]); err == nil {
+			base = base[:idx]
+			file.suffix = suffix
 		}
 	}
 
-	ts, err := time.Parse("2006-01-02T15-04-05Z", name)
-	if err != nil {
-		return time.Time{}, false
+	parsed, err := time.Parse("2006-01-02T15-04-05Z", base)
+	if err != nil || file.suffix < 1 {
+		return reportFile{}, false
 	}
 
-	return ts, true
+	file.time = parsed
+
+	return file, true
+}
+
+// reportFileTime parses the run timestamp encoded in a report filename:
+// 2026-09-02T15-04-05Z.json, optionally with a -N collision suffix.
+func reportFileTime(name string) (time.Time, bool) {
+	file, ok := parseReportFile(name)
+
+	return file.time, ok
 }
