@@ -70,7 +70,6 @@ linters:
     - prealloc
     - predeclared
     - promlinter
-    - protogetter
     - reassign
     - revive
     - rowserrcheck
@@ -151,13 +150,10 @@ linters:
         - lll
         - mnd
         - err113
-      allow-unused: true
+      allow-unused: false
     paralleltest:
       ignore-missing: true
       ignore-missing-subtests: true
-    rowserrcheck:
-      packages:
-        - github.com/jmoiron/sqlx
     tagliatelle:
       case:
         rules:
@@ -180,9 +176,6 @@ linters:
           - gocritic
         source: //noinspection
       - linters:
-          - errorlint
-        source: ^\s+if _, ok := err\.\([^.]+\.InternalError\); ok {
-      - linters:
           - tagliatelle
         path: driver_preset\.go
         text: json\(snake\)
@@ -190,7 +183,7 @@ linters:
           - tagliatelle
         path: pkg/config/.*\.go
         text: json\(snake\)
-        # camelCase json tags are the protojson wire format; preserved intentionally (see #143)
+        # camelCase JSON tags preserve the established v5 JSON format (see #143)
       - linters:
           - bodyclose
           - containedctx
@@ -206,15 +199,10 @@ linters:
           - maintidx
           - mnd
           - noctx
-          - protogetter
-          - wrapcheck
         path: _test\.go
       - linters:
           - mnd
         path: ^workloads/(execute_sql|simple|tpcb|tpcc|tpcds|tpch)/
-      - linters:
-          - unused
-        path: bind.go
       - linters:
           - govet
         text: 'shadow: declaration of "(err|ctx)" shadows declaration at'
@@ -223,7 +211,6 @@ linters:
           - staticcheck
         text: in package name
     paths:
-      - pb.go$
       - ^third_party/
 issues:
   max-same-issues: 50

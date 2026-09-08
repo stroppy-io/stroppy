@@ -154,15 +154,15 @@ func TestParseRunArgs(t *testing.T) {
 			wantSQL:    "tpcc-scale-100",
 		},
 		{
-			name:       "script with .ts extension",
-			args:       []string{"bench.ts"},
-			wantScript: "bench.ts",
+			name:       "registered workload name",
+			args:       []string{"tpcb/tx"},
+			wantScript: "tpcb/tx",
 		},
 		{
-			name:       "script with path and sql",
-			args:       []string{"./benchmarks/custom.ts", "data.sql"},
-			wantScript: "./benchmarks/custom.ts",
-			wantSQL:    "data.sql",
+			name:       "workload with SQL override path",
+			args:       []string{"tpcc/tx", "./workloads/tpcc/pico.sql"},
+			wantScript: "tpcc/tx",
+			wantSQL:    "./workloads/tpcc/pico.sql",
 		},
 		{
 			name:       "third positional returns error",
@@ -170,7 +170,7 @@ func TestParseRunArgs(t *testing.T) {
 			wantErrStr: "too many positional arguments",
 		},
 		{
-			name:       "typed flag pair form",
+			name:       "supported typed flag parses directly",
 			args:       []string{"tpcc", "--vus", "10"},
 			wantScript: "tpcc",
 			wantTyped:  map[string]string{"vus": "10"},
@@ -484,7 +484,7 @@ func TestParseRunArgs(t *testing.T) {
 
 		// ── -- separator ───────────────────────────────────────────────────
 		{
-			name:          "-- passes remaining args to k6",
+			name:          "separator captures a nonempty tail",
 			args:          []string{"tpcc", "--", "--duration", "5m"},
 			wantScript:    "tpcc",
 			wantAfterDash: []string{"--duration", "5m"},
@@ -496,7 +496,7 @@ func TestParseRunArgs(t *testing.T) {
 			wantAfterDash: []string{},
 		},
 		{
-			name:          "flags before -- are not passed to k6",
+			name:          "flags before separator remain parsed",
 			args:          []string{"tpcc", "--steps", "load", "--", "--vus", "10"},
 			wantScript:    "tpcc",
 			wantSteps:     []string{"load"},
@@ -505,7 +505,7 @@ func TestParseRunArgs(t *testing.T) {
 
 		// ── Mixed combinations ─────────────────────────────────────────────
 		{
-			name:          "script + driver + steps + k6args",
+			name:          "script plus options and separator tail",
 			args:          []string{"tpcc", "-d", "pg", "--steps", "load,run", "--", "--duration", "5m"},
 			wantScript:    "tpcc",
 			wantPresets:   map[int]string{0: "pg"},
@@ -642,6 +642,27 @@ func TestParseRunArgs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnknownFlagGuidance(t *testing.T) {
+	t.Parallel()
+
+	_, err := parseRunArgs([]string{"tpch/tx", "-unknown"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "stroppy run <workload> --help")
+	require.NotContains(t, err.Error(), "after --")
+
+	_, err = parseRunArgs([]string{"tpch/tx", "--unknown-flag"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "stroppy run <workload> --help")
+	require.NotContains(t, err.Error(), "after --")
+}
+
+func TestNonemptySeparatorTailIsRejected(t *testing.T) {
+	err := Cmd.RunE(Cmd, []string{"tpch/tx", "--", "--legacy-flag"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "arguments after '--' are not supported")
+	require.Contains(t, err.Error(), "stroppy run <workload> --help")
 }
 
 func TestConfigDriversMergeBelowCLI(t *testing.T) {

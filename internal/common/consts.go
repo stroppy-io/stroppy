@@ -1,4 +1,4 @@
-package common //nolint:revive // package name is intentional
+package common
 
 const (
 	FolderMode = 0o755

@@ -6,7 +6,7 @@ import (
 
 const preset = "tpcc"
 
-// Hardcoded TPC-C population constants (tpcc_common.ts).
+// TPC-C population constants.
 const (
 	districtsPerWarehouse = 10
 	customersPerDistrict  = 3000

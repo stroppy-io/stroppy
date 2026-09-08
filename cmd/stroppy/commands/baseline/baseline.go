@@ -259,7 +259,7 @@ func measureTiers(ctx context.Context, plan runPlan, report *Report) error {
 }
 
 func emitReport(out io.Writer, report *Report) error {
-	previous, _ := loadPrevious(report.Time) //nolint:errcheck // a missing history is not a failure
+	previous, _ := loadPrevious(report.Time)
 
 	var rendered strings.Builder
 

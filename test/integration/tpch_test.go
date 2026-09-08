@@ -50,8 +50,8 @@ func TestTpchWorkloadEndToEnd(t *testing.T) {
 	assertTpchQueriesLogged(t, out)
 }
 
-// assertTpchGrammarComments spot-checks that Draw.grammar is producing
-// grammatical text: a majority of o_comment values should contain at
+// assertTpchGrammarComments spot-checks the canonical dbgen comment output.
+// A majority of o_comment values should contain at
 // least one recognized TPC-H noun / verb / terminator. With 15 000
 // orders at SF=0.01 and a comment length ≥ 19, essentially every row
 // should hit at least one of these lexemes. The 80% floor leaves room for

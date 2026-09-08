@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	// DefaultInterval is the default cadence for InsertSpec progress samples.
+	// DefaultInterval is the default cadence for insert operation progress samples.
 	DefaultInterval = 10 * time.Second
 	// DefaultStallAfter is the default no-progress duration before warning.
 	DefaultStallAfter = time.Minute
@@ -26,15 +26,15 @@ const (
 // ErrInvalidMode is returned when progress mode is not one of off/log/metrics/both.
 var ErrInvalidMode = errors.New("insert progress: invalid mode")
 
-// Mode controls where InsertSpec progress samples are emitted.
+// Mode controls where insert operation progress samples are emitted.
 type Mode string
 
 const (
-	// ModeOff disables the InsertSpec progress watcher.
+	// ModeOff disables the insert operation progress watcher.
 	ModeOff Mode = "off"
 	// ModeLog emits progress samples to the logger.
 	ModeLog Mode = "log"
-	// ModeMetrics emits progress samples to the k6 metrics callback.
+	// ModeMetrics emits progress samples to the metrics callback.
 	ModeMetrics Mode = "metrics"
 	// ModeBoth emits progress samples to both logger and metrics callback.
 	ModeBoth Mode = "both"
@@ -48,13 +48,13 @@ const (
 	EventProgress Event = "progress"
 	// EventStall is an interval sample emitted after no row progress for StallAfter.
 	EventStall Event = "stall"
-	// EventCompleted is the final sample for a successful InsertSpec.
+	// EventCompleted is the final sample for a successful insert operation.
 	EventCompleted Event = "completed"
-	// EventFailed is the final sample for a failed InsertSpec.
+	// EventFailed is the final sample for a failed insert operation.
 	EventFailed Event = "failed"
 )
 
-// Config defines one InsertSpec progress tracker.
+// Config defines one insert operation progress tracker.
 type Config struct {
 	Enabled    bool
 	Interval   time.Duration
@@ -93,7 +93,7 @@ type Snapshot struct {
 	Stalled              bool
 }
 
-// Tracker stores mutable InsertSpec progress state and owns the watcher goroutine.
+// Tracker stores mutable insert operation progress state and owns the watcher goroutine.
 type Tracker struct {
 	config Config
 
@@ -117,7 +117,7 @@ type Tracker struct {
 	stages         map[int]string
 }
 
-// DefaultConfig returns the default InsertSpec progress configuration.
+// DefaultConfig returns the default insert operation progress configuration.
 func DefaultConfig() Config {
 	return Config{
 		Enabled:    true,
@@ -141,7 +141,7 @@ func ParseMode(raw string) (Mode, error) {
 	}
 }
 
-// NewTracker creates an InsertSpec progress tracker.
+// NewTracker creates an insert operation progress tracker.
 func NewTracker(config *Config) *Tracker {
 	normalized := normalizeConfig(config)
 	now := time.Now()
@@ -205,7 +205,7 @@ func (tracker *Tracker) Finish(operationErr error) Snapshot {
 	return snapshot
 }
 
-// SetTotal records the actual runtime row count for this InsertSpec.
+// SetTotal records the actual runtime row count for this insert operation.
 func (tracker *Tracker) SetTotal(rows int64) {
 	if tracker == nil || rows < 0 {
 		return
@@ -214,7 +214,7 @@ func (tracker *Tracker) SetTotal(rows int64) {
 	tracker.totalRows.Store(rows)
 }
 
-// SetWorkers records the effective worker count for this InsertSpec.
+// SetWorkers records the effective worker count for this insert operation.
 func (tracker *Tracker) SetWorkers(workers int) {
 	if tracker == nil || workers <= 0 {
 		return
@@ -223,7 +223,7 @@ func (tracker *Tracker) SetWorkers(workers int) {
 	tracker.workers.Store(int64(workers))
 }
 
-// SetStage records the current stage for one InsertSpec worker.
+// SetStage records the current stage for one insert operation worker.
 func (tracker *Tracker) SetStage(workerIndex int, stage string) {
 	if tracker == nil || stage == "" {
 		return

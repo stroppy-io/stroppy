@@ -335,7 +335,7 @@ func load(path string) (*dump, error) {
 	return dmp, nil
 }
 
-// logMsgRe extracts the quoted message field from a k6/logrus text log line:
+// logMsgRe extracts the quoted message field from a logrus text record:
 //
 //	time="..." level=info msg="__TPCDS_DUMP__\tquery_1\t[[\"..\"]]" source=console
 var logMsgRe = regexp.MustCompile(`msg=("(?:[^"\\]|\\.)*")`)

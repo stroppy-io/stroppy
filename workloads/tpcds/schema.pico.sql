@@ -5,10 +5,10 @@
 --   - date    -> datetime:   sbroad has no DATE type (Tarantool datetime).
 --   - every table carries a PRIMARY KEY (Tarantool spaces require one);
 --     key columns are NOT NULL. No FOREIGN KEY (sbroad limitation).
--- Section layout mirrors schema.pg.sql so tpcds.ts needs no schema-shape
--- branch: drop_schema (plain DROP TABLE IF EXISTS, no CASCADE), create_schema,
--- create_indexes. set_timeout/preconfigure_db are omitted (pg-specific SETs;
--- absent sections are no-ops in the dump pass).
+-- Section layout matches schema.pg.sql so setup uses the same step names:
+-- drop_schema (plain DROP TABLE IF EXISTS, no CASCADE), create_schema,
+-- create_indexes. set_timeout/preconfigure_db are omitted (PostgreSQL SETs;
+-- absent sections are no-ops during setup).
 --+ drop_schema
 --= drop_web_returns
 DROP TABLE IF EXISTS web_returns

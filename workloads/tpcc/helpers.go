@@ -1,8 +1,5 @@
-// Package tpcc is the Go-native port of workloads/tpcc/tx.ts: the five TPC-C
-// transactions as ordered DML steps inside driver transactions, with the standard
-// 45/43/4/4/4 mix. Load/config/prepare are shared structure ported from
-// tpcc_common.ts. Initial port covers pg + mysql; picodata/ydb dialect branches
-// (OFFSET, list params) are deferred.
+// Package tpcc implements the five TPC-C transactions as ordered DML steps
+// inside driver transactions with the standard 45/43/4/4/4 mix.
 package tpcc
 
 import (
@@ -39,8 +36,7 @@ func nurand(r *rand.Rand, paramA, lower, upper int, cSalt uint64) int {
 	return int(((int64(aDraw)|int64(yDraw))+paramC)%span) + lower
 }
 
-// weightedPick mirrors k6/x/stroppy NewPicker.PickWeighted: cumulative-threshold
-// draw over weights.
+// weightedPick makes a cumulative-threshold draw over weights.
 func weightedPick(r *rand.Rand, weights []int) int {
 	total := 0
 	for _, w := range weights {

@@ -1,7 +1,7 @@
 // Package config holds the plain-Go application configuration types for run,
 // workload, driver, pool, logger, exporter, and isolation settings. Unmarshal is
-// the shared strict JSON entry point: it preserves v5 ProtoJSON lower-camel and
-// snake_case field names without retaining application protobuf descriptors.
+// the shared strict JSON entry point: it preserves established v5 lower-camel and
+// snake_case field names without retaining application schema descriptors.
 //
 // Regenerate the committed file-envelope schema after changing these types.
 //

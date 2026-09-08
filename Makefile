@@ -168,17 +168,29 @@ pgnoop-fetch: # Fetch the host-matching pg-noop server for -tags pgnoop_embed bu
 build-pgnoop: pgnoop-fetch # Build stroppy with the pg-noop baseline server embedded
 	$(MAKE) build GO_BUILD_TAGS="-tags=pgnoop_embed"
 
-branch=main
 .PHONY: revision
-revision: # Recreate git tag with version tag=<semver>
+revision: # Create version tag with tag=<semver>
 	@if [ -z "$(tag)" ]; then \
 		echo "error: Specify version 'tag='"; \
 		exit 1; \
 	fi
-	git tag -d v${tag} || true
-	git push --delete origin v${tag} || true
-	git tag v$(tag)
-	git push origin v$(tag)
+	@tag_ref="refs/tags/v$(tag)"; \
+	if git show-ref --verify --quiet "$$tag_ref"; then \
+		echo "error: tag v$(tag) already exists locally"; \
+		exit 1; \
+	fi; \
+	if git ls-remote --exit-code --tags origin "$$tag_ref" >/dev/null 2>&1; then \
+		echo "error: tag v$(tag) already exists on origin"; \
+		exit 1; \
+	else \
+		status=$$?; \
+		if [ $$status -ne 2 ]; then \
+			echo "error: unable to inspect tags on origin"; \
+			exit $$status; \
+		fi; \
+	fi; \
+	git tag -a "v$(tag)" -m "v$(tag)" && \
+	git push origin "$$tag_ref:$$tag_ref"
 
 
 ##

@@ -34,8 +34,8 @@ func (b *Batch) MaterializeRow(i int, dst []any) {
 		case KindTime:
 			dst[c] = col.times[i] //nolint:gosec // G602: i is caller-bounded to [0,b.Len())
 		case KindBytes:
-			start := int(col.boff[i])             //nolint:gosec // G602: i is caller-bounded to [0,b.Len())
-			end := start + int(col.blens[i])      //nolint:gosec // G602: i is caller-bounded to [0,b.Len())
+			start := int(col.boff[i])
+			end := start + int(col.blens[i])
 			dst[c] = string(col.bytes[start:end]) //nolint:gosec // G602: dst len >= Schema.Columns() by caller contract
 		}
 	}

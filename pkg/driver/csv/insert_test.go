@@ -19,9 +19,7 @@ import (
 )
 
 // typedRowsSource returns a 3-column indexed source (id, squared, label)
-// over `total` rows whose values match the legacy rowsSpec: id=entity+1,
-// squared=entity*entity, label="row". Used to exercise the typed Insert
-// path against the same expected CSV output as the InsertSpec tests.
+// over `total` rows: id=entity+1, squared=entity*entity, label="row".
 func typedRowsSource(total int64) *gen.IndexedSource {
 	return typedRowsSourceWithFailure(total, -1)
 }

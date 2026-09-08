@@ -69,11 +69,10 @@ func NewDriver(opts driver.Options) *Driver {
 }
 
 // Insert runs a typed [driver.InsertRequest] through the noop driver. It
-// exercises the full typed generation pipeline (cursor prepare, batch
-// fill, row materialization) and discards the rows without I/O, so
-// framework overhead stays comparable to the legacy InsertSpec path.
-// Every method is accepted: there is no I/O to gate on, so the whole
-// point is to scale row generation alone.
+// exercises generation, batch filling, and row materialization before
+// discarding rows without I/O, exposing framework overhead. Every method is
+// accepted because there is no I/O to gate on; the point is to scale row
+// generation alone.
 func (d *Driver) Insert(
 	ctx context.Context,
 	req *driver.InsertRequest,
@@ -203,8 +202,7 @@ func (c *noopConn) Rollback(_ context.Context) error { return nil }
 // them. Column 0 is int64(1) — deliberately non-zero so a COUNT(*) read does
 // not trip the by-name payment/order-status guards. The row is padded to
 // noopRowWidth so positional reads (row[N], N up to the widest workload SELECT)
-// never index out of range: the original JS/k6 path returned NaN/"" for
-// out-of-range columns, but Go's []any index panics, so the row must be wide
+// never index out of range. Go's []any indexing panics, so the row must be wide
 // enough for every column a workload body reads.
 
 const noopRowWidth = 32

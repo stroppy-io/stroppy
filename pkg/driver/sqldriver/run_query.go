@@ -22,7 +22,7 @@ import (
 var (
 	ErrMissedArgument = errors.New("missed arguments present")
 	ErrExtraArgument  = errors.New("extra arguments provided")
-	// TODO: synchronize with re from TS parse_sql.ts
+	// Match named :parameter tokens at SQL boundaries.
 	argsRe = regexp.MustCompile(`(\s|^|\()(:[a-zA-Z0-9_]+)(\s|$|;|::|,|\))`)
 )
 

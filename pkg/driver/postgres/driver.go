@@ -83,7 +83,7 @@ func NewDriver(
 		return nil, err
 	}
 
-	// Apply DialFunc if provided (for k6 network metrics)
+	// Apply a custom network dialer when provided.
 	if opts.DialFunc != nil {
 		poolCfg := d.pool.Config()
 		poolCfg.ConnConfig.DialFunc = opts.DialFunc

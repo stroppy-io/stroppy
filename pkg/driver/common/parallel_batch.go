@@ -2,8 +2,6 @@
 // Stroppy database driver. The within-table parallel insert orchestrator
 // lives here so pg, mysql, native, and future drivers stay free of their
 // own chunking and worker lifecycle logic.
-//
-//nolint:revive // package path `pkg/driver/common` is fixed by the plan (§B8).
 package common
 
 import (
@@ -30,17 +28,15 @@ var ErrNilBatchFn = errors.New("common: RunParallelBatch requires a non-nil Batc
 // helpers cancel sibling workers on the first error.
 type BatchFn func(ctx context.Context, chunk Chunk, cur gen.Cursor) error
 
-// RunParallelBatch is the typed successor to [RunParallelByWorkers]: it
-// carves req.Source (a [gen.BatchSource]) into `workers` contiguous
-// chunks by entity index, prepares each partition's cursor, and drains
+// RunParallelBatch carves src into `workers` contiguous chunks by entity
+// index, prepares each partition's cursor, and drains
 // them concurrently through fn. It returns the source's total row count
 // (which may differ from Units for fan-out generators).
 //
 // batchRows is the per-batch row capacity passed to
 // [gen.BatchSource.Prepare]; each cursor allocates one batch of that
 // capacity and refills it on every Next, so generation after preparation
-// allocates nothing. Chunking, worker lifecycle, and cancellation reuse
-// the same errgroup machinery as the legacy path.
+// allocates nothing.
 func RunParallelBatch(
 	ctx context.Context,
 	src gen.BatchSource,

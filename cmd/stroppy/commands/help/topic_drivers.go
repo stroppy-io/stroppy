@@ -8,8 +8,7 @@ func init() {
 		Long: `DRIVERS
 
   Stroppy is a single self-contained Go binary. Driver configuration flows
-  directly from CLI flags (or a config file) into the Go-native engine —
-  there is no k6 process, no TypeScript runtime, and no declareDriverSetup().
+  directly from CLI flags (or a config file) into the benchmark engine.
 
 DRIVER PRESETS (-d / --driver)
 

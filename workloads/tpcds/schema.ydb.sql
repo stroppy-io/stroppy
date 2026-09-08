@@ -12,7 +12,7 @@
 -- Only PK columns are NOT NULL: TPC-DS fact foreign-key columns are genuinely
 -- nullable, and BulkUpsert must accept the generated nulls.
 --
--- Two storage sections, chosen by YDB_STORE_MODE in tpcds.ts:
+-- Two storage sections are selected by --ydb-store-mode:
 --   create_schema_column (column store, default)  the OLAP layout for TPC-DS'
 --                        scan-heavy queries; auto-partitions by size. The full
 --                        query suite (window functions, rollup, grouping sets)

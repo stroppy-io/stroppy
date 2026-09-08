@@ -1,8 +1,8 @@
 // Package tpcds owns Stroppy's TPC-DS implementation, tests, dialect SQL, and
 // answer data. It loads 24 tables through the canonical generator and runs the
-// 99 business queries, run either from the baked canonical qualification set or from an
-// in-process generated stream (throughput test). SF=1 answer validation (pg/mysql) is
-// ported from tpcds_validate.ts as a multiset comparison against answers_sf1.json.
+// 99 business queries from the baked qualification set or an in-process stream.
+// SF=1 answer validation on PostgreSQL and MySQL uses a multiset comparison
+// against answers_sf1.json.
 package tpcds
 
 import "github.com/stroppy-io/stroppy/pkg/bench"
@@ -10,7 +10,7 @@ import "github.com/stroppy-io/stroppy/pkg/bench"
 const preset = "tpcds"
 
 // tpcdsTables is the load order: dimensions and static tables first, fan-out fact
-// tables last (each returns after its parent sales table). Matches tpcds.ts.
+// tables last, each immediately after its parent sales table.
 var tpcdsTables = [24]string{
 	"income_band", "ship_mode", "reason", "household_demographics",
 	"customer_demographics", "date_dim", "time_dim", "warehouse",

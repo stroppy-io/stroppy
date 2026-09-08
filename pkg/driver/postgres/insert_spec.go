@@ -19,11 +19,9 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
-// ErrUnsupportedInsertMethod is returned when an InsertSpec requests a
-// method the postgres driver cannot serve. Today every arm of
-// dgproto.InsertMethod is supported, but new enum values land here before
-// the switch learns them.
-var ErrUnsupportedInsertMethod = errors.New("postgres: unsupported InsertSpec method")
+// ErrUnsupportedInsertMethod is returned when an insert request selects a
+// method the PostgreSQL driver cannot serve.
+var ErrUnsupportedInsertMethod = errors.New("postgres: unsupported insert method")
 
 // ErrEmptyColumnOrder is returned by the bulk insert path when the
 // source reports zero columns; a multi-row INSERT would be degenerate
@@ -40,14 +38,14 @@ var ErrUnregisteredColumnType = errors.New("postgres: unregistered column type O
 
 // Insert runs a typed [driver.InsertRequest] through the postgres driver.
 // Each worker prepares a [gen.Cursor] partition, adapts it to a
-// source.RowSource, and drains it through the same runInsertChunk the
-// legacy path uses. Generation is allocation-free after preparation;
-// driver-side row materialization and COPY/bulk encoding may allocate.
+// source.RowSource, and drains it through runInsertChunk. Generation is
+// allocation-free after preparation; driver-side row materialization and
+// COPY or bulk encoding may allocate.
 func (d *Driver) Insert(
 	ctx context.Context,
 	req *driver.InsertRequest,
 ) (*stats.Query, error) {
-	if err := driver.ValidateInsert(req); err != nil { //nolint:errcheck // sentinel wrapped below
+	if err := driver.ValidateInsert(req); err != nil {
 		return nil, err
 	}
 

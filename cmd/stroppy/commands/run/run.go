@@ -50,8 +50,8 @@ var (
 	errTooManyPositionals = errors.New(
 		"too many positional arguments; expected script and optional sql_file before --",
 	)
-	errK6PassthroughRemoved = errors.New(
-		"the '--' k6 passthrough is removed; use --executor/--vus/--iterations/--duration",
+	errArgsAfterDash = errors.New(
+		"arguments after '--' are not supported; inspect 'stroppy run <workload> --help' and pass supported flags directly",
 	)
 	errUnknownWorkload = errors.New(
 		"unknown workload; expected a registered Go workload, a .sql file, or inline SQL",
@@ -186,7 +186,7 @@ Signals:
 		}
 
 		if len(parsed.afterDash) > 0 {
-			return invalidConfig(errK6PassthroughRemoved)
+			return invalidConfig(errArgsAfterDash)
 		}
 
 		// Log override decisions when both CLI and file config are present.
@@ -1022,7 +1022,11 @@ func parseRunArgsBeforeDash(positional []string, parsers []flagParser, parsed *r
 
 func applyPositionalArg(arg string, state positionalState, parsed *runArgs) (positionalState, error) {
 	if strings.HasPrefix(arg, "-") && arg != "-" {
-		return state, fmt.Errorf("%w %q; pass k6 flags after --", errUnknownRunFlag, arg)
+		return state, fmt.Errorf(
+			"%w %q; inspect 'stroppy run <workload> --help' and pass supported typed flags directly",
+			errUnknownRunFlag,
+			arg,
+		)
 	}
 
 	if state == afterPositionals {
@@ -1110,17 +1114,25 @@ func parseTypedParamFlag(args []string, i int, parsed *runArgs) (int, error) {
 func nextTypedFlagValue(args []string, i int) (string, error) {
 	flag := args[i]
 	if i+1 >= len(args) {
-		return "", fmt.Errorf("%s: %w", flag, errFlagRequiresValue)
+		return "", typedFlagRequiresValueError(flag)
 	}
 
 	next := args[i+1]
 	if !strings.HasPrefix(next, "--=") &&
 		(strings.HasPrefix(next, "--") || next == "-h" ||
 			(strings.HasPrefix(next, "-") && (len(next) < 2 || next[1] < '0' || next[1] > '9'))) {
-		return "", fmt.Errorf("%s: %w", flag, errFlagRequiresValue)
+		return "", typedFlagRequiresValueError(flag)
 	}
 
 	return next, nil
+}
+
+func typedFlagRequiresValueError(flag string) error {
+	return fmt.Errorf(
+		"%s: %w; inspect 'stroppy run <workload> --help' and pass supported typed flags directly",
+		flag,
+		errFlagRequiresValue,
+	)
 }
 
 // parseStepsFlag handles --steps and --no-steps in both space and equals forms.

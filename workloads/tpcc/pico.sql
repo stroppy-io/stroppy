@@ -197,14 +197,14 @@ FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
 -- TPC-C 2.5.1.2: 60% of Payment lookups are by (w_id, d_id, c_last).
 -- Single-table SELECT — safe for sbroad (no cross-shard motion).
 -- Using -- comments (not /* */) because sbroad's parser rejects block
--- comments at the head of a statement; parse_sql strips -- lines from
+-- comments at the head of a statement; the SQL parser strips these lines from
 -- query bodies before the query reaches picodata.
 SELECT COUNT(*) FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
 --= get_customer_by_name
 -- TPC-C 2.5.2.2: pick row ceil(n/2) ordered by c_first.
 -- picodata/sbroad rejects OFFSET in SELECT ("expected EOI or DqlOption"),
--- so we fetch all matching rows and pick the median in tx.ts (IS_PICODATA
--- branch). Trailing c_data supports the BC-credit append path (§1.8).
+-- so the Go workload fetches all matching rows and picks the median.
+-- Trailing c_data supports the BC-credit append path (§1.8).
 SELECT c_id, c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since, c_data
 FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
 ORDER BY c_first
@@ -233,7 +233,7 @@ SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer WHERE c_id = :c_
 SELECT COUNT(*) FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
 --= get_customer_by_name
 -- TPC-C 2.6.2.2: pick row ceil(n/2) ordered by c_first.
--- picodata/sbroad rejects OFFSET; fetch all rows and pick in tx.ts.
+-- picodata/sbroad rejects OFFSET; the Go workload fetches all rows and picks the median.
 SELECT c_balance, c_first, c_middle, c_last, c_id FROM customer
 WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_last = :c_last
 ORDER BY c_first
@@ -266,7 +266,7 @@ SELECT d_next_o_id FROM district WHERE d_w_id = :w_id AND d_id = :d_id
 -- item ids from the last-20-orders window. Picodata's sbroad planner
 -- intermittently fails the single-query JOIN/subquery form with "Temporary
 -- SQL table TMP_... not found" (unused-motion cleanup race), so we split
--- the scan into two steps and count low-stock matches in the script.
+-- the scan into two steps and count low-stock matches in the workload.
 SELECT DISTINCT ol_i_id FROM order_line
 WHERE ol_w_id = :w_id
   AND ol_d_id = :d_id
@@ -276,7 +276,7 @@ WHERE ol_w_id = :w_id
 -- Step 2: count low-stock items from an inline IN(...) list. Stroppy's
 -- :name substitution leaves the IN list alone, so we interpolate the ids
 -- directly — they come from the previous trusted SELECT, not user input.
--- {ids} is replaced in the TypeScript before the query is handed to exec.
+-- The Go workload replaces {ids} before executing the query.
 SELECT COUNT(*) FROM stock
 WHERE s_w_id = :w_id
   AND s_quantity < :threshold

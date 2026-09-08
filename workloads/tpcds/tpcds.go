@@ -154,11 +154,8 @@ func (w *workload) runSteps(ctx context.Context, b *bench.Bench) error {
 		return err
 	}
 
-	// SF=1 baked answer validation (pg/mysql), once. validateAnswers runs inside a tx
-	// that applies the schema's set_timeout/preconfigure_db SETs on the pinned conn.
-	// Deviation from tpcds.ts: the TS makes the validate pass and the measured pass
-	// mutually exclusive; this runs validate in setup and the measured pass in Iterate
-	// (mirrors the tpch port), so the queries execute twice at SF=1.
+	// SF=1 baked answer validation (PostgreSQL/MySQL) runs once in setup. The
+	// measured pass still runs in Iterate, so queries execute twice at SF=1.
 	if !w.throughput && w.genStream < 0 && w.isPgOrMs {
 		if err := addStep("validate_answers", func() error {
 			validateAnswers(
@@ -181,9 +178,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 		if err != nil {
 			return err
 		}
-		// The measured pass runs queries raw (no planner SETs), matching tpcds.ts: the
-		// set_timeout/preconfigure_db session setup is a validate-pass concern (applied
-		// inside the validation tx above) and is unnecessary for the throughput pass.
+		// The measured pass runs without validation-only planner settings.
 		lg := b.Logger().Sugar()
 
 		for _, q := range queries {
@@ -239,8 +234,7 @@ func (w *workload) resolveQueries(b *bench.Bench) ([]namedQuery, error) {
 	return generateStream(string(w.driver), w.scaleFactor, w.seed, streamIdx)
 }
 
-// generateStream renders one TPC-DS query stream in-process (port of
-// cmd/xk6air.GenerateTpcdsQueries, called here directly to avoid the cmd/xk6air import).
+// generateStream renders one TPC-DS query stream in process.
 func generateStream(dialect string, scale float64, seed int64, stream int) ([]namedQuery, error) {
 	d, ok := dsqgen.DialectByName(dialect)
 	if !ok {

@@ -47,9 +47,8 @@ func mustLoadSQL(dt bench.DriverTypeName, override string) *bench.SQL {
 	return s
 }
 
-// shiftDate mirrors tpch tx.ts: shift an ISO date by (days, months, years) in UTC
-// and return the new ISO date. picodata/ydb lack date+interval arithmetic, so the
-// anchor dates for those dialects are precomputed client-side.
+// shiftDate shifts an ISO date by (days, months, years) in UTC. Picodata and
+// YDB lack date-plus-interval arithmetic, so their bounds are computed in Go.
 func shiftDate(iso string, days, months, years int) string {
 	t, err := time.Parse("2006-01-02", iso)
 	if err != nil {

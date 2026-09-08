@@ -16,7 +16,7 @@ import (
 
 var _ sqlqueries.Dialect = PgxDialect{}
 
-// ErrUnsupportedType is returned when a proto Value has an unrecognized type.
+// ErrUnsupportedType is returned when a query value has an unrecognized type.
 var ErrUnsupportedType = errors.New("unsupported value type")
 
 // PgxDialect implements sqlqueries.Dialect for PostgreSQL via pgx.

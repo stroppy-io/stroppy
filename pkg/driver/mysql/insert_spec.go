@@ -15,8 +15,7 @@ import (
 
 // Insert runs a typed [driver.InsertRequest] through the mysql driver.
 // Each worker prepares a [gen.Cursor] partition, adapts it to a
-// source.RowSource, and drains it through the same runInsertChunk the
-// legacy path uses.
+// source.RowSource, and drains it through runInsertChunk.
 func (d *Driver) Insert(
 	ctx context.Context,
 	req *driver.InsertRequest,

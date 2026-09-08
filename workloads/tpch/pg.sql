@@ -1,7 +1,7 @@
 -- TPC-H workload for PostgreSQL. Schema follows TPC-H spec §1.4 Clause 1.4.
 -- The 22 business queries live below, each as a named section with a single
 -- `body` entry. Parameter placeholders use :name — values are pinned to
--- TPC-H spec §2.4.x defaults (see workloads/tpch/tx.ts for the mapping).
+-- TPC-H spec §2.4.x defaults defined by the workload's Go parameter map.
 
 --+ drop_schema
 --= drop_lineitem
@@ -185,28 +185,10 @@ CREATE INDEX idx_lineitem_shipdate   ON lineitem (l_shipdate);
 --= idx_orders_orderdate
 CREATE INDEX idx_orders_orderdate    ON orders   (o_orderdate);
 
---+ finalize_totals
--- Spec §4.2.3 o_totalprice = Σ lineitem l_extendedprice × (1 + l_tax) × (1 - l_discount).
--- Deferred to a post-load UPDATE because the value depends on lineitems that
--- don't exist when the orders population is emitted. The subquery rides
--- idx_lineitem_orderkey built in create_indexes above; COALESCE guards any
--- orders row whose per-order degree draw happened to emit zero lines (the
--- spec forbids this via Uniform(1, 7), but the UPDATE stays defensive so a
--- future degree-spec change doesn't leave NULLs in a NOT NULL column).
---= update_totalprice
-UPDATE orders
-   SET o_totalprice = COALESCE((
-         SELECT SUM(l_extendedprice * (1 + l_tax) * (1 - l_discount))
-           FROM lineitem
-          WHERE l_orderkey = orders.o_orderkey
-       ), 0);
---= analyze_orders
-ANALYZE orders;
-
 -- ==========================================================================
--- 22 TPC-H queries. Parameters follow §2.4.x defaults — see workloads/tpch/
--- tx.ts for the bound values (delta=90, region='ASIA', segment='BUILDING',
--- etc.). Each section's `body` entry holds the full SELECT text.
+-- 22 TPC-H queries. Parameters use the workload's §2.4 defaults
+-- (delta=90, region='ASIA', segment='BUILDING', etc.). Each section's `body`
+-- entry holds the full SELECT text.
 -- ==========================================================================
 
 --+ q1

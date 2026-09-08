@@ -309,8 +309,8 @@ func parseSeparator(raw string) (rune, error) {
 
 // resolveWorkload pins the workload sub-directory on first use. The workload
 // name comes from the explicit ?workload= URL query parameter; when absent it
-// defaults to "default". It cannot be inferred from the spec alone because
-// InsertSpecs know their table name, not the workload grouping.
+// defaults to "default". It cannot be inferred from an InsertRequest because
+// requests identify a table, not its workload grouping.
 func (d *Driver) resolveWorkload() string {
 	d.mu.Lock()
 	defer d.mu.Unlock()

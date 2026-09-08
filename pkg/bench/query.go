@@ -66,7 +66,6 @@ func firstQueryValue(rows driver.Rows) (any, error) {
 
 func firstQueryRow(rows driver.Rows) ([]any, error) {
 	if rows == nil {
-		//nolint:nilnil // no-row sentinel: a driver may report no result set
 		return nil, nil
 	}
 
@@ -79,7 +78,6 @@ func firstQueryRow(rows driver.Rows) ([]any, error) {
 
 func readQueryRows(rows driver.Rows) ([][]any, error) {
 	if rows == nil {
-		//nolint:nilnil // no-row sentinel: a driver may report no result set
 		return nil, nil
 	}
 
@@ -135,10 +133,9 @@ func (b *Bench) finishQuery(res *driver.QueryResult, queryErr error) error {
 	return queryErr
 }
 
-// Insert runs a typed [driver.InsertRequest] through the benchmark driver,
-// the typed successor to InsertSpec. It wires the progress tracker and
-// metrics recording, streaming rows from a workload-authored
-// [gen.BatchSource] instead of a dgproto generator.
+// Insert runs a [driver.InsertRequest] through the benchmark driver. It wires
+// progress tracking and metrics while streaming workload-authored
+// [gen.BatchSource] rows.
 func (b *Bench) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Query, error) {
 	if err := driver.ValidateInsert(req); err != nil {
 		return nil, fmt.Errorf("insert: %w", err)
@@ -188,9 +185,8 @@ func (b *Bench) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Q
 	return result, nil
 }
 
-// newBatchInsertTracker builds the progress tracker for the typed Insert
-// path from the request's table/method/workers, mirroring the legacy
-// spec-driven tracker.
+// newBatchInsertTracker builds the progress tracker from the request's
+// table, method, and worker count.
 func (b *Bench) newBatchInsertTracker(req *driver.InsertRequest) *insertprogress.Tracker {
 	cfg := insertprogress.DefaultConfig()
 	cfg.Table = req.Table
@@ -204,11 +200,9 @@ func (b *Bench) newBatchInsertTracker(req *driver.InsertRequest) *insertprogress
 	return insertprogress.NewTracker(&cfg)
 }
 
-// InsertTpch loads one TPC-H table via the ported dbgen generator, streamed
-// through the typed [driver.InsertRequest] path. The dbgen generator lives
-// behind a [gen.BatchSource] adapter (tpchgen.NewBatchSource), so no dgproto
-// InsertSpec is synthesized; canonical seeds, seeking, and entity fan-out are
-// preserved unchanged.
+// InsertTpch loads one TPC-H table from the canonical dbgen implementation,
+// streamed through [driver.InsertRequest] by [tpchgen.NewBatchSource]. Canonical
+// seeds, seeking, and entity fan-out are preserved.
 func (b *Bench) InsertTpch(ctx context.Context, table string, scaleFactor float64, workers int) (*stats.Query, error) {
 	if workers < 1 {
 		workers = 1
@@ -226,11 +220,9 @@ func (b *Bench) InsertTpch(ctx context.Context, table string, scaleFactor float6
 	return b.Insert(ctx, req)
 }
 
-// InsertTpcds loads one TPC-DS table via the ported dsdgen generator, streamed
-// through the typed [driver.InsertRequest] path. The dsdgen generator lives
-// behind a [gen.BatchSource] adapter (tpcdsgen.NewBatchSource), so no dgproto
-// InsertSpec is synthesized; canonical text, null semantics, ticket fan-out,
-// and per-partition seeking are preserved unchanged.
+// InsertTpcds loads one TPC-DS table from the canonical dsdgen implementation,
+// streamed through [driver.InsertRequest] by [tpcdsgen.NewBatchSource]. Canonical
+// text, null semantics, ticket fan-out, and partition seeking are preserved.
 func (b *Bench) InsertTpcds(ctx context.Context, table string, scaleFactor float64, workers int) (*stats.Query, error) {
 	if workers < 1 {
 		workers = 1

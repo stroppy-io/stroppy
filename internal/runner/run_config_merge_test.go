@@ -12,7 +12,7 @@ import (
 func TestEffectiveScript(t *testing.T) {
 	cfg := &runner.LoadedConfig{RunConfig: &config.RunConfig{Script: ptr("tpcc")}}
 
-	assert.Equal(t, "custom.ts", runner.EffectiveScript("custom.ts", cfg))
+	assert.Equal(t, "tpcc/tx", runner.EffectiveScript("tpcc/tx", cfg))
 	assert.Equal(t, "tpcc", runner.EffectiveScript("", cfg))
 	assert.Empty(t, runner.EffectiveScript("", nil))
 }

@@ -7,8 +7,8 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/bench"
 )
 
-// bynameInt mirrors tx.ts `is_byname ? 1 : 0`: the PAYMENT/OSTAT proc params are
-// INTEGER (not BOOLEAN), so the flag is bound as 1/0.
+// bynameInt binds PAYMENT and Order-Status by-name flags as the INTEGER 1/0
+// expected by their stored procedures.
 func bynameInt(b bool) int64 {
 	if b {
 		return 1
