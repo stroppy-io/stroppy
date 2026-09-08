@@ -10,6 +10,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-09-08
+
 ### Added
 
 - New `stroppy baseline` command measures stroppy's own performance ceiling on the current machine without a database: a noop-driver framework tier and a pg-wire protocol tier against the pg-noop blackhole server, each reporting load throughput plus single-VU and parallel transaction rates. Verdicts check hardware-independent invariants (parallel scaling, loopback latency floor, measurement sanity), every run saves a versioned JSON report under `~/.stroppy/baselines/` with a delta versus the previous run, and the pg-noop server ships embedded in release builds or downloads with consent (sha256-verified) otherwise. ([#162](https://github.com/stroppy-io/stroppy/pull/162))
