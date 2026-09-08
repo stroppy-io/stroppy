@@ -524,6 +524,20 @@ type concurrentRunWorkload struct {
 	gate *concurrentRunGate
 }
 
+var (
+	registerConcurrentRunWorkloadOnce sync.Once
+	concurrentRunGateState            atomic.Pointer[concurrentRunGate]
+)
+
+func registerConcurrentRunWorkload(gate *concurrentRunGate) {
+	concurrentRunGateState.Store(gate)
+	registerConcurrentRunWorkloadOnce.Do(func() {
+		Register(func() Workload {
+			return &concurrentRunWorkload{gate: concurrentRunGateState.Load()}
+		})
+	})
+}
+
 func (*concurrentRunWorkload) Name() string      { return "test/concurrent-runs" }
 func (*concurrentRunWorkload) Define(*Def) error { return nil }
 func (w *concurrentRunWorkload) Setup(context.Context, *Bench) error {
@@ -539,7 +553,7 @@ func (*concurrentRunWorkload) Teardown(context.Context, *Bench) error { return n
 func TestConcurrentRunsKeepMetricsIsolated(t *testing.T) {
 	gate := &concurrentRunGate{ready: make(chan struct{}, 2), release: make(chan struct{})}
 
-	Register(func() Workload { return &concurrentRunWorkload{gate: gate} })
+	registerConcurrentRunWorkload(gate)
 
 	type result struct {
 		metrics metricdata.ResourceMetrics
