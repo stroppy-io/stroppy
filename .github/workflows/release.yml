@@ -5,11 +5,17 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
   # Use repo name as binary name by default; override if you need.
   BINARY_NAME: ${{ github.event.repository.name }}
   # Path to main of golang code
@@ -17,7 +23,20 @@ env:
   # Common ldflags: inject version and commit; trim paths; strip symbols.
 
 jobs:
+  validate-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release tag
+        run: |
+          if [[ ! "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "invalid release tag: ${RELEASE_TAG}"
+            exit 1
+          fi
+          git ls-remote --exit-code --tags \
+            "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${RELEASE_TAG}"
+
   ci:
+    needs: [validate-tag]
     uses: ./.github/workflows/ci.yml
 
   build:
@@ -31,6 +50,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - uses: actions/setup-go@v6
         with:
@@ -81,7 +102,7 @@ jobs:
           CGO_ENABLED: "0"
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ env.RELEASE_TAG }}
         run: |
           make build GO_BUILD_TAGS="-tags=pgnoop_embed"
           mkdir -p "${{ steps.names.outputs.outdir }}"
@@ -92,8 +113,8 @@ jobs:
       # runner, so assert the version `-X`-injected into the binary directly.
       - name: Verify version
         run: |
-          expected="${{ github.ref_name }}"
-          if ! strings build/stroppy | grep -Fqx "${expected}"; then
+          expected="${RELEASE_TAG}"
+          if ! strings build/stroppy | grep -Fq "${expected}"; then
             echo "version mismatch: expected '${expected}' not embedded in build/stroppy"
             exit 1
           fi
@@ -141,7 +162,7 @@ jobs:
       - name: Create GitHub Release & Upload Assets
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
           files: ${{ steps.gather.outputs.files }}
           make_latest: true
           draft: false
