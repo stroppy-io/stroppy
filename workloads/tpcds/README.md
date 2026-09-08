@@ -19,8 +19,10 @@ adapter and `Bench.InsertTpcds`.
 ./build/stroppy run tpcds -d ydb \
   -D url=grpc://localhost:2136/local --scale-factor 0.01
 
+# Picodata supports loading only; query execution is not yet supported.
 ./build/stroppy run tpcds -d pico \
-  -D url=postgres://admin:T0psecret@localhost:1331/admin --scale-factor 0.01
+  -D url=postgres://admin:T0psecret@localhost:1331/admin --scale-factor 0.01 \
+  --no-steps workload
 ```
 
 Typed workload parameters are listed by `stroppy run tpcds --help`:
@@ -54,11 +56,11 @@ Setup runs these gatable steps in order:
 7. `analyze`
 8. `validate_answers` for the baked query set on PostgreSQL or MySQL
 
-Each `workload` iteration resolves the selected stream and executes every query
-in order. The default is the checked-in canonical qualification set. On
-PostgreSQL and MySQL, `--query-stream` generates a reproducible stream in
-process, while `--streams N` assigns generated streams to virtual users for a
-throughput run.
+On supported query dialects, each `workload` iteration resolves the selected
+stream and executes every query in order. The default is the checked-in
+canonical qualification set. On PostgreSQL and MySQL, `--query-stream`
+generates a reproducible stream in process, while `--streams N` assigns
+generated streams to virtual users for a throughput run.
 
 ```bash
 ./build/stroppy run tpcds -d pg --scale-factor 1 \
@@ -82,10 +84,8 @@ the SF=1 reference set by default.
   default; row storage is optional. Dates are ISO text because TPC-DS spans
   years outside YDB's date epoch. Generated streams and answer comparison are
   not supported.
-- **Picodata:** loading and 95 baked statements are supported. Query numbers
-  36, 44, 47, 49, 57, 67, 70, and 86 are omitted because sbroad lacks the
-  required window functions. Answer comparison and generated streams are not
-  supported.
+- **Picodata:** loading is supported. Query execution is not supported yet;
+  use `--no-steps workload` for load-only runs.
 
 The SQL ports also account for each engine's date arithmetic, grouping,
 correlated-subquery, join, and type restrictions. See the headers of the

@@ -174,6 +174,10 @@ revision: # Create version tag with tag=<semver>
 		echo "error: Specify version 'tag='"; \
 		exit 1; \
 	fi
+	@if ! printf '%s\n' "$(tag)" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$$'; then \
+		echo "error: tag must be SemVer without the leading 'v' (for example, 6.0.0 or 6.0.0-rc.1)"; \
+		exit 1; \
+	fi
 	@tag_ref="refs/tags/v$(tag)"; \
 	if git show-ref --verify --quiet "$$tag_ref"; then \
 		echo "error: tag v$(tag) already exists locally"; \
