@@ -12,23 +12,23 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
-- CockroachDB SQL variants for TPC-B and TPC-C (`--sql-file tpcb/crdb.sql` or `tpcc/crdb.sql`) retain native workload metrics.
-- Export native transaction, iteration and query throughput over the measured workload window, including explicit zero error counters.
+- CockroachDB SQL variants for TPC-B and TPC-C (`--sql-file tpcb/crdb.sql` or `tpcc/crdb.sql`) retain native workload metrics. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
+- Export native transaction, iteration and query throughput over the measured workload window, including explicit zero error counters. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
 
 ### Fixed
 
-- Yandex Cloud dedicated connections load the internal CA before the first IAM-token handshake; explicit credentials are never replaced by VM metadata credentials after an error.
-- TPC-C population validation retries transient read failures within the configured attempt limit and reports setup retries separately; data mismatches still fail validation.
-- Retry YDB overload errors even when the SDK also reports cancellation of its query stream; explicit caller cancellation still stops the workload.
-- TPC-C population checks now log the underlying database query error, and setup failures report zero measurement time when execution never started.
-- The simple workload uses YDB-compatible table definitions and accepts unsigned row counts.
-- Picodata now honors pgx pool and query execution options supplied through config files or driver flags.
-- Picodata reads exact decimal values in text format to avoid a legacy numeric-zero decoding hang.
-- TPC-C population validation handles fractional Picodata percentages without decimal encoding errors.
-- Retry MySQL/MariaDB snapshot conflicts (error 1020) according to the workload's serialization retry policy.
-- Count the final partial SQL insert batch once in load progress, keeping generated and confirmed row counts consistent.
-- Keep concurrent benchmark metrics distinct and preserve run metadata when exporting through OTLP to Prometheus-compatible storage.
-- Count expected TPC-C procedure rollbacks as successful logical transactions on PostgreSQL and MySQL, while preserving rollback failures.
+- Yandex Cloud dedicated connections load the internal CA before the first IAM-token handshake; explicit credentials are never replaced by VM metadata credentials after an error. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
+- TPC-C population validation retries transient read failures within the configured attempt limit and reports setup retries separately; data mismatches still fail validation. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
+- Retry YDB overload errors even when the SDK also reports cancellation of its query stream; explicit caller cancellation still stops the workload. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
+- TPC-C population checks now log the underlying database query error, and setup failures report zero measurement time when execution never started. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
+- The simple workload uses YDB-compatible table definitions and accepts unsigned row counts. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
+- Picodata now honors pgx pool and query execution options supplied through config files or driver flags. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
+- Picodata reads exact decimal values in text format to avoid a legacy numeric-zero decoding hang. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
+- TPC-C population validation handles fractional Picodata percentages without decimal encoding errors. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
+- Retry MySQL/MariaDB snapshot conflicts (error 1020) according to the workload's serialization retry policy. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
+- Count the final partial SQL insert batch once in load progress, keeping generated and confirmed row counts consistent. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
+- Keep concurrent benchmark metrics distinct and preserve run metadata when exporting through OTLP to Prometheus-compatible storage. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
+- Count expected TPC-C procedure rollbacks as successful logical transactions on PostgreSQL and MySQL, while preserving rollback failures. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
 
 ## [6.0.0] - 2026-09-08
 
