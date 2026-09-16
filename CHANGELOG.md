@@ -10,6 +10,26 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- CockroachDB SQL variants for TPC-B and TPC-C (`--sql-file tpcb/crdb.sql` or `tpcc/crdb.sql`) retain native workload metrics.
+- Export native transaction, iteration and query throughput over the measured workload window, including explicit zero error counters.
+
+### Fixed
+
+- Yandex Cloud dedicated connections load the internal CA before the first IAM-token handshake; explicit credentials are never replaced by VM metadata credentials after an error.
+- TPC-C population validation retries transient read failures within the configured attempt limit and reports setup retries separately; data mismatches still fail validation.
+- Retry YDB overload errors even when the SDK also reports cancellation of its query stream; explicit caller cancellation still stops the workload.
+- TPC-C population checks now log the underlying database query error, and setup failures report zero measurement time when execution never started.
+- The simple workload uses YDB-compatible table definitions and accepts unsigned row counts.
+- Picodata now honors pgx pool and query execution options supplied through config files or driver flags.
+- Picodata reads exact decimal values in text format to avoid a legacy numeric-zero decoding hang.
+- TPC-C population validation handles fractional Picodata percentages without decimal encoding errors.
+- Retry MySQL/MariaDB snapshot conflicts (error 1020) according to the workload's serialization retry policy.
+- Count the final partial SQL insert batch once in load progress, keeping generated and confirmed row counts consistent.
+- Keep concurrent benchmark metrics distinct and preserve run metadata when exporting through OTLP to Prometheus-compatible storage.
+- Count expected TPC-C procedure rollbacks as successful logical transactions on PostgreSQL and MySQL, while preserving rollback failures.
+
 ## [6.0.0] - 2026-09-08
 
 ### Added

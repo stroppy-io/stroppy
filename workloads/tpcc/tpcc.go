@@ -101,7 +101,9 @@ func (w *workload) Define(d *bench.Def) error {
 		bench.DerivedDefault("true when warehouse-start is 1; false otherwise"),
 	).Value()
 	w.pacing = d.Param.Bool("pacing", false, "Apply TPC-C keying and think times.").Value()
-	w.retryAttempts = d.Param.Int("retry-attempts", 3, "Maximum transaction attempts.").Value()
+	w.retryAttempts = d.Param.Int(
+		"retry-attempts", 3, "Maximum attempts per transaction or population validation query.",
+	).Value()
 	w.pgUnlogged = d.Param.Bool("pg-unlogged", false, "Use unlogged PostgreSQL tables while loading.").Value()
 	w.iso = bench.TxIsolationName(d.Param.String("tx-isolation", "", "Transaction isolation override.").Value())
 	w.sqlFile = d.Param.String("sql-file", "", "SQL dialect file override.").Value()
@@ -204,7 +206,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	addStep("create_foreign_keys", func() error { return runSection("create_foreign_keys") })
 	addStep("analyze", func() error { return runSection("analyze") })
 	addStep("validate_population", func() error {
-		return validatePopulation(ctx, b, w.warehouses, w.warehouseStart, w.wIDMax)
+		return validatePopulation(ctx, b, w.warehouses, w.warehouseStart, w.wIDMax, w.retryAttempts)
 	})
 
 	for _, s := range steps {
@@ -308,7 +310,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 		return w.iterateProcs(ctx, b, vs)
 	}
 
-	return b.StepSilent("workload", func() error {
+	return b.Transaction(func() error {
 		idx := weightedPick(vs.picker, txWeights)
 		name := txNames[idx]
 
@@ -1268,10 +1270,6 @@ func (v *vuState) nurand(r *rand.Rand, paramA, lo, hi int, cSalt uint64) int64 {
 }
 
 // --- helpers ---
-
-func isRollbackSentinel(err error) bool {
-	return err != nil && strings.HasPrefix(err.Error(), "tpcc_rollback:")
-}
 
 func itemMapHas(m map[int64][]any, iid int64) bool {
 	_, ok := m[iid]

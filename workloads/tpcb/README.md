@@ -94,3 +94,8 @@ make build
 go test -tags=integration -count=1 -run TestTpcbWorkloadEndToEnd ./test/integration
 make tmpfs-down
 ```
+
+### CockroachDB SQL
+
+Use `--sql-file crdb.sql` with the PostgreSQL driver for CockroachDB.
+This variant analyzes each workload table explicitly and supports both tx and procs.

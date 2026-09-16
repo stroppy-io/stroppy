@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/driver/common"
+	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
 	"github.com/stroppy-io/stroppy/pkg/gen"
 )
 
@@ -153,6 +154,35 @@ func TestRunBulkInsertTypedRemainder(t *testing.T) {
 
 	if m.calls[1].args[0] != int64(501) {
 		t.Fatalf("second call arg = %v, want 501", m.calls[1].args[0])
+	}
+}
+
+func TestRunBulkInsertProgress(t *testing.T) {
+	t.Parallel()
+
+	for _, total := range []int64{1, 100, 500, 501, 1000, 1001} {
+		t.Run(strconv.FormatInt(total, 10), func(t *testing.T) {
+			t.Parallel()
+
+			cfg := insertprogress.DefaultConfig()
+			cfg.Mode = insertprogress.ModeMetrics
+			tracker := insertprogress.NewTracker(&cfg)
+			tracker.SetTotal(total)
+			ctx := insertprogress.ContextWithTracker(context.Background(), tracker)
+			src, cols := typedIntSource(total)
+
+			err := RunBulkInsert[int64](ctx, &mockExecer{}, "progress", typedRowSource(t, src, cols), qmark{}, 500, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			snapshot := tracker.Finish(nil)
+			if snapshot.GeneratedRows != total || snapshot.ConfirmedRows != total ||
+				snapshot.InflightRows != 0 || snapshot.Percent != 100 {
+				t.Fatalf("rows=%d: generated=%d confirmed=%d inflight=%d percent=%v",
+					total, snapshot.GeneratedRows, snapshot.ConfirmedRows, snapshot.InflightRows, snapshot.Percent)
+			}
+		})
 	}
 }
 

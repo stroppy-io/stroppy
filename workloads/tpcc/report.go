@@ -650,7 +650,10 @@ func (w *workload) emitComplianceReport(b *bench.Bench) {
 		}
 	}
 
-	elapsed := time.Since(w.measureStart)
+	var elapsed time.Duration
+	if !w.measureStart.IsZero() {
+		elapsed = time.Since(w.measureStart)
+	}
 
 	var series steadySeries
 	if w.steady != nil {

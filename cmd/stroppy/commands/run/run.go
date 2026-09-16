@@ -835,14 +835,14 @@ func applicableDriverPool(
 	driverType config.DriverType,
 	fileConfig *config.DriverRunConfig,
 ) *config.PoolConfig {
-	if driverType == config.DriverTypePostgres {
+	if driverType == config.DriverTypePostgres || driverType == config.DriverTypePicodata {
 		if fileConfig.SQL != nil {
-			warnIgnoredDriverExtra(idx, "sql", "PostgreSQL uses postgres pool settings")
+			warnIgnoredDriverExtra(idx, "sql", "PostgreSQL and Picodata use pgx pool settings")
 
 			fileConfig.SQL = nil
 		}
 	} else if fileConfig.Postgres != nil {
-		warnIgnoredDriverExtra(idx, "postgres", "only PostgreSQL uses postgres pool settings")
+		warnIgnoredDriverExtra(idx, "postgres", "only PostgreSQL and Picodata use pgx pool settings")
 
 		fileConfig.Postgres = nil
 	}
@@ -873,7 +873,7 @@ func mergePoolDriverSpecific(
 	pool *config.PoolConfig,
 	driverConfig *config.DriverConfig,
 ) {
-	if driverType == config.DriverTypePostgres {
+	if driverType == config.DriverTypePostgres || driverType == config.DriverTypePicodata {
 		postgres := poolPostgresConfig(pool)
 		if specific := driverConfig.Postgres; specific != nil {
 			postgres = runner.MergePostgresConfig(postgres, specific)

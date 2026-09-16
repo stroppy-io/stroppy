@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
@@ -73,7 +74,7 @@ func newMeterProvider(
 
 	if enabled {
 		options = append(options, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(
-			exporter,
+			&metadataExporter{Exporter: exporter, attributes: exportedAttributes(config)},
 			sdkmetric.WithInterval(metricExportInterval()),
 		)))
 	}
@@ -148,6 +149,9 @@ func metricsResource(config *MetricsConfig) (*resource.Resource, error) {
 	for key, value := range config.ResourceAttributes {
 		attrs = append(attrs, attribute.String(key, value))
 	}
+
+	// Every invocation is a distinct metric writer, including multiple Runs in one process.
+	attrs = append(attrs, semconv.ServiceInstanceID(uuid.NewString()))
 
 	return resource.Merge(resource.Default(), resource.NewSchemaless(attrs...))
 }

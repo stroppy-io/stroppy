@@ -78,7 +78,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 // so the same body runs unchanged against real databases, the noop driver,
 // and no-op wire servers that discard I/O.
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
-	return b.StepSilent("workload", func() error {
+	return b.Transaction(func() error {
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "baseline"}, func(tx *bench.TxX) error {
 			for _, stmt := range []string{
 				"UPDATE " + probeTable + " SET v = v + 1 WHERE id = 1",

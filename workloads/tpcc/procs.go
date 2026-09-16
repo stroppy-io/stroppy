@@ -2,6 +2,7 @@ package tpcc
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/bench"
@@ -23,7 +24,7 @@ func bynameInt(b bool) int64 {
 // the HAS_RETURNING / IS_PICODATA branches of the tx variant are absent here. The
 // by-name / remote-wh / rollback decisions stay client-side (they feed proc params).
 func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, vs *vuState) error {
-	return b.StepSilent("workload", func() error {
+	return b.Transaction(func() error {
 		idx := weightedPick(vs.picker, txWeights)
 		name := txNames[idx]
 
@@ -77,19 +78,30 @@ func (w *workload) procNewOrder(ctx context.Context, b *bench.Bench, vs *vuState
 		"w_id": vs.homeWID, "min_w_id": w.warehouseStart, "max_w_id": w.wIDMax,
 		"d_id": dID, "c_id": cID, "ol_cnt": olCnt, "force_rollback": forceRollback,
 	}
+
 	err := bench.Retry0(ctx, w.retryPolicy, func() error {
-		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"}, func(tx *bench.TxX) error {
-			return tx.Exec(ctx, w.q("workload_procs", "new_order"), args)
-		})
+		tx, beginErr := b.Begin(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"})
+		if beginErr != nil {
+			return beginErr
+		}
+
+		if bodyErr := tx.Exec(ctx, w.q("workload_procs", "new_order"), args); bodyErr != nil {
+			rollbackErr := tx.Rollback(ctx)
+			if forceRollback && isRollbackSentinel(bodyErr) {
+				if result := finishNewOrder(bodyErr, rollbackErr); result != nil {
+					return result
+				}
+
+				w.m.rollbackDone.Add(1)
+
+				return nil
+			}
+
+			return errors.Join(bodyErr, rollbackErr)
+		}
+
+		return tx.Commit(ctx)
 	})
-	// Server-side rollback: the proc RAISEs/SIGNALs "tpcc_rollback:item_not_found" when
-	// force_rollback is set. Treat it as a spec-mandated success.
-	if isRollbackSentinel(err) {
-		w.m.rollbackDone.Add(1)
-
-		err = nil
-	}
-
 	if err != nil {
 		return err
 	}

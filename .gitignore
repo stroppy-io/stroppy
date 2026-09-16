@@ -108,3 +108,6 @@ http-client.private.env.json
 
 # CI-fetched pg-noop binary for -tags pgnoop_embed builds
 internal/pgnoop/embedded/
+
+# Local protobuf dependency cache
+/easyp_vendor/

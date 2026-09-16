@@ -118,3 +118,11 @@ make build
 go test -tags=integration -count=1 -run TestTpccWorkloadEndToEnd ./test/integration
 make tmpfs-down
 ```
+
+### CockroachDB SQL
+
+Use `--sql-file crdb.sql` with the PostgreSQL driver for CockroachDB.
+For CockroachDB 24.1, select `--sql-file crdb24.sql`; its procedures use
+WHILE loops supported by that version. Both variants retain the expected
+TPC-C rollback and use Cockroach-compatible decimal arithmetic and statistics.
+The cloud compiler selects the variant from the catalog database version.

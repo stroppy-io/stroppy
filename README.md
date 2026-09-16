@@ -160,6 +160,26 @@ docker run --network host stroppy run tpcc/tx \
 
 Available workloads: `simple`, `tpcb/tx`, `tpcc/tx`, `tpch/tx`, `tpcds`, `execute_sql`.
 
+## Native metrics and throughput
+
+Stroppy exports the workload's counters, bounded latency histograms, load progress,
+error classes and retries through OTLP. TPC-C also retains its compliance report.
+Each invocation has a unique metric writer identity, and configured run metadata
+is preserved on exported points so parallel runs and segments can be filtered.
+
+- `tps`: successful logical transactions per second for TPC-B/TPC-C and baseline.
+  Retries count once when successful; a workload-defined expected rollback counts
+  as a successful logical operation. This is separate from TPC-C tpmC.
+- `iterations_per_second`: completed iterations, including failed iterations.
+- `queries_per_second`: successful SDK queries during the executor window.
+- `measurement_seconds`: elapsed executor wall time shared across VUs, excluding
+  setup and teardown; `successful_transactions_total` supplies the TPS numerator.
+
+Rates are cumulative averages during execution and freeze when the executor ends.
+Skipped transaction steps do not publish TPS. Nontransactional workloads expose
+their own operation and iteration measurements. Prometheus-compatible receivers
+may normalize OTLP names and append unit suffixes (for example `stroppy_tps_per_second`).
+
 ## License
 
 See LICENSE file for details.

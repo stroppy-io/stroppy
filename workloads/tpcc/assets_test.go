@@ -7,7 +7,7 @@ import (
 )
 
 func TestEmbeddedAssetContract(t *testing.T) {
-	dialects := []string{"pg.sql", "mysql.sql", "pico.sql", "ydb.sql", "ydb_no_indexes.sql"}
+	dialects := []string{"pg.sql", "crdb.sql", "crdb24.sql", "mysql.sql", "pico.sql", "ydb.sql", "ydb_no_indexes.sql"}
 	workloadtest.Files(t, files, append([]string{"README.md"}, dialects...)...)
 
 	sections := []string{
@@ -68,13 +68,14 @@ func TestEmbeddedAssetContract(t *testing.T) {
 			dialectSections := sections
 
 			dialectQueries := append([]workloadtest.Query(nil), queries...)
-			if dialect == "pg.sql" || dialect == "ydb.sql" || dialect == "ydb_no_indexes.sql" {
+			if dialect == "pg.sql" || dialect == "crdb.sql" || dialect == "crdb24.sql" ||
+				dialect == "ydb.sql" || dialect == "ydb_no_indexes.sql" {
 				dialectQueries = append(dialectQueries, returningQueries...)
 			} else {
 				dialectQueries = append(dialectQueries, nonReturningQueries...)
 			}
 
-			if dialect == "pg.sql" || dialect == "mysql.sql" {
+			if dialect == "pg.sql" || dialect == "crdb.sql" || dialect == "crdb24.sql" || dialect == "mysql.sql" {
 				dialectSections = append(append([]string(nil), sections...), "create_procedures", "workload_procs")
 				for _, name := range txNames {
 					dialectQueries = append(dialectQueries, workloadtest.Query{Section: "workload_procs", Name: name})

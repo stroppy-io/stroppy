@@ -102,6 +102,19 @@ func NewDriver(
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
+	afterConnect := parsedConfig.AfterConnect
+	parsedConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		if afterConnect != nil {
+			if err := afterConnect(ctx, conn); err != nil {
+				return err
+			}
+		}
+
+		preferNumericText(conn.TypeMap())
+
+		return nil
+	}
+
 	conn, err := picodata.NewWithConfig(ctx,
 		parsedConfig,
 		picodata.WithDisableTopologyManaging(),
