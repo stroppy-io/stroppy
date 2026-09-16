@@ -3,11 +3,12 @@ package tpcc
 import (
 	"testing"
 
+	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/workloads/internal/workloadtest"
 )
 
 func TestEmbeddedAssetContract(t *testing.T) {
-	dialects := []string{"pg.sql", "mysql.sql", "pico.sql", "ydb.sql", "ydb_no_indexes.sql"}
+	dialects := []string{"pg.sql", "crdb.sql", "crdb24.sql", "mysql.sql", "pico.sql", "ydb.sql", "ydb_no_indexes.sql"}
 	workloadtest.Files(t, files, append([]string{"README.md"}, dialects...)...)
 
 	sections := []string{
@@ -68,13 +69,14 @@ func TestEmbeddedAssetContract(t *testing.T) {
 			dialectSections := sections
 
 			dialectQueries := append([]workloadtest.Query(nil), queries...)
-			if dialect == "pg.sql" || dialect == "ydb.sql" || dialect == "ydb_no_indexes.sql" {
+			if dialect == "pg.sql" || dialect == "crdb.sql" || dialect == "crdb24.sql" ||
+				dialect == "ydb.sql" || dialect == "ydb_no_indexes.sql" {
 				dialectQueries = append(dialectQueries, returningQueries...)
 			} else {
 				dialectQueries = append(dialectQueries, nonReturningQueries...)
 			}
 
-			if dialect == "pg.sql" || dialect == "mysql.sql" {
+			if dialect == "pg.sql" || dialect == "crdb.sql" || dialect == "crdb24.sql" || dialect == "mysql.sql" {
 				dialectSections = append(append([]string(nil), sections...), "create_procedures", "workload_procs")
 				for _, name := range txNames {
 					dialectQueries = append(dialectQueries, workloadtest.Query{Section: "workload_procs", Name: name})
@@ -82,6 +84,31 @@ func TestEmbeddedAssetContract(t *testing.T) {
 			}
 
 			workloadtest.SQL(t, files, dialect, dialectSections, dialectQueries)
+		})
+	}
+}
+
+// TestDurabilitySectionsArePostgresOnly guards the optional PG_UNLOGGED load
+// path, since CockroachDB also uses the PostgreSQL driver.
+func TestDurabilitySectionsArePostgresOnly(t *testing.T) {
+	for _, dialect := range []string{"pg.sql", "crdb.sql", "crdb24.sql"} {
+		t.Run(dialect, func(t *testing.T) {
+			data, err := files.ReadFile(dialect)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			sql := bench.ParseSQL(string(data))
+			for _, section := range []string{"set_unlogged", "set_logged"} {
+				queries := sql.Section(section)
+				if dialect == "pg.sql" {
+					if len(queries) != 9 {
+						t.Errorf("%s: want durability changes for all 9 tables, got %d", section, len(queries))
+					}
+				} else if len(queries) != 0 {
+					t.Errorf("%s: CockroachDB must skip PostgreSQL durability changes, got %d queries", section, len(queries))
+				}
+			}
 		})
 	}
 }

@@ -137,7 +137,7 @@ func RunBulkInsert[T any](
 	}
 
 	return flushBulkInsertRemainder(
-		ctx, db, table, columns, batch[:filled], dialect, args, &fullBatchQuery, generatedProgress, timeout)
+		ctx, db, table, columns, batch[:filled], dialect, args, &fullBatchQuery, &generatedProgress, timeout)
 }
 
 func flushBulkInsertRemainder[T any](
@@ -149,7 +149,7 @@ func flushBulkInsertRemainder[T any](
 	dialect queries.Dialect,
 	args []any,
 	fullBatchQuery *string,
-	generatedProgress insertprogress.RowCounter,
+	generatedProgress *insertprogress.RowCounter,
 	timeout time.Duration,
 ) error {
 	if len(rows) == 0 {

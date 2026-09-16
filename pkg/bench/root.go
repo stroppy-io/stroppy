@@ -30,6 +30,7 @@ type RootState struct {
 	onSummary     func(metricdata.ResourceMetrics)
 	quietSummary  bool
 
+	throughput    throughput
 	txMetrics     *txMetrics
 	errorReporter *errorReporter
 

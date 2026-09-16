@@ -13,11 +13,9 @@ func (*Driver) ClassifyError(err error) driver.ErrorFacts {
 		return driver.ErrorFacts{Kind: driver.ErrorKindUnsupported}
 	}
 
-	facts := driver.DefaultErrorFacts(err)
-	if facts.Kind != driver.ErrorKindUnknown {
-		return facts
-	}
-
+	// The SDK can join a retryable server error with cancellation of its query
+	// stream. Preserve the SDK retry decision; the caller context is checked by
+	// the retry loop before another attempt or while waiting for backoff.
 	mode := ydbretry.Check(err)
 	switch {
 	case mode.MustRetry(false):
@@ -29,6 +27,6 @@ func (*Driver) ClassifyError(err error) driver.ErrorFacts {
 			RequiresIdempotency: true,
 		}
 	default:
-		return facts
+		return driver.DefaultErrorFacts(err)
 	}
 }

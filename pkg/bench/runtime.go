@@ -434,6 +434,21 @@ func runScenario(
 	iterate func(*VU) error,
 	onIterationError func(*VU, error),
 ) error {
+	if err := root.startThroughput(); err != nil {
+		return err
+	}
+	defer root.throughput.stop()
+
+	vu := &VU{root: root, ctx: ctx}
+	root.txMetrics.ensureRegistered(vu, root.lg)
+
+	for _, metric := range []*metric{
+		root.txMetrics.failedIterations, root.txMetrics.failedQueries,
+		root.txMetrics.terminalErrors, root.txMetrics.retryAttempts,
+	} {
+		root.txMetrics.emit(vu, metric, 0, metricAttributes{})
+	}
+
 	scenarioCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -503,6 +518,7 @@ func runWorker(
 		start := time.Now()
 		err := iterate(vu)
 		root.txMetrics.recordIteration(vu, time.Since(start))
+		root.throughput.iterations.Add(1)
 
 		if err == nil {
 			continue

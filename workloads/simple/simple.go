@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand/v2"
 
 	"github.com/stroppy-io/stroppy/pkg/bench"
@@ -45,7 +46,12 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	}
 
 	if err := b.Step("create_schema", func() error {
-		return b.Exec(ctx, "CREATE TABLE stroppy_demo (id INT PRIMARY KEY, label TEXT, value INT)", nil)
+		sql := "CREATE TABLE stroppy_demo (id INT PRIMARY KEY, label TEXT, value INT)"
+		if b.DriverTypeName() == bench.DriverYDB {
+			sql = "CREATE TABLE stroppy_demo (id Int64 NOT NULL, label String, value Int64, PRIMARY KEY (id))"
+		}
+
+		return b.Exec(ctx, sql, nil)
 	}); err != nil {
 		return err
 	}
@@ -148,6 +154,12 @@ func toInt(v any) int {
 	case int:
 		return n
 	case int64:
+		return int(n)
+	case uint64:
+		if n > math.MaxInt {
+			return -1
+		}
+
 		return int(n)
 	case float64:
 		return int(n)

@@ -100,7 +100,7 @@ Resolution order for SQL files: **cwd → `~/.stroppy/` → embedded**.
 |--------|-------------|-------|
 | `pg` | `postgres` | pgxpool-based; supports plain_query, plain_bulk, native (COPY) |
 | `mysql` | `mysql` | sql.DB-backed via sqldriver |
-| `pico` | `picodata` | sql.DB-backed; `Begin()` always errors — use isolation `"none"` |
+| `pico` | `picodata` | pgxpool-based; `Begin()` always errors — use isolation `"none"` |
 | `ydb` | `ydb` | sql.DB-backed; native maps to BulkUpsert |
 | `noop` | `noop` | discards all I/O; benchmarks stroppy/framework overhead |
 | *(no preset)* | `csv` | URL-configured CSV output driver; native-only, no query path |
@@ -325,3 +325,34 @@ normalizer there rather than looking for generated descriptors.
 - `github.com/spf13/cobra` — CLI
 - `google.golang.org/grpc` — YDB SDK transport
 - `google.golang.org/protobuf` — indirect protocol dependency of external SDKs (not application config)
+
+## Native throughput and OTLP identity
+
+`Bench.Transaction(fn)` marks one logical transaction, with retries inside `fn`.
+TPC-B, TPC-C and baseline use it. Filtered workload steps and errors do not count
+as successes; TPC-C's expected rollback remains a successful logical operation.
+The native `tps` gauge is successful logical transactions per second over the
+executor's wall-clock window shared across VUs. Setup and teardown are excluded.
+`iterations_per_second` counts completed iterations (including failed ones);
+`queries_per_second` counts successful SDK queries during that same window.
+`measurement_seconds` and `successful_transactions_total` expose the underlying
+measurement. Gauges are cumulative averages while running and freeze at executor
+completion. They are not TPC-C tpmC or TPC-H/TPC-DS compliance scores.
+
+OTLP preserves all existing workload counters and histograms. Each invocation has
+a unique `service.instance.id`; explicit `global.metadata` and `stroppy.run.id`
+are also attached to exported metric points for Prometheus-compatible storage.
+Metadata enrichment runs at export time. Never put credentials in metadata.
+The text summary and OTLP use the same native measurements; the cloud pipeline
+only copies reported values. Disabled OTLP still supports local summaries.
+
+TPC-C procedure rollback recognition uses the exact backend exception code and
+message (PostgreSQL P0001 / MySQL 1644, SQLSTATE 45000), and only accepts an
+expected rollback after the client-requested rollback completes. Unknown
+rollback outcomes remain failures. PostgreSQL serialization conflicts retain
+the configured retry limit and remain visible in attempt/error metrics.
+
+MySQL/MariaDB ER_CHECKREAD (1020) is a serialization conflict and follows the
+workload's existing retry policy. SQL bulk insert remainder flushing must share
+the original progress counter; copying it would count pending generated rows
+again during the deferred flush.

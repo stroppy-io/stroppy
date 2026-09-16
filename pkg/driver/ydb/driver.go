@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
+	"strings"
 	"time"
 
 	ydbsdk "github.com/ydb-platform/ydb-go-sdk/v3"
@@ -65,6 +67,12 @@ func NewDriver(
 	cancelPrimary()
 
 	if primaryErr != nil {
+		// Explicit credentials define the caller's identity. A TLS, transport,
+		// or authorization failure must not switch to the VM service account.
+		if cfg.GetAuthToken() != "" || cfg.GetAuthUser() != "" || cfg.GetAuthPassword() != "" {
+			return nil, primaryErr
+		}
+
 		lg.Warn("primary auth failed, retrying with Yandex Cloud metadata service",
 			zap.Error(primaryErr))
 
@@ -168,6 +176,10 @@ func buildConnectionOptions(
 	if f := cfg.GetCaCertFile(); f != "" {
 		lg.Debug("Using CA certificate", zap.String("file", f))
 		opts = append(opts, ydbsdk.WithCertificatesFromFile(f))
+	} else if isYandexDedicatedEndpoint(cfg.URL) {
+		// Dedicated YC endpoints use the internal CA independently of how the
+		// caller authenticates. In particular, IAM tokens need it on first dial.
+		opts = append(opts, yc.WithInternalCA())
 	}
 
 	if cfg.GetTLSInsecureSkipVerify() {
@@ -187,6 +199,17 @@ func buildConnectionOptions(
 	}
 
 	return opts
+}
+
+func isYandexDedicatedEndpoint(dsn string) bool {
+	endpoint, err := url.Parse(dsn)
+	if err != nil || !strings.EqualFold(endpoint.Scheme, "grpcs") {
+		return false
+	}
+
+	host := strings.TrimSuffix(strings.ToLower(endpoint.Hostname()), ".")
+
+	return strings.HasSuffix(host, ".ydb.mdb.yandexcloud.net")
 }
 
 func (d *Driver) Begin(ctx context.Context, isolation config.TxIsolationLevel) (driver.Tx, error) {

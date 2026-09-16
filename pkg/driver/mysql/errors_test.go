@@ -20,6 +20,14 @@ func TestClassifyError(t *testing.T) {
 	}{
 		{name: "deadlock", err: &gomysql.MySQLError{Number: errLockDeadlock}, want: driver.ErrorKindDeadlock},
 		{
+			name: "wrapped snapshot conflict",
+			err: fmt.Errorf("transaction: %w", &gomysql.MySQLError{
+				Number:   1020,
+				SQLState: [5]byte{'H', 'Y', '0', '0', '0'}, Message: "Record has changed since last read",
+			}),
+			want: driver.ErrorKindSerialization,
+		},
+		{
 			name: "wrapped lock timeout",
 			err:  fmt.Errorf("query: %w", &gomysql.MySQLError{Number: errLockWaitTimeout}),
 			want: driver.ErrorKindLockTimeout,

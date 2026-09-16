@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/stroppy-io/stroppy/pkg/bench"
 )
 
@@ -14,7 +16,15 @@ var errValidatePopulation = errors.New("validate_population")
 
 // validatePopulation runs the §1.3.1 consistency and cardinality checks and
 // returns an error if any fail.
-func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehouseStart, wIDMax int64) error {
+func validatePopulation(
+	ctx context.Context, b *bench.Bench, warehouses, warehouseStart, wIDMax int64, maxAttempts int,
+) error {
+	retries := b.Counter("tpcc_population_retry_attempts")
+	reader := &populationReader{Bench: b, policy: b.TxRetryPolicy(bench.TxRetryPolicyOptions{
+		MaxAttempts: maxAttempts,
+		Idempotent:  true,
+		OnRetry:     func(int, error, bench.RetryDecision) { retries.Add(1) },
+	})}
 	wRange := fmt.Sprintf("BETWEEN %d AND %d", warehouseStart, wIDMax)
 	wWhere := func(col string) string { return "WHERE " + col + " " + wRange }
 
@@ -26,21 +36,21 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 		}
 	}
 
-	distNext, ordMax, noStats, err := prefetchDistrictAggregates(ctx, b, wWhere)
+	distNext, ordMax, noStats, err := prefetchDistrictAggregates(ctx, reader, wWhere)
 	if err != nil {
 		return err
 	}
 
-	cc1WSum, cc1WErr := qfloat(ctx, b, "SELECT SUM(w_ytd) FROM warehouse WHERE w_id "+wRange)
-	cc1DSum, cc1DErr := qfloat(ctx, b, "SELECT SUM(d_ytd) FROM district "+wWhere("d_w_id"))
-	cc4OSum, cc4OErr := qint(ctx, b, "SELECT SUM(o_ol_cnt) FROM orders "+wWhere("o_w_id"))
-	cc4OlCnt, cc4OlErr := qint(ctx, b, "SELECT COUNT(*) FROM order_line "+wWhere("ol_w_id"))
+	cc1WSum, cc1WErr := qfloat(ctx, reader, "SELECT SUM(w_ytd) FROM warehouse WHERE w_id "+wRange)
+	cc1DSum, cc1DErr := qfloat(ctx, reader, "SELECT SUM(d_ytd) FROM district "+wWhere("d_w_id"))
+	cc4OSum, cc4OErr := qint(ctx, reader, "SELECT SUM(o_ol_cnt) FROM orders "+wWhere("o_w_id"))
+	cc4OlCnt, cc4OlErr := qint(ctx, reader, "SELECT COUNT(*) FROM order_line "+wWhere("ol_w_id"))
 
-	checkCardinalities(ctx, b, check, wWhere, wRange, warehouses)
+	checkCardinalities(ctx, reader, check, wWhere, wRange, warehouses)
 	checkConsistency(check, distNext, ordMax, noStats,
 		cc1WSum, cc1DSum, cc1WErr, cc1DErr,
 		cc4OSum, cc4OlCnt, cc4OErr, cc4OlErr)
-	checkDistribution(ctx, b, check, wWhere, wRange)
+	checkDistribution(ctx, reader, check, wWhere, wRange)
 
 	if len(failures) > 0 {
 		detail := strings.Join(failures, "\n  ")
@@ -54,7 +64,7 @@ func validatePopulation(ctx context.Context, b *bench.Bench, warehouses, warehou
 // prefetchDistrictAggregates loads the per-district next-o-id, max order id, and
 // new_order min/max/count aggregates used by the consistency checks (CC2/CC3).
 func prefetchDistrictAggregates(
-	ctx context.Context, b *bench.Bench,
+	ctx context.Context, b *populationReader,
 	wWhere func(string) string,
 ) (distNext, ordMax map[string]int64, noStats map[string]noStat, err error) {
 	distRows, err := b.QueryRows(ctx, "SELECT d_w_id, d_id, d_next_o_id FROM district "+wWhere("d_w_id"), nil)
@@ -97,7 +107,7 @@ type noStat struct{ max, min, cnt int64 }
 
 // checkCardinalities runs the eight §1.3.1 table-cardinality checks.
 func checkCardinalities(
-	ctx context.Context, b *bench.Bench,
+	ctx context.Context, b *populationReader,
 	check func(string, bool),
 	wWhere func(string) string, wRange string, warehouses int64,
 ) {
@@ -152,23 +162,29 @@ func checkConsistency(
 
 // checkDistribution runs the §1.3.1 data-distribution and constant-column checks.
 func checkDistribution(
-	ctx context.Context, b *bench.Bench,
+	ctx context.Context, b *populationReader,
 	check func(string, bool),
 	wWhere func(string) string, wRange string,
 ) {
-	iDataPct, _ := qfloat(ctx, b,
-		"SELECT 100.0 * SUM(CASE WHEN i_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM item")
-	check("I_DATA 10% ORIGINAL (5..15%)", iDataPct >= 5 && iDataPct <= 15)
+	percent := "100.0"
+	if b.DriverTypeName() == bench.DriverPicodata {
+		// Picodata pgproto cannot encode recurring high-precision decimals.
+		percent = "CAST(100.0 AS DOUBLE)"
+	}
 
-	sDataPct, _ := qfloat(ctx, b,
-		"SELECT 100.0 * SUM(CASE WHEN s_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM stock "+
+	iDataPct, iErr := qfloat(ctx, b,
+		"SELECT "+percent+" * SUM(CASE WHEN i_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM item")
+	check("I_DATA 10% ORIGINAL (5..15%)", iErr == nil && iDataPct >= 5 && iDataPct <= 15)
+
+	sDataPct, sErr := qfloat(ctx, b,
+		"SELECT "+percent+" * SUM(CASE WHEN s_data LIKE '%ORIGINAL%' THEN 1 ELSE 0 END) / COUNT(*) FROM stock "+
 			wWhere("s_w_id"))
-	check("S_DATA 10% ORIGINAL (5..15%)", sDataPct >= 5 && sDataPct <= 15)
+	check("S_DATA 10% ORIGINAL (5..15%)", sErr == nil && sDataPct >= 5 && sDataPct <= 15)
 
-	bcPct, _ := qfloat(ctx, b,
-		"SELECT 100.0 * SUM(CASE WHEN c_credit = 'BC' THEN 1 ELSE 0 END) / COUNT(*) FROM customer "+
+	bcPct, bcErr := qfloat(ctx, b,
+		"SELECT "+percent+" * SUM(CASE WHEN c_credit = 'BC' THEN 1 ELSE 0 END) / COUNT(*) FROM customer "+
 			wWhere("c_w_id"))
-	check("C_CREDIT 10% BC (5..15%)", bcPct >= 5 && bcPct <= 15)
+	check("C_CREDIT 10% BC (5..15%)", bcErr == nil && bcPct >= 5 && bcPct <= 15)
 	check("C_MIDDLE = 'OE' everywhere", qintEq(ctx, b,
 		"SELECT COUNT(*) FROM customer WHERE c_middle <> 'OE' AND c_w_id "+wRange, 0))
 	check("W_YTD = 300000 everywhere", qintEq(ctx, b,
@@ -178,14 +194,18 @@ func checkDistribution(
 }
 
 // qint runs a scalar COUNT/SUM-int query and compares to want.
-func qintEq(ctx context.Context, b *bench.Bench, sql string, want int64) bool {
+func qintEq(ctx context.Context, b *populationReader, sql string, want int64) bool {
 	got, err := qint(ctx, b, sql)
 
 	return err == nil && got == want
 }
 
-func qint(ctx context.Context, b *bench.Bench, sql string) (int64, error) {
+func qint(ctx context.Context, b *populationReader, sql string) (int64, error) {
 	v, err := b.QueryValue(ctx, sql, nil)
+	if err != nil {
+		b.Logger().Error("population validation query failed", zap.String("query", sql), zap.Error(err))
+	}
+
 	if err != nil || v == nil {
 		return 0, err
 	}
@@ -193,8 +213,12 @@ func qint(ctx context.Context, b *bench.Bench, sql string) (int64, error) {
 	return toInt64(v), nil
 }
 
-func qfloat(ctx context.Context, b *bench.Bench, sql string) (float64, error) {
+func qfloat(ctx context.Context, b *populationReader, sql string) (float64, error) {
 	v, err := b.QueryValue(ctx, sql, nil)
+	if err != nil {
+		b.Logger().Error("population validation query failed", zap.String("query", sql), zap.Error(err))
+	}
+
 	if err != nil || v == nil {
 		return 0, err
 	}
@@ -330,4 +354,34 @@ func atof(s string) float64 {
 	}
 
 	return f
+}
+
+// populationReader retries only the read-only setup checks. It never repeats
+// population writes or treats a data mismatch as a transient database failure.
+type populationReader struct {
+	*bench.Bench
+	policy bench.RetryPolicy
+}
+
+func (r *populationReader) QueryValue(ctx context.Context, sql string, args map[string]any) (any, error) {
+	return readPopulation(ctx, r.policy, func() (any, error) { return r.Bench.QueryValue(ctx, sql, args) })
+}
+
+func (r *populationReader) QueryRows(ctx context.Context, sql string, args map[string]any) ([][]any, error) {
+	return readPopulation(ctx, r.policy, func() ([][]any, error) { return r.Bench.QueryRows(ctx, sql, args) })
+}
+
+func readPopulation[T any](ctx context.Context, policy bench.RetryPolicy, query func() (T, error)) (T, error) {
+	var result T
+
+	err := bench.Retry0(ctx, policy, func() error {
+		value, err := query()
+		if err == nil {
+			result = value
+		}
+
+		return err
+	})
+
+	return result, err
 }

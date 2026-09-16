@@ -231,6 +231,10 @@ func (m *txMetrics) recordQueryResult(vu *VU, elapsed time.Duration, queryErr er
 		return
 	}
 
+	if vu.root.throughput.active.Load() {
+		vu.root.throughput.queries.Add(1)
+	}
+
 	m.emit(vu, m.queryDuration, elapsed.Seconds()*millisPerSecond, attrs)
 }
 

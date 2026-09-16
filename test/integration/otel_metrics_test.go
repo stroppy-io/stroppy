@@ -62,6 +62,16 @@ func TestOtelStroppyMetrics(t *testing.T) {
 			return err
 		}
 
+		var instance string
+		for _, sample := range samples {
+			if sample.name == "stroppy_iterations_total" {
+				instance = sample.labels["instance"]
+			}
+		}
+		if instance == "" {
+			return fmt.Errorf("missing Stroppy service instance identity")
+		}
+
 		rows := map[string]float64{
 			"pgbench_branches": 1,
 			"pgbench_tellers":  10,
@@ -85,6 +95,7 @@ func TestOtelStroppyMetrics(t *testing.T) {
 				{name: "stroppy_insert_duration_milliseconds_count", labels: tableLabels, value: 1, exact: true},
 				{name: "stroppy_insert_operations_total", labels: tableLabels, value: 1, exact: true},
 			} {
+				expectation.labels["instance"] = instance
 				if err := requirePrometheusExpectation(samples, expectation); err != nil {
 					return err
 				}
@@ -99,6 +110,8 @@ func TestOtelStroppyMetrics(t *testing.T) {
 			"step":         "workload",
 		}
 		expected := []metricExpectation{
+			{name: "stroppy_successful_transactions_total", labels: labels{"job": "stroppy"}, value: 1, exact: true},
+			{name: "stroppy_failed_iterations_total", labels: labels{"job": "stroppy"}, value: 0, exact: true},
 			{name: "stroppy_run_query_operations_total", labels: labels{"job": "stroppy", "step": "workload"}, value: 5, exact: true},
 			{name: "stroppy_run_query_duration_milliseconds_count", labels: labels{"job": "stroppy", "step": "workload"}, value: 5, exact: true},
 			{name: "stroppy_transactions_total", labels: txLabels, value: 1, exact: true},
@@ -109,6 +122,7 @@ func TestOtelStroppyMetrics(t *testing.T) {
 			{name: "stroppy_iteration_duration_milliseconds_count", labels: labels{"job": "stroppy"}, value: 1, exact: true},
 		}
 		for _, expectation := range expected {
+			expectation.labels["instance"] = instance
 			if err := requirePrometheusExpectation(samples, expectation); err != nil {
 				return err
 			}

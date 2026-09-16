@@ -7,17 +7,17 @@ import (
 )
 
 func TestEmbeddedAssetContract(t *testing.T) {
-	workloadtest.Files(t, files, "README.md", "pg.sql", "mysql.sql", "pico.sql", "ydb.sql")
+	workloadtest.Files(t, files, "README.md", "pg.sql", "crdb.sql", "mysql.sql", "pico.sql", "ydb.sql")
 
 	txQueries := make([]workloadtest.Query, 0, len(requiredTxQueries))
 	for _, query := range requiredTxQueries {
 		txQueries = append(txQueries, workloadtest.Query{Section: query.section, Name: query.query})
 	}
 
-	for _, dialect := range []string{"pg.sql", "mysql.sql", "pico.sql", "ydb.sql"} {
+	for _, dialect := range []string{"pg.sql", "crdb.sql", "mysql.sql", "pico.sql", "ydb.sql"} {
 		t.Run(dialect, func(t *testing.T) {
 			queries := txQueries
-			if dialect == "pg.sql" || dialect == "mysql.sql" {
+			if dialect == "pg.sql" || dialect == "crdb.sql" || dialect == "mysql.sql" {
 				queries = append(append([]workloadtest.Query(nil), txQueries...), workloadtest.Query{
 					Section: "workload_procs",
 					Name:    "tpcb_transaction",
