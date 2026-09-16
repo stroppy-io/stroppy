@@ -17,6 +17,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- CockroachDB TPC-C loads ignore the PostgreSQL-only unlogged option instead of issuing unsupported durability changes. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
 - Yandex Cloud dedicated connections load the internal CA before the first IAM-token handshake; explicit credentials are never replaced by VM metadata credentials after an error. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
 - TPC-C population validation retries transient read failures within the configured attempt limit and reports setup retries separately; data mismatches still fail validation. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
 - Retry YDB overload errors even when the SDK also reports cancellation of its query stream; explicit caller cancellation still stops the workload. ([#166](https://github.com/stroppy-io/stroppy/pull/166))

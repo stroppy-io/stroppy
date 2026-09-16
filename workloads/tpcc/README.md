@@ -126,3 +126,5 @@ For CockroachDB 24.1, select `--sql-file crdb24.sql`; its procedures use
 WHILE loops supported by that version. Both variants retain the expected
 TPC-C rollback and use Cockroach-compatible decimal arithmetic and statistics.
 The cloud compiler selects the variant from the catalog database version.
+These SQL variants ignore `--pg-unlogged`: loading keeps CockroachDB's normal
+durability and does not issue PostgreSQL-only `SET UNLOGGED`/`SET LOGGED` commands.

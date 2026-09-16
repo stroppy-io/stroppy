@@ -3,6 +3,7 @@ package tpcc
 import (
 	"testing"
 
+	"github.com/stroppy-io/stroppy/pkg/bench"
 	"github.com/stroppy-io/stroppy/workloads/internal/workloadtest"
 )
 
@@ -83,6 +84,31 @@ func TestEmbeddedAssetContract(t *testing.T) {
 			}
 
 			workloadtest.SQL(t, files, dialect, dialectSections, dialectQueries)
+		})
+	}
+}
+
+// TestDurabilitySectionsArePostgresOnly guards the optional PG_UNLOGGED load
+// path, since CockroachDB also uses the PostgreSQL driver.
+func TestDurabilitySectionsArePostgresOnly(t *testing.T) {
+	for _, dialect := range []string{"pg.sql", "crdb.sql", "crdb24.sql"} {
+		t.Run(dialect, func(t *testing.T) {
+			data, err := files.ReadFile(dialect)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			sql := bench.ParseSQL(string(data))
+			for _, section := range []string{"set_unlogged", "set_logged"} {
+				queries := sql.Section(section)
+				if dialect == "pg.sql" {
+					if len(queries) != 9 {
+						t.Errorf("%s: want durability changes for all 9 tables, got %d", section, len(queries))
+					}
+				} else if len(queries) != 0 {
+					t.Errorf("%s: CockroachDB must skip PostgreSQL durability changes, got %d queries", section, len(queries))
+				}
+			}
 		})
 	}
 }

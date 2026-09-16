@@ -133,29 +133,6 @@ CREATE TABLE stock (
 )
 
 
---+ set_unlogged
--- Flip tables to UNLOGGED for a WAL-free bulk load; set_logged restores
--- durability after population. Gated by PG_UNLOGGED (default false), pg-only.
---= warehouse
-ALTER TABLE warehouse  SET UNLOGGED;
---= district
-ALTER TABLE district   SET UNLOGGED;
---= customer
-ALTER TABLE customer   SET UNLOGGED;
---= history
-ALTER TABLE history    SET UNLOGGED;
---= new_order
-ALTER TABLE new_order  SET UNLOGGED;
---= orders
-ALTER TABLE orders     SET UNLOGGED;
---= order_line
-ALTER TABLE order_line SET UNLOGGED;
---= item
-ALTER TABLE item       SET UNLOGGED;
---= stock
-ALTER TABLE stock      SET UNLOGGED;
-
-
 --+ create_procedures
 /* TPC-C §3.4.0.1 Table 3-1: NO/P/D require isolation Level 3
    (phantom-protected), OS/SL require Level 2 (repeatable read).
@@ -543,34 +520,8 @@ CREATE INDEX idx_customer_name ON customer (c_w_id, c_d_id, c_last, c_first);
 CREATE INDEX idx_order ON orders (o_w_id, o_d_id, o_c_id, o_id);
 
 
---+ set_logged
--- Restore durability after the UNLOGGED bulk load (pg-only, PG_UNLOGGED).
---= warehouse
-ALTER TABLE warehouse  SET LOGGED;
---= district
-ALTER TABLE district   SET LOGGED;
---= customer
-ALTER TABLE customer   SET LOGGED;
---= history
-ALTER TABLE history    SET LOGGED;
---= new_order
-ALTER TABLE new_order  SET LOGGED;
---= orders
-ALTER TABLE orders     SET LOGGED;
---= order_line
-ALTER TABLE order_line SET LOGGED;
---= item
-ALTER TABLE item       SET LOGGED;
---= stock
-ALTER TABLE stock      SET LOGGED;
-
-
 --+ create_foreign_keys
--- FK constraints added post-load, AFTER set_logged, on already-logged tables.
--- Postgres checks FK persistence in BOTH directions, so a logged<->unlogged FK
--- edge may never exist: keeping these out of create_schema lets set_unlogged and
--- set_logged flip every table cleanly. warehouse/item are the referenced parents.
--- pg-only; dialects without this section no-op.
+-- Add foreign keys after population, once referenced rows are loaded.
 --= district_w_fk
 ALTER TABLE district   ADD CONSTRAINT district_w_fk   FOREIGN KEY (d_w_id)  REFERENCES warehouse(w_id);
 --= customer_w_fk
