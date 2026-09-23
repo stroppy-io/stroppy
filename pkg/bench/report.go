@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/attribute"
@@ -154,6 +155,17 @@ func reportScenario(scenario scenarioSpec) report.Scenario {
 	return out
 }
 
+// AddReportData adds or replaces one JSON value in the common report metadata.
+// Values are copied into the final envelope and should contain only non-secret run labels.
+func (b *Bench) AddReportData(key, value string) {
+	b.root.reportMu.Lock()
+	if b.root.reportData == nil {
+		b.root.reportData = make(map[string]string)
+	}
+	b.root.reportData[key] = value
+	b.root.reportMu.Unlock()
+}
+
 func reportParameters(params []resolvedParam) report.Parameters {
 	out := report.Parameters{
 		Run:      make(map[string]report.Parameter),
@@ -181,6 +193,9 @@ func finalizeRunReport(
 	phase string,
 ) {
 	run.FinishedAt = time.Now().UTC()
+	root.reportMu.Lock()
+	run.Custom = maps.Clone(root.reportData)
+	root.reportMu.Unlock()
 	run.Steps = root.stepFilter.snapshot()
 	run.Metrics = reportMetrics(data, root.metricsPrefix)
 	run.Errors = reportErrors(root.errorReporter.snapshot())
@@ -273,7 +288,12 @@ func boundReportError(err error) string {
 		return message
 	}
 
-	return message[:maxBytes]
+	message = message[:maxBytes]
+	for !utf8.ValidString(message) {
+		message = message[:len(message)-1]
+	}
+
+	return message
 }
 
 func aggregateMetricSnapshots(data metricdata.ResourceMetrics, prefix string) map[string]MetricSnapshot {

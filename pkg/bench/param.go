@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"regexp"
@@ -180,7 +181,8 @@ var (
 
 var reservedWorkloadParamNames = map[string]struct{}{
 	"driver": {}, "driver-opt": {}, "duration": {}, "env": {}, "executor": {},
-	"file": {}, "help": {}, "iterations": {}, "no-steps": {}, "steps": {}, "vus": {},
+	"file": {}, "help": {}, "iterations": {}, "no-report": {}, "no-steps": {},
+	"report-file": {}, "report-format": {}, "steps": {}, "vus": {},
 }
 
 func newDef(inputs ParamInputs, defaultsOnly bool) *Def {
@@ -212,9 +214,7 @@ func cloneStringMap(src map[string]string) map[string]string {
 	}
 
 	dst := make(map[string]string, len(src))
-	for key, value := range src {
-		dst[key] = value
-	}
+	maps.Copy(dst, src)
 
 	return dst
 }

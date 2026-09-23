@@ -134,6 +134,7 @@ func TestParseRunArgs(t *testing.T) {
 		wantAfterDash []string
 		wantTyped     map[string]string
 		wantHelp      bool
+		wantReport    reportOutput
 		wantPresets   map[int]string
 		wantOpts      map[int][][2]string
 		wantErr       error
@@ -198,6 +199,34 @@ func TestParseRunArgs(t *testing.T) {
 			args:       []string{"tpcc", "--help"},
 			wantScript: "tpcc",
 			wantHelp:   true,
+		},
+		{
+			name:       "JSON report stdout",
+			args:       []string{"simple", "--report-format", "json"},
+			wantScript: "simple",
+			wantReport: reportOutput{format: "json"},
+		},
+		{
+			name:       "report file equals form",
+			args:       []string{"simple", "--report-file=result.json"},
+			wantScript: "simple",
+			wantReport: reportOutput{file: "result.json"},
+		},
+		{
+			name:       "reports disabled",
+			args:       []string{"simple", "--no-report"},
+			wantScript: "simple",
+			wantReport: reportOutput{disabled: true},
+		},
+		{
+			name:    "unsupported report format",
+			args:    []string{"simple", "--report-format", "yaml"},
+			wantErr: errInvalidReportFormat,
+		},
+		{
+			name:    "disabled report conflicts with output",
+			args:    []string{"simple", "--no-report", "--report-file", "result.json"},
+			wantErr: errReportDisabledOutput,
 		},
 		{
 			name:        "inline SQL query with spaces and equals is single positional",
@@ -633,6 +662,10 @@ func TestParseRunArgs(t *testing.T) {
 				t.Errorf("help: got %v, want %v", got.help, tt.wantHelp)
 			}
 
+			if got.report != tt.wantReport {
+				t.Errorf("report: got %#v, want %#v", got.report, tt.wantReport)
+			}
+
 			if !presetMapsEqual(got.driverPresets, tt.wantPresets) {
 				t.Errorf("driverPresets: got %v, want %v", got.driverPresets, tt.wantPresets)
 			}
@@ -663,6 +696,66 @@ func TestNonemptySeparatorTailIsRejected(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "arguments after '--' are not supported")
 	require.Contains(t, err.Error(), "stroppy run <workload> --help")
+}
+
+func TestJSONReportStdoutAndFile(t *testing.T) {
+	unsetLoggerEnv(t)
+
+	previousOutput := Cmd.OutOrStdout()
+	previousContext := Cmd.Context()
+	t.Cleanup(func() {
+		Cmd.SetOut(previousOutput)
+		Cmd.SetContext(previousContext)
+	})
+	Cmd.SetContext(t.Context())
+
+	var stdout bytes.Buffer
+	Cmd.SetOut(&stdout)
+	reportPath := t.TempDir() + "/result.json"
+
+	err := Cmd.RunE(Cmd, []string{
+		"simple", "-d", "noop", "--executor", "shared-iterations", "--iterations", "2",
+		"--report-format", "json", "--report-file", reportPath,
+	})
+	require.NoError(t, err)
+
+	var stdoutReport map[string]any
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &stdoutReport))
+	fileData, err := os.ReadFile(reportPath)
+	require.NoError(t, err)
+
+	var fileReport map[string]any
+	require.NoError(t, json.Unmarshal(fileData, &fileReport))
+	require.Equal(t, stdoutReport, fileReport)
+	require.Equal(t, float64(1), stdoutReport["schema"])
+	require.Equal(t, "run", stdoutReport["kind"])
+	require.Equal(t, "simple", stdoutReport["workload"])
+	require.Equal(t, "noop", stdoutReport["driver"])
+	require.Equal(t, "completed_with_errors", stdoutReport["status"])
+
+	params := objectField(t, stdoutReport, "parameters")
+	runParams := objectField(t, params, "run")
+	iterations := objectField(t, runParams, "iterations")
+	require.Equal(t, float64(2), iterations["value"])
+	require.Equal(t, "cli", iterations["source"])
+
+	metrics := objectField(t, stdoutReport, "metrics")
+	require.Contains(t, metrics, "iterations_total")
+}
+
+func TestReportFileFailureReturnsError(t *testing.T) {
+	unsetLoggerEnv(t)
+
+	previousContext := Cmd.Context()
+	Cmd.SetContext(t.Context())
+	t.Cleanup(func() { Cmd.SetContext(previousContext) })
+
+	err := Cmd.RunE(Cmd, []string{
+		"simple", "-d", "noop", "--executor", "shared-iterations", "--iterations", "1",
+		"--report-file", t.TempDir(),
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "publish report file")
 }
 
 func TestConfigDriversMergeBelowCLI(t *testing.T) {

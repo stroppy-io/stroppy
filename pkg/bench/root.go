@@ -38,6 +38,9 @@ type RootState struct {
 	sharedSlots map[uint64]*sharedDriverSlot
 
 	stepFilter *stepFilterState
+
+	reportMu   sync.Mutex
+	reportData map[string]string
 }
 
 type sharedDriverSlot struct {

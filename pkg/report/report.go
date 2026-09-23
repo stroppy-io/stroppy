@@ -48,6 +48,7 @@ type Run struct {
 	Driver             string            `json:"driver"`
 	Drivers            []Driver          `json:"drivers"`
 	Metadata           map[string]string `json:"metadata,omitempty"`
+	Custom             map[string]string `json:"custom,omitempty"`
 	Host               Host              `json:"host"`
 	Scenario           Scenario          `json:"scenario"`
 	Parameters         Parameters        `json:"parameters"`

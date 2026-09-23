@@ -110,6 +110,18 @@ Typed parameter precedence is: CLI flag > process environment > `-e` > matching
 `-d/-D` > config `drivers`. Legacy `DURATION` inference remains compatible but
 warns; use an explicit executor.
 
+Every workload can emit one versioned JSON report containing effective inputs,
+host details, steps, metrics, bounded errors, and workload-specific results:
+
+```bash
+stroppy run tpcb/tx -d pg --report-format json
+stroppy run tpcc/tx -d pg --report-file result.json
+```
+
+Human output and diagnostics remain on stderr, so requested stdout stays valid
+JSON. See [run reports](docs/run-reports.md) for report fields, output behavior,
+and workload payloads.
+
 Use `stroppy help` to explore available topics:
 
 ```bash

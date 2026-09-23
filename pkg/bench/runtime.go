@@ -292,24 +292,34 @@ func RunWithReport(
 		}
 	}
 
+	terminalPhase := phase
 	phase = "teardown"
 	teardownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
 	if err := wl.Teardown(teardownCtx, setupBench); err != nil {
+		if runErr == nil {
+			terminalPhase = phase
+		}
 		runErr = errors.Join(runErr, fmt.Errorf("teardown: %w", err))
 	}
 	cancel()
 
 	if err := root.Teardown(); err != nil {
+		if runErr == nil {
+			terminalPhase = phase
+		}
 		runErr = errors.Join(runErr, fmt.Errorf("shared driver teardown: %w", err))
 	}
 
 	teardownCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
 	if err := drv.Teardown(teardownCtx); err != nil {
+		if runErr == nil {
+			terminalPhase = phase
+		}
 		runErr = errors.Join(runErr, fmt.Errorf("driver teardown: %w", err))
 	}
 	cancel()
 
-	return finishRunReport(runReport, root, definition.reports, runErr, phase)
+	return finishRunReport(runReport, root, definition.reports, runErr, terminalPhase)
 }
 
 func finishRunReport(

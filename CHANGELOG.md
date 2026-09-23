@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- Every workload can emit one versioned JSON run report to stdout or a file, with effective inputs, host details, steps, metrics, bounded errors, and structured TPC-C, TPC-H, and TPC-DS results.
 - CockroachDB SQL variants for TPC-B and TPC-C (`--sql-file tpcb/crdb.sql` or `tpcc/crdb.sql`) retain native workload metrics. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
 - Export native transaction, iteration and query throughput over the measured workload window, including explicit zero error counters. ([#166](https://github.com/stroppy-io/stroppy/pull/166))
 
