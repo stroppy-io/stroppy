@@ -2,7 +2,6 @@ package bench
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -18,11 +17,14 @@ type stepFilterState struct {
 	except map[string]struct{}
 
 	mu      sync.Mutex
-	records []report.Step
+	records map[string]*report.Step
+	order   []string
 }
 
 func newStepFilter(steps, noSteps []string) *stepFilterState {
-	s := &stepFilterState{only: map[string]struct{}{}, except: map[string]struct{}{}}
+	s := &stepFilterState{
+		only: map[string]struct{}{}, except: map[string]struct{}{}, records: map[string]*report.Step{},
+	}
 
 	for _, n := range steps {
 		if n = strings.TrimSpace(n); n != "" {
@@ -55,15 +57,32 @@ func (s *stepFilterState) enabled(name string) bool {
 
 func (s *stepFilterState) record(step report.Step) {
 	s.mu.Lock()
-	s.records = append(s.records, step)
-	s.mu.Unlock()
+	defer s.mu.Unlock()
+
+	recorded := s.records[step.Name]
+	if recorded == nil {
+		recorded = &report.Step{Name: step.Name, Status: step.Status}
+		s.records[step.Name] = recorded
+		s.order = append(s.order, step.Name)
+	}
+
+	if step.Status != "skipped" {
+		recorded.Status = step.Status
+		recorded.Executions++
+		recorded.DurationSeconds += step.DurationSeconds
+	}
 }
 
 func (s *stepFilterState) snapshot() []report.Step {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return slices.Clone(s.records)
+	steps := make([]report.Step, 0, len(s.order))
+	for _, name := range s.order {
+		steps = append(steps, *s.records[name])
+	}
+
+	return steps
 }
 
 // Step runs fn as a named phase: skips if filtered out (logging the skip), otherwise

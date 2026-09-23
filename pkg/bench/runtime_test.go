@@ -467,6 +467,10 @@ func TestRunReportCapturesCommonAndCustomData(t *testing.T) {
 		t.Fatalf("iterations metric = %#v", runReport.Metrics["iterations_total"])
 	}
 
+	if len(runReport.Steps) != 2 || runReport.Steps[1].Name != "workload" || runReport.Steps[1].Executions != 2 {
+		t.Fatalf("steps = %#v", runReport.Steps)
+	}
+
 	if len(runReport.WorkloadReports) != 1 || runReport.WorkloadReports[0].Kind != "test.payload" {
 		t.Fatalf("workload reports = %#v", runReport.WorkloadReports)
 	}

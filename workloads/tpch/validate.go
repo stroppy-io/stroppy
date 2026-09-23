@@ -47,6 +47,7 @@ func loadAnswers() (*answersFile, error) {
 const (
 	toleranceRel = 0.01 // ±1%
 	toleranceAbs = 100  // ±$100
+	maxDeltas    = 5
 )
 
 // normalizeCell coerces a DB value to a comparison string (mirrors tpch_validate).
@@ -159,7 +160,7 @@ func (w *workload) validationContribution(bench.ReportContext) (bench.ReportCont
 
 func compareQuery(query string, gotRows [][]any, want answerBlock) compareResult {
 	rowBudget := max(len(gotRows), len(want.Rows))
-	deltas := make([]string, 0, rowBudget)
+	deltas := make([]string, 0, min(rowBudget, maxDeltas))
 
 	for i := range rowBudget {
 		var (
@@ -176,6 +177,11 @@ func compareQuery(query string, gotRows [][]any, want answerBlock) compareResult
 		}
 
 		deltas = append(deltas, compareRow(i, got, w)...)
+		if len(deltas) >= maxDeltas {
+			deltas = deltas[:maxDeltas]
+
+			break
+		}
 	}
 
 	status := "ok"

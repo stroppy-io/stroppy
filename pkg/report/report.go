@@ -106,6 +106,7 @@ type StepSelection struct {
 type Step struct {
 	Name            string  `json:"name"`
 	Status          string  `json:"status"`
+	Executions      uint64  `json:"executions"`
 	DurationSeconds float64 `json:"duration_seconds,omitempty"`
 }
 
@@ -126,13 +127,13 @@ type Metric struct {
 
 // MetricSeries is one dimensioned counter, gauge, or histogram point.
 type MetricSeries struct {
-	Attributes   map[string]string `json:"attributes,omitempty"`
-	Total        *float64          `json:"total,omitempty"`
-	Count        *uint64           `json:"count,omitempty"`
-	Sum          *float64          `json:"sum,omitempty"`
-	Average      *float64          `json:"average,omitempty"`
-	Bounds       []float64         `json:"bounds,omitempty"`
-	BucketCounts []uint64          `json:"bucket_counts,omitempty"`
+	Attributes   map[string]any `json:"attributes,omitempty"`
+	Total        *float64       `json:"total,omitempty"`
+	Count        *uint64        `json:"count,omitempty"`
+	Sum          *float64       `json:"sum,omitempty"`
+	Average      *float64       `json:"average,omitempty"`
+	Bounds       []float64      `json:"bounds,omitempty"`
+	BucketCounts []uint64       `json:"bucket_counts,omitempty"`
 }
 
 // ErrorSummary contains bounded nonfatal terminal error groups.

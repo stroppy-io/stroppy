@@ -198,7 +198,7 @@ func Run(
 	lg *zap.Logger,
 	metricsConfig *MetricsConfig,
 ) error {
-	_, err := RunWithReport(ctx, name, drivers, paramInputs, steps, noSteps, lg, metricsConfig, ReportOptions{})
+	_, err := run(ctx, name, drivers, paramInputs, steps, noSteps, lg, metricsConfig, nil)
 
 	return err
 }
@@ -215,6 +215,20 @@ func RunWithReport(
 	metricsConfig *MetricsConfig,
 	reportOptions ReportOptions,
 ) (*report.Run, error) {
+	return run(ctx, name, drivers, paramInputs, steps, noSteps, lg, metricsConfig, &reportOptions)
+}
+
+//nolint:funlen // lifecycle order stays explicit: setup, scenario, teardown, report.
+func run(
+	ctx context.Context,
+	name string,
+	drivers map[int]*config.DriverConfig,
+	paramInputs ParamInputs,
+	steps, noSteps []string,
+	lg *zap.Logger,
+	metricsConfig *MetricsConfig,
+	reportOptions *ReportOptions,
+) (*report.Run, error) {
 	wl, ok := Lookup(name)
 	if !ok {
 		return nil, fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
@@ -230,7 +244,10 @@ func RunWithReport(
 		return nil, fmt.Errorf("scenario: %w", err)
 	}
 
-	runReport := newRunReport(name, drivers, definition.resolved, sc, steps, noSteps, reportOptions)
+	var runReport *report.Run
+	if reportOptions != nil {
+		runReport = newRunReport(name, drivers, definition.resolved, sc, steps, noSteps, *reportOptions)
+	}
 
 	root, err := newRootState(lg, ctx, steps, noSteps, metricsConfig)
 	if err != nil {
@@ -245,13 +262,13 @@ func RunWithReport(
 	cfg := drivers[0]
 	if cfg == nil {
 		runErr = errDriverIndexMissing
-		return finishRunReport(runReport, root, definition.reports, runErr, phase)
+		return finishRun(runReport, root, definition.reports, runErr, phase)
 	}
 
 	queryTimeout := scenarioParams.queryTimeout.Value()
 	if queryTimeout < 0 {
 		runErr = fmt.Errorf("%w, got %s", errNegativeQueryTimeout, queryTimeout)
-		return finishRunReport(runReport, root, definition.reports, runErr, phase)
+		return finishRun(runReport, root, definition.reports, runErr, phase)
 	}
 
 	drv, err := driver.Dispatch(ctx, driver.Options{
@@ -262,7 +279,7 @@ func RunWithReport(
 	})
 	if err != nil {
 		runErr = fmt.Errorf("driver dispatch: %w", err)
-		return finishRunReport(runReport, root, definition.reports, runErr, phase)
+		return finishRun(runReport, root, definition.reports, runErr, phase)
 	}
 
 	setupVU := &VU{root: root, vuid: 1, initPhase: true, ctx: ctx}
@@ -319,10 +336,10 @@ func RunWithReport(
 	}
 	cancel()
 
-	return finishRunReport(runReport, root, definition.reports, runErr, terminalPhase)
+	return finishRun(runReport, root, definition.reports, runErr, terminalPhase)
 }
 
-func finishRunReport(
+func finishRun(
 	runReport *report.Run,
 	root *RootState,
 	definitions []reportDefinition,
@@ -341,7 +358,9 @@ func finishRunReport(
 		root.onSummary(data)
 	}
 
-	finalizeRunReport(runReport, root, definitions, data, runErr, phase)
+	if runReport != nil {
+		finalizeRunReport(runReport, root, definitions, data, runErr, phase)
+	}
 	newSummary(root).printDataTo(os.Stderr, data)
 
 	return runReport, runErr

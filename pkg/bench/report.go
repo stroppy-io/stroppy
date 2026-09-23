@@ -398,15 +398,15 @@ func reportMetric(metric metricdata.Metrics) (report.Metric, bool) {
 	}
 }
 
-func reportAttributes(set attribute.Set) map[string]string {
+func reportAttributes(set attribute.Set) map[string]any {
 	values := set.ToSlice()
 	if len(values) == 0 {
 		return nil
 	}
 
-	out := make(map[string]string, len(values))
+	out := make(map[string]any, len(values))
 	for _, value := range values {
-		out[string(value.Key)] = value.Value.String()
+		out[string(value.Key)] = value.Value.AsInterface()
 	}
 
 	return out
