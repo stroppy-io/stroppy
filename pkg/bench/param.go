@@ -80,6 +80,13 @@ type ParamSchema struct {
 	Config             string
 }
 
+type resolvedParam struct {
+	name   string
+	scope  ParamScope
+	value  any
+	source ParamSource
+}
+
 // Description is the discoverable, default-only schema for a workload.
 type Description struct {
 	Name   string
@@ -140,6 +147,8 @@ type Def struct {
 	defaultsOnly bool
 	scope        ParamScope
 	descriptors  []paramDescriptor
+	resolved     []resolvedParam
+	reports      []reportDefinition
 	names        map[string]struct{}
 	envNames     map[string]string
 	errs         []error
@@ -360,8 +369,13 @@ func declareParam[T any](
 	}
 
 	if !ok {
-		return Param[T]{value: defaultValue, source: ParamSourceDefault}
+		value = defaultValue
+		source = ParamSourceDefault
 	}
+
+	d.resolved = append(d.resolved, resolvedParam{
+		name: name, scope: desc.scope, value: reportParamValue(value), source: source,
+	})
 
 	return Param[T]{value: value, source: source}
 }
@@ -549,6 +563,14 @@ func decodeFiniteFloat(raw json.RawMessage) (float64, error) {
 	}
 
 	return value, nil
+}
+
+func reportParamValue(value any) any {
+	if duration, ok := value.(time.Duration); ok {
+		return duration.String()
+	}
+
+	return value
 }
 
 func (d *Def) finish() error {
