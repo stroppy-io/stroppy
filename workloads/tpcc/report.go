@@ -1,7 +1,6 @@
 package tpcc
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -623,30 +622,17 @@ func passFail(v *bool) string {
 	}
 }
 
-// emitComplianceReport collects the run's TPC-C metrics, computes the compliance
-// report, and writes the human block to stderr plus one JSON line to stdout.
-// Emitting is report-only: a non-compliant or unavailable report never changes the
-// process exit status.
-func (w *workload) emitComplianceReport(b *bench.Bench) {
-	metrics, err := b.CollectedMetrics()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tpcc: compliance report skipped: %v\n", err)
-
-		return
-	}
-
+func (w *workload) complianceContribution(context bench.ReportContext) (bench.ReportContribution, error) {
 	obs := make([]txObservation, len(complianceTxTable))
 
 	for i, spec := range complianceTxTable {
-		dur, ok := metrics["tpcc_"+spec.name+"_duration"]
+		duration, ok := context.Metrics["tpcc_"+spec.name+"_duration"]
 		if !ok {
-			continue // no transactions of this type recorded
+			continue
 		}
 
 		obs[i] = txObservation{
-			count:        dur.Count,
-			bounds:       dur.Bounds,
-			bucketCounts: dur.Buckets,
+			count: duration.Count, bounds: duration.Bounds, bucketCounts: duration.Buckets,
 		}
 	}
 
@@ -660,25 +646,14 @@ func (w *workload) emitComplianceReport(b *bench.Bench) {
 		series = w.steady.snapshot(elapsed)
 	}
 
-	// Compliance verdicts apply only when pacing is on (TPC-C keying and think
-	// times, §5.2.5): that slow, spec-style run is the only one whose observed mix
-	// and response times can be judged against the specification. An unpaced run is
-	// a raw stress test with no steady-state guarantee.
-	report, err := complianceReport(obs, reportOptions{
-		workload: w.Name(),
-		paced:    w.pacing,
-		elapsed:  elapsed,
-		steady:   series,
+	compliance, err := complianceReport(obs, reportOptions{
+		workload: w.Name(), paced: w.pacing, elapsed: elapsed, steady: series,
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "tpcc: compliance report unavailable: %v\n", err)
-
-		return
+		return bench.ReportContribution{}, err
 	}
 
-	fmt.Fprint(os.Stderr, report.text())
+	fmt.Fprint(os.Stderr, compliance.text())
 
-	if err := json.NewEncoder(os.Stdout).Encode(map[string]Report{"compliance": report}); err != nil {
-		fmt.Fprintf(os.Stderr, "tpcc: compliance JSON output failed: %v\n", err)
-	}
+	return bench.ReportContribution{Data: compliance}, nil
 }

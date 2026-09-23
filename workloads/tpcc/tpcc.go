@@ -88,6 +88,8 @@ func init() {
 func (w *workload) Name() string { return "tpcc/" + w.variant }
 
 func (w *workload) Define(d *bench.Def) error {
+	d.Report("tpcc.compliance", 1, w.complianceContribution)
+
 	warehouses := d.Param.Int(
 		"scale-factor", 1, "Number of warehouses.", bench.LegacyEnvAliases("WAREHOUSES"),
 	).Value()
@@ -345,11 +347,7 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	})
 }
 
-func (w *workload) Teardown(_ context.Context, b *bench.Bench) error {
-	w.emitComplianceReport(b)
-
-	return nil
-}
+func (*workload) Teardown(context.Context, *bench.Bench) error { return nil }
 
 // recordSteady buckets a New-Order completion into the paced steady-state time
 // series, for the report's 3σ spread check. No-op on unpaced runs.

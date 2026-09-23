@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/pkg/report"
 	"github.com/stroppy-io/stroppy/workloads"
 )
 
@@ -113,6 +115,48 @@ type compareResult struct {
 	errMsg   string
 }
 
+type validationReport struct {
+	Status  string            `json:"status"`
+	Reason  string            `json:"reason,omitempty"`
+	Queries []validationQuery `json:"queries"`
+	Totals  validationTotals  `json:"totals"`
+}
+
+type validationQuery struct {
+	Query        string   `json:"query"`
+	Status       string   `json:"status"`
+	ActualRows   int      `json:"actual_rows"`
+	ExpectedRows int      `json:"expected_rows"`
+	Mismatches   []string `json:"mismatches,omitempty"`
+	Error        string   `json:"error,omitempty"`
+}
+
+type validationTotals struct {
+	Total   int `json:"total"`
+	OK      int `json:"ok"`
+	Diff    int `json:"diff"`
+	Skipped int `json:"skipped"`
+	Error   int `json:"error"`
+}
+
+func (w *workload) validationContribution(bench.ReportContext) (bench.ReportContribution, error) {
+	if w.validation.Status == "" {
+		return bench.ReportContribution{
+			Status: report.WorkloadReportSkipped, Reason: "answer validation was not selected",
+			Data: validationReport{
+				Status: "skipped", Reason: "answer validation was not selected", Queries: []validationQuery{},
+			},
+		}, nil
+	}
+	if w.validation.Status == "skipped" {
+		return bench.ReportContribution{
+			Status: report.WorkloadReportSkipped, Reason: w.validation.Reason, Data: w.validation,
+		}, nil
+	}
+
+	return bench.ReportContribution{Data: w.validation}, nil
+}
+
 func compareQuery(query string, gotRows [][]any, want answerBlock) compareResult {
 	rowBudget := max(len(gotRows), len(want.Rows))
 	deltas := make([]string, 0, rowBudget)
@@ -186,25 +230,27 @@ func compareRow(i int, got []any, w []string) []string {
 func validateAnswers(
 	ctx context.Context, b *bench.Bench, sql *bench.SQL,
 	params map[string]map[string]any, scaleFactor float64, dt bench.DriverTypeName,
-) {
+) validationReport {
 	lg := b.Logger().Sugar()
 	if math.Abs(scaleFactor-1) > 1e-9 {
-		lg.Info("[tpch_validate] skipped: answers_sf1 is SF=1 only")
+		const reason = "answers_sf1 is SF=1 only"
+		lg.Info("[tpch_validate] skipped: " + reason)
 
-		return
+		return validationReport{Status: "skipped", Reason: reason, Queries: []validationQuery{}}
 	}
 
 	if dt != bench.DriverPostgres {
-		lg.Infof("[tpch_validate] skipped: answers_sf1 generated against postgres only; driverType=%s", dt)
+		reason := fmt.Sprintf("answers_sf1 generated against postgres only; driverType=%s", dt)
+		lg.Infof("[tpch_validate] skipped: %s", reason)
 
-		return
+		return validationReport{Status: "skipped", Reason: reason, Queries: []validationQuery{}}
 	}
 
 	af, err := loadAnswers()
 	if err != nil {
 		lg.Errorf("[tpch_validate] failed to load answers: %v", err)
 
-		return
+		return validationReport{Status: "error", Reason: err.Error(), Queries: []validationQuery{}}
 	}
 
 	var results []compareResult
@@ -239,6 +285,37 @@ func validateAnswers(
 	}
 
 	logSummary(b, results)
+
+	return newValidationReport(results)
+}
+
+func newValidationReport(results []compareResult) validationReport {
+	validation := validationReport{
+		Status: "ok", Queries: make([]validationQuery, 0, len(results)),
+		Totals: validationTotals{Total: len(results)},
+	}
+	for _, result := range results {
+		query := validationQuery{
+			Query: result.query, Status: result.status, ActualRows: result.gotRows,
+			ExpectedRows: result.wantRows, Mismatches: slices.Clone(result.deltas), Error: result.errMsg,
+		}
+		switch result.status {
+		case "ok":
+			validation.Totals.OK++
+		case "mismatch":
+			validation.Totals.Diff++
+		case "skipped":
+			validation.Totals.Skipped++
+		case "error":
+			validation.Totals.Error++
+		}
+		validation.Queries = append(validation.Queries, query)
+	}
+	if validation.Totals.Diff > 0 || validation.Totals.Error > 0 {
+		validation.Status = "failed"
+	}
+
+	return validation
 }
 
 func logSummary(b *bench.Bench, results []compareResult) {

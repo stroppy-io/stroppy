@@ -28,8 +28,9 @@ type workload struct {
 	ydbStoreMode  string
 	sqlFile       string
 
-	params map[string]map[string]any // final per-query params (end dates + q1 cutoff precomputed)
-	m      map[string]*queryMetrics
+	params     map[string]map[string]any // final per-query params (end dates + q1 cutoff precomputed)
+	m          map[string]*queryMetrics
+	validation validationReport
 }
 
 type queryMetrics struct {
@@ -44,6 +45,8 @@ func init() { bench.Register(func() bench.Workload { return &workload{} }) }
 func (*workload) Name() string { return "tpch/tx" }
 
 func (w *workload) Define(d *bench.Def) error {
+	d.Report("tpch.validation", 1, w.validationContribution)
+
 	w.scaleFactor = d.Param.Float64("scale-factor", 1, "TPC-H scale factor.").Value()
 	w.loadWorkers = d.Param.Int("load-workers", 0, "Workers used to load each table.").Value()
 	w.useUnlogged = d.Param.Bool("pg-unlogged", false, "Use unlogged PostgreSQL tables while loading.").Value()
@@ -119,7 +122,7 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 
 	addStep("analyze", func() error { return runSection("analyze") })
 	addStep("validate_answers", func() error {
-		validateAnswers(ctx, b, w.sql, w.params, w.scaleFactor, w.driverType)
+		w.validation = validateAnswers(ctx, b, w.sql, w.params, w.scaleFactor, w.driverType)
 
 		return nil
 	})
