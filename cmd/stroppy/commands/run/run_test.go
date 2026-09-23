@@ -727,7 +727,7 @@ func TestJSONReportStdoutAndFile(t *testing.T) {
 	var fileReport map[string]any
 	require.NoError(t, json.Unmarshal(fileData, &fileReport))
 	require.Equal(t, stdoutReport, fileReport)
-	require.Equal(t, float64(1), stdoutReport["schema"])
+	require.InDelta(t, 1, stdoutReport["schema"], 0)
 	require.Equal(t, "run", stdoutReport["kind"])
 	require.Equal(t, "simple", stdoutReport["workload"])
 	require.Equal(t, "noop", stdoutReport["driver"])
@@ -736,7 +736,7 @@ func TestJSONReportStdoutAndFile(t *testing.T) {
 	params := objectField(t, stdoutReport, "parameters")
 	runParams := objectField(t, params, "run")
 	iterations := objectField(t, runParams, "iterations")
-	require.Equal(t, float64(2), iterations["value"])
+	require.InDelta(t, 2, iterations["value"], 0)
 	require.Equal(t, "cli", iterations["source"])
 
 	metrics := objectField(t, stdoutReport, "metrics")

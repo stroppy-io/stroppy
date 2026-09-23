@@ -453,16 +453,20 @@ func TestRunReportCapturesCommonAndCustomData(t *testing.T) {
 	if runReport.Schema != 1 || runReport.ID != "run-42" || runReport.Status != "completed" {
 		t.Fatalf("report identity/status = %#v", runReport)
 	}
+
 	if runReport.Parameters.Workload["label"].Value != "cli-value" ||
 		runReport.Parameters.Workload["label"].Source != "cli" {
 		t.Fatalf("label parameter = %#v", runReport.Parameters.Workload["label"])
 	}
+
 	if runReport.Custom["observed"] != "yes" {
 		t.Fatalf("custom = %#v", runReport.Custom)
 	}
+
 	if runReport.Metrics["iterations_total"].Total == nil || *runReport.Metrics["iterations_total"].Total != 2 {
 		t.Fatalf("iterations metric = %#v", runReport.Metrics["iterations_total"])
 	}
+
 	if len(runReport.WorkloadReports) != 1 || runReport.WorkloadReports[0].Kind != "test.payload" {
 		t.Fatalf("workload reports = %#v", runReport.WorkloadReports)
 	}
@@ -475,6 +479,7 @@ type reportTestWorkload struct {
 var registerReportTestWorkloadOnce sync.Once
 
 func (*reportTestWorkload) Name() string { return "test/run-report" }
+
 func (w *reportTestWorkload) Define(def *Def) error {
 	w.label = def.Param.String("label", "default", "Report label.").Value()
 	def.Report("test.payload", 1, func(ReportContext) (ReportContribution, error) {
@@ -483,6 +488,7 @@ func (w *reportTestWorkload) Define(def *Def) error {
 
 	return nil
 }
+
 func (*reportTestWorkload) Setup(_ context.Context, bench *Bench) error {
 	return bench.Step("setup", func() error {
 		bench.AddReportData("observed", "yes")
@@ -490,9 +496,11 @@ func (*reportTestWorkload) Setup(_ context.Context, bench *Bench) error {
 		return nil
 	})
 }
+
 func (*reportTestWorkload) Iterate(_ context.Context, bench *Bench) error {
 	return bench.StepSilent("workload", func() error { return nil })
 }
+
 func (*reportTestWorkload) Teardown(context.Context, *Bench) error { return nil }
 
 func TestRunQuietSummaryDeliversMetricsSilently(t *testing.T) {

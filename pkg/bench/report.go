@@ -49,25 +49,31 @@ type reportDefinition struct {
 	contributor ReportContributor
 }
 
+var (
+	errEmptyReportKind     = errors.New("report kind must not be empty")
+	errInvalidReportSchema = errors.New("report schema must be at least 1")
+	errDuplicateReportKind = errors.New("duplicate report kind")
+)
+
 // Report declares one workload-owned payload. Declaration is optional: every
 // workload receives the common report envelope without adding custom code.
 func (d *Def) Report(kind string, schema int, contributor ReportContributor) {
 	kind = strings.TrimSpace(kind)
 	if kind == "" {
-		d.addError(errors.New("report kind must not be empty"))
+		d.addError(errEmptyReportKind)
 
 		return
 	}
 
 	if schema < 1 {
-		d.addError(fmt.Errorf("report %q schema must be at least 1", kind))
+		d.addError(fmt.Errorf("report %q: %w", kind, errInvalidReportSchema))
 
 		return
 	}
 
 	for _, declared := range d.reports {
 		if declared.kind == kind {
-			d.addError(fmt.Errorf("duplicate report kind %q", kind))
+			d.addError(fmt.Errorf("%w %q", errDuplicateReportKind, kind))
 
 			return
 		}
@@ -199,7 +205,8 @@ func finalizeRunReport(
 	run.Steps = root.stepFilter.snapshot()
 	run.Metrics = reportMetrics(data, root.metricsPrefix)
 	run.Errors = reportErrors(root.errorReporter.snapshot())
-	if seconds := metricTotal(run.Metrics["measurement_seconds"]); seconds > 0 {
+	measurementMetric := run.Metrics["measurement_seconds"]
+	if seconds := metricTotal(&measurementMetric); seconds > 0 {
 		run.MeasurementSeconds = seconds
 	}
 
@@ -222,7 +229,7 @@ func finalizeRunReport(
 	run.WorkloadReports = buildWorkloadReports(definitions, ReportContext{Metrics: snapshots})
 }
 
-func buildWorkloadReports(definitions []reportDefinition, context ReportContext) []report.WorkloadReport {
+func buildWorkloadReports(definitions []reportDefinition, reportContext ReportContext) []report.WorkloadReport {
 	out := make([]report.WorkloadReport, 0, len(definitions))
 	for _, definition := range definitions {
 		item := report.WorkloadReport{
@@ -235,7 +242,7 @@ func buildWorkloadReports(definitions []reportDefinition, context ReportContext)
 			continue
 		}
 
-		contribution, err := definition.contributor(context)
+		contribution, err := definition.contributor(reportContext)
 		if err != nil {
 			item.Status = report.WorkloadReportError
 			item.Reason = boundReportError(err)
@@ -405,8 +412,8 @@ func reportAttributes(set attribute.Set) map[string]string {
 	return out
 }
 
-func metricTotal(metric report.Metric) float64 {
-	if metric.Total == nil {
+func metricTotal(metric *report.Metric) float64 {
+	if metric == nil || metric.Total == nil {
 		return 0
 	}
 
