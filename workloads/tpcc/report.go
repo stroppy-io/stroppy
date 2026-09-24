@@ -637,8 +637,14 @@ func (w *workload) complianceContribution(context bench.ReportContext) (bench.Re
 	}
 
 	var elapsed time.Duration
+
 	if !w.measureStart.IsZero() {
-		elapsed = time.Since(w.measureStart)
+		end := w.measureEnd
+		if end.IsZero() {
+			end = time.Now()
+		}
+
+		elapsed = end.Sub(w.measureStart)
 	}
 
 	var series steadySeries

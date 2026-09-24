@@ -430,6 +430,31 @@ func newRuntimeTestRoot(t *testing.T) *RootState {
 	return testRoot
 }
 
+func TestRunWithoutEnvelopeStillExecutesContributors(t *testing.T) {
+	registerReportTestWorkloadOnce.Do(func() {
+		Register(func() Workload { return &reportTestWorkload{} })
+	})
+	reportContributionCalls.Store(0)
+
+	err := Run(
+		context.Background(),
+		"test/run-report",
+		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
+		ParamInputs{CLI: map[string]string{"iterations": "1", "vus": "1"}},
+		nil,
+		nil,
+		zap.NewNop(),
+		&MetricsConfig{Quiet: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if reportContributionCalls.Load() != 1 {
+		t.Fatalf("contributor calls = %d, want 1", reportContributionCalls.Load())
+	}
+}
+
 func TestRunReportCapturesCommonAndCustomData(t *testing.T) {
 	registerReportTestWorkloadOnce.Do(func() {
 		Register(func() Workload { return &reportTestWorkload{} })
@@ -480,13 +505,18 @@ type reportTestWorkload struct {
 	label string
 }
 
-var registerReportTestWorkloadOnce sync.Once
+var (
+	registerReportTestWorkloadOnce sync.Once
+	reportContributionCalls        atomic.Int64
+)
 
 func (*reportTestWorkload) Name() string { return "test/run-report" }
 
 func (w *reportTestWorkload) Define(def *Def) error {
 	w.label = def.Param.String("label", "default", "Report label.").Value()
 	def.Report("test.payload", 1, func(ReportContext) (ReportContribution, error) {
+		reportContributionCalls.Add(1)
+
 		return ReportContribution{Data: map[string]string{"label": w.label}}, nil
 	})
 

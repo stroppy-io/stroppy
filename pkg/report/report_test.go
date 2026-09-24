@@ -41,6 +41,7 @@ func TestRunJSONRoundTripKeepsUnknownWorkloadPayload(t *testing.T) {
 	if err := json.Unmarshal(decoded.WorkloadReports[0].Data, &payload); err != nil {
 		t.Fatal(err)
 	}
+
 	future := payload["future"].(map[string]any)
 	if future["value"] != float64(42) {
 		t.Fatalf("payload = %#v", payload)

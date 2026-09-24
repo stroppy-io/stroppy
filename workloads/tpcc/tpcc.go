@@ -65,6 +65,7 @@ type workload struct {
 	retryPolicy bench.RetryPolicy
 
 	measureStart time.Time
+	measureEnd   time.Time
 	steady       *steady
 
 	vuStates sync.Map // uint64 -> *vuState
@@ -347,7 +348,11 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	})
 }
 
-func (*workload) Teardown(context.Context, *bench.Bench) error { return nil }
+func (w *workload) Teardown(context.Context, *bench.Bench) error {
+	w.measureEnd = time.Now()
+
+	return nil
+}
 
 // recordSteady buckets a New-Order completion into the paced steady-state time
 // series, for the report's 3σ spread check. No-op on unpaced runs.

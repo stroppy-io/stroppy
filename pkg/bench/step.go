@@ -104,6 +104,7 @@ func (b *Bench) StepSilent(name string, fn func() error) error {
 func (b *Bench) step(name string, fn func() error, silent bool) (err error) {
 	if !b.root.stepFilter.enabled(name) {
 		b.root.stepFilter.record(report.Step{Name: name, Status: "skipped"})
+
 		if !silent {
 			b.lg.Sugar().Infof("Skipping step '%s'", name)
 		}
@@ -112,13 +113,16 @@ func (b *Bench) step(name string, fn func() error, silent bool) (err error) {
 	}
 
 	started := time.Now()
+
 	stepBegin(b, name, silent)
 	defer func() {
 		stepEnd(b, name, silent)
+
 		status := "completed"
 		if err != nil {
 			status = "failed"
 		}
+
 		b.root.stepFilter.record(report.Step{
 			Name: name, Status: status, DurationSeconds: time.Since(started).Seconds(),
 		})

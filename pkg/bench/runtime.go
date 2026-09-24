@@ -251,10 +251,11 @@ func run(
 
 	root, err := newRootState(lg, ctx, steps, noSteps, metricsConfig)
 	if err != nil {
-		return runReport, fmt.Errorf("initialize metrics: %w", err)
+		return nil, fmt.Errorf("initialize metrics: %w", err)
 	}
 
 	phase := "driver"
+
 	var runErr error
 
 	defer func() { root.shutdownMetrics() }()
@@ -262,12 +263,14 @@ func run(
 	cfg := drivers[0]
 	if cfg == nil {
 		runErr = errDriverIndexMissing
+
 		return finishRun(runReport, root, definition.reports, runErr, phase)
 	}
 
 	queryTimeout := scenarioParams.queryTimeout.Value()
 	if queryTimeout < 0 {
 		runErr = fmt.Errorf("%w, got %s", errNegativeQueryTimeout, queryTimeout)
+
 		return finishRun(runReport, root, definition.reports, runErr, phase)
 	}
 
@@ -279,6 +282,7 @@ func run(
 	})
 	if err != nil {
 		runErr = fmt.Errorf("driver dispatch: %w", err)
+
 		return finishRun(runReport, root, definition.reports, runErr, phase)
 	}
 
@@ -290,10 +294,12 @@ func run(
 	}
 
 	phase = "setup"
+
 	if err := wl.Setup(ctx, setupBench); err != nil {
 		runErr = fmt.Errorf("setup: %w", err)
 	} else {
 		phase = "scenario"
+
 		if err := runScenario(ctx, root, sc, func(vu *VU) error {
 			b := &Bench{
 				root: root, vu: vu,
@@ -311,19 +317,23 @@ func run(
 
 	terminalPhase := phase
 	phase = "teardown"
+
 	teardownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
 	if err := wl.Teardown(teardownCtx, setupBench); err != nil {
 		if runErr == nil {
 			terminalPhase = phase
 		}
+
 		runErr = errors.Join(runErr, fmt.Errorf("teardown: %w", err))
 	}
+
 	cancel()
 
 	if err := root.Teardown(); err != nil {
 		if runErr == nil {
 			terminalPhase = phase
 		}
+
 		runErr = errors.Join(runErr, fmt.Errorf("shared driver teardown: %w", err))
 	}
 
@@ -332,8 +342,10 @@ func run(
 		if runErr == nil {
 			terminalPhase = phase
 		}
+
 		runErr = errors.Join(runErr, fmt.Errorf("driver teardown: %w", err))
 	}
+
 	cancel()
 
 	return finishRun(runReport, root, definition.reports, runErr, terminalPhase)
@@ -360,7 +372,12 @@ func finishRun(
 
 	if runReport != nil {
 		finalizeRunReport(runReport, root, definitions, data, runErr, phase)
+	} else if len(definitions) > 0 {
+		buildWorkloadReports(definitions, ReportContext{
+			Metrics: aggregateMetricSnapshots(data, root.metricsPrefix),
+		})
 	}
+
 	newSummary(root).printDataTo(os.Stderr, data)
 
 	return runReport, runErr

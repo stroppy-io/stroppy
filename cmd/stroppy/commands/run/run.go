@@ -708,8 +708,9 @@ func runGoWorkload(
 		cmd.Context(), name, drivers, paramInputs, steps, noSteps,
 		logger.Global(), metrics, reportConfig,
 	)
+
 	var outputErr error
-	if output.requested() {
+	if output.requested() && runReport != nil {
 		outputErr = writeRunReport(cmd.OutOrStdout(), output, runReport)
 	}
 
@@ -735,6 +736,7 @@ func writeRunReport(stdout io.Writer, output reportOutput, runReport *report.Run
 	if err != nil {
 		return fmt.Errorf("marshal run report: %w", err)
 	}
+
 	data = append(data, '\n')
 
 	if output.format == "json" {
@@ -754,12 +756,14 @@ func writeRunReport(stdout io.Writer, output reportOutput, runReport *report.Run
 
 func writeReportFile(path string, data []byte) (retErr error) {
 	dir := filepath.Dir(path)
+
 	file, err := os.CreateTemp(dir, ".stroppy-report-*.tmp")
 	if err != nil {
 		return fmt.Errorf("create report file: %w", err)
 	}
 
 	tempPath := file.Name()
+
 	defer func() {
 		if retErr != nil {
 			retErr = errors.Join(retErr, file.Close(), os.Remove(tempPath))
@@ -769,12 +773,15 @@ func writeReportFile(path string, data []byte) (retErr error) {
 	if _, err := file.Write(data); err != nil {
 		return fmt.Errorf("write report file: %w", err)
 	}
+
 	if err := file.Sync(); err != nil {
 		return fmt.Errorf("sync report file: %w", err)
 	}
+
 	if err := file.Close(); err != nil {
 		return fmt.Errorf("close report file: %w", err)
 	}
+
 	if err := os.Rename(tempPath, path); err != nil {
 		return fmt.Errorf("publish report file: %w", err)
 	}
@@ -1203,9 +1210,11 @@ func parseReportFlags(args []string, i int, parsed *runArgs) (int, error) {
 			if err != nil {
 				return 0, err
 			}
+
 			if flag == flagReportFormat && value != "json" {
 				return 0, fmt.Errorf("%w, got %q", errInvalidReportFormat, value)
 			}
+
 			*destination = value
 
 			return consumedPairFlag, nil
@@ -1215,9 +1224,11 @@ func parseReportFlags(args []string, i int, parsed *runArgs) (int, error) {
 			if value == "" {
 				return 0, fmt.Errorf("%s: %w", flag, errFlagRequiresValue)
 			}
+
 			if flag == flagReportFormat && value != "json" {
 				return 0, fmt.Errorf("%w, got %q", errInvalidReportFormat, value)
 			}
+
 			*destination = value
 
 			return 1, nil

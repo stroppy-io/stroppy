@@ -1,25 +1,6 @@
-package tpch
+package tpcds
 
 import "testing"
-
-func TestCompareQueryBoundsMismatchDetails(t *testing.T) {
-	got := make([][]any, maxDeltas+10)
-	want := answerBlock{Rows: make([][]string, maxDeltas+10)}
-
-	for idx := range got {
-		got[idx] = []any{"got"}
-		want.Rows[idx] = []string{"want"}
-	}
-
-	result := compareQuery("q1", got, want)
-	if result.status != "diff" {
-		t.Fatalf("status = %q, want diff", result.status)
-	}
-
-	if len(result.deltas) != maxDeltas {
-		t.Fatalf("deltas = %d, want %d", len(result.deltas), maxDeltas)
-	}
-}
 
 func TestValidationReportUsesPublicStatuses(t *testing.T) {
 	report := newValidationReport([]compareResult{

@@ -167,7 +167,7 @@ func sortedWant(rows [][]string) [][]string {
 
 type compareResult struct {
 	query    string
-	status   string // ok | mismatch | skipped | error
+	status   string // ok | diff | skip | error
 	gotRows  int
 	wantRows int
 	deltas   []string
@@ -207,6 +207,7 @@ func (w *workload) validationContribution(bench.ReportContext) (bench.ReportCont
 			},
 		}, nil
 	}
+
 	if w.validation.Status == "skipped" {
 		return bench.ReportContribution{
 			Status: report.WorkloadReportSkipped, Reason: w.validation.Reason, Data: w.validation,
@@ -248,7 +249,7 @@ func compareQuery(query string, got [][]string, want answerBlock) compareResult 
 
 	status := "ok"
 	if len(deltas) > 0 || len(got) != len(wantRows) {
-		status = "mismatch"
+		status = "diff"
 	}
 
 	return compareResult{query: query, status: status, gotRows: len(got), wantRows: len(wantRows), deltas: deltas}
@@ -295,6 +296,7 @@ func validateAnswers(
 	scaleFactor float64, dt bench.DriverTypeName, force bool,
 ) validationReport {
 	lg := b.Logger().Sugar()
+
 	if dt != bench.DriverPostgres && dt != bench.DriverMySQL {
 		reason := fmt.Sprintf("answers_sf1 validates postgres/mysql only; driverType=%s", dt)
 		lg.Infof("[tpcds_validate] skipped: %s", reason)
@@ -332,13 +334,13 @@ func validateAnswers(
 
 		body, ok := queries.Query("", name)
 		if !ok {
-			results = append(results, compareResult{query: name, status: "skipped", deltas: []string{"query text missing"}})
+			results = append(results, compareResult{query: name, status: "skip", deltas: []string{"query text missing"}})
 
 			continue
 		}
 
 		if !hasWant {
-			results = append(results, compareResult{query: name, status: "skipped", deltas: []string{"no reference answer"}})
+			results = append(results, compareResult{query: name, status: "skip", deltas: []string{"no reference answer"}})
 
 			continue
 		}
@@ -387,15 +389,17 @@ func newValidationReport(results []compareResult) validationReport {
 		switch result.status {
 		case "ok":
 			validation.Totals.OK++
-		case "mismatch":
+		case "diff":
 			validation.Totals.Diff++
-		case "skipped":
+		case "skip":
 			validation.Totals.Skipped++
 		case "error":
 			validation.Totals.Error++
 		}
+
 		validation.Queries = append(validation.Queries, query)
 	}
+
 	if validation.Totals.Diff > 0 || validation.Totals.Error > 0 {
 		validation.Status = "failed"
 	}
@@ -414,7 +418,7 @@ func logSummary(b *bench.Bench, results []compareResult) {
 			ok++
 
 			lines = append(lines, fmt.Sprintf("  %-12s: OK      rows=%d", r.query, r.gotRows))
-		case "mismatch":
+		case "diff":
 			mismatch++
 
 			preview := strings.Join(r.deltas[:min(3, len(r.deltas))], "; ")
@@ -423,7 +427,7 @@ func logSummary(b *bench.Bench, results []compareResult) {
 			}
 
 			lines = append(lines, fmt.Sprintf("  %-12s: DIFF    rows=%d/%d  %s", r.query, r.gotRows, r.wantRows, preview))
-		case "skipped":
+		case "skip":
 			skipped++
 
 			lines = append(lines, fmt.Sprintf("  %-12s: SKIP    %s", r.query, strings.Join(r.deltas, "; ")))

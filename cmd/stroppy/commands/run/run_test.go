@@ -703,6 +703,7 @@ func TestJSONReportStdoutAndFile(t *testing.T) {
 
 	previousOutput := Cmd.OutOrStdout()
 	previousContext := Cmd.Context()
+
 	t.Cleanup(func() {
 		Cmd.SetOut(previousOutput)
 		Cmd.SetContext(previousContext)
@@ -711,6 +712,7 @@ func TestJSONReportStdoutAndFile(t *testing.T) {
 
 	var stdout bytes.Buffer
 	Cmd.SetOut(&stdout)
+
 	reportPath := t.TempDir() + "/result.json"
 
 	err := Cmd.RunE(Cmd, []string{
@@ -721,6 +723,7 @@ func TestJSONReportStdoutAndFile(t *testing.T) {
 
 	var stdoutReport map[string]any
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &stdoutReport))
+
 	fileData, err := os.ReadFile(reportPath)
 	require.NoError(t, err)
 
@@ -741,6 +744,28 @@ func TestJSONReportStdoutAndFile(t *testing.T) {
 
 	metrics := objectField(t, stdoutReport, "metrics")
 	require.Contains(t, metrics, "iterations_total")
+}
+
+func TestInvalidRunDoesNotWriteNullReport(t *testing.T) {
+	unsetLoggerEnv(t)
+
+	previousOutput := Cmd.OutOrStdout()
+	previousContext := Cmd.Context()
+
+	t.Cleanup(func() {
+		Cmd.SetOut(previousOutput)
+		Cmd.SetContext(previousContext)
+	})
+	Cmd.SetContext(t.Context())
+
+	var stdout bytes.Buffer
+	Cmd.SetOut(&stdout)
+
+	err := Cmd.RunE(Cmd, []string{
+		"simple", "-d", "noop", "--vus", "0", "--report-format", "json",
+	})
+	require.Error(t, err)
+	require.Empty(t, stdout.String())
 }
 
 func TestReportFileFailureReturnsError(t *testing.T) {

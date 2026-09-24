@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stroppy-io/stroppy/pkg/bench"
 )
 
 // testBounds is a small deterministic histogram layout used only by the unit
@@ -41,6 +43,28 @@ func fullMix(latencies []float64) []txObservation {
 		binSamples(repeat(latencies[2], 40)),
 		binSamples(repeat(latencies[3], 40)),
 		binSamples(repeat(latencies[4], 40)),
+	}
+}
+
+func TestComplianceContributionUsesMeasurementEnd(t *testing.T) {
+	start := time.Unix(100, 0)
+	end := start.Add(2 * time.Minute)
+	workload := &workload{
+		variant: "tx", measureStart: start, measureEnd: end,
+	}
+
+	contribution, err := workload.complianceContribution(bench.ReportContext{Metrics: map[string]bench.MetricSnapshot{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	report, ok := contribution.Data.(Report)
+	if !ok {
+		t.Fatalf("contribution data = %T, want Report", contribution.Data)
+	}
+
+	if report.ElapsedSeconds != end.Sub(start).Seconds() {
+		t.Fatalf("elapsed = %v, want %v", report.ElapsedSeconds, end.Sub(start).Seconds())
 	}
 }
 

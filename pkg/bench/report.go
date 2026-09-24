@@ -91,6 +91,7 @@ func newRunReport(
 	options ReportOptions,
 ) *report.Run {
 	started := time.Now().UTC()
+
 	reportID := options.RunID
 	if reportID == "" {
 		reportID = uuid.NewString()
@@ -168,6 +169,7 @@ func (b *Bench) AddReportData(key, value string) {
 	if b.root.reportData == nil {
 		b.root.reportData = make(map[string]string)
 	}
+
 	b.root.reportData[key] = value
 	b.root.reportMu.Unlock()
 }
@@ -199,12 +201,14 @@ func finalizeRunReport(
 	phase string,
 ) {
 	run.FinishedAt = time.Now().UTC()
+
 	root.reportMu.Lock()
 	run.Custom = maps.Clone(root.reportData)
 	root.reportMu.Unlock()
 	run.Steps = root.stepFilter.snapshot()
 	run.Metrics = reportMetrics(data, root.metricsPrefix)
 	run.Errors = reportErrors(root.errorReporter.snapshot())
+
 	measurementMetric := run.Metrics["measurement_seconds"]
 	if seconds := metricTotal(&measurementMetric); seconds > 0 {
 		run.MeasurementSeconds = seconds
@@ -255,6 +259,7 @@ func buildWorkloadReports(definitions []reportDefinition, reportContext ReportCo
 		if item.Status == "" {
 			item.Status = report.WorkloadReportOK
 		}
+
 		item.Reason = contribution.Reason
 		if contribution.Data != nil {
 			encoded, marshalErr := json.Marshal(contribution.Data)
@@ -305,6 +310,7 @@ func boundReportError(err error) string {
 
 func aggregateMetricSnapshots(data metricdata.ResourceMetrics, prefix string) map[string]MetricSnapshot {
 	out := make(map[string]MetricSnapshot)
+
 	for _, scope := range data.ScopeMetrics {
 		for _, metric := range scope.Metrics {
 			snapshot, ok := snapshotMetric(metric)
@@ -319,9 +325,11 @@ func aggregateMetricSnapshots(data metricdata.ResourceMetrics, prefix string) ma
 
 func reportMetrics(data metricdata.ResourceMetrics, prefix string) map[string]report.Metric {
 	out := make(map[string]report.Metric)
+
 	for _, scope := range data.ScopeMetrics {
 		for _, metric := range scope.Metrics {
 			name := strings.TrimPrefix(metric.Name, prefix)
+
 			converted, ok := reportMetric(metric)
 			if ok {
 				out[name] = converted
@@ -337,7 +345,9 @@ func reportMetric(metric metricdata.Metrics) (report.Metric, bool) {
 	case metricdata.Sum[float64]:
 		result := report.Metric{Type: "counter", Unit: metric.Unit}
 		result.Series = make([]report.MetricSeries, 0, len(aggregation.DataPoints))
+
 		var total float64
+
 		for _, point := range aggregation.DataPoints {
 			value := point.Value
 			total += value
@@ -345,12 +355,16 @@ func reportMetric(metric metricdata.Metrics) (report.Metric, bool) {
 				Attributes: reportAttributes(point.Attributes), Total: &value,
 			})
 		}
+
 		result.Total = &total
+
 		return result, true
 	case metricdata.Gauge[float64]:
 		result := report.Metric{Type: "gauge", Unit: metric.Unit}
 		result.Series = make([]report.MetricSeries, 0, len(aggregation.DataPoints))
+
 		var total float64
+
 		for _, point := range aggregation.DataPoints {
 			value := point.Value
 			total += value
@@ -358,16 +372,21 @@ func reportMetric(metric metricdata.Metrics) (report.Metric, bool) {
 				Attributes: reportAttributes(point.Attributes), Total: &value,
 			})
 		}
+
 		result.Total = &total
+
 		return result, true
 	case metricdata.Histogram[float64]:
 		snapshot := histogramSnapshot(aggregation.DataPoints)
+
 		average := 0.0
 		if snapshot.Count > 0 {
 			average = snapshot.Sum / float64(snapshot.Count)
 		}
+
 		count := snapshot.Count
 		sum := snapshot.Sum
+
 		result := report.Metric{
 			Type: "histogram", Unit: metric.Unit, Count: &count, Sum: &sum, Average: &average,
 			Bounds: slices.Clone(snapshot.Bounds), BucketCounts: slices.Clone(snapshot.Buckets),
@@ -382,16 +401,19 @@ func reportMetric(metric metricdata.Metrics) (report.Metric, bool) {
 		for _, point := range aggregation.DataPoints {
 			pointCount := point.Count
 			pointSum := point.Sum
+
 			pointAverage := 0.0
 			if pointCount > 0 {
 				pointAverage = pointSum / float64(pointCount)
 			}
+
 			result.Series = append(result.Series, report.MetricSeries{
 				Attributes: reportAttributes(point.Attributes), Count: &pointCount, Sum: &pointSum,
 				Average: &pointAverage, Bounds: slices.Clone(point.Bounds),
 				BucketCounts: slices.Clone(point.BucketCounts),
 			})
 		}
+
 		return result, true
 	default:
 		return report.Metric{}, false
