@@ -18,6 +18,7 @@ import (
 
 	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/pkg/report"
 )
 
 // Workload is a Go-native benchmark. Define declares and binds typed parameters;
@@ -145,12 +146,12 @@ func Describe(name string) (Description, error) {
 		return Description{}, fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
 	}
 
-	_, schema, err := defineWorkload(wl, ParamInputs{}, true)
+	_, def, err := defineWorkload(wl, ParamInputs{}, true)
 	if err != nil {
 		return Description{}, fmt.Errorf("define workload %q: %w", name, err)
 	}
 
-	return Description{Name: name, Params: schema}, nil
+	return Description{Name: name, Params: def.schema()}, nil
 }
 
 // DescribeAll returns all registered workload schemas ordered by workload name.
@@ -196,42 +197,89 @@ func Run(
 	steps, noSteps []string,
 	lg *zap.Logger,
 	metricsConfig *MetricsConfig,
-) (retErr error) {
+) error {
+	_, err := run(ctx, name, drivers, paramInputs, steps, noSteps, lg, metricsConfig, nil)
+
+	return err
+}
+
+// RunWithReport executes one workload and returns its final common report even
+// when setup, scenario, or teardown fails after report initialization.
+func RunWithReport(
+	ctx context.Context,
+	name string,
+	drivers map[int]*config.DriverConfig,
+	paramInputs ParamInputs,
+	steps, noSteps []string,
+	lg *zap.Logger,
+	metricsConfig *MetricsConfig,
+	reportOptions ReportOptions,
+) (*report.Run, error) {
+	return run(ctx, name, drivers, paramInputs, steps, noSteps, lg, metricsConfig, &reportOptions)
+}
+
+//nolint:funlen,gocognit // lifecycle order stays explicit: setup, scenario, teardown, report.
+func run(
+	ctx context.Context,
+	name string,
+	drivers map[int]*config.DriverConfig,
+	paramInputs ParamInputs,
+	steps, noSteps []string,
+	lg *zap.Logger,
+	metricsConfig *MetricsConfig,
+	reportOptions *ReportOptions,
+) (*report.Run, error) {
 	wl, ok := Lookup(name)
 	if !ok {
-		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
+		return nil, fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
 	}
 
-	scenarioParams, _, err := defineWorkload(wl, paramInputs, false)
+	scenarioParams, definition, err := defineWorkload(wl, paramInputs, false)
 	if err != nil {
-		return fmt.Errorf("define workload %q: %w", name, err)
+		return nil, fmt.Errorf("define workload %q: %w", name, err)
 	}
 
 	sc, err := scenarioParams.spec(lg)
 	if err != nil {
-		return fmt.Errorf("scenario: %w", err)
+		return nil, fmt.Errorf("scenario: %w", err)
+	}
+
+	var runReport *report.Run
+	if reportOptions != nil {
+		runReport = newRunReport(name, drivers, definition.resolved, sc, steps, noSteps, *reportOptions)
 	}
 
 	root, err := newRootState(lg, ctx, steps, noSteps, metricsConfig)
 	if err != nil {
-		return fmt.Errorf("initialize metrics: %w", err)
+		runErr := fmt.Errorf("initialize metrics: %w", err)
+
+		if runReport != nil {
+			runReport.FinishedAt = time.Now().UTC()
+			runReport.Status = report.StatusFailed
+			runReport.Failure = &report.Failure{Phase: "metrics", Reason: boundReportError(runErr)}
+		}
+
+		return runReport, runErr
 	}
 
-	sum := newSummary(root)
+	phase := "driver"
 
-	defer root.shutdownMetrics()
-	defer sum.print()
-	defer root.errorReporter.stopAndWait()
-	defer func() { _ = root.Teardown() }()
+	var runErr error
+
+	defer func() { root.shutdownMetrics() }()
 
 	cfg := drivers[0]
 	if cfg == nil {
-		return errDriverIndexMissing
+		runErr = errDriverIndexMissing
+
+		return finishRun(runReport, root, definition.reports, runErr, phase)
 	}
 
 	queryTimeout := scenarioParams.queryTimeout.Value()
 	if queryTimeout < 0 {
-		return fmt.Errorf("%w, got %s", errNegativeQueryTimeout, queryTimeout)
+		runErr = fmt.Errorf("%w, got %s", errNegativeQueryTimeout, queryTimeout)
+
+		return finishRun(runReport, root, definition.reports, runErr, phase)
 	}
 
 	drv, err := driver.Dispatch(ctx, driver.Options{
@@ -241,17 +289,10 @@ func Run(
 		QueryTimeout: queryTimeout,
 	})
 	if err != nil {
-		return fmt.Errorf("driver dispatch: %w", err)
+		runErr = fmt.Errorf("driver dispatch: %w", err)
+
+		return finishRun(runReport, root, definition.reports, runErr, phase)
 	}
-
-	defer func() {
-		teardownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
-		defer cancel()
-
-		if err := drv.Teardown(teardownCtx); err != nil {
-			retErr = errors.Join(retErr, fmt.Errorf("driver teardown: %w", err))
-		}
-	}()
 
 	setupVU := &VU{root: root, vuid: 1, initPhase: true, ctx: ctx}
 	setupBench := &Bench{
@@ -260,37 +301,94 @@ func Run(
 		drv: drv, cfg: cfg,
 	}
 
-	// Teardown always runs exactly once, even when Setup or the scenario returns
-	// early on cancellation or error. It executes under a timeout detached from
-	// cancellation of the run ctx, and its error is joined with any returned error.
-	defer func() {
-		teardownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
-		defer cancel()
-
-		if err := wl.Teardown(teardownCtx, setupBench); err != nil {
-			retErr = errors.Join(retErr, fmt.Errorf("teardown: %w", err))
-		}
-	}()
+	phase = "setup"
 
 	if err := wl.Setup(ctx, setupBench); err != nil {
-		return fmt.Errorf("setup: %w", err)
+		runErr = fmt.Errorf("setup: %w", err)
+	} else {
+		phase = "scenario"
+
+		if err := runScenario(ctx, root, sc, func(vu *VU) error {
+			b := &Bench{
+				root: root, vu: vu,
+				lg:  lg.Named("workload").With(zap.String("workload", name), zap.Uint64("VUID", vu.VUID())),
+				drv: drv, cfg: cfg,
+			}
+
+			return wl.Iterate(vu.Context(), b)
+		}, func(vu *VU, err error) {
+			root.errorReporter.record(vu, terminalErrorIteration, "iteration", err, drv.ClassifyError)
+		}); err != nil {
+			runErr = fmt.Errorf("scenario %q: %w", sc.name, err)
+		}
 	}
 
-	if err := runScenario(ctx, root, sc, func(vu *VU) error {
-		b := &Bench{
-			root: root, vu: vu,
-			lg:  lg.Named("workload").With(zap.String("workload", name), zap.Uint64("VUID", vu.VUID())),
-			drv: drv, cfg: cfg,
+	terminalPhase := phase
+	phase = "teardown"
+
+	teardownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
+	if err := wl.Teardown(teardownCtx, setupBench); err != nil {
+		if runErr == nil {
+			terminalPhase = phase
 		}
 
-		return wl.Iterate(vu.Context(), b)
-	}, func(vu *VU, err error) {
-		root.errorReporter.record(vu, terminalErrorIteration, "iteration", err, drv.ClassifyError)
-	}); err != nil {
-		return fmt.Errorf("scenario %q: %w", sc.name, err)
+		runErr = errors.Join(runErr, fmt.Errorf("teardown: %w", err))
 	}
 
-	return nil
+	cancel()
+
+	if err := root.Teardown(); err != nil {
+		if runErr == nil {
+			terminalPhase = phase
+		}
+
+		runErr = errors.Join(runErr, fmt.Errorf("shared driver teardown: %w", err))
+	}
+
+	teardownCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
+	if err := drv.Teardown(teardownCtx); err != nil {
+		if runErr == nil {
+			terminalPhase = phase
+		}
+
+		runErr = errors.Join(runErr, fmt.Errorf("driver teardown: %w", err))
+	}
+
+	cancel()
+
+	return finishRun(runReport, root, definition.reports, runErr, terminalPhase)
+}
+
+func finishRun(
+	runReport *report.Run,
+	root *RootState,
+	definitions []reportDefinition,
+	runErr error,
+	phase string,
+) (*report.Run, error) {
+	root.errorReporter.stopAndWait()
+
+	var data metricdata.ResourceMetrics
+	if err := root.manualReader.Collect(context.Background(), &data); err != nil {
+		runErr = errors.Join(runErr, fmt.Errorf("collect metrics: %w", err))
+		phase = "report"
+	}
+
+	if root.onSummary != nil {
+		root.onSummary(data)
+	}
+
+	if runReport != nil {
+		finalizeRunReport(runReport, root, definitions, data, runErr, phase)
+	} else if len(definitions) > 0 {
+		buildWorkloadReports(definitions, ReportContext{
+			Metrics: aggregateMetricSnapshots(data, root.metricsPrefix),
+		})
+	}
+
+	newSummary(root).printDataTo(os.Stderr, data)
+
+	return runReport, runErr
 }
 
 // --- scenario ---
@@ -316,7 +414,7 @@ func defineWorkload(
 	wl Workload,
 	inputs ParamInputs,
 	defaultsOnly bool,
-) (scenarioParams, []ParamSchema, error) {
+) (scenarioParams, *Def, error) {
 	def := newDef(inputs, defaultsOnly)
 
 	iterationOptions := []ParamOption{LegacyEnvAliases("ITER")}
@@ -342,7 +440,7 @@ func defineWorkload(
 	def.scope = ParamScopeWorkload
 	defineErr := wl.Define(def)
 
-	return params, def.schema(), errors.Join(defineErr, def.finish())
+	return params, def, errors.Join(defineErr, def.finish())
 }
 
 func effectiveDurationIsLegacy(inputs ParamInputs) bool {
@@ -573,15 +671,7 @@ type summary struct {
 
 func newSummary(root *RootState) *summary { return &summary{root: root} }
 
-func (s *summary) print() {
-	s.printTo(os.Stderr)
-}
-
 func (s *summary) printTo(out io.Writer) {
-	if s.root.errorReporter != nil && !s.root.quietSummary {
-		defer s.root.errorReporter.writeSummary(out)
-	}
-
 	var data metricdata.ResourceMetrics
 	if err := s.root.manualReader.Collect(context.Background(), &data); err != nil {
 		if !s.root.quietSummary {
@@ -593,6 +683,14 @@ func (s *summary) printTo(out io.Writer) {
 
 	if s.root.onSummary != nil {
 		s.root.onSummary(data)
+	}
+
+	s.printDataTo(out, data)
+}
+
+func (s *summary) printDataTo(out io.Writer, data metricdata.ResourceMetrics) {
+	if s.root.errorReporter != nil && !s.root.quietSummary {
+		defer s.root.errorReporter.writeSummary(out)
 	}
 
 	if s.root.quietSummary {

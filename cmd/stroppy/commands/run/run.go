@@ -1,12 +1,13 @@
 package run
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/stroppy-io/stroppy/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/pkg/config"
 	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/pkg/report"
 )
 
 const (
@@ -27,6 +29,9 @@ const (
 	flagSteps        = "--steps"
 	flagNoSteps      = "--no-steps"
 	flagDriverOpt    = "--driver-opt"
+	flagReportFormat = "--report-format"
+	flagReportFile   = "--report-file"
+	flagNoReport     = "--no-report"
 )
 
 const (
@@ -58,6 +63,8 @@ var (
 	)
 	errInvalidConfigLogLevel = errors.New("invalid config log level")
 	errInvalidConfigLogMode  = errors.New("invalid config log mode")
+	errInvalidReportFormat   = errors.New("report format must be json")
+	errReportDisabledOutput  = errors.New("--no-report cannot be combined with report output options")
 )
 
 var Cmd = &cobra.Command{
@@ -101,6 +108,12 @@ Config file flags:
                           Config env values are lower precedence than -e and typed values.
                           Config drivers are lower precedence than -d/-D.
                           See 'stroppy help config-file' for details.
+
+Run reports:
+  --report-format json    Write one versioned JSON report to stdout.
+  --report-file PATH      Write the same JSON document to a file.
+  --no-report             Disable report construction and output.
+                          Logs, diagnostics, and human summaries remain on stderr.
 
 Signals:
   SIGINT and SIGTERM cancel the running workload and trigger graceful teardown.
@@ -246,13 +259,15 @@ Signals:
 		// lookup so the preset's sql arg is honored.
 		if name, body, file, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
 			return runGoWorkload(
-				cmd.Context(),
+				cmd,
 				name,
 				steps,
 				noSteps,
 				withExecuteSQLSource(paramInputs, body, file),
 				driverConfigs,
 				metricsConfig(loadedRunConfig(fileConfig)),
+				reportOptions(loadedRunConfig(fileConfig)),
+				parsed.report,
 			)
 		}
 
@@ -265,13 +280,15 @@ Signals:
 			}
 
 			return runGoWorkload(
-				cmd.Context(),
+				cmd,
 				scriptArg,
 				steps,
 				noSteps,
 				workloadParamInputs,
 				driverConfigs,
 				metricsConfig(loadedRunConfig(fileConfig)),
+				reportOptions(loadedRunConfig(fileConfig)),
+				parsed.report,
 			)
 		}
 
@@ -564,6 +581,9 @@ func printWorkloadHelp(cmd *cobra.Command, description bench.Description) error 
 	output.WriteString("      --log-mode VALUE      Set global log output mode\n")
 	output.WriteString("      --steps NAMES        Run only named steps\n")
 	output.WriteString("      --no-steps NAMES     Skip named steps\n")
+	output.WriteString("      --report-format json Write JSON report to stdout\n")
+	output.WriteString("      --report-file PATH   Write JSON report to file\n")
+	output.WriteString("      --no-report          Disable report construction\n")
 	output.WriteString("  -h, --help               Show this help\n")
 	output.WriteString("\nBoolean parameters require an explicit value: --flag=true or --flag=false.\n")
 
@@ -581,7 +601,9 @@ func writeParamHelpSection(
 	params []bench.ParamSchema,
 	scope bench.ParamScope,
 ) {
-	output.WriteString("\n" + title + ":\n")
+	output.WriteByte('\n')
+	output.WriteString(title)
+	output.WriteString(":\n")
 
 	for idx := range params {
 		param := &params[idx]
@@ -642,12 +664,14 @@ func executeSQLGoRoute(scriptArg, sqlArg string) (name, body, file string, ok bo
 // runGoWorkload dispatches to the Go-native bench engine. Driver, parameter,
 // and step inputs are passed explicitly to their runtime owners.
 func runGoWorkload(
-	ctx context.Context,
+	cmd *cobra.Command,
 	name string,
 	steps, noSteps []string,
 	paramInputs bench.ParamInputs,
 	driverConfigs runner.DriverCLIConfigs,
 	metrics *bench.MetricsConfig,
+	reportConfig bench.ReportOptions,
+	output reportOutput,
 ) error {
 	drivers := map[int]*config.DriverConfig{}
 
@@ -670,17 +694,96 @@ func runGoWorkload(
 		}
 	}
 
-	if err := bench.Run(
-		ctx,
-		name,
-		drivers,
-		paramInputs,
-		steps,
-		noSteps,
-		logger.Global(),
-		metrics,
-	); err != nil {
-		return fmt.Errorf("failed to run go workload: %w", err)
+	if output.disabled {
+		if err := bench.Run(
+			cmd.Context(), name, drivers, paramInputs, steps, noSteps, logger.Global(), metrics,
+		); err != nil {
+			return fmt.Errorf("failed to run go workload: %w", err)
+		}
+
+		return nil
+	}
+
+	runReport, runErr := bench.RunWithReport(
+		cmd.Context(), name, drivers, paramInputs, steps, noSteps,
+		logger.Global(), metrics, reportConfig,
+	)
+
+	var outputErr error
+	if output.requested() && runReport != nil {
+		outputErr = writeRunReport(cmd.OutOrStdout(), output, runReport)
+	}
+
+	if runErr != nil {
+		runErr = fmt.Errorf("failed to run go workload: %w", runErr)
+	}
+
+	return errors.Join(runErr, outputErr)
+}
+
+func reportOptions(cfg *config.RunConfig) bench.ReportOptions {
+	options := bench.ReportOptions{StroppyVersion: version.Version}
+	if cfg != nil && cfg.Global != nil {
+		options.RunID = cfg.Global.RunID
+		options.Metadata = cfg.Global.Metadata
+	}
+
+	return options
+}
+
+func writeRunReport(stdout io.Writer, output reportOutput, runReport *report.Run) error {
+	data, err := json.MarshalIndent(runReport, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal run report: %w", err)
+	}
+
+	data = append(data, '\n')
+
+	if output.format == "json" {
+		if _, err := stdout.Write(data); err != nil {
+			return fmt.Errorf("write run report to stdout: %w", err)
+		}
+	}
+
+	if output.file != "" {
+		if err := writeReportFile(output.file, data); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func writeReportFile(path string, data []byte) (retErr error) {
+	dir := filepath.Dir(path)
+
+	file, err := os.CreateTemp(dir, ".stroppy-report-*.tmp")
+	if err != nil {
+		return fmt.Errorf("create report file: %w", err)
+	}
+
+	tempPath := file.Name()
+
+	defer func() {
+		if retErr != nil {
+			retErr = errors.Join(retErr, file.Close(), os.Remove(tempPath))
+		}
+	}()
+
+	if _, err := file.Write(data); err != nil {
+		return fmt.Errorf("write report file: %w", err)
+	}
+
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("sync report file: %w", err)
+	}
+
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close report file: %w", err)
+	}
+
+	if err := os.Rename(tempPath, path); err != nil {
+		return fmt.Errorf("publish report file: %w", err)
 	}
 
 	return nil
@@ -915,6 +1018,14 @@ func poolSQLConfig(pool *config.PoolConfig) *config.SQLConfig {
 	}
 }
 
+type reportOutput struct {
+	format   string
+	file     string
+	disabled bool
+}
+
+func (o reportOutput) requested() bool { return o.format != "" || o.file != "" }
+
 // runArgs holds the result of parseRunArgs.
 type runArgs struct {
 	scriptArg     string
@@ -926,6 +1037,7 @@ type runArgs struct {
 	envArgs       []string          // -e KEY=VALUE raw pairs
 	typedParams   map[string]string // provisional --name=value workload/run params
 	help          bool
+	report        reportOutput
 	driverPresets map[int]string      // driver index → preset name
 	driverOpts    map[int][][2]string // driver index → list of [key, value] pairs
 }
@@ -958,6 +1070,7 @@ func parseRunArgs(args []string) (runArgs, error) {
 
 	parsers := []flagParser{
 		parseHelpFlag,
+		parseReportFlags,
 		parseStepsFlag,
 		parseFileFlag,
 		parseEnvFlag,
@@ -976,13 +1089,17 @@ func parseRunArgs(args []string) (runArgs, error) {
 		return runArgs{}, errStepsMutExclusive
 	}
 
+	if parsed.report.disabled && parsed.report.requested() {
+		return runArgs{}, errReportDisabledOutput
+	}
+
 	return parsed, nil
 }
 
 func normalizeStepNames(names []string) []string {
 	normalized := make([]string, 0, len(names))
 	for _, group := range names {
-		for _, name := range strings.Split(group, ",") {
+		for name := range strings.SplitSeq(group, ",") {
 			if name = strings.TrimSpace(name); name != "" {
 				normalized = append(normalized, name)
 			}
@@ -1074,6 +1191,51 @@ func parseHelpFlag(args []string, i int, parsed *runArgs) (int, error) {
 	parsed.help = true
 
 	return 1, nil
+}
+
+func parseReportFlags(args []string, i int, parsed *runArgs) (int, error) {
+	arg := args[i]
+	if arg == flagNoReport {
+		parsed.report.disabled = true
+
+		return 1, nil
+	}
+
+	for flag, destination := range map[string]*string{
+		flagReportFormat: &parsed.report.format,
+		flagReportFile:   &parsed.report.file,
+	} {
+		if arg == flag {
+			value, err := nextFlagValue(args, i)
+			if err != nil {
+				return 0, err
+			}
+
+			if flag == flagReportFormat && value != "json" {
+				return 0, fmt.Errorf("%w, got %q", errInvalidReportFormat, value)
+			}
+
+			*destination = value
+
+			return consumedPairFlag, nil
+		}
+
+		if value, ok := strings.CutPrefix(arg, flag+"="); ok {
+			if value == "" {
+				return 0, fmt.Errorf("%s: %w", flag, errFlagRequiresValue)
+			}
+
+			if flag == flagReportFormat && value != "json" {
+				return 0, fmt.Errorf("%w, got %q", errInvalidReportFormat, value)
+			}
+
+			*destination = value
+
+			return 1, nil
+		}
+	}
+
+	return 0, nil
 }
 
 func parseTypedParamFlag(args []string, i int, parsed *runArgs) (int, error) {

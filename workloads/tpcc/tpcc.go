@@ -65,6 +65,7 @@ type workload struct {
 	retryPolicy bench.RetryPolicy
 
 	measureStart time.Time
+	measureEnd   time.Time
 	steady       *steady
 
 	vuStates sync.Map // uint64 -> *vuState
@@ -88,6 +89,8 @@ func init() {
 func (w *workload) Name() string { return "tpcc/" + w.variant }
 
 func (w *workload) Define(d *bench.Def) error {
+	d.Report("tpcc.compliance", 1, w.complianceContribution)
+
 	warehouses := d.Param.Int(
 		"scale-factor", 1, "Number of warehouses.", bench.LegacyEnvAliases("WAREHOUSES"),
 	).Value()
@@ -345,8 +348,8 @@ func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	})
 }
 
-func (w *workload) Teardown(_ context.Context, b *bench.Bench) error {
-	w.emitComplianceReport(b)
+func (w *workload) Teardown(context.Context, *bench.Bench) error {
+	w.measureEnd = time.Now()
 
 	return nil
 }

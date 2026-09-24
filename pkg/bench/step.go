@@ -3,7 +3,10 @@ package bench
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/stroppy-io/stroppy/pkg/report"
 )
 
 // Step filtering turns the explicit --steps allowlist and --no-steps blocklist
@@ -12,10 +15,16 @@ import (
 type stepFilterState struct {
 	only   map[string]struct{}
 	except map[string]struct{}
+
+	mu      sync.Mutex
+	records map[string]*report.Step
+	order   []string
 }
 
 func newStepFilter(steps, noSteps []string) *stepFilterState {
-	s := &stepFilterState{only: map[string]struct{}{}, except: map[string]struct{}{}}
+	s := &stepFilterState{
+		only: map[string]struct{}{}, except: map[string]struct{}{}, records: map[string]*report.Step{},
+	}
 
 	for _, n := range steps {
 		if n = strings.TrimSpace(n); n != "" {
@@ -46,6 +55,36 @@ func (s *stepFilterState) enabled(name string) bool {
 	return true
 }
 
+func (s *stepFilterState) record(step report.Step) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	recorded := s.records[step.Name]
+	if recorded == nil {
+		recorded = &report.Step{Name: step.Name, Status: step.Status}
+		s.records[step.Name] = recorded
+		s.order = append(s.order, step.Name)
+	}
+
+	if step.Status != "skipped" {
+		recorded.Status = step.Status
+		recorded.Executions++
+		recorded.DurationSeconds += step.DurationSeconds
+	}
+}
+
+func (s *stepFilterState) snapshot() []report.Step {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	steps := make([]report.Step, 0, len(s.order))
+	for _, name := range s.order {
+		steps = append(steps, *s.records[name])
+	}
+
+	return steps
+}
+
 // Step runs fn as a named phase: skips if filtered out (logging the skip), otherwise
 // tags metrics, notifies, logs start/end timing, clears the tag, and returns fn's
 // error. Use it for one-shot setup/load/schema steps, which should each emit one
@@ -62,8 +101,10 @@ func (b *Bench) StepSilent(name string, fn func() error) error {
 	return b.step(name, fn, true)
 }
 
-func (b *Bench) step(name string, fn func() error, silent bool) error {
+func (b *Bench) step(name string, fn func() error, silent bool) (err error) {
 	if !b.root.stepFilter.enabled(name) {
+		b.root.stepFilter.record(report.Step{Name: name, Status: "skipped"})
+
 		if !silent {
 			b.lg.Sugar().Infof("Skipping step '%s'", name)
 		}
@@ -71,8 +112,21 @@ func (b *Bench) step(name string, fn func() error, silent bool) error {
 		return nil
 	}
 
+	started := time.Now()
+
 	stepBegin(b, name, silent)
-	defer stepEnd(b, name, silent)
+	defer func() {
+		stepEnd(b, name, silent)
+
+		status := "completed"
+		if err != nil {
+			status = "failed"
+		}
+
+		b.root.stepFilter.record(report.Step{
+			Name: name, Status: status, DurationSeconds: time.Since(started).Seconds(),
+		})
+	}()
 
 	if fn != nil {
 		return fn()

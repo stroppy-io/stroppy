@@ -37,6 +37,8 @@ type workload struct {
 	streams    int
 	seed       int64
 	genStream  int // QUERY_STREAM value (<0 = unset → baked)
+
+	validation validationReport
 }
 
 type namedQuery struct {
@@ -49,6 +51,8 @@ func init() { bench.Register(func() bench.Workload { return &workload{} }) }
 func (*workload) Name() string { return "tpcds" }
 
 func (w *workload) Define(d *bench.Def) error {
+	d.Report("tpcds.validation", 1, w.validationContribution)
+
 	w.scaleFactor = d.Param.Float64("scale-factor", 1, "TPC-DS scale factor.").Value()
 	w.loadWorkers = d.Param.Int("load-workers", 0, "Workers used to load each table.").Value()
 	w.useUnlogged = d.Param.Bool("pg-unlogged", false, "Use unlogged PostgreSQL tables while loading.").Value()
@@ -158,7 +162,7 @@ func (w *workload) runSteps(ctx context.Context, b *bench.Bench) error {
 	// measured pass still runs in Iterate, so queries execute twice at SF=1.
 	if !w.throughput && w.genStream < 0 && w.isPgOrMs {
 		if err := addStep("validate_answers", func() error {
-			validateAnswers(
+			w.validation = validateAnswers(
 				ctx, b, w.schemaSQL, w.querySQL, w.querySQL.Names(""),
 				w.scaleFactor, w.driver, w.validateForce,
 			)

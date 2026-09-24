@@ -430,6 +430,142 @@ func newRuntimeTestRoot(t *testing.T) *RootState {
 	return testRoot
 }
 
+func TestRunReportCapturesMetricsInitializationFailure(t *testing.T) {
+	registerReportTestWorkloadOnce.Do(func() {
+		Register(func() Workload { return &reportTestWorkload{} })
+	})
+
+	runReport, err := RunWithReport(
+		context.Background(),
+		"test/run-report",
+		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
+		ParamInputs{},
+		nil,
+		nil,
+		zap.NewNop(),
+		&MetricsConfig{Headers: "Authorization=%"},
+		ReportOptions{StroppyVersion: "v-test"},
+	)
+	if err == nil {
+		t.Fatal("RunWithReport() error = nil")
+	}
+
+	if runReport == nil || runReport.Status != "failed" || runReport.FinishedAt.IsZero() {
+		t.Fatalf("report = %#v", runReport)
+	}
+
+	if runReport.Failure == nil || runReport.Failure.Phase != "metrics" {
+		t.Fatalf("failure = %#v", runReport.Failure)
+	}
+}
+
+func TestRunWithoutEnvelopeStillExecutesContributors(t *testing.T) {
+	registerReportTestWorkloadOnce.Do(func() {
+		Register(func() Workload { return &reportTestWorkload{} })
+	})
+	reportContributionCalls.Store(0)
+
+	err := Run(
+		context.Background(),
+		"test/run-report",
+		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
+		ParamInputs{CLI: map[string]string{"iterations": "1", "vus": "1"}},
+		nil,
+		nil,
+		zap.NewNop(),
+		&MetricsConfig{Quiet: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if reportContributionCalls.Load() != 1 {
+		t.Fatalf("contributor calls = %d, want 1", reportContributionCalls.Load())
+	}
+}
+
+func TestRunReportCapturesCommonAndCustomData(t *testing.T) {
+	registerReportTestWorkloadOnce.Do(func() {
+		Register(func() Workload { return &reportTestWorkload{} })
+	})
+
+	runReport, err := RunWithReport(
+		context.Background(),
+		"test/run-report",
+		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
+		ParamInputs{CLI: map[string]string{"iterations": "2", "vus": "1", "label": "cli-value"}},
+		[]string{"setup", "workload"},
+		nil,
+		zap.NewNop(),
+		&MetricsConfig{Quiet: true},
+		ReportOptions{StroppyVersion: "v-test", RunID: "run-42", Metadata: map[string]string{"env": "test"}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if runReport.Schema != 1 || runReport.ID != "run-42" || runReport.Status != "completed" {
+		t.Fatalf("report identity/status = %#v", runReport)
+	}
+
+	if runReport.Parameters.Workload["label"].Value != "cli-value" ||
+		runReport.Parameters.Workload["label"].Source != "cli" {
+		t.Fatalf("label parameter = %#v", runReport.Parameters.Workload["label"])
+	}
+
+	if runReport.Custom["observed"] != "yes" {
+		t.Fatalf("custom = %#v", runReport.Custom)
+	}
+
+	if runReport.Metrics["iterations_total"].Total == nil || *runReport.Metrics["iterations_total"].Total != 2 {
+		t.Fatalf("iterations metric = %#v", runReport.Metrics["iterations_total"])
+	}
+
+	if len(runReport.Steps) != 2 || runReport.Steps[1].Name != "workload" || runReport.Steps[1].Executions != 2 {
+		t.Fatalf("steps = %#v", runReport.Steps)
+	}
+
+	if len(runReport.WorkloadReports) != 1 || runReport.WorkloadReports[0].Kind != "test.payload" {
+		t.Fatalf("workload reports = %#v", runReport.WorkloadReports)
+	}
+}
+
+type reportTestWorkload struct {
+	label string
+}
+
+var (
+	registerReportTestWorkloadOnce sync.Once
+	reportContributionCalls        atomic.Int64
+)
+
+func (*reportTestWorkload) Name() string { return "test/run-report" }
+
+func (w *reportTestWorkload) Define(def *Def) error {
+	w.label = def.Param.String("label", "default", "Report label.").Value()
+	def.Report("test.payload", 1, func(ReportContext) (ReportContribution, error) {
+		reportContributionCalls.Add(1)
+
+		return ReportContribution{Data: map[string]string{"label": w.label}}, nil
+	})
+
+	return nil
+}
+
+func (*reportTestWorkload) Setup(_ context.Context, bench *Bench) error {
+	return bench.Step("setup", func() error {
+		bench.AddReportData("observed", "yes")
+
+		return nil
+	})
+}
+
+func (*reportTestWorkload) Iterate(_ context.Context, bench *Bench) error {
+	return bench.StepSilent("workload", func() error { return nil })
+}
+
+func (*reportTestWorkload) Teardown(context.Context, *Bench) error { return nil }
+
 func TestRunQuietSummaryDeliversMetricsSilently(t *testing.T) {
 	registerQuietSummaryWorkloadOnce.Do(func() {
 		Register(func() Workload { return &noopIterateWorkload{} })

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"regexp"
@@ -80,6 +81,13 @@ type ParamSchema struct {
 	Config             string
 }
 
+type resolvedParam struct {
+	name   string
+	scope  ParamScope
+	value  any
+	source ParamSource
+}
+
 // Description is the discoverable, default-only schema for a workload.
 type Description struct {
 	Name   string
@@ -140,6 +148,8 @@ type Def struct {
 	defaultsOnly bool
 	scope        ParamScope
 	descriptors  []paramDescriptor
+	resolved     []resolvedParam
+	reports      []reportDefinition
 	names        map[string]struct{}
 	envNames     map[string]string
 	errs         []error
@@ -171,7 +181,8 @@ var (
 
 var reservedWorkloadParamNames = map[string]struct{}{
 	"driver": {}, "driver-opt": {}, "duration": {}, "env": {}, "executor": {},
-	"file": {}, "help": {}, "iterations": {}, "no-steps": {}, "steps": {}, "vus": {},
+	"file": {}, "help": {}, "iterations": {}, "no-report": {}, "no-steps": {},
+	"report-file": {}, "report-format": {}, "steps": {}, "vus": {},
 }
 
 func newDef(inputs ParamInputs, defaultsOnly bool) *Def {
@@ -203,9 +214,7 @@ func cloneStringMap(src map[string]string) map[string]string {
 	}
 
 	dst := make(map[string]string, len(src))
-	for key, value := range src {
-		dst[key] = value
-	}
+	maps.Copy(dst, src)
 
 	return dst
 }
@@ -360,8 +369,13 @@ func declareParam[T any](
 	}
 
 	if !ok {
-		return Param[T]{value: defaultValue, source: ParamSourceDefault}
+		value = defaultValue
+		source = ParamSourceDefault
 	}
+
+	d.resolved = append(d.resolved, resolvedParam{
+		name: name, scope: desc.scope, value: reportParamValue(value), source: source,
+	})
 
 	return Param[T]{value: value, source: source}
 }
@@ -549,6 +563,14 @@ func decodeFiniteFloat(raw json.RawMessage) (float64, error) {
 	}
 
 	return value, nil
+}
+
+func reportParamValue(value any) any {
+	if duration, ok := value.(time.Duration); ok {
+		return duration.String()
+	}
+
+	return value
 }
 
 func (d *Def) finish() error {
