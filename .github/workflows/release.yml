@@ -77,7 +77,7 @@ jobs:
       - name: Fetch pg-noop server for embedding
         env:
           # Keep in sync with internal/pgnoop.Version.
-          PGNOOP_VERSION: v0.1.2
+          PGNOOP_VERSION: v0.2.0
         run: |
           case "${{ matrix.os }}_${{ matrix.arch }}" in
             linux_amd64)  asset="pg-noop-x86_64-unknown-linux-musl.tar.xz" ;;

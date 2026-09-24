@@ -123,7 +123,7 @@ STROPPY_LDFLAGS=-ldflags "-s -w -X 'github.com/stroppy-io/stroppy/internal/versi
 GO_BUILD_TAGS ?=
 
 # Keep in sync with internal/pgnoop.Version.
-PGNOOP_VERSION=v0.1.2
+PGNOOP_VERSION=v0.2.0
 PGNOOP_EMBED_DIR=$(CURDIR)/internal/pgnoop/embedded
 PGNOOP_CHECKSUMS=$(CURDIR)/internal/pgnoop/release.sha256
 

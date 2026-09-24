@@ -16,7 +16,7 @@ import (
 
 // Version is the pg-noop release stroppy pins. Bump together with
 // release.sha256 and the asset mapping below when upgrading.
-const Version = "v0.1.2"
+const Version = "v0.2.0"
 
 const (
 	releaseBase = "https://github.com/stroppy-io/pg-noop/releases/download/"
