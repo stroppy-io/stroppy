@@ -430,6 +430,35 @@ func newRuntimeTestRoot(t *testing.T) *RootState {
 	return testRoot
 }
 
+func TestRunReportCapturesMetricsInitializationFailure(t *testing.T) {
+	registerReportTestWorkloadOnce.Do(func() {
+		Register(func() Workload { return &reportTestWorkload{} })
+	})
+
+	runReport, err := RunWithReport(
+		context.Background(),
+		"test/run-report",
+		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
+		ParamInputs{},
+		nil,
+		nil,
+		zap.NewNop(),
+		&MetricsConfig{Headers: "Authorization=%"},
+		ReportOptions{StroppyVersion: "v-test"},
+	)
+	if err == nil {
+		t.Fatal("RunWithReport() error = nil")
+	}
+
+	if runReport == nil || runReport.Status != "failed" || runReport.FinishedAt.IsZero() {
+		t.Fatalf("report = %#v", runReport)
+	}
+
+	if runReport.Failure == nil || runReport.Failure.Phase != "metrics" {
+		t.Fatalf("failure = %#v", runReport.Failure)
+	}
+}
+
 func TestRunWithoutEnvelopeStillExecutesContributors(t *testing.T) {
 	registerReportTestWorkloadOnce.Do(func() {
 		Register(func() Workload { return &reportTestWorkload{} })

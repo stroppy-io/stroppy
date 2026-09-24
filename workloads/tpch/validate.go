@@ -113,6 +113,7 @@ type compareResult struct {
 	gotRows  int
 	wantRows int
 	deltas   []string
+	reason   string
 	errMsg   string
 }
 
@@ -129,6 +130,7 @@ type validationQuery struct {
 	ActualRows   int      `json:"actual_rows"`
 	ExpectedRows int      `json:"expected_rows"`
 	Mismatches   []string `json:"mismatches,omitempty"`
+	Reason       string   `json:"reason,omitempty"`
 	Error        string   `json:"error,omitempty"`
 }
 
@@ -268,13 +270,13 @@ func validateAnswers(
 
 		want, hasWant := af.Answers[name]
 		if !ok {
-			results = append(results, compareResult{query: name, status: "skip", deltas: []string{"query text missing"}})
+			results = append(results, compareResult{query: name, status: "skip", reason: "query text missing"})
 
 			continue
 		}
 
 		if !hasWant {
-			results = append(results, compareResult{query: name, status: "skip", deltas: []string{"no reference answer"}})
+			results = append(results, compareResult{query: name, status: "skip", reason: "no reference answer"})
 
 			continue
 		}
@@ -305,7 +307,8 @@ func newValidationReport(results []compareResult) validationReport {
 	for _, result := range results {
 		query := validationQuery{
 			Query: result.query, Status: result.status, ActualRows: result.gotRows,
-			ExpectedRows: result.wantRows, Mismatches: slices.Clone(result.deltas), Error: result.errMsg,
+			ExpectedRows: result.wantRows, Mismatches: slices.Clone(result.deltas),
+			Reason: result.reason, Error: result.errMsg,
 		}
 		switch result.status {
 		case "ok":
@@ -321,8 +324,11 @@ func newValidationReport(results []compareResult) validationReport {
 		validation.Queries = append(validation.Queries, query)
 	}
 
-	if validation.Totals.Diff > 0 || validation.Totals.Error > 0 {
+	switch {
+	case validation.Totals.Diff > 0 || validation.Totals.Error > 0:
 		validation.Status = "failed"
+	case validation.Totals.OK == 0:
+		validation.Status = "skipped"
 	}
 
 	return validation
@@ -351,7 +357,7 @@ func logSummary(b *bench.Bench, results []compareResult) {
 		case "skip":
 			skipped++
 
-			lines = append(lines, fmt.Sprintf("  %-4s: SKIP    %s", r.query, strings.Join(r.deltas, "; ")))
+			lines = append(lines, fmt.Sprintf("  %-4s: SKIP    %s", r.query, r.reason))
 		case "error":
 			errN++
 

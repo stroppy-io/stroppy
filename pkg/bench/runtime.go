@@ -218,7 +218,7 @@ func RunWithReport(
 	return run(ctx, name, drivers, paramInputs, steps, noSteps, lg, metricsConfig, &reportOptions)
 }
 
-//nolint:funlen // lifecycle order stays explicit: setup, scenario, teardown, report.
+//nolint:funlen,gocognit // lifecycle order stays explicit: setup, scenario, teardown, report.
 func run(
 	ctx context.Context,
 	name string,
@@ -251,7 +251,15 @@ func run(
 
 	root, err := newRootState(lg, ctx, steps, noSteps, metricsConfig)
 	if err != nil {
-		return nil, fmt.Errorf("initialize metrics: %w", err)
+		runErr := fmt.Errorf("initialize metrics: %w", err)
+
+		if runReport != nil {
+			runReport.FinishedAt = time.Now().UTC()
+			runReport.Status = report.StatusFailed
+			runReport.Failure = &report.Failure{Phase: "metrics", Reason: boundReportError(runErr)}
+		}
+
+		return runReport, runErr
 	}
 
 	phase := "driver"
