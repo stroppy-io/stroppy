@@ -10,6 +10,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+## [6.1.0] - 2026-09-24
+
 ### Added
 
 - Every workload can emit one versioned JSON run report to stdout or a file, with effective inputs, host details, steps, metrics, bounded errors, and structured TPC-C, TPC-H, and TPC-DS results. ([#172](https://github.com/stroppy-io/stroppy/pull/172))
