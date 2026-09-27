@@ -58,7 +58,7 @@ Setup runs these gatable steps in order:
 
 On supported query dialects, each `workload` iteration resolves the selected
 stream and executes every query in order. The default is the checked-in
-canonical qualification set. On PostgreSQL and MySQL, `--query-stream`
+canonical qualification set. On PostgreSQL, `--query-stream`
 generates a reproducible stream in process, while `--streams N` assigns
 generated streams to virtual users for a throughput run.
 
@@ -69,6 +69,11 @@ generated streams to virtual users for a throughput run.
   --executor constant-vus --vus 4 --duration 10m
 ```
 
+Generated PostgreSQL streams include all 99 query IDs (103 SQL statements,
+including multipart queries). Any generator skip is a setup error listing the
+unsupported queries, rather than a successful partial run. Load-only runs that
+exclude the workload step do not require query generation.
+
 YDB supports only the baked power-test query set; generated streams are
 rejected. Answer comparison is available only on PostgreSQL and MySQL and uses
 the SF=1 reference set by default.
@@ -78,8 +83,8 @@ the SF=1 reference set by default.
 - **PostgreSQL:** all 103 baked statements, generated streams, and answer
   comparison are supported.
 - **MySQL:** all 103 baked statements and answer comparison are supported.
-  Generated streams omit queries 51, 88, and 97; those queries remain available
-  in the baked set.
+  Generated streams are rejected before schema changes or loading: queries 51
+  and 97 require an unsupported FULL OUTER JOIN rewrite. Use the baked set.
 - **YDB:** all 103 baked statements run on the YQL port. Column storage is the
   default; row storage is optional. Dates are ISO text because TPC-DS spans
   years outside YDB's date epoch. Generated streams and answer comparison are

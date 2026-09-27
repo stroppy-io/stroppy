@@ -18,8 +18,7 @@ type Result struct {
 // Generate renders every template for one dialect/scale/seed/stream. Each query
 // is seeded by (seed + query index) so a stream varies per query and is
 // reproducible. Templates that reference an unsupported pseudo-distribution
-// (e.g. query88's syllable-generated store names) are reported in Skipped rather
-// than emitted with a broken parameter.
+// are reported in Skipped rather than emitted with a broken parameter.
 func Generate(dialect Dialect, scale float64, seed int64, streamNum int) (*Result, error) {
 	tmpls, err := LoadTemplates()
 	if err != nil {

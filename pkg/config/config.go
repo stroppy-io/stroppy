@@ -370,6 +370,7 @@ type DriverRunConfig struct {
 	BulkSize              *int32                `json:"bulkSize,omitempty"`
 	CaCertFile            *string               `json:"caCertFile,omitempty"`
 	AuthToken             *string               `json:"authToken,omitempty"`
+	ServiceAccountKeyFile *string               `json:"serviceAccountKeyFile,omitempty"`
 	AuthUser              *string               `json:"authUser,omitempty"`
 	AuthPassword          *string               `json:"authPassword,omitempty"`
 	TLSInsecureSkipVerify *bool                 `json:"tlsInsecureSkipVerify,omitempty"`
@@ -414,6 +415,14 @@ func (c *DriverRunConfig) GetCaCertFile() string {
 func (c *DriverRunConfig) GetAuthToken() string {
 	if c != nil && c.AuthToken != nil {
 		return *c.AuthToken
+	}
+
+	return ""
+}
+
+func (c *DriverRunConfig) GetServiceAccountKeyFile() string {
+	if c != nil && c.ServiceAccountKeyFile != nil {
+		return *c.ServiceAccountKeyFile
 	}
 
 	return ""
@@ -586,6 +595,7 @@ type DriverConfig struct {
 	SQL                   *SQLConfig            `json:"sql,omitempty"`
 	CaCertFile            *string               `json:"caCertFile,omitempty"`
 	AuthToken             *string               `json:"authToken,omitempty"`
+	ServiceAccountKeyFile *string               `json:"serviceAccountKeyFile,omitempty"`
 	AuthUser              *string               `json:"authUser,omitempty"`
 	AuthPassword          *string               `json:"authPassword,omitempty"`
 	TLSInsecureSkipVerify *bool                 `json:"tlsInsecureSkipVerify,omitempty"`
@@ -619,6 +629,14 @@ func (c *DriverConfig) GetCaCertFile() string {
 func (c *DriverConfig) GetAuthToken() string {
 	if c != nil && c.AuthToken != nil {
 		return *c.AuthToken
+	}
+
+	return ""
+}
+
+func (c *DriverConfig) GetServiceAccountKeyFile() string {
+	if c != nil && c.ServiceAccountKeyFile != nil {
+		return *c.ServiceAccountKeyFile
 	}
 
 	return ""

@@ -1,11 +1,8 @@
 package dsqgen
 
 import (
-	"strings"
 	"testing"
 )
-
-func contains(s, sub string) bool { return strings.Contains(s, sub) }
 
 func loadQuery(t *testing.T, name string) *Template {
 	t.Helper()
@@ -64,17 +61,11 @@ func TestEvalAllTemplates(t *testing.T) {
 	}
 	dc := newDistCache()
 	var failed []string
-	for _, scale := range []float64{1, 100} {
+	for _, scale := range []float64{0.01, 1, 100} {
 		for _, seed := range []int64{1, 99999} {
 			for _, tm := range tmpls {
 				ev := newEvaluator(seed, scale, dc)
 				if _, err := ev.evalTemplate(tm); err != nil {
-					// query88 uses dist(stores,…); store names are syllable-generated,
-					// not a vendored distribution, so that one param falls back to its
-					// baked value at generation time. Known, documented gap.
-					if tm.Name == "query88" && contains(err.Error(), `"stores"`) {
-						continue
-					}
 					failed = append(failed, tm.Name+": "+err.Error())
 				}
 			}

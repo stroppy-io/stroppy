@@ -52,6 +52,8 @@ var versionCmd = &cobra.Command{
 		}
 
 		if versionJSON {
+			// Version of the native YDB SDK service-account key contract.
+			versions["ydb_service_account_key_file"] = "1"
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")
 

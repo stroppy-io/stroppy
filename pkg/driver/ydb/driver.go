@@ -12,6 +12,7 @@ import (
 
 	ydbsdk "github.com/ydb-platform/ydb-go-sdk/v3"
 	ydbconfig "github.com/ydb-platform/ydb-go-sdk/v3/config"
+	ycauth "github.com/ydb-platform/ydb-go-yc"
 	yc "github.com/ydb-platform/ydb-go-yc-metadata"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -69,7 +70,8 @@ func NewDriver(
 	if primaryErr != nil {
 		// Explicit credentials define the caller's identity. A TLS, transport,
 		// or authorization failure must not switch to the VM service account.
-		if cfg.GetAuthToken() != "" || cfg.GetAuthUser() != "" || cfg.GetAuthPassword() != "" {
+		if cfg.GetServiceAccountKeyFile() != "" || cfg.GetAuthToken() != "" ||
+			cfg.GetAuthUser() != "" || cfg.GetAuthPassword() != "" {
 			return nil, primaryErr
 		}
 
@@ -189,6 +191,14 @@ func buildConnectionOptions(
 	}
 
 	switch {
+	case cfg.GetServiceAccountKeyFile() != "":
+		lg.Info("Using Yandex Cloud service account key authentication")
+
+		opts = append(opts, ycauth.WithServiceAccountKeyFileCredentials(
+			cfg.GetServiceAccountKeyFile(),
+			// The IAM transport must validate TLS independently of database TLS options.
+			ycauth.WithInsecureSkipVerify(false),
+		))
 	case cfg.GetAuthToken() != "":
 		lg.Debug("Using token authentication")
 

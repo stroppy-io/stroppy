@@ -38,6 +38,14 @@
         {
           "not": {
             "required": [
+              "serviceAccountKeyFile",
+              "service_account_key_file"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
               "authUser",
               "auth_user"
             ]
@@ -277,6 +285,26 @@
           "anyOf": [
             {
               "$ref": "#/$defs/PostgresConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "serviceAccountKeyFile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "service_account_key_file": {
+          "anyOf": [
+            {
+              "type": "string"
             },
             {
               "type": "null"

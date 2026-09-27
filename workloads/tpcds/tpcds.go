@@ -14,6 +14,7 @@ import (
 var (
 	errScaleFactorMustBePositive = errors.New("SCALE_FACTOR must be positive")
 	errUnknownDialect            = errors.New("dsqgen: unknown dialect")
+	errIncompleteQuerySet        = errors.New("tpcds: generated query set is incomplete")
 	errYdbBakedOnly              = errors.New("[tpcds] ydb supports the baked query set (power test) only; " +
 		"STREAMS>1 and QUERY_STREAM need the in-process generator, which does not target YQL yet")
 )
@@ -100,6 +101,14 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 
 	if w.driver == bench.DriverYDB && (w.throughput || w.genStream >= 0) {
 		return errYdbBakedOnly
+	}
+
+	// Reject incomplete generated sets before any schema changes or loading.
+	// Respect load-only runs that explicitly exclude the workload step.
+	if (w.throughput || w.genStream >= 0) && b.StepEnabled("workload") {
+		if _, err := generateStream(string(w.driver), w.scaleFactor, w.seed, max(w.genStream, 0)); err != nil {
+			return err
+		}
 	}
 
 	schemaFile, queryFile := dialectFiles(w.driver, w.schemaFile, w.sqlFile)
@@ -248,6 +257,14 @@ func generateStream(dialect string, scale float64, seed int64, stream int) ([]na
 	res, err := dsqgen.Generate(d, scale, seed, stream)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(res.Skipped) > 0 {
+		return nil, fmt.Errorf("%w: %s", errIncompleteQuerySet, strings.Join(res.Skipped, "; "))
+	}
+
+	if len(res.Queries) != 99 {
+		return nil, fmt.Errorf("%w: expected 99 queries, got %d", errIncompleteQuerySet, len(res.Queries))
 	}
 
 	suffix := []string{"_a", "_b", "_c"}

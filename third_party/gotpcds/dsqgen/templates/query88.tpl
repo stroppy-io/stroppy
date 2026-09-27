@@ -33,7 +33,7 @@
 -- Contributors:
 -- 
  define HOUR = ulist(random(-1,4,uniform),3);
- define STORE = dist(stores,1,1);
+-- STORE was unused: the SQL below selects the canonical literal store name.
 
 select  *
 from
