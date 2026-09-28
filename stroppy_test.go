@@ -35,10 +35,12 @@ func TestApplicationRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	metrics := &bench.MetricsConfig{Quiet: true}
+
 	report, err := app.Run(t.Context(), &stroppy.RunRequest{
 		Drivers: map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
 		Params:  bench.ParamInputs{CLI: map[string]string{"iterations": "2"}},
-		Metrics: &bench.MetricsConfig{Quiet: true},
+		Metrics: metrics,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -46,6 +48,10 @@ func TestApplicationRun(t *testing.T) {
 
 	if report.Workload != "external/example" || report.Driver != "noop" {
 		t.Fatalf("report identity = %s/%s", report.Workload, report.Driver)
+	}
+
+	if metrics.ServiceVersion != "" {
+		t.Fatalf("caller metrics service version mutated to %q", metrics.ServiceVersion)
 	}
 }
 

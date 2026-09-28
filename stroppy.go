@@ -121,9 +121,9 @@ func (a *Application) Run(ctx context.Context, request *RunRequest) (*report.Run
 		log = logger.Global()
 	}
 
-	metrics := request.Metrics
-	if metrics == nil {
-		metrics = &bench.MetricsConfig{}
+	metrics := &bench.MetricsConfig{}
+	if request.Metrics != nil {
+		*metrics = *request.Metrics
 	}
 
 	if metrics.ServiceVersion == "" {

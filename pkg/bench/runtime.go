@@ -211,7 +211,9 @@ func Run(
 		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
 	}
 
-	return RunFactory(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig)
+	_, err := run(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, nil, name)
+
+	return err
 }
 
 // RunFactory executes one fresh workload from factory.
@@ -224,7 +226,7 @@ func RunFactory(
 	lg *zap.Logger,
 	metricsConfig *MetricsConfig,
 ) error {
-	_, err := run(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, nil)
+	_, err := run(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, nil, "")
 
 	return err
 }
@@ -246,8 +248,8 @@ func RunWithReport(
 		return nil, fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
 	}
 
-	return RunFactoryWithReport(
-		ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, reportOptions,
+	return run(
+		ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, &reportOptions, name,
 	)
 }
 
@@ -267,7 +269,9 @@ func RunCatalog(
 		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
 	}
 
-	return RunFactory(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig)
+	_, err := run(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, nil, name)
+
+	return err
 }
 
 // RunCatalogWithReport executes one fresh workload selected from catalog and returns its report.
@@ -287,8 +291,8 @@ func RunCatalogWithReport(
 		return nil, fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
 	}
 
-	return RunFactoryWithReport(
-		ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, reportOptions,
+	return run(
+		ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, &reportOptions, name,
 	)
 }
 
@@ -303,7 +307,7 @@ func RunFactoryWithReport(
 	metricsConfig *MetricsConfig,
 	reportOptions ReportOptions,
 ) (*report.Run, error) {
-	return run(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, &reportOptions)
+	return run(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, &reportOptions, "")
 }
 
 //nolint:funlen,gocognit // lifecycle order stays explicit: setup, scenario, teardown, report.
@@ -316,9 +320,14 @@ func run(
 	lg *zap.Logger,
 	metricsConfig *MetricsConfig,
 	reportOptions *ReportOptions,
+	expectedName string,
 ) (*report.Run, error) {
 	wl := workloadFromFactory(factory)
 	name := wl.Name()
+
+	if expectedName != "" && name != expectedName {
+		return nil, fmt.Errorf("%w: got %q, want %q", errFactoryNameChanged, name, expectedName)
+	}
 
 	scenarioParams, definition, err := defineWorkload(wl, paramInputs, false)
 	if err != nil {
