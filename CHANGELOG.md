@@ -10,6 +10,11 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- Custom Go workloads can run as standalone Stroppy applications with the standard drivers, CLI, probe, version, reports, and programmatic runtime API.
+- Every constructed workload run report is saved under `~/.stroppy/reports/`; history write failures warn without failing the run.
+
 ### Changed
 
 - Go applications can depend on Stroppy v6 through the standard `github.com/stroppy-io/stroppy/v6` module path. ([#181](https://github.com/stroppy-io/stroppy/pull/181))

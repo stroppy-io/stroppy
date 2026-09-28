@@ -19,9 +19,12 @@ stroppy run simple -d noop --no-report
 ```
 
 `--report-format` currently accepts `json`. `--report-file` publishes the file
-atomically. A requested output failure returns a nonzero exit status. When a run
-itself fails after reporting starts, Stroppy still writes the requested report
-with `status: "failed"` or `status: "canceled"`, then returns the run error.
+atomically. A requested output failure returns a nonzero exit status. Every
+constructed report is also saved under `~/.stroppy/reports/`; `--no-report`
+disables both report construction and automatic history. History failures warn
+on stderr without failing the run. When a run itself fails after reporting starts,
+Stroppy still writes the requested report with `status: "failed"` or
+`status: "canceled"`, then returns the run error.
 
 Common fields include report schema and identity, Stroppy version, timestamps,
 host runtime facts, driver types, effective scenario and parameter values,
