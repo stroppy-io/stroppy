@@ -131,7 +131,7 @@ func TestExplicitServiceAccountKeyDoesNotFallBackToMetadata(t *testing.T) {
 	require.NotContains(t, err.Error(), "yc metadata fallback")
 }
 
-func TestServiceAccountKeyRejectsInsecureDatabaseTransport(t *testing.T) {
+func TestServiceAccountKeyRejectsUnsafeDatabaseTransportOrCredentials(t *testing.T) {
 	for _, tt := range []struct {
 		name       string
 		url        string
@@ -143,6 +143,8 @@ func TestServiceAccountKeyRejectsInsecureDatabaseTransport(t *testing.T) {
 		{name: "wrong scheme", url: "https://127.0.0.1:1/test", want: "grpcs://"},
 		{name: "missing host", url: "grpcs:///test", want: "grpcs://"},
 		{name: "malformed", url: "grpcs://%/test", want: "grpcs://"},
+		{name: "URL user", url: "grpcs://user@127.0.0.1:1/test", want: "URL-embedded credentials"},
+		{name: "URL user and password", url: "grpcs://user:password@127.0.0.1:1/test", want: "URL-embedded credentials"},
 		{name: "unverified TLS", url: "grpcs://127.0.0.1:1/test", skipVerify: true, want: "certificate verification"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

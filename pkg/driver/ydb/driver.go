@@ -29,8 +29,9 @@ const primaryConnectTimeout = 3 * time.Second
 var ErrUnsupportedInsertMethod = errors.New("unsupported insert method for ydb driver")
 
 var (
-	errServiceAccountEndpoint = errors.New("YDB serviceAccountKeyFile requires a grpcs:// endpoint")
-	errServiceAccountTLS      = errors.New("YDB serviceAccountKeyFile requires TLS certificate verification")
+	errServiceAccountEndpoint       = errors.New("YDB serviceAccountKeyFile requires a grpcs:// endpoint")
+	errServiceAccountTLS            = errors.New("YDB serviceAccountKeyFile requires TLS certificate verification")
+	errServiceAccountURLCredentials = errors.New("YDB serviceAccountKeyFile cannot be combined with URL-embedded credentials")
 )
 
 func init() {
@@ -69,6 +70,10 @@ func NewDriver(
 		endpoint, err := url.Parse(cfg.URL)
 		if err != nil || endpoint.Scheme != "grpcs" || endpoint.Host == "" {
 			return nil, errServiceAccountEndpoint
+		}
+
+		if endpoint.User != nil {
+			return nil, errServiceAccountURLCredentials
 		}
 
 		if cfg.GetTLSInsecureSkipVerify() {
