@@ -732,8 +732,14 @@ func runGoWorkload(
 	)
 
 	var outputErr error
-	if output.requested() && runReport != nil {
-		outputErr = writeRunReport(cmd.OutOrStdout(), output, runReport)
+	if runReport != nil {
+		if _, err := report.Save(runReport); err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: save report history: %v\n", err)
+		}
+
+		if output.requested() {
+			outputErr = writeRunReport(cmd.OutOrStdout(), output, runReport)
+		}
 	}
 
 	if runErr != nil {
