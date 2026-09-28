@@ -26,40 +26,46 @@ var (
 	formats             = []string{humanFormat, jsonFormat}
 	formatsWithCommas   = strings.Join(formats, ", ")
 	ErrUnsoportedFormat = errors.New("unsupported format")
-	Cmd                 = func() *cobra.Command {
-		cmd := &cobra.Command{
-			Use:   "probe",
-			Short: "List embedded workload presets and supported drivers",
-			Long: `Probe lists the embedded workload presets (their SQL dialects and docs)
+	Cmd                 = NewCommand(bench.RegisteredCatalog())
+)
+
+// NewCommand builds a probe command over an explicit workload catalog.
+func NewCommand(workloadCatalog *bench.Catalog) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "probe",
+		Short: "List embedded workload presets and supported drivers",
+		Long: `Probe lists the embedded workload presets (their SQL dialects and docs)
 and the insert methods each driver supports. Registered workload parameter schemas
 are read without setting up a workload or connecting to a database.
 
   -o json   machine-readable output
 `,
-			Args: cobra.NoArgs,
-			RunE: func(cmd *cobra.Command, _ []string) error {
-				formatFlagValue := cmd.Flag(formatFlag).Value.String()
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			formatFlagValue := cmd.Flag(formatFlag).Value.String()
 
-				if !contains(formats, formatFlagValue) {
-					return fmt.Errorf(
-						"%q, available (%s): %w",
-						formatFlagValue,
-						formatsWithCommas,
-						ErrUnsoportedFormat,
-					)
-				}
+			if !contains(formats, formatFlagValue) {
+				return fmt.Errorf(
+					"%q, available (%s): %w",
+					formatFlagValue,
+					formatsWithCommas,
+					ErrUnsoportedFormat,
+				)
+			}
 
-				return printCatalog(cmd.OutOrStdout(), formatFlagValue)
-			},
-		}
+			return printCatalog(cmd.OutOrStdout(), workloadCatalog, formatFlagValue)
+		},
+	}
 
-		cmd.Flags().
-			StringP(formatFlag, string(formatFlag[0]), humanFormat,
-				fmt.Sprintf("(%s)", formatsWithCommas))
+	cmd.Flags().StringP(
+		formatFlag,
+		string(formatFlag[0]),
+		humanFormat,
+		fmt.Sprintf("(%s)", formatsWithCommas),
+	)
 
-		return cmd
-	}()
-)
+	return cmd
+}
 
 func contains(haystack []string, needle string) bool {
 	for _, s := range haystack {
@@ -73,13 +79,13 @@ func contains(haystack []string, needle string) bool {
 
 // printCatalog renders the embedded preset catalog, workload schemas, and driver
 // insert-method matrix in the requested format.
-func printCatalog(output io.Writer, format string) error {
+func printCatalog(output io.Writer, workloadCatalog *bench.Catalog, format string) error {
 	catalog, err := workloads.Catalog()
 	if err != nil {
 		return fmt.Errorf("failed to build workloads catalog: %w", err)
 	}
 
-	descriptions, err := bench.DescribeAll()
+	descriptions, err := workloadCatalog.DescribeAll()
 	if err != nil {
 		return fmt.Errorf("failed to describe workloads: %w", err)
 	}
