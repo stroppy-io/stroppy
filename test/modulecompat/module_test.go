@@ -23,6 +23,7 @@ func TestExternalModuleResolvesV6Release(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	proxyDir := t.TempDir()
 	writeModuleProxy(t, proxyDir, repoRoot)
 
@@ -43,6 +44,7 @@ func TestExternalModuleResolvesV6Release(t *testing.T) {
 
 	home := t.TempDir()
 	runEnv := append(os.Environ(), "HOME="+home)
+
 	for _, test := range []struct {
 		args []string
 		want string
@@ -112,12 +114,13 @@ func writeModuleProxy(t *testing.T, proxyDir, repoRoot string) {
 
 	archive := zip.NewWriter(file)
 	prefix := modulePath + "@" + version + "/"
-
 	archived := 0
+
 	err = filepath.WalkDir(repoRoot, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
+
 		if entry.IsDir() {
 			name := entry.Name()
 			if path != repoRoot && (strings.HasPrefix(name, ".") || name == "build" || name == "bin") {
@@ -131,6 +134,7 @@ func writeModuleProxy(t *testing.T, proxyDir, repoRoot string) {
 		if err != nil {
 			return err
 		}
+
 		if !moduleArchiveFile(relative) {
 			return nil
 		}
@@ -139,10 +143,12 @@ func writeModuleProxy(t *testing.T, proxyDir, repoRoot string) {
 		if err != nil {
 			return err
 		}
+
 		writer, err := archive.Create(prefix + filepath.ToSlash(relative))
 		if err != nil {
 			return err
 		}
+
 		_, err = writer.Write(body)
 		archived++
 
@@ -151,6 +157,7 @@ func writeModuleProxy(t *testing.T, proxyDir, repoRoot string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if archived == 0 {
 		t.Fatal("module archive is empty")
 	}
@@ -187,14 +194,16 @@ func makeWritable(t *testing.T, root string) {
 
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
-			return nil
+			return walkErr
 		}
+
 		if entry.IsDir() {
 			return os.Chmod(path, 0o700)
 		}
 
 		return os.Chmod(path, 0o600)
 	})
+
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("make module cache writable: %v", err)
 	}

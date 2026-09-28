@@ -31,8 +31,11 @@ type Factory = bench.Factory
 // Workload is implemented by a Go-native benchmark.
 type Workload = bench.Workload
 
+const defaultPostgresURL = "postgres://postgres:postgres@localhost:5432" //nolint:gosec // local development default
+
 var (
 	errReservedWorkloadName = errors.New("stroppy: reserved workload name")
+	errNilApplication       = errors.New("stroppy: nil application")
 	reservedWorkloadNames   = map[string]struct{}{"help": {}, "probe": {}, "version": {}}
 )
 
@@ -79,7 +82,7 @@ func (a *Application) Execute(
 	stdout, stderr io.Writer,
 ) error {
 	if a == nil {
-		return errors.New("stroppy: nil application")
+		return errNilApplication
 	}
 
 	return cli.Execute(ctx, cli.Options{
@@ -99,18 +102,18 @@ type RunRequest struct {
 }
 
 // Run executes the standalone workload directly and returns its report.
-func (a *Application) Run(ctx context.Context, request RunRequest) (*report.Run, error) {
+func (a *Application) Run(ctx context.Context, request *RunRequest) (*report.Run, error) {
 	if a == nil {
-		return nil, errors.New("stroppy: nil application")
+		return nil, errNilApplication
+	}
+
+	if request == nil {
+		request = &RunRequest{}
 	}
 
 	drivers := request.Drivers
 	if drivers == nil {
-		drivers = map[int]*config.DriverConfig{0: {
-			DriverType:          config.DriverTypePostgres,
-			URL:                 "postgres://postgres:postgres@localhost:5432",
-			DefaultInsertMethod: "native",
-		}}
+		drivers = defaultDrivers()
 	}
 
 	log := request.Logger
@@ -122,6 +125,7 @@ func (a *Application) Run(ctx context.Context, request RunRequest) (*report.Run,
 	if metrics == nil {
 		metrics = &bench.MetricsConfig{}
 	}
+
 	if metrics.ServiceVersion == "" {
 		metrics.ServiceVersion = version.Version
 	}
@@ -146,17 +150,30 @@ func (a *Application) Run(ctx context.Context, request RunRequest) (*report.Run,
 
 // Main runs one workload as a standalone process with Stroppy signal semantics.
 func Main(factory Factory) {
+	os.Exit(mainExitCode(factory))
+}
+
+func mainExitCode(factory Factory) int {
 	application, err := New(factory)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+
+		return 1
 	}
 
 	ctx, stop, exitStatus := shutdown.NotifyContext(context.Background(), nil)
-	defer stop()
 
 	err = application.Execute(ctx, os.Args[1:], os.Stdout, os.Stderr)
-	if code := cli.ExitCodeFor(exitStatus(), err); code != 0 {
-		os.Exit(code)
-	}
+
+	stop()
+
+	return cli.ExitCodeFor(exitStatus(), err)
+}
+
+func defaultDrivers() map[int]*config.DriverConfig {
+	return map[int]*config.DriverConfig{0: {
+		DriverType:          config.DriverTypePostgres,
+		URL:                 defaultPostgresURL,
+		DefaultInsertMethod: "native",
+	}}
 }

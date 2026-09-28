@@ -66,9 +66,11 @@ func newRootState(
 	var quiet bool
 
 	summaryWriter := io.Writer(os.Stderr)
+
 	if metricsConfig != nil {
 		onSummary = metricsConfig.OnSummary
 		quiet = metricsConfig.Quiet
+
 		if metricsConfig.SummaryWriter != nil {
 			summaryWriter = metricsConfig.SummaryWriter
 		}

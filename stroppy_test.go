@@ -35,7 +35,7 @@ func TestApplicationRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	report, err := app.Run(t.Context(), stroppy.RunRequest{
+	report, err := app.Run(t.Context(), &stroppy.RunRequest{
 		Drivers: map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
 		Params:  bench.ParamInputs{CLI: map[string]string{"iterations": "2"}},
 		Metrics: &bench.MetricsConfig{Quiet: true},
@@ -68,9 +68,11 @@ func TestApplicationExecute(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
+
 			if err := app.Execute(t.Context(), test.args, &stdout, &stderr); err != nil {
 				t.Fatalf("Execute() error = %v, stderr = %q", err, stderr.String())
 			}
+
 			if !strings.Contains(stdout.String(), test.want) {
 				t.Fatalf("stdout = %q, want %q", stdout.String(), test.want)
 			}
@@ -78,6 +80,7 @@ func TestApplicationExecute(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
+
 	err = app.Execute(t.Context(), []string{
 		"-d", "noop", "--iterations", "2", "--report-format", "json",
 	}, &stdout, &stderr)
@@ -89,6 +92,7 @@ func TestApplicationExecute(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("decode report: %v\n%s", err, stdout.String())
 	}
+
 	if report["workload"] != "external/example" {
 		t.Fatalf("workload = %v", report["workload"])
 	}

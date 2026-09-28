@@ -71,6 +71,8 @@ var Cmd = NewCommand(bench.RegisteredCatalog(), "")
 
 // NewCommand builds a run command over an explicit workload catalog. A non-empty
 // default workload accepts flags without a workload positional.
+//
+//nolint:gocognit,cyclop,funlen,maintidx // Command wiring keeps parsing, precedence, and dispatch order visible.
 func NewCommand(catalog *bench.Catalog, defaultWorkload string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "run [<workload>] [sql_file] [-f config.json] [-d driver] [-D key=value] " +
@@ -530,6 +532,7 @@ func metricsConfig(cfg *config.RunConfig) *bench.MetricsConfig {
 	return metrics
 }
 
+//nolint:gocognit // Completion mirrors run parsing and parameter projection.
 func completeRunArgs(catalog *bench.Catalog) cobra.CompletionFunc {
 	return func(
 		_ *cobra.Command,
@@ -738,6 +741,7 @@ func runGoWorkload(
 	)
 
 	var outputErr error
+
 	if runReport != nil {
 		if _, err := report.Save(runReport); err != nil {
 			fmt.Fprintf(cmd.ErrOrStderr(), "warning: save report history: %v\n", err)

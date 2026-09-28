@@ -28,6 +28,7 @@ func NewCatalog(factories ...Factory) (*Catalog, error) {
 	for _, factory := range factories {
 		workload := workloadFromFactory(factory)
 		name := workload.Name()
+
 		if _, exists := catalog.factories[name]; exists {
 			return nil, fmt.Errorf("%w %q", errDuplicateWorkload, name)
 		}
@@ -101,10 +102,12 @@ func (c *Catalog) names() []string {
 
 	if c.registered {
 		regMu.RLock()
+
 		names := make([]string, 0, len(regWorkloads))
 		for name := range regWorkloads {
 			names = append(names, name)
 		}
+
 		regMu.RUnlock()
 		slices.Sort(names)
 
@@ -115,6 +118,7 @@ func (c *Catalog) names() []string {
 	for name := range c.factories {
 		names = append(names, name)
 	}
+
 	slices.Sort(names)
 
 	return names

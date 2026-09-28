@@ -162,7 +162,9 @@ func DescribeFactory(factory Factory) (Description, error) {
 
 func registeredFactory(name string) (Factory, bool) {
 	regMu.RLock()
+
 	factory, ok := regWorkloads[name]
+
 	regMu.RUnlock()
 
 	return factory, ok
