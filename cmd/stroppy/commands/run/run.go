@@ -67,10 +67,11 @@ var (
 	errReportDisabledOutput  = errors.New("--no-report cannot be combined with report output options")
 )
 
-var Cmd = NewCommand(bench.RegisteredCatalog())
+var Cmd = NewCommand(bench.RegisteredCatalog(), "")
 
-// NewCommand builds a run command over an explicit workload catalog.
-func NewCommand(catalog *bench.Catalog) *cobra.Command {
+// NewCommand builds a run command over an explicit workload catalog. A non-empty
+// default workload accepts flags without a workload positional.
+func NewCommand(catalog *bench.Catalog, defaultWorkload string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "run [<workload>] [sql_file] [-f config.json] [-d driver] [-D key=value] " +
 			"[-e KEY=VALUE] [--steps step1,step2]",
@@ -148,6 +149,10 @@ Signals:
     --steps drop_schema,create_schema,load_data  # dump generated rows to CSV
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if defaultWorkload != "" {
+				args = append([]string{defaultWorkload}, args...)
+			}
+
 			parsed, err := parseRunArgs(args)
 			if err != nil {
 				return invalidConfig(err)
@@ -716,6 +721,7 @@ func runGoWorkload(
 	}
 
 	if output.disabled {
+		metrics.SummaryWriter = cmd.ErrOrStderr()
 		if err := bench.RunCatalog(
 			cmd.Context(), catalog, name, drivers, paramInputs, steps, noSteps, logger.Global(), metrics,
 		); err != nil {

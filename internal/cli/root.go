@@ -37,24 +37,34 @@ func NewRoot(options Options) *cobra.Command {
 	}
 
 	root := &cobra.Command{
-		Use:          appName,
-		Short:        "Generate and run Go-native database stress tests",
-		SilenceUsage: true,
+		Use:                appName,
+		Short:              "Generate and run Go-native database stress tests",
+		SilenceUsage:       true,
+		DisableFlagParsing: options.DefaultWorkload != "",
 	}
 	root.CompletionOptions.HiddenDefaultCmd = true
 	root.SetVersionTemplate(`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "%s" .Version}}`)
 
-	run := runcommand.NewCommand(catalog)
-	root.AddCommand(newVersionCommand(), run, probe.NewCommand(catalog), help.NewCommand())
+	run := runcommand.NewCommand(catalog, options.DefaultWorkload)
+	root.AddCommand(newVersionCommand(), probe.NewCommand(catalog), help.NewCommand())
 	root.AddCommand(options.ExtraCommands...)
 
-	if options.DefaultWorkload != "" {
+	if options.DefaultWorkload == "" {
+		root.AddCommand(run)
+	} else {
 		root.Args = cobra.ArbitraryArgs
 		root.RunE = func(cmd *cobra.Command, args []string) error {
-			return run.RunE(run, append([]string{options.DefaultWorkload}, args...))
+			run.SetContext(cmd.Context())
+			run.SetOut(cmd.OutOrStdout())
+			run.SetErr(cmd.ErrOrStderr())
+
+			return run.RunE(run, args)
 		}
-		root.SetHelpFunc(func(*cobra.Command, []string) {
-			_ = run.RunE(run, []string{options.DefaultWorkload, "--help"})
+		root.SetHelpFunc(func(cmd *cobra.Command, _ []string) {
+			run.SetContext(cmd.Context())
+			run.SetOut(cmd.OutOrStdout())
+			run.SetErr(cmd.ErrOrStderr())
+			_ = run.RunE(run, []string{"--help"})
 		})
 	}
 
