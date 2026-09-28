@@ -68,10 +68,14 @@ type options struct {
 var opts options
 
 // Cmd is the `stroppy baseline` subcommand.
-var Cmd = &cobra.Command{
-	Use:   "baseline",
-	Short: "Measure stroppy's own performance on this machine",
-	Long: `Measure the stroppy ceiling on this machine: no database required.
+var Cmd = NewCommand()
+
+// NewCommand creates an independent baseline command.
+func NewCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "baseline",
+		Short: "Measure stroppy's own performance on this machine",
+		Long: `Measure the stroppy ceiling on this machine: no database required.
 
 Two tiers run the built-in baseline workload back to back:
 
@@ -91,35 +95,36 @@ absolute thresholds, and a versioned JSON report is saved under
 The pg-noop server binary is resolved from an embedded copy (release builds),
 the ~/.stroppy/bin/ cache, or the pinned GitHub release (downloaded with
 consent). Use --server-path or STROPPY_PG_NOOP_PATH to supply it directly.`,
-	Example: `
+		Example: `
   stroppy baseline                     # full two-tier run, ~20s
   stroppy baseline --quick             # 1s phases, smaller load
   stroppy baseline --tiers noop        # framework tier only, no server needed
   stroppy baseline --json              # machine-readable report on stdout
   stroppy baseline --server-path ./pgnoop
 `,
-	RunE: func(cmd *cobra.Command, _ []string) error {
-		return run(cmd.Context(), cmd.OutOrStdout())
-	},
-}
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return run(cmd.Context(), cmd.OutOrStdout())
+		},
+	}
 
-func init() {
-	Cmd.Flags().BoolVar(&opts.quick, "quick", false, "shorter phases and a smaller load")
-	Cmd.Flags().BoolVar(&opts.jsonOut, "json", false, "print the report as JSON")
-	Cmd.Flags().StringSliceVar(&opts.tiers, "tiers", []string{tierNoop, tierWire},
+	cmd.Flags().BoolVar(&opts.quick, "quick", false, "shorter phases and a smaller load")
+	cmd.Flags().BoolVar(&opts.jsonOut, "json", false, "print the report as JSON")
+	cmd.Flags().StringSliceVar(&opts.tiers, "tiers", []string{tierNoop, tierWire},
 		"tiers to run: noop, wire")
-	Cmd.Flags().IntVar(&opts.vus, "vus", runtime.GOMAXPROCS(0),
+	cmd.Flags().IntVar(&opts.vus, "vus", runtime.GOMAXPROCS(0),
 		"VU count for the parallel tx phase")
-	Cmd.Flags().DurationVar(&opts.duration, "duration", 0,
+	cmd.Flags().DurationVar(&opts.duration, "duration", 0,
 		"tx phase duration (default 3s, 1s with --quick)")
-	Cmd.Flags().Int64Var(&opts.rows, "rows", 0,
+	cmd.Flags().Int64Var(&opts.rows, "rows", 0,
 		"load rows (default 250000, 100000 with --quick)")
-	Cmd.Flags().StringVar(&opts.serverPath, "server-path", "",
+	cmd.Flags().StringVar(&opts.serverPath, "server-path", "",
 		"path to a pg-noop binary (env STROPPY_PG_NOOP_PATH)")
-	Cmd.Flags().StringVar(&opts.download, "download", "ask",
+	cmd.Flags().StringVar(&opts.download, "download", "ask",
 		"server download consent: ask, always, or never")
-	Cmd.Flags().BoolVar(&opts.noSave, "no-save", false,
+	cmd.Flags().BoolVar(&opts.noSave, "no-save", false,
 		"do not write the report to ~/.stroppy/baselines/")
+
+	return cmd
 }
 
 // runPlan is the validated shape of one baseline invocation.
