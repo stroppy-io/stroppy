@@ -91,6 +91,7 @@ DRIVER OPTIONS (-D / --driver-opt)
     caCertFile             string    Path to CA certificate PEM file
     authToken              string    Authentication token (e.g., IAM token)
     serviceAccountKeyFile string    Yandex JSON key; SDK manages IAM tokens (takes precedence over authToken)
+                                    Requires grpcs:// and TLS certificate verification
     authUser               string    Username for static credentials auth
     authPassword           string    Password for static credentials auth
     tlsInsecureSkipVerify  bool      Skip TLS cert verification (testing only)

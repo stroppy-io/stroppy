@@ -28,6 +28,11 @@ const primaryConnectTimeout = 3 * time.Second
 
 var ErrUnsupportedInsertMethod = errors.New("unsupported insert method for ydb driver")
 
+var (
+	errServiceAccountEndpoint = errors.New("YDB serviceAccountKeyFile requires a grpcs:// endpoint")
+	errServiceAccountTLS      = errors.New("YDB serviceAccountKeyFile requires TLS certificate verification")
+)
+
 func init() {
 	driver.RegisterDriver(
 		config.DriverTypeYDB,
@@ -59,6 +64,18 @@ func NewDriver(
 	}
 
 	cfg := opts.Config
+	if cfg.GetServiceAccountKeyFile() != "" {
+		// IAM TLS protects token issuance; the database hop must protect its use.
+		endpoint, err := url.Parse(cfg.URL)
+		if err != nil || endpoint.Scheme != "grpcs" || endpoint.Host == "" {
+			return nil, errServiceAccountEndpoint
+		}
+
+		if cfg.GetTLSInsecureSkipVerify() {
+			return nil, errServiceAccountTLS
+		}
+	}
+
 	sqlCfg := cfg.SQL
 	connOpts := buildConnectionOptions(lg, cfg, opts.DialFunc)
 

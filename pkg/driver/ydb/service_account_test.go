@@ -7,7 +7,9 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
+	"net"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -121,10 +123,47 @@ func TestServiceAccountSDKRenewsCredentialsAndPreservesIdentity(t *testing.T) {
 func TestExplicitServiceAccountKeyDoesNotFallBackToMetadata(t *testing.T) {
 	keyFile := filepath.Join(t.TempDir(), "missing-key.json")
 	_, err := NewDriver(t.Context(), driver.Options{
-		Config: &config.DriverConfig{URL: "grpc://127.0.0.1:1/?database=/test", ServiceAccountKeyFile: &keyFile},
+		Config: &config.DriverConfig{URL: "grpcs://127.0.0.1:1/?database=/test", ServiceAccountKeyFile: &keyFile},
 		Logger: zap.NewNop(),
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "missing-key.json")
 	require.NotContains(t, err.Error(), "yc metadata fallback")
+}
+
+func TestServiceAccountKeyRejectsInsecureDatabaseTransport(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		url        string
+		skipVerify bool
+		want       string
+	}{
+		{name: "plaintext", url: "grpc://127.0.0.1:1/test", want: "grpcs://"},
+		{name: "missing scheme", url: "127.0.0.1:1/test", want: "grpcs://"},
+		{name: "wrong scheme", url: "https://127.0.0.1:1/test", want: "grpcs://"},
+		{name: "missing host", url: "grpcs:///test", want: "grpcs://"},
+		{name: "malformed", url: "grpcs://%/test", want: "grpcs://"},
+		{name: "unverified TLS", url: "grpcs://127.0.0.1:1/test", skipVerify: true, want: "certificate verification"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			keyFile := filepath.Join(t.TempDir(), "must-not-read-key.json")
+
+			var dials atomic.Int32
+
+			_, err := NewDriver(t.Context(), driver.Options{
+				Config: &config.DriverConfig{
+					URL: tt.url, ServiceAccountKeyFile: &keyFile, TLSInsecureSkipVerify: &tt.skipVerify,
+				},
+				Logger: zap.NewNop(),
+				DialFunc: func(context.Context, string, string) (net.Conn, error) {
+					dials.Add(1)
+
+					return nil, errors.New("unexpected network connection")
+				},
+			})
+			require.ErrorContains(t, err, tt.want)
+			require.NotContains(t, err.Error(), "must-not-read-key")
+			require.Zero(t, dials.Load())
+		})
+	}
 }

@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
-- YDB supports `serviceAccountKeyFile` authentication with automatic IAM token management by the official Yandex Cloud credentials library; `version --json` advertises `ydb_service_account_key_file=1`. ([#173](https://github.com/stroppy-io/stroppy/pull/173))
+- YDB supports `serviceAccountKeyFile` authentication with automatic IAM token management by the official Yandex Cloud credentials library; this mode requires `grpcs://` with certificate verification to protect tokens in transit. `version --json` advertises `ydb_service_account_key_file=1`. ([#173](https://github.com/stroppy-io/stroppy/pull/173))
 
 ### Fixed
 
