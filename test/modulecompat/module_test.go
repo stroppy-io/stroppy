@@ -2,11 +2,14 @@ package modulecompat_test
 
 import (
 	"archive/zip"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -16,23 +19,74 @@ const (
 )
 
 func TestExternalModuleResolvesV6Release(t *testing.T) {
-	repoRoot := filepath.Clean(filepath.Join("..", ".."))
+	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
 	proxyDir := t.TempDir()
 	writeModuleProxy(t, proxyDir, repoRoot)
 
-	consumerDir := t.TempDir()
-	copyFile(t, filepath.Join("testdata", "consumer", "go.mod"), filepath.Join(consumerDir, "go.mod"))
-	copyFile(t, filepath.Join("testdata", "consumer", "main.go.txt"), filepath.Join(consumerDir, "main.go"))
-
+	consumerDir := prepareConsumer(t)
+	binary := filepath.Join(consumerDir, "consumer")
 	proxyURL := (&url.URL{Scheme: "file", Path: proxyDir}).String()
-	cmd := exec.Command("go", "build", "-mod=mod", "-o", filepath.Join(consumerDir, "consumer"), ".")
-	cmd.Dir = consumerDir
+	moduleCache := filepath.Join(t.TempDir(), "modcache")
+	t.Cleanup(func() { makeWritable(t, moduleCache) })
+	buildEnv := append(os.Environ(),
+		"GOPROXY="+proxyURL+",https://proxy.golang.org,direct",
+		"GONOSUMDB="+modulePath,
+		"GOWORK=off",
+		"GOMODCACHE="+moduleCache,
+		"GOCACHE="+filepath.Join(t.TempDir(), "gocache"),
+	)
 
-	cmd.Env = append(os.Environ(), "GOPROXY="+proxyURL+",off", "GOSUMDB=off", "GOWORK=off")
+	runCommand(t, consumerDir, buildEnv, "go", "build", "-mod=mod", "-o", binary, ".")
 
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("build external consumer: %v\n%s", err, output)
+	home := t.TempDir()
+	runEnv := append(os.Environ(), "HOME="+home)
+	for _, test := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--help"}, "external/fixture"},
+		{[]string{"probe", "-o", "json"}, `"external/fixture"`},
+		{[]string{"version", "--json"}, `"stroppy"`},
+		{[]string{"-d", "noop", "--iterations", "2", "--report-format", "json"}, `"workload": "external/fixture"`},
+	} {
+		output := runCommand(t, consumerDir, runEnv, binary, test.args...)
+		if !strings.Contains(output, test.want) {
+			t.Fatalf("%s output = %q, want %q", test.args, output, test.want)
+		}
 	}
+
+	history, err := filepath.Glob(filepath.Join(home, ".stroppy", "reports", "*.json"))
+	if err != nil || len(history) != 1 {
+		t.Fatalf("report history = %v, error = %v", history, err)
+	}
+}
+
+func prepareConsumer(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	copyFile(t, filepath.Join("testdata", "consumer", "go.mod"), filepath.Join(dir, "go.mod"))
+	copyFile(t, filepath.Join("testdata", "consumer", "main.go.txt"), filepath.Join(dir, "main.go"))
+
+	return dir
+}
+
+func runCommand(t *testing.T, dir string, env []string, name string, args ...string) string {
+	t.Helper()
+
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	cmd.Env = env
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%s %v: %v\n%s", name, args, err, output)
+	}
+
+	return string(output)
 }
 
 func writeModuleProxy(t *testing.T, proxyDir, repoRoot string) {
@@ -59,20 +113,46 @@ func writeModuleProxy(t *testing.T, proxyDir, repoRoot string) {
 	archive := zip.NewWriter(file)
 	prefix := modulePath + "@" + version + "/"
 
-	for _, name := range []string{"go.mod", "pkg/report/report.go"} {
-		body, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(name)))
-		if err != nil {
-			t.Fatal(err)
+	archived := 0
+	err = filepath.WalkDir(repoRoot, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			name := entry.Name()
+			if path != repoRoot && (strings.HasPrefix(name, ".") || name == "build" || name == "bin") {
+				return filepath.SkipDir
+			}
+
+			return nil
 		}
 
-		entry, err := archive.Create(prefix + name)
+		relative, err := filepath.Rel(repoRoot, path)
 		if err != nil {
-			t.Fatal(err)
+			return err
+		}
+		if !moduleArchiveFile(relative) {
+			return nil
 		}
 
-		if _, err := entry.Write(body); err != nil {
-			t.Fatal(err)
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return err
 		}
+		writer, err := archive.Create(prefix + filepath.ToSlash(relative))
+		if err != nil {
+			return err
+		}
+		_, err = writer.Write(body)
+		archived++
+
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if archived == 0 {
+		t.Fatal("module archive is empty")
 	}
 
 	if err := archive.Close(); err != nil {
@@ -81,6 +161,42 @@ func writeModuleProxy(t *testing.T, proxyDir, repoRoot string) {
 
 	if err := file.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func moduleArchiveFile(path string) bool {
+	if path == "go.mod" || path == "go.sum" || path == "LICENSE" {
+		return true
+	}
+
+	if strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
+		return true
+	}
+
+	for _, prefix := range []string{"third_party/", "workloads/"} {
+		if strings.HasPrefix(filepath.ToSlash(path), prefix) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func makeWritable(t *testing.T, root string) {
+	t.Helper()
+
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil
+		}
+		if entry.IsDir() {
+			return os.Chmod(path, 0o700)
+		}
+
+		return os.Chmod(path, 0o600)
+	})
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("make module cache writable: %v", err)
 	}
 }
 
