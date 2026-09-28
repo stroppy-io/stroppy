@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	stroppyconfig "github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	stroppyconfig "github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 // buildURL returns a URL string pointing at dir with the given query

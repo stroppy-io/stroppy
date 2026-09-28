@@ -1,4 +1,4 @@
-module github.com/stroppy-io/stroppy
+module github.com/stroppy-io/stroppy/v6
 
 go 1.26
 

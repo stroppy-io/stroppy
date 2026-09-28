@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/source"
-	"github.com/stroppy-io/stroppy/pkg/gen"
-	"github.com/stroppy-io/stroppy/third_party/gotpc/dbgen"
+	"github.com/stroppy-io/stroppy/v6/pkg/datagen/source"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/third_party/gotpc/dbgen"
 )
 
 // tpchBytesBudget is the per-row byte budget for every TPC-H text column.

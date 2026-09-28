@@ -10,9 +10,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/config"
-	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
 )
 
 // TestProcsRegistered verifies both TPC-B variants are registered and self-name.

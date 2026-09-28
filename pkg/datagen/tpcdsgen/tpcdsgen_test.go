@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/source"
+	"github.com/stroppy-io/stroppy/v6/pkg/datagen/source"
 )
 
 func drain(t *testing.T, rs source.RowSource) []string {

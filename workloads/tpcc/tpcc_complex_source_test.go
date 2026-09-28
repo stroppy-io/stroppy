@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // drainRangePrepared drains a prepared cursor over [0, count), returning rows

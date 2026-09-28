@@ -5,7 +5,7 @@
 // against answers_sf1.json.
 package tpcds
 
-import "github.com/stroppy-io/stroppy/pkg/bench"
+import "github.com/stroppy-io/stroppy/v6/pkg/bench"
 
 const preset = "tpcds"
 

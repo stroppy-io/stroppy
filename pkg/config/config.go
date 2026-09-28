@@ -5,7 +5,7 @@
 //
 // Regenerate the committed file-envelope schema after changing these types.
 //
-//go:generate go run github.com/stroppy-io/stroppy/internal/jsonschema-gen -out ../../docs/jsonschema/run.schema.json
+//go:generate go run github.com/stroppy-io/stroppy/v6/internal/jsonschema-gen -out ../../docs/jsonschema/run.schema.json
 package config
 
 import (

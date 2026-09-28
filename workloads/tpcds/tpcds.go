@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/third_party/gotpcds/dsqgen"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/third_party/gotpcds/dsqgen"
 )
 
 var (

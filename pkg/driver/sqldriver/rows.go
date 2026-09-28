@@ -3,7 +3,7 @@ package sqldriver
 import (
 	"database/sql"
 
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 var _ driver.Rows = (*Rows)(nil)

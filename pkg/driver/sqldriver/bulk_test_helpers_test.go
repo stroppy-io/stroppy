@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver/queries"
 )
 
 // mockExecer captures every ExecContext call so tests can inspect the SQL

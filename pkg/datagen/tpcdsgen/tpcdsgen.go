@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/source"
-	"github.com/stroppy-io/stroppy/third_party/gotpcds/dsdgen"
+	"github.com/stroppy-io/stroppy/v6/pkg/datagen/source"
+	"github.com/stroppy-io/stroppy/v6/third_party/gotpcds/dsdgen"
 )
 
 // ErrUnknownTable is returned by New when the table is not a TPC-DS table this

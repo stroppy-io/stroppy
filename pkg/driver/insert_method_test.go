@@ -3,7 +3,7 @@ package driver_test
 import (
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 func TestParseInsertMethod(t *testing.T) {

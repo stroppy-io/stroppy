@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/report"
-	"github.com/stroppy-io/stroppy/workloads"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
+	"github.com/stroppy-io/stroppy/v6/workloads"
 )
 
 // The SF=1 answer comparator logs diagnostic deltas without aborting the run.

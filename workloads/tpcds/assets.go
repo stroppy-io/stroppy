@@ -3,7 +3,7 @@ package tpcds
 import (
 	"embed"
 
-	"github.com/stroppy-io/stroppy/workloads"
+	"github.com/stroppy-io/stroppy/v6/workloads"
 )
 
 //go:embed *.sql *.json README.md

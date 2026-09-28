@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pashagolub/pgxmock/v4"
 
-	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/v6/pkg/common/logger"
 )
 
 // mockExecutor wraps pgxmock.PgxPoolIface to satisfy the Executor interface

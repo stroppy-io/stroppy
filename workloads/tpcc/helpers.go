@@ -5,7 +5,7 @@ package tpcc
 import (
 	"math/rand/v2"
 
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // tpccSyllables + cLastDict: spec §4.3.2.3 — C_LAST is a 3-syllable concat indexed

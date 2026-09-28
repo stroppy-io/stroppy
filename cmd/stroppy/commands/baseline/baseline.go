@@ -21,11 +21,11 @@ import (
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
-	"github.com/stroppy-io/stroppy/internal/pgnoop"
-	"github.com/stroppy-io/stroppy/internal/version"
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/internal/pgnoop"
+	"github.com/stroppy-io/stroppy/v6/internal/version"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 const (

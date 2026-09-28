@@ -11,13 +11,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/baseline"
-	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/help"
-	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/probe"
-	"github.com/stroppy-io/stroppy/cmd/stroppy/commands/run"
-	"github.com/stroppy-io/stroppy/internal/version"
-	"github.com/stroppy-io/stroppy/pkg/common/shutdown"
-	_ "github.com/stroppy-io/stroppy/workloads/all"
+	"github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/baseline"
+	"github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/help"
+	"github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/probe"
+	"github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/run"
+	"github.com/stroppy-io/stroppy/v6/internal/version"
+	"github.com/stroppy-io/stroppy/v6/pkg/common/shutdown"
+	_ "github.com/stroppy-io/stroppy/v6/workloads/all"
 )
 
 // appName is the binary / command name.

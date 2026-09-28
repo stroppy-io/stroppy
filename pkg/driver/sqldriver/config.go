@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 // ApplySQLConfig applies SQL pool configuration to a *sql.DB.

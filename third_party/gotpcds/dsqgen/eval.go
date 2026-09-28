@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stroppy-io/stroppy/third_party/gotpcds/dsdgen"
+	"github.com/stroppy-io/stroppy/v6/third_party/gotpcds/dsdgen"
 )
 
 // cell is one evaluated value: either an integer or a string.

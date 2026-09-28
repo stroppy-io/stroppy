@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
 // tpcbSQL assembles a minimal TPC-B SQL document with both required setup

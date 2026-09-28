@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/workloads/internal/workloadtest"
+	"github.com/stroppy-io/stroppy/v6/workloads/internal/workloadtest"
 )
 
 func TestEmbeddedAssetContract(t *testing.T) {

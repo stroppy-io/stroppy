@@ -13,14 +13,14 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/source"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/pkg/driver/common"
-	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
-	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
-	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
-	"github.com/stroppy-io/stroppy/pkg/driver/stats"
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/datagen/source"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/common"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/insertprogress"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver/queries"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/stats"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // Insert runs a typed [driver.InsertRequest] through the ydb driver.

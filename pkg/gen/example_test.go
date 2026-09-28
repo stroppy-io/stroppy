@@ -3,7 +3,7 @@ package gen_test
 import (
 	"fmt"
 
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // Example models three columns of a TPC-C-style item row with plain imperative

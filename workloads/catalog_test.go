@@ -3,8 +3,8 @@ package workloads_test
 import (
 	"testing"
 
-	"github.com/stroppy-io/stroppy/workloads"
-	_ "github.com/stroppy-io/stroppy/workloads/all"
+	"github.com/stroppy-io/stroppy/v6/workloads"
+	_ "github.com/stroppy-io/stroppy/v6/workloads/all"
 )
 
 func TestCatalog(t *testing.T) {

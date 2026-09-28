@@ -14,7 +14,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 const schemaFileMode = 0o644

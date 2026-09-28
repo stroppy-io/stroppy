@@ -15,8 +15,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
-	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
 )
 
 // testBenchFixture wires a Bench to an observer logger and a fresh meter provider
