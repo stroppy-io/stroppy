@@ -144,12 +144,7 @@ func nilWorkload(workload Workload) bool {
 
 // Describe returns a registered workload's deterministic parameter schema without setup or drivers.
 func Describe(name string) (Description, error) {
-	factory, ok := registeredFactory(name)
-	if !ok {
-		return Description{}, fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
-	}
-
-	return DescribeFactory(factory)
+	return RegisteredCatalog().Describe(name)
 }
 
 // DescribeFactory returns a workload factory's deterministic parameter schema without setup or drivers.
@@ -188,28 +183,7 @@ func workloadFromFactory(factory Factory) Workload {
 
 // DescribeAll returns all registered workload schemas ordered by workload name.
 func DescribeAll() ([]Description, error) {
-	regMu.RLock()
-
-	names := make([]string, 0, len(regWorkloads))
-	for name := range regWorkloads {
-		names = append(names, name)
-	}
-
-	regMu.RUnlock()
-
-	slices.Sort(names)
-
-	descriptions := make([]Description, 0, len(names))
-	for _, name := range names {
-		description, err := Describe(name)
-		if err != nil {
-			return nil, err
-		}
-
-		descriptions = append(descriptions, description)
-	}
-
-	return descriptions, nil
+	return RegisteredCatalog().DescribeAll()
 }
 
 // teardownTimeout bounds workload Teardown. It runs under a detached context so
@@ -266,6 +240,47 @@ func RunWithReport(
 	reportOptions ReportOptions,
 ) (*report.Run, error) {
 	factory, ok := registeredFactory(name)
+	if !ok {
+		return nil, fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
+	}
+
+	return RunFactoryWithReport(
+		ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, reportOptions,
+	)
+}
+
+// RunCatalog executes one fresh workload selected from catalog.
+func RunCatalog(
+	ctx context.Context,
+	catalog *Catalog,
+	name string,
+	drivers map[int]*config.DriverConfig,
+	paramInputs ParamInputs,
+	steps, noSteps []string,
+	lg *zap.Logger,
+	metricsConfig *MetricsConfig,
+) error {
+	factory, ok := catalog.Factory(name)
+	if !ok {
+		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
+	}
+
+	return RunFactory(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig)
+}
+
+// RunCatalogWithReport executes one fresh workload selected from catalog and returns its report.
+func RunCatalogWithReport(
+	ctx context.Context,
+	catalog *Catalog,
+	name string,
+	drivers map[int]*config.DriverConfig,
+	paramInputs ParamInputs,
+	steps, noSteps []string,
+	lg *zap.Logger,
+	metricsConfig *MetricsConfig,
+	reportOptions ReportOptions,
+) (*report.Run, error) {
+	factory, ok := catalog.Factory(name)
 	if !ok {
 		return nil, fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
 	}

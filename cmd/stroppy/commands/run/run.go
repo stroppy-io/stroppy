@@ -67,11 +67,15 @@ var (
 	errReportDisabledOutput  = errors.New("--no-report cannot be combined with report output options")
 )
 
-var Cmd = &cobra.Command{
-	Use: "run [<workload>] [sql_file] [-f config.json] [-d driver] [-D key=value] " +
-		"[-e KEY=VALUE] [--steps step1,step2]",
-	Short: "Run a benchmark workload",
-	Long: `Run a Go-native benchmark workload. The first positional selects the mode:
+var Cmd = NewCommand(bench.RegisteredCatalog())
+
+// NewCommand builds a run command over an explicit workload catalog.
+func NewCommand(catalog *bench.Catalog) *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "run [<workload>] [sql_file] [-f config.json] [-d driver] [-D key=value] " +
+			"[-e KEY=VALUE] [--steps step1,step2]",
+		Short: "Run a benchmark workload",
+		Long: `Run a Go-native benchmark workload. The first positional selects the mode:
 
   <name>       → registered workload   stroppy run tpcc/tx
   <name>.sql   → SQL file              stroppy run queries.sql
@@ -122,10 +126,10 @@ Signals:
   130 (SIGINT) or 143 (SIGTERM) after a graceful cancellation, 2 after a forced
   exit, and 1 for setup, validation, teardown, fatal, or other command errors.
 `,
-	DisableFlagParsing: true,
-	SilenceErrors:      false,
-	ValidArgsFunction:  completeRunArgs,
-	Example: `
+		DisableFlagParsing: true,
+		SilenceErrors:      false,
+		ValidArgsFunction:  completeRunArgs(catalog),
+		Example: `
   stroppy run tpcc/tx                           # built-in TPC-C tx workload
   stroppy run tpcb/tx                           # TPC-B tx workload
   stroppy run tpcb/procs                        # TPC-B stored-procedure variant (pg/mysql)
@@ -143,165 +147,175 @@ Signals:
   stroppy run tpcb/tx -D driverType=csv -D url='/tmp/tpcb-csv?merge=true' \
     --steps drop_schema,create_schema,load_data  # dump generated rows to CSV
 `,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		parsed, err := parseRunArgs(args)
-		if err != nil {
-			return invalidConfig(err)
-		}
-
-		if parsed.help && parsed.scriptArg != "" {
-			return printSelectedWorkloadHelp(cmd, parsed.scriptArg, parsed.sqlArg)
-		}
-
-		// Resolve -e values before loading configuration so logger input is ready
-		// before any configuration diagnostics are emitted.
-		envOverrides, err := runner.ResolveEnvOverrides(parsed.envArgs)
-		if err != nil {
-			return invalidConfig(err)
-		}
-
-		// Load configuration without emitting diagnostics. The effective logger is
-		// initialized immediately afterward so every following log shares it.
-		fileConfig, _, err := runner.LoadRunConfig(parsed.fileArg)
-		if err != nil {
-			return invalidConfig(fmt.Errorf("failed to load config file: %w", err))
-		}
-
-		if err := initializeLogger(parsed.typedParams, envOverrides, fileConfig); err != nil {
-			return invalidConfig(err)
-		}
-
-		runner.LogConfigFile(fileConfig)
-
-		// Apply effective values: CLI overrides config file.
-		scriptArg := runner.EffectiveScript(parsed.scriptArg, fileConfig)
-		sqlArg := runner.EffectiveSQL(parsed.sqlArg, fileConfig)
-		steps := normalizeStepNames(runner.EffectiveSteps(parsed.steps, fileConfig))
-		noSteps := normalizeStepNames(runner.EffectiveNoSteps(parsed.noSteps, fileConfig))
-
-		if parsed.help {
-			if scriptArg == "" {
-				return cmd.Help()
-			}
-
-			return printSelectedWorkloadHelp(cmd, scriptArg, sqlArg)
-		}
-
-		if scriptArg == "" {
-			return invalidConfig(errNoScript)
-		}
-
-		// Mutual exclusion is checked on the merged inputs (CLI over config file),
-		// not just CLI-vs-CLI, so `config steps + CLI --no-steps` (and vice versa)
-		// is rejected the same way.
-		if len(steps) > 0 && len(noSteps) > 0 {
-			return invalidConfig(errStepsMutExclusive)
-		}
-
-		if len(parsed.afterDash) > 0 {
-			return invalidConfig(errArgsAfterDash)
-		}
-
-		// Log override decisions when both CLI and file config are present.
-		if fileConfig != nil {
-			lg := logger.Global().Named("run")
-
-			if parsed.scriptArg != "" && fileConfig.RunConfig.GetScript() != "" {
-				lg.Debug("CLI script overrides config file",
-					zap.String("cli", parsed.scriptArg),
-					zap.String("file", fileConfig.RunConfig.GetScript()),
-				)
-			}
-
-			if len(parsed.steps) > 0 && len(fileConfig.RunConfig.Steps) > 0 {
-				lg.Debug("CLI --steps overrides config file steps",
-					zap.Strings("cli", parsed.steps),
-					zap.Strings("file", fileConfig.RunConfig.Steps),
-				)
-			}
-		}
-
-		paramInputs := bench.ParamInputs{
-			CLI:       withoutLoggerParams(parsed.typedParams),
-			LegacyEnv: withoutLoggerEnv(envOverrides),
-		}
-
-		driverConfigs := runner.DriverCLIConfigs{}
-
-		if fileConfig != nil {
-			paramInputs.RunConfig = fileConfig.Run
-			paramInputs.WorkloadConfig = fileConfig.Params
-			paramInputs.LegacyConfigEnv = withoutLoggerEnv(fileConfig.RunConfig.Env)
-
-			driverConfigs, err = runner.DriverCLIConfigsFromFile(fileConfig.RunConfig.Drivers)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			parsed, err := parseRunArgs(args)
 			if err != nil {
 				return invalidConfig(err)
 			}
-		}
 
-		for idx, presetName := range parsed.driverPresets {
-			if err := applyDriverPreset(driverConfigs, idx, presetName); err != nil {
+			if parsed.help && parsed.scriptArg != "" {
+				return printSelectedWorkloadHelp(cmd, catalog, parsed.scriptArg, parsed.sqlArg)
+			}
+
+			// Resolve -e values before loading configuration so logger input is ready
+			// before any configuration diagnostics are emitted.
+			envOverrides, err := runner.ResolveEnvOverrides(parsed.envArgs)
+			if err != nil {
 				return invalidConfig(err)
 			}
-		}
 
-		for idx, opts := range parsed.driverOpts {
-			for _, kv := range opts {
-				if err := applyDriverOpt(driverConfigs, idx, kv[0], kv[1]); err != nil {
+			// Load configuration without emitting diagnostics. The effective logger is
+			// initialized immediately afterward so every following log shares it.
+			fileConfig, _, err := runner.LoadRunConfig(parsed.fileArg)
+			if err != nil {
+				return invalidConfig(fmt.Errorf("failed to load config file: %w", err))
+			}
+
+			if err := initializeLogger(parsed.typedParams, envOverrides, fileConfig); err != nil {
+				return invalidConfig(err)
+			}
+
+			runner.LogConfigFile(fileConfig)
+
+			// Apply effective values: CLI overrides config file.
+			scriptArg := runner.EffectiveScript(parsed.scriptArg, fileConfig)
+			sqlArg := runner.EffectiveSQL(parsed.sqlArg, fileConfig)
+			steps := normalizeStepNames(runner.EffectiveSteps(parsed.steps, fileConfig))
+			noSteps := normalizeStepNames(runner.EffectiveNoSteps(parsed.noSteps, fileConfig))
+
+			if parsed.help {
+				if scriptArg == "" {
+					return cmd.Help()
+				}
+
+				return printSelectedWorkloadHelp(cmd, catalog, scriptArg, sqlArg)
+			}
+
+			if scriptArg == "" {
+				return invalidConfig(errNoScript)
+			}
+
+			// Mutual exclusion is checked on the merged inputs (CLI over config file),
+			// not just CLI-vs-CLI, so `config steps + CLI --no-steps` (and vice versa)
+			// is rejected the same way.
+			if len(steps) > 0 && len(noSteps) > 0 {
+				return invalidConfig(errStepsMutExclusive)
+			}
+
+			if len(parsed.afterDash) > 0 {
+				return invalidConfig(errArgsAfterDash)
+			}
+
+			// Log override decisions when both CLI and file config are present.
+			if fileConfig != nil {
+				lg := logger.Global().Named("run")
+
+				if parsed.scriptArg != "" && fileConfig.RunConfig.GetScript() != "" {
+					lg.Debug("CLI script overrides config file",
+						zap.String("cli", parsed.scriptArg),
+						zap.String("file", fileConfig.RunConfig.GetScript()),
+					)
+				}
+
+				if len(parsed.steps) > 0 && len(fileConfig.RunConfig.Steps) > 0 {
+					lg.Debug("CLI --steps overrides config file steps",
+						zap.Strings("cli", parsed.steps),
+						zap.Strings("file", fileConfig.RunConfig.Steps),
+					)
+				}
+			}
+
+			paramInputs := bench.ParamInputs{
+				CLI:       withoutLoggerParams(parsed.typedParams),
+				LegacyEnv: withoutLoggerEnv(envOverrides),
+			}
+
+			driverConfigs := runner.DriverCLIConfigs{}
+
+			if fileConfig != nil {
+				paramInputs.RunConfig = fileConfig.Run
+				paramInputs.WorkloadConfig = fileConfig.Params
+				paramInputs.LegacyConfigEnv = withoutLoggerEnv(fileConfig.RunConfig.Env)
+
+				driverConfigs, err = runner.DriverCLIConfigsFromFile(fileConfig.RunConfig.Drivers)
+				if err != nil {
 					return invalidConfig(err)
 				}
 			}
-		}
 
-		// Go-native execute_sql: a .sql file, inline SQL (contains spaces), or the
-		// execute_sql preset routes to the Go runner with its SQL source bound as an
-		// explicit typed workload parameter. Checked before the registered-name
-		// lookup so the preset's sql arg is honored.
-		if name, body, file, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
-			return runGoWorkload(
-				cmd,
-				name,
-				steps,
-				noSteps,
-				withExecuteSQLSource(paramInputs, body, file),
-				driverConfigs,
-				metricsConfig(loadedRunConfig(fileConfig)),
-				reportOptions(loadedRunConfig(fileConfig)),
-				parsed.report,
-			)
-		}
-
-		// Go-native workload: if a Go workload is registered under the bare
-		// script name, dispatch to bench.Run.
-		if _, ok := bench.Lookup(scriptArg); ok {
-			workloadParamInputs, err := withEffectiveSQLFile(scriptArg, paramInputs, sqlArg)
-			if err != nil {
-				return invalidConfig(err)
+			for idx, presetName := range parsed.driverPresets {
+				if err := applyDriverPreset(driverConfigs, idx, presetName); err != nil {
+					return invalidConfig(err)
+				}
 			}
 
-			return runGoWorkload(
-				cmd,
-				scriptArg,
-				steps,
-				noSteps,
-				workloadParamInputs,
-				driverConfigs,
-				metricsConfig(loadedRunConfig(fileConfig)),
-				reportOptions(loadedRunConfig(fileConfig)),
-				parsed.report,
-			)
-		}
+			for idx, opts := range parsed.driverOpts {
+				for _, kv := range opts {
+					if err := applyDriverOpt(driverConfigs, idx, kv[0], kv[1]); err != nil {
+						return invalidConfig(err)
+					}
+				}
+			}
 
-		return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
-	},
+			// Go-native execute_sql: a .sql file, inline SQL (contains spaces), or the
+			// execute_sql preset routes to the Go runner with its SQL source bound as an
+			// explicit typed workload parameter. Checked before the registered-name
+			// lookup so the preset's sql arg is honored.
+			if name, body, file, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
+				return runGoWorkload(
+					cmd,
+					catalog,
+					name,
+					steps,
+					noSteps,
+					withExecuteSQLSource(paramInputs, body, file),
+					driverConfigs,
+					metricsConfig(loadedRunConfig(fileConfig)),
+					reportOptions(loadedRunConfig(fileConfig)),
+					parsed.report,
+				)
+			}
+
+			// Go-native workload: if a Go workload is registered under the bare
+			// script name, dispatch to bench.Run.
+			if _, ok := catalog.Factory(scriptArg); ok {
+				workloadParamInputs, err := withEffectiveSQLFile(catalog, scriptArg, paramInputs, sqlArg)
+				if err != nil {
+					return invalidConfig(err)
+				}
+
+				return runGoWorkload(
+					cmd,
+					catalog,
+					scriptArg,
+					steps,
+					noSteps,
+					workloadParamInputs,
+					driverConfigs,
+					metricsConfig(loadedRunConfig(fileConfig)),
+					reportOptions(loadedRunConfig(fileConfig)),
+					parsed.report,
+				)
+			}
+
+			return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
+		},
+	}
+
+	return cmd
 }
 
-func withEffectiveSQLFile(name string, inputs bench.ParamInputs, sqlFile string) (bench.ParamInputs, error) {
+func withEffectiveSQLFile(
+	catalog *bench.Catalog,
+	name string,
+	inputs bench.ParamInputs,
+	sqlFile string,
+) (bench.ParamInputs, error) {
 	if sqlFile == "" {
 		return inputs, nil
 	}
 
-	description, err := bench.Describe(name)
+	description, err := catalog.Describe(name)
 	if err != nil {
 		return inputs, err
 	}
@@ -511,56 +525,62 @@ func metricsConfig(cfg *config.RunConfig) *bench.MetricsConfig {
 	return metrics
 }
 
-func completeRunArgs(
-	_ *cobra.Command,
-	args []string,
-	toComplete string,
-) ([]string, cobra.ShellCompDirective) {
-	if !strings.HasPrefix(toComplete, "--") {
-		return nil, cobra.ShellCompDirectiveDefault
-	}
-
-	parsed, err := parseRunArgs(args)
-	if err != nil || parsed.scriptArg == "" {
-		return nil, cobra.ShellCompDirectiveDefault
-	}
-
-	describeName := parsed.scriptArg
-	if name, _, _, ok := executeSQLGoRoute(parsed.scriptArg, parsed.sqlArg); ok {
-		describeName = name
-	}
-
-	description, err := bench.Describe(describeName)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveDefault
-	}
-
-	completions := make([]string, 0, len(description.Params))
-	for idx := range description.Params {
-		param := &description.Params[idx]
-
-		candidates := []string{param.Flag}
-		if param.Type == bench.ParamTypeBool {
-			candidates = []string{param.Flag + "=true", param.Flag + "=false"}
+func completeRunArgs(catalog *bench.Catalog) cobra.CompletionFunc {
+	return func(
+		_ *cobra.Command,
+		args []string,
+		toComplete string,
+	) ([]string, cobra.ShellCompDirective) {
+		if !strings.HasPrefix(toComplete, "--") {
+			return nil, cobra.ShellCompDirectiveDefault
 		}
 
-		for _, candidate := range candidates {
-			if strings.HasPrefix(candidate, toComplete) {
-				completions = append(completions, candidate+"\t"+param.Description)
+		parsed, err := parseRunArgs(args)
+		if err != nil || parsed.scriptArg == "" {
+			return nil, cobra.ShellCompDirectiveDefault
+		}
+
+		describeName := parsed.scriptArg
+		if name, _, _, ok := executeSQLGoRoute(parsed.scriptArg, parsed.sqlArg); ok {
+			describeName = name
+		}
+
+		description, err := catalog.Describe(describeName)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveDefault
+		}
+
+		completions := make([]string, 0, len(description.Params))
+		for idx := range description.Params {
+			param := &description.Params[idx]
+
+			candidates := []string{param.Flag}
+			if param.Type == bench.ParamTypeBool {
+				candidates = []string{param.Flag + "=true", param.Flag + "=false"}
+			}
+
+			for _, candidate := range candidates {
+				if strings.HasPrefix(candidate, toComplete) {
+					completions = append(completions, candidate+"\t"+param.Description)
+				}
 			}
 		}
-	}
 
-	return completions, cobra.ShellCompDirectiveNoFileComp
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	}
 }
 
-func printSelectedWorkloadHelp(cmd *cobra.Command, scriptArg, sqlArg string) error {
+func printSelectedWorkloadHelp(
+	cmd *cobra.Command,
+	catalog *bench.Catalog,
+	scriptArg, sqlArg string,
+) error {
 	describeName := scriptArg
 	if name, _, _, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
 		describeName = name
 	}
 
-	description, err := bench.Describe(describeName)
+	description, err := catalog.Describe(describeName)
 	if err != nil {
 		return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
 	}
@@ -665,6 +685,7 @@ func executeSQLGoRoute(scriptArg, sqlArg string) (name, body, file string, ok bo
 // and step inputs are passed explicitly to their runtime owners.
 func runGoWorkload(
 	cmd *cobra.Command,
+	catalog *bench.Catalog,
 	name string,
 	steps, noSteps []string,
 	paramInputs bench.ParamInputs,
@@ -695,8 +716,8 @@ func runGoWorkload(
 	}
 
 	if output.disabled {
-		if err := bench.Run(
-			cmd.Context(), name, drivers, paramInputs, steps, noSteps, logger.Global(), metrics,
+		if err := bench.RunCatalog(
+			cmd.Context(), catalog, name, drivers, paramInputs, steps, noSteps, logger.Global(), metrics,
 		); err != nil {
 			return fmt.Errorf("failed to run go workload: %w", err)
 		}
@@ -704,8 +725,9 @@ func runGoWorkload(
 		return nil
 	}
 
-	runReport, runErr := bench.RunWithReport(
-		cmd.Context(), name, drivers, paramInputs, steps, noSteps,
+	metrics.SummaryWriter = cmd.ErrOrStderr()
+	runReport, runErr := bench.RunCatalogWithReport(
+		cmd.Context(), catalog, name, drivers, paramInputs, steps, noSteps,
 		logger.Global(), metrics, reportConfig,
 	)
 
