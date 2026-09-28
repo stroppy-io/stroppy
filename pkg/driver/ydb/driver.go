@@ -31,7 +31,9 @@ var ErrUnsupportedInsertMethod = errors.New("unsupported insert method for ydb d
 var (
 	errServiceAccountEndpoint       = errors.New("YDB serviceAccountKeyFile requires a grpcs:// endpoint")
 	errServiceAccountTLS            = errors.New("YDB serviceAccountKeyFile requires TLS certificate verification")
-	errServiceAccountURLCredentials = errors.New("YDB serviceAccountKeyFile cannot be combined with URL-embedded credentials")
+	errServiceAccountURLCredentials = errors.New(
+		"YDB serviceAccountKeyFile cannot be combined with URL-embedded credentials",
+	)
 )
 
 func init() {
