@@ -3,7 +3,9 @@ package bench
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -29,6 +31,7 @@ type RootState struct {
 	metricsPrefix string
 	onSummary     func(metricdata.ResourceMetrics)
 	quietSummary  bool
+	summaryWriter io.Writer
 
 	throughput    throughput
 	txMetrics     *txMetrics
@@ -62,9 +65,13 @@ func newRootState(
 
 	var quiet bool
 
+	summaryWriter := io.Writer(os.Stderr)
 	if metricsConfig != nil {
 		onSummary = metricsConfig.OnSummary
 		quiet = metricsConfig.Quiet
+		if metricsConfig.SummaryWriter != nil {
+			summaryWriter = metricsConfig.SummaryWriter
+		}
 	}
 
 	state := &RootState{
@@ -77,6 +84,7 @@ func newRootState(
 		metricsPrefix: prefix,
 		onSummary:     onSummary,
 		quietSummary:  quiet,
+		summaryWriter: summaryWriter,
 		txMetrics:     &txMetrics{},
 		sharedSlots:   make(map[uint64]*sharedDriverSlot),
 		stepFilter:    newStepFilter(steps, noSteps),
