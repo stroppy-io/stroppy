@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	_ "github.com/stroppy-io/stroppy/workloads/all"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	_ "github.com/stroppy-io/stroppy/v6/workloads/all"
 )
 
 func TestJSONCatalogIncludesWorkloadSchemas(t *testing.T) {

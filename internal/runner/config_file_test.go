@@ -12,9 +12,9 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
-	"github.com/stroppy-io/stroppy/internal/runner"
-	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/internal/runner"
+	"github.com/stroppy-io/stroppy/v6/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 func TestLoadRunConfigIsSilentUntilLogged(t *testing.T) {

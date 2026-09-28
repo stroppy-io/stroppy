@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
 // bynameInt binds PAYMENT and Order-Status by-name flags as the INTEGER 1/0

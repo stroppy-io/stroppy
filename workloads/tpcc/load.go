@@ -3,8 +3,8 @@ package tpcc
 import (
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // fillVar draws a length in [min, max] from lenField, allocates that many

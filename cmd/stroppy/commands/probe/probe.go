@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/workloads"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/workloads"
 )
 
 const (

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 // InsertCapability pairs a driver type with the insert methods its

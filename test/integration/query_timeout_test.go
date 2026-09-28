@@ -12,10 +12,10 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	_ "github.com/stroppy-io/stroppy/pkg/driver/mysql"
-	_ "github.com/stroppy-io/stroppy/pkg/driver/postgres"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/mysql"
+	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/postgres"
 )
 
 // dispatchQueryTimeout builds a stroppy driver with a per-statement deadline.

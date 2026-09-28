@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	stroppyconfig "github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	stroppyconfig "github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // typedRowsSource returns a 3-column indexed source (id, squared, label)

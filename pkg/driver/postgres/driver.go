@@ -9,11 +9,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/pkg/driver/postgres/pool"
-	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
+	"github.com/stroppy-io/stroppy/v6/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/postgres/pool"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver"
 )
 
 const dbConnectionTimeout = 5 * time.Second

@@ -7,11 +7,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
-	"github.com/stroppy-io/stroppy/pkg/driver/stats"
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/insertprogress"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/stats"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 func validInsertSource() *gen.IndexedSource {

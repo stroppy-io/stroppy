@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
 var errScaleFactorMustBePositive = errors.New("SCALE_FACTOR must be positive")

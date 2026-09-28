@@ -10,8 +10,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 // DefaultConfigFile is the file auto-discovered in the current directory.

@@ -2,11 +2,11 @@
 package all
 
 import (
-	_ "github.com/stroppy-io/stroppy/workloads/baseline"
-	_ "github.com/stroppy-io/stroppy/workloads/execute_sql"
-	_ "github.com/stroppy-io/stroppy/workloads/simple"
-	_ "github.com/stroppy-io/stroppy/workloads/tpcb"
-	_ "github.com/stroppy-io/stroppy/workloads/tpcc"
-	_ "github.com/stroppy-io/stroppy/workloads/tpcds"
-	_ "github.com/stroppy-io/stroppy/workloads/tpch"
+	_ "github.com/stroppy-io/stroppy/v6/workloads/baseline"
+	_ "github.com/stroppy-io/stroppy/v6/workloads/execute_sql"
+	_ "github.com/stroppy-io/stroppy/v6/workloads/simple"
+	_ "github.com/stroppy-io/stroppy/v6/workloads/tpcb"
+	_ "github.com/stroppy-io/stroppy/v6/workloads/tpcc"
+	_ "github.com/stroppy-io/stroppy/v6/workloads/tpcds"
+	_ "github.com/stroppy-io/stroppy/v6/workloads/tpch"
 )

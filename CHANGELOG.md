@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Changed
+
+- Go applications can depend on Stroppy v6 through the standard `github.com/stroppy-io/stroppy/v6` module path.
+
 ## [6.1.1] - 2026-09-28
 
 ### Added

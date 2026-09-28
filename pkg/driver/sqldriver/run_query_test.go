@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver/queries"
 )
 
 var _ queries.Dialect = testDialect{}

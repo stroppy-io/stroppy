@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/tpchgen"
+	"github.com/stroppy-io/stroppy/v6/pkg/datagen/tpchgen"
 )
 
 // goldenHashes pins the exact gotpc output at sf=0.01 so refactors (e.g. the

@@ -116,7 +116,7 @@ gen-tpch-json: # Regenerate workloads/tpch/distributions.json and answers_sf1.js
 
 STROPPY_BIN_NAME=stroppy
 STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
-STROPPY_LDFLAGS=-ldflags "-s -w -X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'"
+STROPPY_LDFLAGS=-ldflags "-s -w -X 'github.com/stroppy-io/stroppy/v6/internal/version.Version=$(VERSION)'"
 
 # Extra go build tags (release builds pass -tags=pgnoop_embed to carry the
 # pg-noop baseline server inside the stroppy binary).
@@ -130,7 +130,7 @@ PGNOOP_CHECKSUMS=$(CURDIR)/internal/pgnoop/release.sha256
 build-debug: # Build binary stroppy (with symbols)
 	@mkdir -p $(CURDIR)/build
 	echo $(VERSION)
-	go build -trimpath -ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'" -o $(STROPPY_OUT_FILE) ./cmd/stroppy
+	go build -trimpath -ldflags "-X 'github.com/stroppy-io/stroppy/v6/internal/version.Version=$(VERSION)'" -o $(STROPPY_OUT_FILE) ./cmd/stroppy
 
 build: # Build binary stroppy
 	@mkdir -p $(CURDIR)/build

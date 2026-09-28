@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/stroppy-io/stroppy/internal/runner"
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/internal/runner"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 func TestMergePostgresConfig(t *testing.T) {

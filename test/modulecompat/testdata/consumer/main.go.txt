@@ -1,0 +1,7 @@
+package main
+
+import "github.com/stroppy-io/stroppy/v6/pkg/report"
+
+func main() {
+	_ = report.SchemaVersion
+}

@@ -11,8 +11,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 // Driver preset literals reused across the postgres-family presets and

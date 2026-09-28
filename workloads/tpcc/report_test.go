@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
 // testBounds is a small deterministic histogram layout used only by the unit

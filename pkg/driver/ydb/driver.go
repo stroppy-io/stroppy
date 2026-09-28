@@ -17,11 +17,11 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
-	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
-	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
+	"github.com/stroppy-io/stroppy/v6/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver/queries"
 )
 
 const primaryConnectTimeout = 3 * time.Second

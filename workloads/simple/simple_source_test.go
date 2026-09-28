@@ -7,9 +7,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/pkg/driver/common"
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/common"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // drainAll prepares a full-range cursor over req.Source and materializes

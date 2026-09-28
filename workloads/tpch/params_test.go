@@ -3,7 +3,7 @@ package tpch
 import (
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
 func TestSQLFileDefaults(t *testing.T) {

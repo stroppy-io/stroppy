@@ -7,7 +7,7 @@ import (
 	"math/rand/v2"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 // ErrorAction is workload policy for one classified driver error.

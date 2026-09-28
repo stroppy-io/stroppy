@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/report"
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
 // Step filtering turns the explicit --steps allowlist and --no-steps blocklist

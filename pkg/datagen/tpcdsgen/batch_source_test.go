@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/tpcdsgen"
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/datagen/tpcdsgen"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // allTables is every TPC-DS table this generator exposes.

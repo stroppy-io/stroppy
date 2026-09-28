@@ -3,7 +3,7 @@ package tpcb
 import (
 	"embed"
 
-	"github.com/stroppy-io/stroppy/workloads"
+	"github.com/stroppy-io/stroppy/v6/workloads"
 )
 
 //go:embed *.sql README.md

@@ -11,8 +11,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/insertprogress"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // ErrNilBatchSource is returned by the typed parallel helpers when the

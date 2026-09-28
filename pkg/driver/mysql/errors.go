@@ -5,7 +5,7 @@ import (
 
 	gomysql "github.com/go-sql-driver/mysql"
 
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 const (

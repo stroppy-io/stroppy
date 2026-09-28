@@ -6,7 +6,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/stroppy-io/stroppy/workloads"
+	"github.com/stroppy-io/stroppy/v6/workloads"
 )
 
 // SQL is a parsed SQL file split into named sections and the named/anonymous

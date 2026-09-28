@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver"
 )
 
 var pgxDialect = PgxDialect{}

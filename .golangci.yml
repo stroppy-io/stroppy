@@ -224,7 +224,7 @@ formatters:
       sections:
         - standard
         - default
-        - prefix(github.com/stroppy-io/stroppy)
+        - prefix(github.com/stroppy-io/stroppy/v6)
         - localmodule
         - blank
         - dot

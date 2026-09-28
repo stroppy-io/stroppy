@@ -3,8 +3,8 @@ package tpcc
 import (
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/workloads/internal/workloadtest"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/workloads/internal/workloadtest"
 )
 
 func TestEmbeddedAssetContract(t *testing.T) {

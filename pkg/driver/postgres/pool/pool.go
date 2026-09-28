@@ -19,7 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 const (

@@ -6,7 +6,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/tpchgen"
+	"github.com/stroppy-io/stroppy/v6/pkg/datagen/tpchgen"
 )
 
 // TestOfficialAnswersQ1Q6SF1 validates gotpc data WITHOUT a database by

@@ -11,7 +11,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 const metricsShutdownTimeout = 10 * time.Second
@@ -71,7 +71,7 @@ func newRootState(
 		lg:            lg,
 		ctx:           ctx,
 		dialer:        &net.Dialer{},
-		registry:      NewRegistry(provider.Meter("github.com/stroppy-io/stroppy/pkg/bench"), prefix),
+		registry:      NewRegistry(provider.Meter("github.com/stroppy-io/stroppy/v6/pkg/bench"), prefix),
 		meterProvider: provider,
 		manualReader:  reader,
 		metricsPrefix: prefix,

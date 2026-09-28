@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/stroppy-io/stroppy/internal/version"
+	"github.com/stroppy-io/stroppy/v6/internal/version"
 )
 
 // manifest is the shape of <outdir>/<workload>/MANIFEST.json. It captures

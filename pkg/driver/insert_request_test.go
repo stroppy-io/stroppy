@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // validSource is a one-column indexed source acceptable to ValidateInsert.

@@ -16,10 +16,10 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
-	"github.com/stroppy-io/stroppy/pkg/driver/stats"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/stats"
 )
 
 func TestRunScenarioReturnsFatalErrorAndCancelsWorkers(t *testing.T) {
