@@ -26,7 +26,7 @@ func TestJSONCatalogIncludesWorkloadSchemas(t *testing.T) {
 
 func TestHumanCatalogIncludesGroupedWorkloads(t *testing.T) {
 	var output bytes.Buffer
-	if err := printCatalog(&output, humanFormat); err != nil {
+	if err := printCatalog(&output, bench.RegisteredCatalog(), humanFormat); err != nil {
 		t.Fatalf("printCatalog() error = %v", err)
 	}
 
@@ -50,7 +50,7 @@ func renderJSONCatalog(t *testing.T) []byte {
 	t.Helper()
 
 	var output bytes.Buffer
-	if err := printCatalog(&output, jsonFormat); err != nil {
+	if err := printCatalog(&output, bench.RegisteredCatalog(), jsonFormat); err != nil {
 		t.Fatalf("printCatalog() error = %v", err)
 	}
 

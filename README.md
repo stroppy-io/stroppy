@@ -122,6 +122,9 @@ Human output and diagnostics remain on stderr, so requested stdout stays valid
 JSON. See [run reports](docs/run-reports.md) for report fields, output behavior,
 and workload payloads.
 
+Custom Go workloads can also run as self-contained applications with `go run .`
+or a normal built executable. See [standalone workloads](docs/standalone-workloads.md).
+
 Use `stroppy help` to explore available topics:
 
 ```bash

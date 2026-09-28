@@ -21,6 +21,9 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
+// Factory creates a fresh workload instance for one description or run.
+type Factory func() Workload
+
 // Workload is a Go-native benchmark. Define declares and binds typed parameters;
 // Setup runs once (schema + load steps); Iterate is the measured body driven across
 // VUs by the executor; Teardown runs once.
@@ -65,7 +68,7 @@ func (b *Bench) Logger() *zap.Logger { return b.lg }
 
 var (
 	regMu        sync.RWMutex
-	regWorkloads = map[string]func() Workload{}
+	regWorkloads = map[string]Factory{}
 
 	errNoWorkloadRegistered      = errors.New("bench: no workload registered")
 	errDriverIndexMissing        = errors.New("bench: driver index 0 not configured")
@@ -80,7 +83,7 @@ var (
 )
 
 // Register adds a workload factory. Workload packages call it during init.
-func Register(factory func() Workload) {
+func Register(factory Factory) {
 	if factory == nil {
 		panic("bench: register nil workload factory")
 	}
@@ -139,12 +142,15 @@ func nilWorkload(workload Workload) bool {
 	}
 }
 
-// Describe returns a workload's deterministic parameter schema without setup or drivers.
+// Describe returns a registered workload's deterministic parameter schema without setup or drivers.
 func Describe(name string) (Description, error) {
-	wl, ok := Lookup(name)
-	if !ok {
-		return Description{}, fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
-	}
+	return RegisteredCatalog().Describe(name)
+}
+
+// DescribeFactory returns a workload factory's deterministic parameter schema without setup or drivers.
+func DescribeFactory(factory Factory) (Description, error) {
+	wl := workloadFromFactory(factory)
+	name := wl.Name()
 
 	_, def, err := defineWorkload(wl, ParamInputs{}, true)
 	if err != nil {
@@ -154,30 +160,32 @@ func Describe(name string) (Description, error) {
 	return Description{Name: name, Params: def.schema()}, nil
 }
 
-// DescribeAll returns all registered workload schemas ordered by workload name.
-func DescribeAll() ([]Description, error) {
+func registeredFactory(name string) (Factory, bool) {
 	regMu.RLock()
 
-	names := make([]string, 0, len(regWorkloads))
-	for name := range regWorkloads {
-		names = append(names, name)
-	}
+	factory, ok := regWorkloads[name]
 
 	regMu.RUnlock()
 
-	slices.Sort(names)
+	return factory, ok
+}
 
-	descriptions := make([]Description, 0, len(names))
-	for _, name := range names {
-		description, err := Describe(name)
-		if err != nil {
-			return nil, err
-		}
-
-		descriptions = append(descriptions, description)
+func workloadFromFactory(factory Factory) Workload {
+	if factory == nil {
+		panic("bench: nil workload factory")
 	}
 
-	return descriptions, nil
+	workload := factory()
+	if nilWorkload(workload) || workload.Name() == "" {
+		panic("bench: workload factory returned an invalid workload")
+	}
+
+	return workload
+}
+
+// DescribeAll returns all registered workload schemas ordered by workload name.
+func DescribeAll() ([]Description, error) {
+	return RegisteredCatalog().DescribeAll()
 }
 
 // teardownTimeout bounds workload Teardown. It runs under a detached context so
@@ -198,12 +206,32 @@ func Run(
 	lg *zap.Logger,
 	metricsConfig *MetricsConfig,
 ) error {
-	_, err := run(ctx, name, drivers, paramInputs, steps, noSteps, lg, metricsConfig, nil)
+	factory, ok := registeredFactory(name)
+	if !ok {
+		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
+	}
+
+	_, err := run(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, nil, name)
 
 	return err
 }
 
-// RunWithReport executes one workload and returns its final common report even
+// RunFactory executes one fresh workload from factory.
+func RunFactory(
+	ctx context.Context,
+	factory Factory,
+	drivers map[int]*config.DriverConfig,
+	paramInputs ParamInputs,
+	steps, noSteps []string,
+	lg *zap.Logger,
+	metricsConfig *MetricsConfig,
+) error {
+	_, err := run(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, nil, "")
+
+	return err
+}
+
+// RunWithReport executes one registered workload and returns its final common report even
 // when setup, scenario, or teardown fails after report initialization.
 func RunWithReport(
 	ctx context.Context,
@@ -215,23 +243,90 @@ func RunWithReport(
 	metricsConfig *MetricsConfig,
 	reportOptions ReportOptions,
 ) (*report.Run, error) {
-	return run(ctx, name, drivers, paramInputs, steps, noSteps, lg, metricsConfig, &reportOptions)
+	factory, ok := registeredFactory(name)
+	if !ok {
+		return nil, fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
+	}
+
+	return run(
+		ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, &reportOptions, name,
+	)
 }
 
-//nolint:funlen,gocognit // lifecycle order stays explicit: setup, scenario, teardown, report.
-func run(
+// RunCatalog executes one fresh workload selected from catalog.
+func RunCatalog(
 	ctx context.Context,
+	catalog *Catalog,
 	name string,
 	drivers map[int]*config.DriverConfig,
 	paramInputs ParamInputs,
 	steps, noSteps []string,
 	lg *zap.Logger,
 	metricsConfig *MetricsConfig,
-	reportOptions *ReportOptions,
+) error {
+	factory, ok := catalog.Factory(name)
+	if !ok {
+		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
+	}
+
+	_, err := run(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, nil, name)
+
+	return err
+}
+
+// RunCatalogWithReport executes one fresh workload selected from catalog and returns its report.
+func RunCatalogWithReport(
+	ctx context.Context,
+	catalog *Catalog,
+	name string,
+	drivers map[int]*config.DriverConfig,
+	paramInputs ParamInputs,
+	steps, noSteps []string,
+	lg *zap.Logger,
+	metricsConfig *MetricsConfig,
+	reportOptions ReportOptions,
 ) (*report.Run, error) {
-	wl, ok := Lookup(name)
+	factory, ok := catalog.Factory(name)
 	if !ok {
 		return nil, fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
+	}
+
+	return run(
+		ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, &reportOptions, name,
+	)
+}
+
+// RunFactoryWithReport executes one fresh workload from factory and returns its final report.
+func RunFactoryWithReport(
+	ctx context.Context,
+	factory Factory,
+	drivers map[int]*config.DriverConfig,
+	paramInputs ParamInputs,
+	steps, noSteps []string,
+	lg *zap.Logger,
+	metricsConfig *MetricsConfig,
+	reportOptions ReportOptions,
+) (*report.Run, error) {
+	return run(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, &reportOptions, "")
+}
+
+//nolint:funlen,gocognit // lifecycle order stays explicit: setup, scenario, teardown, report.
+func run(
+	ctx context.Context,
+	factory Factory,
+	drivers map[int]*config.DriverConfig,
+	paramInputs ParamInputs,
+	steps, noSteps []string,
+	lg *zap.Logger,
+	metricsConfig *MetricsConfig,
+	reportOptions *ReportOptions,
+	expectedName string,
+) (*report.Run, error) {
+	wl := workloadFromFactory(factory)
+	name := wl.Name()
+
+	if expectedName != "" && name != expectedName {
+		return nil, fmt.Errorf("%w: got %q, want %q", errFactoryNameChanged, name, expectedName)
 	}
 
 	scenarioParams, definition, err := defineWorkload(wl, paramInputs, false)
@@ -386,7 +481,7 @@ func finishRun(
 		})
 	}
 
-	newSummary(root).printDataTo(os.Stderr, data)
+	newSummary(root).printDataTo(root.summaryWriter, data)
 
 	return runReport, runErr
 }

@@ -3,6 +3,7 @@ package bench
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"strconv"
@@ -41,9 +42,12 @@ type MetricsConfig struct {
 	// consumers (stroppy baseline) read structured numbers here.
 	OnSummary func(metricdata.ResourceMetrics)
 
-	// Quiet suppresses the final text summary on stderr. Programmatic
-	// consumers that read OnSummary render their own report.
+	// Quiet suppresses the final text summary. Programmatic consumers that
+	// read OnSummary render their own report.
 	Quiet bool
+
+	// SummaryWriter receives the final text summary. Nil uses os.Stderr.
+	SummaryWriter io.Writer
 }
 
 func newMeterProvider(
