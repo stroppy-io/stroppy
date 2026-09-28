@@ -17,6 +17,7 @@ func Resolve() string {
 	if !ok {
 		return Version
 	}
+
 	if info.Main.Path == modulePath && info.Main.Version != "" && info.Main.Version != "(devel)" {
 		return info.Main.Version
 	}

@@ -136,6 +136,7 @@ func newVersionCommand() *cobra.Command {
 
 func componentVersions() map[string]string {
 	versions := map[string]string{appName: version.Resolve()}
+
 	if info, ok := debug.ReadBuildInfo(); ok {
 		for _, dependency := range info.Deps {
 			if dependency.Path == "github.com/jackc/pgx/v5" {
