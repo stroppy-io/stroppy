@@ -9,9 +9,10 @@ import (
 var _ driver.Rows = (*Rows)(nil)
 
 type Rows struct {
-	sqlRows *sql.Rows
-	cols    []string
-	closed  bool
+	sqlRows     *sql.Rows
+	cols        []string
+	closed      bool
+	terminalErr error
 }
 
 func NewRows(sqlRows *sql.Rows) driver.Rows {
@@ -81,6 +82,10 @@ func (r *Rows) ReadAll(limit int) [][]any {
 }
 
 func (r *Rows) Err() error {
+	if r.closed {
+		return r.terminalErr
+	}
+
 	return r.sqlRows.Err()
 }
 
@@ -90,7 +95,7 @@ func (r *Rows) Close() error {
 
 func (r *Rows) close(currentResultDone bool) error {
 	if r.closed {
-		return r.sqlRows.Err()
+		return r.terminalErr
 	}
 
 	r.closed = true
@@ -107,5 +112,10 @@ func (r *Rows) close(currentResultDone bool) error {
 		}
 	}
 
-	return driver.JoinErrors(r.sqlRows.Err(), r.sqlRows.Close())
+	// Freeze the outcome before cancelRows releases the per-query context.
+	// database/sql may otherwise observe that cleanup cancellation later and
+	// report context.Canceled for an already drained, successfully closed stream.
+	r.terminalErr = driver.JoinErrors(r.sqlRows.Err(), r.sqlRows.Close())
+
+	return r.terminalErr
 }

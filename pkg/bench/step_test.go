@@ -71,6 +71,29 @@ func TestStepLogsStartAndEnd(t *testing.T) {
 	require.Empty(t, fx.b.vu.stepTag) // tag cleared after the step
 }
 
+func TestStepEnabledDoesNotRecordPreflightAsExecution(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		only    []string
+		except  []string
+		enabled bool
+	}{
+		{name: "default", enabled: true},
+		{name: "load-only", only: []string{"load_data"}},
+		{name: "excluded", except: []string{"workload"}},
+		{name: "included", only: []string{"workload"}, enabled: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fx := newTestBenchFixture(t)
+			fx.rootState.stepFilter = newStepFilter(tc.only, tc.except)
+			require.Equal(t, tc.enabled, fx.b.StepEnabled("workload"))
+			require.Empty(t, fx.rootState.stepFilter.snapshot())
+			require.Zero(t, fx.logs.Len())
+			require.Empty(t, fx.b.vu.stepTag)
+		})
+	}
+}
+
 func TestStepSilentKeepsMetricTagWithoutLogging(t *testing.T) {
 	fx := newTestBenchFixture(t)
 

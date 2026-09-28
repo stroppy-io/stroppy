@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,6 +17,43 @@ import (
 
 	"go.uber.org/zap"
 )
+
+// Streaming drivers can know there may be another result set, then discover
+// EOF only when advancing. database/sql does not set hitEOF in that path.
+type streamingEOFResultRows struct{ scriptedResultRows }
+
+func (*streamingEOFResultRows) HasNextResultSet() bool { return true }
+func (*streamingEOFResultRows) NextResultSet() error   { return io.EOF }
+
+func TestCompletedStreamingRowsIgnoreOwnTimeoutCleanup(t *testing.T) {
+	previous := runtime.GOMAXPROCS(1)
+	defer runtime.GOMAXPROCS(previous)
+
+	db := openRowsTestDB(t, func(context.Context) sqldriver.Rows {
+		return &streamingEOFResultRows{scriptedResultRows{sets: [][][]sqldriver.Value{{{int64(1)}}}}}
+	})
+	for i := range 100 {
+		result, err := RunQuery(t.Context(), db, NewRows, testDialect{}, zap.NewNop(), "SELECT 1", nil, time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := result.Rows.Close(); err != nil {
+			t.Fatalf("successful stream Close: %v", err)
+		}
+		// Let sql.Rows.awaitDone see both its Close signal and our per-query
+		// cleanup cancellation before checking the completed cursor again.
+		runtime.Gosched()
+
+		if err := result.Rows.Err(); err != nil {
+			t.Fatalf("completed query %d changed to an error after cleanup: %v", i, err)
+		}
+
+		if err := result.Rows.Close(); err != nil {
+			t.Fatalf("second Close of completed query: %v", err)
+		}
+	}
+}
 
 type rowsTestConnector struct {
 	newRows func(context.Context) sqldriver.Rows

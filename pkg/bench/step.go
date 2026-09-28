@@ -93,6 +93,12 @@ func (b *Bench) Step(name string, fn func() error) error {
 	return b.step(name, fn, false)
 }
 
+// StepEnabled checks step selection without executing or recording a step.
+// Use it for setup validation that only applies to a selected workload phase.
+func (b *Bench) StepEnabled(name string) bool {
+	return b.root.stepFilter.enabled(name)
+}
+
 // StepSilent runs fn under the named step tag with the same filtering semantics as
 // Step, but emits no console records. Use it for a step that wraps every iteration
 // (the "workload" step): per-VU query/transaction metrics keep the step tag while

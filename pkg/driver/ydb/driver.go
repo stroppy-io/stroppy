@@ -12,6 +12,7 @@ import (
 
 	ydbsdk "github.com/ydb-platform/ydb-go-sdk/v3"
 	ydbconfig "github.com/ydb-platform/ydb-go-sdk/v3/config"
+	ycauth "github.com/ydb-platform/ydb-go-yc"
 	yc "github.com/ydb-platform/ydb-go-yc-metadata"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -26,6 +27,14 @@ import (
 const primaryConnectTimeout = 3 * time.Second
 
 var ErrUnsupportedInsertMethod = errors.New("unsupported insert method for ydb driver")
+
+var (
+	errServiceAccountEndpoint       = errors.New("YDB serviceAccountKeyFile requires a grpcs:// endpoint")
+	errServiceAccountTLS            = errors.New("YDB serviceAccountKeyFile requires TLS certificate verification")
+	errServiceAccountURLCredentials = errors.New(
+		"YDB serviceAccountKeyFile cannot be combined with URL-embedded credentials",
+	)
+)
 
 func init() {
 	driver.RegisterDriver(
@@ -58,6 +67,22 @@ func NewDriver(
 	}
 
 	cfg := opts.Config
+	if cfg.GetServiceAccountKeyFile() != "" {
+		// IAM TLS protects token issuance; the database hop must protect its use.
+		endpoint, err := url.Parse(cfg.URL)
+		if err != nil || endpoint.Scheme != "grpcs" || endpoint.Host == "" {
+			return nil, errServiceAccountEndpoint
+		}
+
+		if endpoint.User != nil {
+			return nil, errServiceAccountURLCredentials
+		}
+
+		if cfg.GetTLSInsecureSkipVerify() {
+			return nil, errServiceAccountTLS
+		}
+	}
+
 	sqlCfg := cfg.SQL
 	connOpts := buildConnectionOptions(lg, cfg, opts.DialFunc)
 
@@ -69,7 +94,8 @@ func NewDriver(
 	if primaryErr != nil {
 		// Explicit credentials define the caller's identity. A TLS, transport,
 		// or authorization failure must not switch to the VM service account.
-		if cfg.GetAuthToken() != "" || cfg.GetAuthUser() != "" || cfg.GetAuthPassword() != "" {
+		if cfg.GetServiceAccountKeyFile() != "" || cfg.GetAuthToken() != "" ||
+			cfg.GetAuthUser() != "" || cfg.GetAuthPassword() != "" {
 			return nil, primaryErr
 		}
 
@@ -189,6 +215,14 @@ func buildConnectionOptions(
 	}
 
 	switch {
+	case cfg.GetServiceAccountKeyFile() != "":
+		lg.Info("Using Yandex Cloud service account key authentication")
+
+		opts = append(opts, ycauth.WithServiceAccountKeyFileCredentials(
+			cfg.GetServiceAccountKeyFile(),
+			// The IAM transport must validate TLS independently of database TLS options.
+			ycauth.WithInsecureSkipVerify(false),
+		))
 	case cfg.GetAuthToken() != "":
 		lg.Debug("Using token authentication")
 

@@ -901,6 +901,10 @@ func applyDriverRunConfigExtras(
 		driverConfig.AuthToken = fileConfig.AuthToken
 	}
 
+	if fileConfig.ServiceAccountKeyFile != nil {
+		driverConfig.ServiceAccountKeyFile = fileConfig.ServiceAccountKeyFile
+	}
+
 	if fileConfig.AuthUser != nil {
 		driverConfig.AuthUser = fileConfig.AuthUser
 	}

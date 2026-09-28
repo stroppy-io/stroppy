@@ -10,6 +10,15 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- YDB supports `serviceAccountKeyFile` authentication with automatic IAM token management by the official Yandex Cloud credentials library; this mode requires `grpcs://` with certificate verification to protect tokens in transit. `version --json` advertises `ydb_service_account_key_file=1`. ([#173](https://github.com/stroppy-io/stroppy/pull/173))
+
+### Fixed
+
+- Successfully drained SQL streams no longer turn into `context canceled` errors when their per-query timeout context is released. ([#173](https://github.com/stroppy-io/stroppy/pull/173))
+- Generated TPC-DS includes Q88 and rejects incomplete query sets before schema changes or data loading instead of silently skipping unsupported queries. ([#173](https://github.com/stroppy-io/stroppy/pull/173))
+
 ## [6.1.0] - 2026-09-24
 
 ### Added
