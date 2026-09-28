@@ -127,12 +127,12 @@ func (a *Application) Run(ctx context.Context, request *RunRequest) (*report.Run
 	}
 
 	if metrics.ServiceVersion == "" {
-		metrics.ServiceVersion = version.Version
+		metrics.ServiceVersion = version.Resolve()
 	}
 
 	reportOptions := request.ReportOptions
 	if reportOptions.StroppyVersion == "" {
-		reportOptions.StroppyVersion = version.Version
+		reportOptions.StroppyVersion = version.Resolve()
 	}
 
 	return bench.RunFactoryWithReport(

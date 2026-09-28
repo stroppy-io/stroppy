@@ -508,7 +508,7 @@ func withoutLoggerEnv(values map[string]string) map[string]string {
 }
 
 func metricsConfig(cfg *config.RunConfig) *bench.MetricsConfig {
-	metrics := &bench.MetricsConfig{ServiceVersion: version.Version}
+	metrics := &bench.MetricsConfig{ServiceVersion: version.Resolve()}
 	if cfg == nil || cfg.Global == nil {
 		return metrics
 	}
@@ -760,7 +760,7 @@ func runGoWorkload(
 }
 
 func reportOptions(cfg *config.RunConfig) bench.ReportOptions {
-	options := bench.ReportOptions{StroppyVersion: version.Version}
+	options := bench.ReportOptions{StroppyVersion: version.Resolve()}
 	if cfg != nil && cfg.Global != nil {
 		options.RunID = cfg.Global.RunID
 		options.Metadata = cfg.Global.Metadata

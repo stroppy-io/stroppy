@@ -90,7 +90,7 @@ func writeManifest(
 	doc := manifest{
 		Workload:     workloadName,
 		Generated:    time.Now().UTC().Format(time.RFC3339),
-		FrameworkVer: version.Version,
+		FrameworkVer: version.Resolve(),
 		InsertMethod: "NATIVE",
 		Config: manifestConfig{
 			Dir:       cfg.dir,

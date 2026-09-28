@@ -135,12 +135,8 @@ func newVersionCommand() *cobra.Command {
 }
 
 func componentVersions() map[string]string {
-	versions := map[string]string{appName: version.Version}
+	versions := map[string]string{appName: version.Resolve()}
 	if info, ok := debug.ReadBuildInfo(); ok {
-		if versions[appName] == "unknown" {
-			versions[appName] = moduleVersion(info)
-		}
-
 		for _, dependency := range info.Deps {
 			if dependency.Path == "github.com/jackc/pgx/v5" {
 				versions["pgx"] = dependency.Version
@@ -149,18 +145,4 @@ func componentVersions() map[string]string {
 	}
 
 	return versions
-}
-
-func moduleVersion(info *debug.BuildInfo) string {
-	if info.Main.Version != "" && info.Main.Version != "(devel)" {
-		return info.Main.Version
-	}
-
-	for _, dependency := range info.Deps {
-		if dependency.Path == "github.com/stroppy-io/stroppy/v6" {
-			return dependency.Version
-		}
-	}
-
-	return version.Version
 }

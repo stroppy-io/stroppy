@@ -202,7 +202,7 @@ func run(ctx context.Context, out io.Writer) error {
 
 	report := Report{
 		Schema:  reportSchema,
-		Stroppy: version.Version,
+		Stroppy: version.Resolve(),
 		Time:    time.Now().UTC(),
 		Host:    hostInfo(),
 	}
