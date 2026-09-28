@@ -6,12 +6,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/baseline"
 	"github.com/stroppy-io/stroppy/v6/internal/cli"
 	"github.com/stroppy-io/stroppy/v6/pkg/common/shutdown"
 	_ "github.com/stroppy-io/stroppy/v6/workloads/all"
 )
 
-var rootCmd = cli.NewRoot(cli.Options{IncludeBaseline: true})
+var rootCmd = cli.NewRoot(cli.Options{ExtraCommands: []*cobra.Command{baseline.NewCommand()}})
 
 // Execute runs the root command under a signal-derived context.
 func Execute() {

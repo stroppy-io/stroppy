@@ -11,7 +11,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/baseline"
 	"github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/help"
 	"github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/probe"
 	runcommand "github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/run"
@@ -25,11 +24,13 @@ const appName = "stroppy"
 type Options struct {
 	Catalog         *bench.Catalog
 	DefaultWorkload string
-	IncludeBaseline bool
+	ExtraCommands   []*cobra.Command
 }
 
 // NewRoot creates an independent Stroppy command tree.
 func NewRoot(options Options) *cobra.Command {
+	cobra.EnableCommandSorting = false
+
 	catalog := options.Catalog
 	if catalog == nil {
 		catalog = bench.RegisteredCatalog()
@@ -45,9 +46,7 @@ func NewRoot(options Options) *cobra.Command {
 
 	run := runcommand.NewCommand(catalog)
 	root.AddCommand(newVersionCommand(), run, probe.NewCommand(catalog), help.NewCommand())
-	if options.IncludeBaseline {
-		root.AddCommand(baseline.NewCommand())
-	}
+	root.AddCommand(options.ExtraCommands...)
 
 	if options.DefaultWorkload != "" {
 		root.Args = cobra.ArbitraryArgs
