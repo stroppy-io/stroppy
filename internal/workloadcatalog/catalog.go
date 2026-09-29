@@ -98,7 +98,9 @@ func (store *Store) List() ([]Entry, error) {
 			return nil, err
 		}
 
-		if err := store.validateArtifact(&entry); err != nil {
+		if err := store.validateArtifactPath(entry.ArtifactPath); err != nil {
+			entry.Status = "broken"
+		} else if err := store.validateArtifact(&entry); err != nil {
 			entry.Status = "broken"
 		} else {
 			entry.Status = "ready"
@@ -247,7 +249,7 @@ func (store *Store) Remove(name string) (returnErr error) {
 		return fmt.Errorf("remove catalog entry: %w", err)
 	}
 
-	if err := store.validateOwnedPath(entry.ArtifactPath); err != nil {
+	if err := store.validateArtifactPath(entry.ArtifactPath); err != nil {
 		if errors.Is(err, errOutsideCatalog) || errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
@@ -287,7 +289,7 @@ func (store *Store) readManifest(path string) (Entry, error) {
 		return Entry{}, fmt.Errorf("%w %q: unexpected artifact path", ErrInvalidEntry, path)
 	}
 
-	if err := store.validateOwnedPath(entry.ArtifactPath); err != nil {
+	if err := store.validateArtifactPath(entry.ArtifactPath); err != nil {
 		return Entry{}, fmt.Errorf("%w %q: unexpected artifact path: %w", ErrInvalidEntry, path, err)
 	}
 
@@ -324,6 +326,30 @@ func (store *Store) ensureDirs() error {
 
 	if err := store.validateOwnedPath(store.artifactsDir()); err != nil {
 		return fmt.Errorf("validate workload artifacts directory: %w", err)
+	}
+
+	return nil
+}
+
+func (store *Store) validateArtifactPath(path string) error {
+	if err := store.validateOwnedPath(path); err != nil {
+		return err
+	}
+
+	artifactDir, err := filepath.EvalSymlinks(store.artifactsDir())
+	if err != nil {
+		return err
+	}
+
+	resolved, err := evalExistingPath(path)
+	if err != nil {
+		return err
+	}
+
+	relative, err := filepath.Rel(artifactDir, resolved)
+	if err != nil || filepath.IsAbs(relative) || relative == ".." ||
+		strings.HasPrefix(relative, ".."+string(os.PathSeparator)) {
+		return errOutsideCatalog
 	}
 
 	return nil
