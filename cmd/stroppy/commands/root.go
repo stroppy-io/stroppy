@@ -18,7 +18,7 @@ var rootCmd = newRoot()
 func newRoot() *cobra.Command {
 	store, err := workloadcatalog.Open()
 	if err != nil {
-		panic(err)
+		store = nil
 	}
 
 	return cli.NewRoot(cli.Options{

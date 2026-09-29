@@ -24,9 +24,10 @@ const (
 )
 
 var (
-	ErrNotFound      = errors.New("workload catalog entry not found")
-	ErrAlreadyExists = errors.New("workload catalog entry already exists")
-	ErrInvalidEntry  = errors.New("invalid workload catalog entry")
+	ErrNotFound       = errors.New("workload catalog entry not found")
+	ErrAlreadyExists  = errors.New("workload catalog entry already exists")
+	ErrInvalidEntry   = errors.New("invalid workload catalog entry")
+	errOutsideCatalog = errors.New("path resolves outside catalog root")
 )
 
 // Entry describes one active custom workload artifact.
@@ -36,6 +37,7 @@ type Entry struct {
 	Source       string    `json:"source"`
 	BuiltAt      time.Time `json:"built_at"`
 	ArtifactPath string    `json:"artifact_path"`
+	Status       string    `json:"status,omitempty"`
 }
 
 // Store owns one local custom-workload catalog.
@@ -96,6 +98,12 @@ func (store *Store) List() ([]Entry, error) {
 			return nil, err
 		}
 
+		if err := store.validateArtifact(&entry); err != nil {
+			entry.Status = "broken"
+		} else {
+			entry.Status = "ready"
+		}
+
 		entries = append(entries, entry)
 	}
 
@@ -116,11 +124,21 @@ func (store *Store) Get(name string) (Entry, error) {
 		return Entry{}, fmt.Errorf("%w: %s", ErrNotFound, name)
 	}
 
-	return entry, err
+	if err != nil {
+		return Entry{}, err
+	}
+
+	if err := store.validateArtifact(&entry); err != nil {
+		return Entry{}, err
+	}
+
+	entry.Status = "ready"
+
+	return entry, nil
 }
 
 // Publish atomically activates artifact for entry.Name. Source artifact remains caller-owned.
-func (store *Store) Publish(entry *Entry, sourceArtifact string, replace bool) (Entry, error) {
+func (store *Store) Publish(entry *Entry, sourceArtifact string, replace bool) (publishedEntry Entry, returnErr error) {
 	if entry == nil {
 		return Entry{}, ErrInvalidEntry
 	}
@@ -132,6 +150,12 @@ func (store *Store) Publish(entry *Entry, sourceArtifact string, replace bool) (
 	if err := store.ensureDirs(); err != nil {
 		return Entry{}, err
 	}
+
+	unlock, err := store.lockExclusive()
+	if err != nil {
+		return Entry{}, err
+	}
+	defer func() { returnErr = errors.Join(returnErr, unlock()) }()
 
 	manifestPath, _ := store.manifestPath(entry.Name)
 
@@ -164,9 +188,10 @@ func (store *Store) Publish(entry *Entry, sourceArtifact string, replace bool) (
 		}
 	}()
 
-	publishedEntry := *entry
+	publishedEntry = *entry
 	publishedEntry.Schema = SchemaVersion
 	publishedEntry.BuiltAt = publishedEntry.BuiltAt.UTC()
+	publishedEntry.Status = "ready"
 
 	if publishedEntry.BuiltAt.IsZero() {
 		publishedEntry.BuiltAt = time.Now().UTC()
@@ -193,15 +218,37 @@ func (store *Store) Publish(entry *Entry, sourceArtifact string, replace bool) (
 }
 
 // Remove deletes only Stroppy-owned catalog data for name.
-func (store *Store) Remove(name string) error {
-	entry, err := store.Get(name)
+func (store *Store) Remove(name string) (returnErr error) {
+	manifestPath, err := store.manifestPath(name)
 	if err != nil {
 		return err
 	}
 
-	manifestPath, _ := store.manifestPath(name)
+	if err := store.ensureDirs(); err != nil {
+		return err
+	}
+
+	unlock, err := store.lockExclusive()
+	if err != nil {
+		return err
+	}
+	defer func() { returnErr = errors.Join(returnErr, unlock()) }()
+
+	entry, err := store.readManifest(manifestPath)
+	if errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("%w: %s", ErrNotFound, name)
+	}
+
+	if err != nil {
+		return err
+	}
+
 	if err := os.Remove(manifestPath); err != nil {
 		return fmt.Errorf("remove catalog entry: %w", err)
+	}
+
+	if err := store.validateOwnedPath(entry.ArtifactPath); err != nil {
+		return nil
 	}
 
 	if err := os.Remove(entry.ArtifactPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -236,16 +283,28 @@ func (store *Store) readManifest(path string) (Entry, error) {
 		return Entry{}, fmt.Errorf("%w %q: unexpected artifact path", ErrInvalidEntry, path)
 	}
 
-	info, err := os.Stat(entry.ArtifactPath)
-	if err != nil {
-		return Entry{}, fmt.Errorf("%w %q: artifact: %w", ErrInvalidEntry, path, err)
-	}
-
-	if !info.Mode().IsRegular() || info.Mode()&0o111 == 0 {
-		return Entry{}, fmt.Errorf("%w %q: artifact is not executable", ErrInvalidEntry, path)
+	if err := store.validateOwnedPath(entry.ArtifactPath); err != nil {
+		return Entry{}, fmt.Errorf("%w %q: unexpected artifact path: %w", ErrInvalidEntry, path, err)
 	}
 
 	return entry, nil
+}
+
+func (store *Store) validateArtifact(entry *Entry) error {
+	if entry == nil {
+		return ErrInvalidEntry
+	}
+
+	info, err := os.Stat(entry.ArtifactPath)
+	if err != nil {
+		return fmt.Errorf("%w: artifact: %w", ErrInvalidEntry, err)
+	}
+
+	if !info.Mode().IsRegular() || info.Mode()&0o111 == 0 {
+		return fmt.Errorf("%w: artifact is not executable", ErrInvalidEntry)
+	}
+
+	return nil
 }
 
 func (store *Store) ensureDirs() error {
@@ -255,7 +314,53 @@ func (store *Store) ensureDirs() error {
 		}
 	}
 
+	if err := store.validateOwnedPath(store.entriesDir()); err != nil {
+		return fmt.Errorf("validate workload entries directory: %w", err)
+	}
+
+	if err := store.validateOwnedPath(store.artifactsDir()); err != nil {
+		return fmt.Errorf("validate workload artifacts directory: %w", err)
+	}
+
 	return nil
+}
+
+func (store *Store) validateOwnedPath(path string) error {
+	root, err := filepath.EvalSymlinks(store.root)
+	if err != nil {
+		return err
+	}
+
+	resolved, err := evalExistingPath(path)
+	if err != nil {
+		return err
+	}
+
+	relative, err := filepath.Rel(root, resolved)
+	if err != nil || filepath.IsAbs(relative) || relative == ".." ||
+		strings.HasPrefix(relative, ".."+string(os.PathSeparator)) {
+		return errOutsideCatalog
+	}
+
+	return nil
+}
+
+func evalExistingPath(path string) (string, error) {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err == nil {
+		return resolved, nil
+	}
+
+	if !errors.Is(err, fs.ErrNotExist) {
+		return "", err
+	}
+
+	parent, parentErr := filepath.EvalSymlinks(filepath.Dir(path))
+	if parentErr != nil {
+		return "", parentErr
+	}
+
+	return filepath.Join(parent, filepath.Base(path)), nil
 }
 
 func (store *Store) manifestPath(name string) (string, error) {

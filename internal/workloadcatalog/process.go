@@ -10,6 +10,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
+)
+
+const (
+	terminateGrace = 2 * time.Second
+	killWait       = 2 * time.Second
 )
 
 var ErrProbeContract = errors.New("workload probe contract failed")
@@ -72,7 +78,18 @@ func (store *Store) Run(ctx context.Context, name string, args []string, process
 		}
 	case <-ctx.Done():
 		terminateProcessGroup(command)
-		<-wait
+
+		select {
+		case <-wait:
+			return ctx.Err()
+		case <-time.After(terminateGrace):
+			killProcessGroup(command)
+		}
+
+		select {
+		case <-wait:
+		case <-time.After(killWait):
+		}
 
 		return ctx.Err()
 	}
