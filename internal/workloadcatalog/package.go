@@ -103,10 +103,12 @@ func DiscoverPackage(
 	}, nil
 }
 
-// ModuleConfig returns selected module requirements and local replacements without changing source files.
+type moduleReplacements map[module.Version]module.Version
+
+// ModuleConfig returns selected module requirements and replacements without changing source files.
 func ModuleConfig(
 	pkg Package,
-) (requirements, replacements map[string]string, err error) {
+) (requirements map[string]string, replacements moduleReplacements, err error) {
 	path := filepath.Join(pkg.ModuleRoot, "go.mod")
 
 	data, err := os.ReadFile(path)
@@ -128,19 +130,22 @@ func ModuleConfig(
 		requirements[pkg.ModulePath] = moduleVersion(pkg.ModulePath)
 	}
 
-	replacements = map[string]string{pkg.ModulePath: pkg.ModuleRoot}
+	replacements = moduleReplacements{
+		module.Version{Path: pkg.ModulePath}: module.Version{Path: pkg.ModuleRoot},
+	}
 
 	for _, replacement := range file.Replace {
-		if !modfile.IsDirectoryPath(replacement.New.Path) {
-			continue
+		newModule := replacement.New
+		if modfile.IsDirectoryPath(newModule.Path) {
+			resolved, err := resolveLocalModule(pkg.ModuleRoot, newModule.Path)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			newModule.Path = resolved
 		}
 
-		resolved, err := resolveLocalModule(pkg.ModuleRoot, replacement.New.Path)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		replacements[replacement.Old.Path] = resolved
+		replacements[replacement.Old] = newModule
 	}
 
 	return requirements, replacements, nil

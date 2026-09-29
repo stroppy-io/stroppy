@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
 
 	"github.com/stroppy-io/stroppy/v6/internal/toolchain"
@@ -47,9 +49,9 @@ func BuildRunner(ctx context.Context, compiler *toolchain.Compiler, request *Run
 
 	requirements := map[string]string{stroppyModulePath: stroppyModuleVersion()}
 
-	replacements := map[string]string{}
+	replacements := moduleReplacements{}
 	if request.StroppyRoot != "" {
-		replacements[stroppyModulePath] = request.StroppyRoot
+		replacements[module.Version{Path: stroppyModulePath}] = module.Version{Path: request.StroppyRoot}
 	}
 
 	imports := make([]string, 0, len(request.Packages)+1)
@@ -132,13 +134,16 @@ func mergeRequirements(destination, source map[string]string) {
 	}
 }
 
-func mergeReplacements(destination, source map[string]string) error {
-	for module, path := range source {
-		if existing, ok := destination[module]; ok && existing != path {
-			return fmt.Errorf("%w for %s: %s and %s", ErrReplaceConflict, module, existing, path)
+func mergeReplacements(destination, source moduleReplacements) error {
+	for oldModule, newModule := range source {
+		if existing, ok := destination[oldModule]; ok && existing != newModule {
+			return fmt.Errorf(
+				"%w for %s: %s and %s", ErrReplaceConflict,
+				oldModule.String(), existing.String(), newModule.String(),
+			)
 		}
 
-		destination[module] = path
+		destination[oldModule] = newModule
 	}
 
 	return nil
@@ -147,7 +152,8 @@ func mergeReplacements(destination, source map[string]string) error {
 func writeRunnerModule(
 	directory string,
 	imports []string,
-	requirements, replacements map[string]string,
+	requirements map[string]string,
+	replacements moduleReplacements,
 ) error {
 	sort.Strings(imports)
 
@@ -165,8 +171,14 @@ func writeRunnerModule(
 	fmt.Fprintf(&mainSource, "%q", stroppyVersion())
 	mainSource.WriteString(") }\n")
 
-	var module strings.Builder
-	module.WriteString("module stroppy.local/export\n\ngo 1.26\n\n")
+	moduleFile := new(modfile.File)
+	if err := moduleFile.AddModuleStmt("stroppy.local/export"); err != nil {
+		return err
+	}
+
+	if err := moduleFile.AddGoStmt("1.26"); err != nil {
+		return err
+	}
 
 	requirementKeys := make([]string, 0, len(requirements))
 	for key := range requirements {
@@ -176,18 +188,32 @@ func writeRunnerModule(
 	sort.Strings(requirementKeys)
 
 	for _, key := range requirementKeys {
-		fmt.Fprintf(&module, "require %s %s\n", key, requirements[key])
+		if err := moduleFile.AddRequire(key, requirements[key]); err != nil {
+			return err
+		}
 	}
 
-	replacementKeys := make([]string, 0, len(replacements))
+	replacementKeys := make([]module.Version, 0, len(replacements))
 	for key := range replacements {
 		replacementKeys = append(replacementKeys, key)
 	}
 
-	sort.Strings(replacementKeys)
+	sort.Slice(replacementKeys, func(left, right int) bool {
+		return replacementKeys[left].String() < replacementKeys[right].String()
+	})
 
-	for _, key := range replacementKeys {
-		fmt.Fprintf(&module, "replace %s => %s\n", key, replacements[key])
+	for _, oldModule := range replacementKeys {
+		newModule := replacements[oldModule]
+		if err := moduleFile.AddReplace(
+			oldModule.Path, oldModule.Version, newModule.Path, newModule.Version,
+		); err != nil {
+			return err
+		}
+	}
+
+	moduleSource, err := moduleFile.Format()
+	if err != nil {
+		return err
 	}
 
 	if err := os.WriteFile(
@@ -196,5 +222,5 @@ func writeRunnerModule(
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(directory, "go.mod"), []byte(module.String()), runnerFilePerm)
+	return os.WriteFile(filepath.Join(directory, "go.mod"), moduleSource, runnerFilePerm)
 }
