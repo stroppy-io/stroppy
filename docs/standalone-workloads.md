@@ -39,6 +39,26 @@ go run . version --json
 PostgreSQL, MySQL, Picodata, YDB, noop, and CSV drivers. No driver blank imports,
 installed `stroppy` command, or imports from `cmd/` and `internal/` are required.
 
+Installed Stroppy can build and register the project in its local catalog:
+
+```bash
+stroppy build .
+stroppy list
+stroppy run example/query -d noop --iterations 10
+stroppy probe example/query -o json
+stroppy remove example/query
+```
+
+`stroppy run` uses the last successful build. Source edits require another
+`stroppy build`; an existing name requires `--replace`. Failed builds and failed
+replacements leave the previous artifact active. `remove` deletes only files
+owned by Stroppy under `~/.stroppy/workloads/`, never project source. Once built,
+the workload remains runnable after the source directory is moved or deleted.
+
+This first catalog build path uses a compatible `go` executable already in
+`PATH`. Managed private toolchains and cross-compilation belong to #177; build
+caching and richer provenance belong to #178.
+
 Standalone runs use the same configuration, metrics, report, cancellation, and
 `~/.stroppy` storage conventions as installed Stroppy. Constructed run reports
 are saved under `~/.stroppy/reports/`; `--no-report` disables both construction

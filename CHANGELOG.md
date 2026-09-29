@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- `stroppy build`, `list`, and `remove` manage compiled custom workloads under `~/.stroppy/workloads/`, and registered workloads run or probe by name without their source tree.
 - Custom Go workloads can run as standalone Stroppy applications with the standard drivers, CLI, probe, version, reports, and programmatic runtime API. ([#183](https://github.com/stroppy-io/stroppy/pull/183))
 - Every constructed workload run report is saved under `~/.stroppy/reports/`; history write failures warn without failing the run. ([#183](https://github.com/stroppy-io/stroppy/pull/183))
 
