@@ -7,6 +7,7 @@ import (
 	"errors"
 	"maps"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 
@@ -689,6 +690,39 @@ func TestUnknownFlagGuidance(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "stroppy run <workload> --help")
 	require.NotContains(t, err.Error(), "after --")
+}
+
+func TestResolverReceivesArgumentsAfterWorkload(t *testing.T) {
+	catalog, err := bench.NewCatalog(func() bench.Workload { return &runParamTestWorkload{} })
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		gotName string
+		gotArgs []string
+	)
+
+	command := NewCommandWithResolver(catalog, "", func(
+		_ context.Context,
+		_ *cobra.Command,
+		name string,
+		args []string,
+	) (bool, error) {
+		gotName = name
+
+		gotArgs = append([]string(nil), args...)
+
+		return true, nil
+	})
+
+	if err := command.RunE(command, []string{"custom/name", "-d", "noop", "--iterations", "2"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if gotName != "custom/name" || !slices.Equal(gotArgs, []string{"-d", "noop", "--iterations", "2"}) {
+		t.Fatalf("resolver got name=%q args=%v", gotName, gotArgs)
+	}
 }
 
 func TestNonemptySeparatorTailIsRejected(t *testing.T) {

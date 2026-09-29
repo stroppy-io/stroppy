@@ -98,11 +98,6 @@ require github.com/stroppy-io/stroppy/v6 v6.0.0
 replace github.com/stroppy-io/stroppy/v6 => %s
 `, repoRoot)
 
-	goSum, err := os.ReadFile(filepath.Join(repoRoot, "go.sum"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	main := `package main
 
 import (
@@ -121,10 +116,6 @@ func main() { _ = "` + marker + `"; stroppy.Main(func() bench.Workload { return 
 `
 
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := os.WriteFile(filepath.Join(dir, "go.sum"), goSum, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
