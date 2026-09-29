@@ -1,4 +1,4 @@
-//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
+//go:build aix || solaris
 
 package workloadcatalog
 
@@ -7,7 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 func (store *Store) lockExclusive() (func() error, error) {
@@ -20,18 +21,16 @@ func (store *Store) lockExclusive() (func() error, error) {
 		return nil, fmt.Errorf("open workload catalog lock: %w", err)
 	}
 
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+	lock := unix.Flock_t{Type: unix.F_WRLCK}
+	if err := unix.FcntlFlock(file.Fd(), unix.F_SETLKW, &lock); err != nil {
 		_ = file.Close()
 
 		return nil, fmt.Errorf("lock workload catalog: %w", err)
 	}
 
-	unlock := func() error {
-		return errors.Join(
-			syscall.Flock(int(file.Fd()), syscall.LOCK_UN),
-			file.Close(),
-		)
-	}
+	return func() error {
+		lock.Type = unix.F_UNLCK
 
-	return unlock, nil
+		return errors.Join(unix.FcntlFlock(file.Fd(), unix.F_SETLKW, &lock), file.Close())
+	}, nil
 }

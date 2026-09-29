@@ -21,7 +21,7 @@ func newRoot() *cobra.Command {
 		store = nil
 	}
 
-	return cli.NewRoot(cli.Options{
+	return cli.NewRoot(&cli.Options{
 		ExtraCommands:  []*cobra.Command{baseline.NewCommand()},
 		ManagedCatalog: store,
 	})
