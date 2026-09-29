@@ -77,9 +77,12 @@ func newListCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobra
 				return err
 			}
 
-			custom, err := store.List()
-			if err != nil {
-				return err
+			var custom []workloadcatalog.Entry
+			if store != nil {
+				custom, err = store.List()
+				if err != nil {
+					return err
+				}
 			}
 
 			return writeList(cmd.OutOrStdout(), format, builtIns, custom)

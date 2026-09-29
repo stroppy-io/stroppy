@@ -27,6 +27,7 @@ type Options struct {
 	DefaultWorkload string
 	ExtraCommands   []*cobra.Command
 	ManagedCatalog  *workloadcatalog.Store
+	IncludeList     bool
 }
 
 // NewRoot creates an independent Stroppy command tree.
@@ -56,6 +57,9 @@ func NewRoot(options Options) *cobra.Command {
 	root.AddCommand(newVersionCommand(), probeCommand, help.NewCommand())
 	root.AddCommand(options.ExtraCommands...)
 	addManagedCommands(root, probeCommand, catalog, options.ManagedCatalog)
+	if options.IncludeList && options.ManagedCatalog == nil {
+		root.AddCommand(newListCommand(catalog, nil))
+	}
 
 	if options.DefaultWorkload == "" {
 		root.AddCommand(run)
