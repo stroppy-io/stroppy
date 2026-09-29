@@ -208,13 +208,13 @@ func (store *Store) readManifest(path string) (Entry, error) {
 
 	var entry Entry
 	if err := json.Unmarshal(data, &entry); err != nil {
-		return Entry{}, fmt.Errorf("%w %q: %v", ErrInvalidEntry, path, err)
+		return Entry{}, fmt.Errorf("%w %q: %w", ErrInvalidEntry, path, err)
 	}
 	if entry.Schema != SchemaVersion {
 		return Entry{}, fmt.Errorf("%w %q: schema %d", ErrInvalidEntry, path, entry.Schema)
 	}
 	if err := validateName(entry.Name); err != nil {
-		return Entry{}, fmt.Errorf("%w %q: %v", ErrInvalidEntry, path, err)
+		return Entry{}, fmt.Errorf("%w %q: %w", ErrInvalidEntry, path, err)
 	}
 
 	artifactDir := store.artifactsDir() + string(os.PathSeparator)

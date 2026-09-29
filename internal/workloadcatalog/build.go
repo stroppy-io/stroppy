@@ -43,7 +43,7 @@ func Build(ctx context.Context, source string, diagnostics io.Writer) (BuildResu
 
 	goBinary, err := exec.LookPath("go")
 	if err != nil {
-		return BuildResult{}, fmt.Errorf("%w: %v", ErrGoUnavailable, err)
+		return BuildResult{}, errors.Join(ErrGoUnavailable, err)
 	}
 
 	temporary, err := os.MkdirTemp("", "stroppy-workload-build-*")
@@ -57,7 +57,7 @@ func Build(ctx context.Context, source string, diagnostics io.Writer) (BuildResu
 		temporary: temporary,
 	}
 
-	command := exec.CommandContext(ctx, goBinary, "build", "-trimpath", "-o", result.Artifact, ".")
+	command := exec.CommandContext(ctx, goBinary, "build", "-trimpath", "-mod=mod", "-o", result.Artifact, ".")
 	command.Dir = absolute
 	command.Stdout = diagnostics
 	command.Stderr = diagnostics
