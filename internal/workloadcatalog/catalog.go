@@ -248,7 +248,11 @@ func (store *Store) Remove(name string) (returnErr error) {
 	}
 
 	if err := store.validateOwnedPath(entry.ArtifactPath); err != nil {
-		return nil
+		if errors.Is(err, errOutsideCatalog) || errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+
+		return fmt.Errorf("catalog entry removed; artifact left in place: %w", err)
 	}
 
 	if err := os.Remove(entry.ArtifactPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
