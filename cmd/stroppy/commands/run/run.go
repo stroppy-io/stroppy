@@ -1,6 +1,7 @@
 package run
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -71,9 +72,22 @@ var Cmd = NewCommand(bench.RegisteredCatalog(), "")
 
 // NewCommand builds a run command over an explicit workload catalog. A non-empty
 // default workload accepts flags without a workload positional.
-//
-//nolint:gocognit,cyclop,funlen,maintidx // Command wiring keeps parsing, precedence, and dispatch order visible.
 func NewCommand(catalog *bench.Catalog, defaultWorkload string) *cobra.Command {
+	return NewCommandWithResolver(catalog, defaultWorkload, nil)
+}
+
+// NewCommandWithResolver builds a run command that may delegate custom names.
+// Resolver may handle a workload name outside the in-process catalog.
+type Resolver func(context.Context, *cobra.Command, string, []string) (bool, error)
+
+// Command wiring keeps parsing, precedence, and dispatch order visible.
+//
+//nolint:gocognit,cyclop,funlen,gocyclo,maintidx // command wiring stays explicit
+func NewCommandWithResolver(
+	catalog *bench.Catalog,
+	defaultWorkload string,
+	resolve Resolver,
+) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "run [<workload>] [sql_file] [-f config.json] [-d driver] [-D key=value] " +
 			"[-e KEY=VALUE] [--steps step1,step2]",
@@ -202,6 +216,17 @@ Signals:
 				return invalidConfig(errNoScript)
 			}
 
+			if resolve != nil {
+				handled, err := resolve(cmd.Context(), cmd, scriptArg, argsAfterScript(args, parsed.scriptArg))
+				if err != nil {
+					return err
+				}
+
+				if handled {
+					return nil
+				}
+			}
+
 			// Mutual exclusion is checked on the merged inputs (CLI over config file),
 			// not just CLI-vs-CLI, so `config steps + CLI --no-steps` (and vice versa)
 			// is rejected the same way.
@@ -310,6 +335,20 @@ Signals:
 	}
 
 	return cmd
+}
+
+func argsAfterScript(args []string, script string) []string {
+	if script == "" {
+		return args
+	}
+
+	for index, argument := range args {
+		if argument == script {
+			return append([]string(nil), args[index+1:]...)
+		}
+	}
+
+	return nil
 }
 
 func withEffectiveSQLFile(

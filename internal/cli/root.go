@@ -15,6 +15,7 @@ import (
 	"github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/probe"
 	runcommand "github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/run"
 	"github.com/stroppy-io/stroppy/v6/internal/version"
+	"github.com/stroppy-io/stroppy/v6/internal/workloadcatalog"
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
@@ -25,6 +26,7 @@ type Options struct {
 	Catalog         *bench.Catalog
 	DefaultWorkload string
 	ExtraCommands   []*cobra.Command
+	ManagedCatalog  *workloadcatalog.Store
 }
 
 // NewRoot creates an independent Stroppy command tree.
@@ -45,9 +47,15 @@ func NewRoot(options Options) *cobra.Command {
 	root.CompletionOptions.HiddenDefaultCmd = true
 	root.SetVersionTemplate(`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "%s" .Version}}`)
 
-	run := runcommand.NewCommand(catalog, options.DefaultWorkload)
-	root.AddCommand(newVersionCommand(), probe.NewCommand(catalog), help.NewCommand())
+	run := runcommand.NewCommandWithResolver(
+		catalog,
+		options.DefaultWorkload,
+		catalogResolver(options.ManagedCatalog),
+	)
+	probeCommand := probe.NewCommand(catalog)
+	root.AddCommand(newVersionCommand(), probeCommand, help.NewCommand())
 	root.AddCommand(options.ExtraCommands...)
+	addManagedCommands(root, probeCommand, catalog, options.ManagedCatalog)
 
 	if options.DefaultWorkload == "" {
 		root.AddCommand(run)
