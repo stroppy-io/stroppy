@@ -72,8 +72,6 @@ var Cmd = NewCommand(bench.RegisteredCatalog(), "")
 
 // NewCommand builds a run command over an explicit workload catalog. A non-empty
 // default workload accepts flags without a workload positional.
-//
-//nolint:gocognit,cyclop,funlen,maintidx // Command wiring keeps parsing, precedence, and dispatch order visible.
 func NewCommand(catalog *bench.Catalog, defaultWorkload string) *cobra.Command {
 	return NewCommandWithResolver(catalog, defaultWorkload, nil)
 }
@@ -82,6 +80,9 @@ func NewCommand(catalog *bench.Catalog, defaultWorkload string) *cobra.Command {
 // Resolver may handle a workload name outside the in-process catalog.
 type Resolver func(context.Context, *cobra.Command, string, []string) (bool, error)
 
+// Command wiring keeps parsing, precedence, and dispatch order visible.
+//
+//nolint:gocognit,cyclop,funlen,gocyclo,maintidx // command wiring stays explicit
 func NewCommandWithResolver(
 	catalog *bench.Catalog,
 	defaultWorkload string,
@@ -220,6 +221,7 @@ Signals:
 				if err != nil {
 					return err
 				}
+
 				if handled {
 					return nil
 				}

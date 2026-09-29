@@ -18,7 +18,11 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
-var errBuiltInNameCollision = errors.New("custom workload name conflicts with a built-in workload")
+var (
+	errBuiltInNameCollision = errors.New("custom workload name conflicts with a built-in workload")
+	errRemoveBuiltIn        = errors.New("cannot remove built-in workload")
+	errOutputFormat         = errors.New("unsupported output format")
+)
 
 func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobra.Command {
 	var replace bool
@@ -43,7 +47,7 @@ func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 				return fmt.Errorf("%w: %s", errBuiltInNameCollision, result.Name)
 			}
 
-			entry, err := store.Publish(workloadcatalog.Entry{
+			entry, err := store.Publish(&workloadcatalog.Entry{
 				Name: result.Name, Source: result.Source,
 			}, result.Artifact, replace)
 			if err != nil {
@@ -93,7 +97,7 @@ func newRemoveCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cob
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if _, builtIn := catalog.Factory(args[0]); builtIn {
-				return fmt.Errorf("cannot remove built-in workload %q", args[0])
+				return fmt.Errorf("%w %q", errRemoveBuiltIn, args[0])
 			}
 
 			if err := store.Remove(args[0]); err != nil {
@@ -121,14 +125,17 @@ func writeList(
 	}
 
 	items := make([]item, 0, len(builtIns)+len(custom))
+
 	for _, description := range builtIns {
 		items = append(items, item{Name: description.Name, Origin: "built-in"})
 	}
+
 	for _, entry := range custom {
 		items = append(items, item{
 			Name: entry.Name, Origin: "custom", Source: entry.Source, Artifact: entry.ArtifactPath,
 		})
 	}
+
 	slices.SortFunc(items, func(left, right item) int { return strings.Compare(left.Name, right.Name) })
 
 	switch format {
@@ -146,8 +153,36 @@ func writeList(
 
 		return nil
 	default:
-		return fmt.Errorf("unsupported output format %q", format)
+		return fmt.Errorf("%w %q", errOutputFormat, format)
 	}
+}
+
+func catalogResolver(store *workloadcatalog.Store) runcommand.Resolver {
+	if store == nil {
+		return nil
+	}
+
+	return managedResolver(store)
+}
+
+func addManagedCommands(
+	root, probeCommand *cobra.Command,
+	catalog *bench.Catalog,
+	store *workloadcatalog.Store,
+) {
+	if store == nil {
+		return
+	}
+
+	root.AddCommand(
+		newBuildCommand(catalog, store),
+		newListCommand(catalog, store),
+		newRemoveCommand(catalog, store),
+	)
+
+	probeCommand.Args = cobra.ArbitraryArgs
+	probeCommand.DisableFlagParsing = true
+	probeCommand.RunE = managedProbe(catalog, store)
 }
 
 func managedResolver(store *workloadcatalog.Store) runcommand.Resolver {
@@ -178,6 +213,7 @@ func managedProbe(catalog *bench.Catalog, store *workloadcatalog.Store) func(*co
 		}
 
 		name := args[0]
+
 		if _, err := store.Get(name); errors.Is(err, workloadcatalog.ErrNotFound) {
 			return fmt.Errorf("%w: %s", workloadcatalog.ErrNotFound, name)
 		} else if err != nil {
@@ -204,7 +240,7 @@ func executeCustom(
 		return fmt.Errorf("resolve working directory: %w", err)
 	}
 
-	return store.Run(ctx, name, args, workloadcatalog.Process{
+	return store.Run(ctx, name, args, &workloadcatalog.Process{
 		Stdin: stdin, Stdout: stdout, Stderr: stderr, Env: os.Environ(), Dir: workingDirectory,
 	})
 }

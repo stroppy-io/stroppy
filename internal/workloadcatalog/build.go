@@ -34,9 +34,11 @@ func Build(ctx context.Context, source string, diagnostics io.Writer) (BuildResu
 	if err != nil {
 		return BuildResult{}, fmt.Errorf("inspect workload source: %w", err)
 	}
+
 	if !info.IsDir() {
 		return BuildResult{}, fmt.Errorf("%w: %s", ErrSourceProject, absolute)
 	}
+
 	if _, err := os.Stat(filepath.Join(absolute, "go.mod")); err != nil {
 		return BuildResult{}, fmt.Errorf("%w: missing go.mod in %s", ErrSourceProject, absolute)
 	}
@@ -61,6 +63,7 @@ func Build(ctx context.Context, source string, diagnostics io.Writer) (BuildResu
 	command.Dir = absolute
 	command.Stdout = diagnostics
 	command.Stderr = diagnostics
+
 	command.Env = append(os.Environ(), "GOTOOLCHAIN=local")
 
 	if err := command.Run(); err != nil {

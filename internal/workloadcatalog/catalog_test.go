@@ -10,6 +10,7 @@ import (
 
 func TestPublishReplaceListAndRemove(t *testing.T) {
 	root := t.TempDir()
+
 	store, err := OpenAt(filepath.Join(root, "catalog"))
 	if err != nil {
 		t.Fatal(err)
@@ -21,12 +22,13 @@ func TestPublishReplaceListAndRemove(t *testing.T) {
 	}
 
 	builtAt := time.Date(2026, time.September, 29, 1, 2, 3, 0, time.UTC)
-	entry, err := store.Publish(Entry{Name: "custom/test", Source: "/source", BuiltAt: builtAt}, source, false)
+
+	entry, err := store.Publish(&Entry{Name: "custom/test", Source: "/source", BuiltAt: builtAt}, source, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := store.Publish(Entry{Name: "custom/test"}, source, false); !errors.Is(err, ErrAlreadyExists) {
+	if _, err := store.Publish(&Entry{Name: "custom/test"}, source, false); !errors.Is(err, ErrAlreadyExists) {
 		t.Fatalf("duplicate publish error = %v", err)
 	}
 
@@ -34,7 +36,7 @@ func TestPublishReplaceListAndRemove(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	replaced, err := store.Publish(Entry{Name: "custom/test", Source: "/source-2"}, source, true)
+	replaced, err := store.Publish(&Entry{Name: "custom/test", Source: "/source-2"}, source, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,6 +45,7 @@ func TestPublishReplaceListAndRemove(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if string(data) != "second" {
 		t.Fatalf("artifact = %q", data)
 	}
@@ -51,6 +54,7 @@ func TestPublishReplaceListAndRemove(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if len(entries) != 1 || entries[0].Name != entry.Name || entries[0].Source != "/source-2" {
 		t.Fatalf("entries = %#v", entries)
 	}
@@ -58,6 +62,7 @@ func TestPublishReplaceListAndRemove(t *testing.T) {
 	if err := store.Remove("custom/test"); err != nil {
 		t.Fatal(err)
 	}
+
 	if _, err := store.Get("custom/test"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("Get() after remove = %v", err)
 	}
@@ -74,12 +79,12 @@ func TestFailedPublishKeepsPreviousEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	before, err := store.Publish(Entry{Name: "custom/stable"}, source, false)
+	before, err := store.Publish(&Entry{Name: "custom/stable"}, source, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := store.Publish(Entry{Name: "custom/stable"}, filepath.Join(t.TempDir(), "missing"), true); err == nil {
+	if _, err := store.Publish(&Entry{Name: "custom/stable"}, filepath.Join(t.TempDir(), "missing"), true); err == nil {
 		t.Fatal("broken replacement succeeded")
 	}
 
@@ -87,6 +92,7 @@ func TestFailedPublishKeepsPreviousEntry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if before.ArtifactPath != after.ArtifactPath {
 		t.Fatalf("artifact changed: %#v to %#v", before, after)
 	}

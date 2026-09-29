@@ -31,6 +31,7 @@ func copyStaged(source, destinationDir, prefix string, permission os.FileMode) (
 	if err != nil {
 		return "", err
 	}
+
 	defer input.Close()
 
 	if err := os.MkdirAll(destinationDir, dirPerm); err != nil {
@@ -43,6 +44,7 @@ func copyStaged(source, destinationDir, prefix string, permission os.FileMode) (
 	}
 
 	temporaryPath := temporary.Name()
+
 	defer func() {
 		if returnErr != nil {
 			returnErr = errors.Join(returnErr, temporary.Close(), os.Remove(temporaryPath))
@@ -52,12 +54,15 @@ func copyStaged(source, destinationDir, prefix string, permission os.FileMode) (
 	if _, err := io.Copy(temporary, input); err != nil {
 		return "", err
 	}
+
 	if err := temporary.Chmod(permission); err != nil {
 		return "", err
 	}
+
 	if err := temporary.Sync(); err != nil {
 		return "", err
 	}
+
 	if err := temporary.Close(); err != nil {
 		return "", err
 	}
@@ -76,6 +81,7 @@ func writeAtomic(path string, data []byte, permission os.FileMode) (returnErr er
 	}
 
 	temporaryPath := temporary.Name()
+
 	defer func() {
 		if returnErr != nil {
 			returnErr = errors.Join(returnErr, temporary.Close(), os.Remove(temporaryPath))
@@ -85,12 +91,15 @@ func writeAtomic(path string, data []byte, permission os.FileMode) (returnErr er
 	if _, err := temporary.Write(data); err != nil {
 		return err
 	}
+
 	if err := temporary.Chmod(permission); err != nil {
 		return err
 	}
+
 	if err := temporary.Sync(); err != nil {
 		return err
 	}
+
 	if err := temporary.Close(); err != nil {
 		return err
 	}

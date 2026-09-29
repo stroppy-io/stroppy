@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +19,7 @@ func TestManagedCatalogCommands(t *testing.T) {
 	}
 
 	project := createWorkloadProject(t, repoRoot, "managed/example", "first")
+
 	store, err := workloadcatalog.OpenAt(filepath.Join(t.TempDir(), "catalog"))
 	if err != nil {
 		t.Fatal(err)
@@ -25,6 +27,7 @@ func TestManagedCatalogCommands(t *testing.T) {
 
 	execute := func(args ...string) (string, error) {
 		var stdout, stderr bytes.Buffer
+
 		err := Execute(t.Context(), Options{
 			Catalog: bench.RegisteredCatalog(), ManagedCatalog: store,
 		}, args, &stdout, &stderr)
@@ -39,6 +42,7 @@ func TestManagedCatalogCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build: %v\n%s", err, output)
 	}
+
 	if !strings.Contains(output, "managed/example") {
 		t.Fatalf("build output = %q", output)
 	}
@@ -65,13 +69,17 @@ func TestManagedCatalogCommands(t *testing.T) {
 	if err := os.RemoveAll(project); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := execute("run", "managed/example", "-d", "noop", "--iterations", "1", "--no-report"); err != nil {
+
+	if _, err := execute(
+		"run", "managed/example", "-d", "noop", "--iterations", "1", "--no-report",
+	); err != nil {
 		t.Fatalf("run without source: %v", err)
 	}
 
 	if _, err := execute("remove", "managed/example"); err != nil {
 		t.Fatalf("remove: %v", err)
 	}
+
 	if _, err := store.Get("managed/example"); err == nil {
 		t.Fatal("removed entry remains")
 	}
@@ -81,12 +89,20 @@ func createWorkloadProject(t *testing.T, repoRoot, name, marker string) string {
 	t.Helper()
 
 	dir := t.TempDir()
-	goMod := "module example.com/managed\n\ngo 1.26\n\nrequire github.com/stroppy-io/stroppy/v6 v6.0.0\n\nreplace github.com/stroppy-io/stroppy/v6 => " + repoRoot + "\n"
+	goMod := fmt.Sprintf(`module example.com/managed
+
+go 1.26
+
+require github.com/stroppy-io/stroppy/v6 v6.0.0
+
+replace github.com/stroppy-io/stroppy/v6 => %s
+`, repoRoot)
 
 	goSum, err := os.ReadFile(filepath.Join(repoRoot, "go.sum"))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	main := `package main
 
 import (
@@ -107,9 +123,11 @@ func main() { _ = "` + marker + `"; stroppy.Main(func() bench.Workload { return 
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o600); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := os.WriteFile(filepath.Join(dir, "go.sum"), goSum, 0o600); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(main), 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -47,26 +47,15 @@ func NewRoot(options Options) *cobra.Command {
 	root.CompletionOptions.HiddenDefaultCmd = true
 	root.SetVersionTemplate(`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "%s" .Version}}`)
 
-	var resolve runcommand.Resolver
-	if options.ManagedCatalog != nil {
-		resolve = managedResolver(options.ManagedCatalog)
-	}
-
-	run := runcommand.NewCommandWithResolver(catalog, options.DefaultWorkload, resolve)
+	run := runcommand.NewCommandWithResolver(
+		catalog,
+		options.DefaultWorkload,
+		catalogResolver(options.ManagedCatalog),
+	)
 	probeCommand := probe.NewCommand(catalog)
 	root.AddCommand(newVersionCommand(), probeCommand, help.NewCommand())
 	root.AddCommand(options.ExtraCommands...)
-
-	if options.ManagedCatalog != nil {
-		root.AddCommand(
-			newBuildCommand(catalog, options.ManagedCatalog),
-			newListCommand(catalog, options.ManagedCatalog),
-			newRemoveCommand(catalog, options.ManagedCatalog),
-		)
-		probeCommand.Args = cobra.ArbitraryArgs
-		probeCommand.DisableFlagParsing = true
-		probeCommand.RunE = managedProbe(catalog, options.ManagedCatalog)
-	}
+	addManagedCommands(root, probeCommand, catalog, options.ManagedCatalog)
 
 	if options.DefaultWorkload == "" {
 		root.AddCommand(run)

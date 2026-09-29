@@ -75,10 +75,12 @@ func (store *Store) Root() string {
 // List returns valid catalog entries ordered by workload name.
 func (store *Store) List() ([]Entry, error) {
 	entriesDir := store.entriesDir()
+
 	files, err := os.ReadDir(entriesDir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return []Entry{}, nil
 	}
+
 	if err != nil {
 		return nil, fmt.Errorf("read workload catalog: %w", err)
 	}
@@ -118,7 +120,11 @@ func (store *Store) Get(name string) (Entry, error) {
 }
 
 // Publish atomically activates artifact for entry.Name. Source artifact remains caller-owned.
-func (store *Store) Publish(entry Entry, sourceArtifact string, replace bool) (Entry, error) {
+func (store *Store) Publish(entry *Entry, sourceArtifact string, replace bool) (Entry, error) {
+	if entry == nil {
+		return Entry{}, ErrInvalidEntry
+	}
+
 	if err := validateName(entry.Name); err != nil {
 		return Entry{}, err
 	}
@@ -130,6 +136,7 @@ func (store *Store) Publish(entry Entry, sourceArtifact string, replace bool) (E
 	manifestPath, _ := store.manifestPath(entry.Name)
 
 	var previous *Entry
+
 	if _, err := os.Stat(manifestPath); err == nil {
 		if !replace {
 			return Entry{}, fmt.Errorf("%w: %s", ErrAlreadyExists, entry.Name)
@@ -157,14 +164,17 @@ func (store *Store) Publish(entry Entry, sourceArtifact string, replace bool) (E
 		}
 	}()
 
-	entry.Schema = SchemaVersion
-	entry.BuiltAt = entry.BuiltAt.UTC()
-	if entry.BuiltAt.IsZero() {
-		entry.BuiltAt = time.Now().UTC()
-	}
-	entry.ArtifactPath = artifactPath
+	publishedEntry := *entry
+	publishedEntry.Schema = SchemaVersion
+	publishedEntry.BuiltAt = publishedEntry.BuiltAt.UTC()
 
-	data, err := json.MarshalIndent(entry, "", "  ")
+	if publishedEntry.BuiltAt.IsZero() {
+		publishedEntry.BuiltAt = time.Now().UTC()
+	}
+
+	publishedEntry.ArtifactPath = artifactPath
+
+	data, err := json.MarshalIndent(publishedEntry, "", "  ")
 	if err != nil {
 		return Entry{}, fmt.Errorf("marshal catalog entry: %w", err)
 	}
@@ -174,11 +184,12 @@ func (store *Store) Publish(entry Entry, sourceArtifact string, replace bool) (E
 	}
 
 	published = true
+
 	if previous != nil && previous.ArtifactPath != artifactPath {
 		_ = os.Remove(previous.ArtifactPath)
 	}
 
-	return entry, nil
+	return publishedEntry, nil
 }
 
 // Remove deletes only Stroppy-owned catalog data for name.
@@ -210,9 +221,11 @@ func (store *Store) readManifest(path string) (Entry, error) {
 	if err := json.Unmarshal(data, &entry); err != nil {
 		return Entry{}, fmt.Errorf("%w %q: %w", ErrInvalidEntry, path, err)
 	}
+
 	if entry.Schema != SchemaVersion {
 		return Entry{}, fmt.Errorf("%w %q: schema %d", ErrInvalidEntry, path, entry.Schema)
 	}
+
 	if err := validateName(entry.Name); err != nil {
 		return Entry{}, fmt.Errorf("%w %q: %w", ErrInvalidEntry, path, err)
 	}
@@ -225,8 +238,9 @@ func (store *Store) readManifest(path string) (Entry, error) {
 
 	info, err := os.Stat(entry.ArtifactPath)
 	if err != nil {
-		return Entry{}, fmt.Errorf("%w %q: artifact: %v", ErrInvalidEntry, path, err)
+		return Entry{}, fmt.Errorf("%w %q: artifact: %w", ErrInvalidEntry, path, err)
 	}
+
 	if !info.Mode().IsRegular() || info.Mode()&0o111 == 0 {
 		return Entry{}, fmt.Errorf("%w %q: artifact is not executable", ErrInvalidEntry, path)
 	}
