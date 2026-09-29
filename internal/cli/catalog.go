@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"runtime/debug"
 	"slices"
 	"strings"
 
@@ -14,6 +16,7 @@ import (
 
 	"github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/probe"
 	runcommand "github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/run"
+	"github.com/stroppy-io/stroppy/v6/internal/toolchain"
 	"github.com/stroppy-io/stroppy/v6/internal/workloadcatalog"
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
@@ -25,7 +28,11 @@ var (
 )
 
 func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobra.Command {
-	var replace bool
+	var (
+		replace bool
+		yes     bool
+		offline bool
+	)
 
 	command := &cobra.Command{
 		Use:   "build [path]",
@@ -37,7 +44,17 @@ func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 				source = args[0]
 			}
 
-			result, err := workloadcatalog.Build(cmd.Context(), source, cmd.ErrOrStderr())
+			compiler, err := toolchain.Resolve(cmd.Context(), toolchain.Options{
+				Root: store.StroppyRoot(), Consent: toolchainConsent(yes),
+				Input: cmd.InOrStdin(), Output: cmd.ErrOrStderr(), Offline: offline,
+			})
+			if err != nil {
+				return err
+			}
+
+			result, err := workloadcatalog.Build(
+				cmd.Context(), compiler, source, cmd.ErrOrStderr(), offline, stroppySourceRoot(),
+			)
 			if err != nil {
 				return err
 			}
@@ -49,6 +66,8 @@ func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 
 			entry, err := store.Publish(&workloadcatalog.Entry{
 				Name: result.Name, Source: result.Source,
+				Package: result.Package.ImportPath, ModulePath: result.Package.ModulePath,
+				ModuleRoot: result.Package.ModuleRoot,
 			}, result.Artifact, replace)
 			if err != nil {
 				return err
@@ -60,6 +79,8 @@ func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 		},
 	}
 	command.Flags().BoolVar(&replace, "replace", false, "replace an existing custom workload")
+	command.Flags().BoolVarP(&yes, "yes", "y", false, "allow verified private Go download")
+	command.Flags().BoolVar(&offline, "offline", false, "use only cached tools and modules")
 
 	return command
 }
@@ -179,6 +200,7 @@ func addManagedCommands(
 
 	root.AddCommand(
 		newBuildCommand(catalog, store),
+		newExportCommand(store),
 		newListCommand(catalog, store),
 		newRemoveCommand(catalog, store),
 	)
@@ -227,6 +249,47 @@ func managedProbe(catalog *bench.Catalog, store *workloadcatalog.Store) func(*co
 			command.Context(), store, name, append([]string{"probe"}, args[1:]...),
 			command.InOrStdin(), command.OutOrStdout(), command.ErrOrStderr(),
 		)
+	}
+}
+
+func toolchainConsent(yes bool) toolchain.Consent {
+	if yes {
+		return toolchain.ConsentAlways
+	}
+
+	return toolchain.ConsentAsk
+}
+
+func stroppySourceRoot() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok || info.Main.Path != "github.com/stroppy-io/stroppy/v6" || info.Main.Version != "(devel)" {
+		return ""
+	}
+
+	root, err := moduleRoot(".")
+	if err != nil {
+		return ""
+	}
+
+	return root
+}
+
+func moduleRoot(start string) (string, error) {
+	path, err := filepath.Abs(start)
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		if _, err := os.Stat(filepath.Join(path, "go.mod")); err == nil {
+			return path, nil
+		}
+
+		parent := filepath.Dir(path)
+		if parent == path {
+			return "", os.ErrNotExist
+		}
+		path = parent
 	}
 }
 

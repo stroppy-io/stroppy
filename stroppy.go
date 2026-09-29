@@ -163,9 +163,15 @@ func RegisteredMain() {
 func registeredMainExitCode() int {
 	ctx, stop, exitStatus := shutdown.NotifyContext(context.Background(), nil)
 
+	catalog := bench.RegisteredCatalog()
+	defaultWorkload := ""
+	if descriptions, err := catalog.DescribeAll(); err == nil && len(descriptions) == 1 {
+		defaultWorkload = descriptions[0].Name
+	}
+
 	err := cli.Execute(ctx, cli.Options{
-		Catalog:     bench.RegisteredCatalog(),
-		IncludeList: true,
+		Catalog: catalog, DefaultWorkload: defaultWorkload,
+		IncludeList: true, RegisteredRun: defaultWorkload == "",
 	}, os.Args[1:], os.Stdout, os.Stderr)
 
 	stop()

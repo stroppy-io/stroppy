@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
+
+	"github.com/stroppy-io/stroppy/v6/internal/toolchain"
 )
 
 var (
@@ -20,32 +21,22 @@ type BuildResult struct {
 	Name      string
 	Source    string
 	Artifact  string
+	Package   Package
 	temporary string
 }
 
-// Build compiles one standalone workload project with system Go and probes its identity.
-func Build(ctx context.Context, source string, diagnostics io.Writer) (BuildResult, error) {
-	absolute, err := filepath.Abs(source)
+// Build compiles one importable workload package through a generated runner.
+func Build(
+	ctx context.Context,
+	compiler *toolchain.Compiler,
+	source string,
+	diagnostics io.Writer,
+	offline bool,
+	stroppyRoot string,
+) (BuildResult, error) {
+	pkg, err := DiscoverPackage(ctx, compiler, source, offline)
 	if err != nil {
-		return BuildResult{}, fmt.Errorf("resolve workload source: %w", err)
-	}
-
-	info, err := os.Stat(absolute)
-	if err != nil {
-		return BuildResult{}, fmt.Errorf("inspect workload source: %w", err)
-	}
-
-	if !info.IsDir() {
-		return BuildResult{}, fmt.Errorf("%w: %s", ErrSourceProject, absolute)
-	}
-
-	if _, err := os.Stat(filepath.Join(absolute, "go.mod")); err != nil {
-		return BuildResult{}, fmt.Errorf("%w: missing go.mod in %s", ErrSourceProject, absolute)
-	}
-
-	goBinary, err := exec.LookPath("go")
-	if err != nil {
-		return BuildResult{}, errors.Join(ErrGoUnavailable, err)
+		return BuildResult{}, err
 	}
 
 	temporary, err := os.MkdirTemp("", "stroppy-workload-build-*")
@@ -54,22 +45,22 @@ func Build(ctx context.Context, source string, diagnostics io.Writer) (BuildResu
 	}
 
 	result := BuildResult{
-		Source:    absolute,
+		Source:    pkg.Directory,
 		Artifact:  filepath.Join(temporary, "workload"),
+		Package:   pkg,
 		temporary: temporary,
 	}
 
-	command := exec.CommandContext(ctx, goBinary, "build", "-trimpath", "-mod=mod", "-o", result.Artifact, ".")
-	command.Dir = absolute
-	command.Stdout = diagnostics
-	command.Stderr = diagnostics
-
-	command.Env = append(os.Environ(), "GOTOOLCHAIN=local")
-
-	if err := command.Run(); err != nil {
+	if err := BuildRunner(ctx, compiler, RunnerRequest{
+		Packages:    []Package{pkg},
+		Output:      result.Artifact,
+		Offline:     offline,
+		Diagnostics: diagnostics,
+		StroppyRoot: stroppyRoot,
+	}); err != nil {
 		result.Cleanup()
 
-		return BuildResult{}, fmt.Errorf("compile workload: %w", err)
+		return BuildResult{}, err
 	}
 
 	probe, err := Probe(ctx, result.Artifact)

@@ -18,7 +18,7 @@ func TestManagedCatalogCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	project := createWorkloadProject(t, repoRoot, "managed/example", "first")
+	project, packageDir := createWorkloadProject(t, repoRoot, "managed/example", "first")
 
 	store, err := workloadcatalog.OpenAt(filepath.Join(t.TempDir(), "catalog"))
 	if err != nil {
@@ -38,7 +38,7 @@ func TestManagedCatalogCommands(t *testing.T) {
 		return stdout.String(), nil
 	}
 
-	output, err := execute("build", project)
+	output, err := execute("build", packageDir)
 	if err != nil {
 		t.Fatalf("build: %v\n%s", err, output)
 	}
@@ -47,7 +47,7 @@ func TestManagedCatalogCommands(t *testing.T) {
 		t.Fatalf("build output = %q", output)
 	}
 
-	if _, err := execute("build", project); err == nil {
+	if _, err := execute("build", packageDir); err == nil {
 		t.Fatal("duplicate build succeeded")
 	}
 
@@ -85,10 +85,15 @@ func TestManagedCatalogCommands(t *testing.T) {
 	}
 }
 
-func createWorkloadProject(t *testing.T, repoRoot, name, marker string) string {
+func createWorkloadProject(t *testing.T, repoRoot, name, marker string) (root, packageDir string) {
 	t.Helper()
 
-	dir := t.TempDir()
+	root = t.TempDir()
+	packageDir = filepath.Join(root, "workload")
+	if err := os.MkdirAll(packageDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
 	goMod := fmt.Sprintf(`module example.com/managed
 
 go 1.26
@@ -98,11 +103,10 @@ require github.com/stroppy-io/stroppy/v6 v6.0.0
 replace github.com/stroppy-io/stroppy/v6 => %s
 `, repoRoot)
 
-	main := `package main
+	workloadSource := `package workload
 
 import (
     "context"
-    stroppy "github.com/stroppy-io/stroppy/v6"
     "github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
@@ -112,16 +116,17 @@ func (*workload) Define(*bench.Def) error { return nil }
 func (*workload) Setup(context.Context, *bench.Bench) error { return nil }
 func (*workload) Iterate(context.Context, *bench.Bench) error { return nil }
 func (*workload) Teardown(context.Context, *bench.Bench) error { return nil }
-func main() { _ = "` + marker + `"; stroppy.Main(func() bench.Workload { return &workload{} }) }
+func New() bench.Workload { _ = "` + marker + `"; return &workload{} }
+func init() { bench.Register(New) }
 `
 
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte(goMod), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(main), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(packageDir, "workload.go"), []byte(workloadSource), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	return dir
+	return root, packageDir
 }

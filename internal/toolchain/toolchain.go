@@ -102,6 +102,7 @@ func (compiler *Compiler) Env(targetOS, targetArch string, offline bool) []strin
 	values = setEnv(values, "GOWORK", "off")
 	values = setEnv(values, "GOPATH", filepath.Join(privateRoot, "gopath"))
 	values = setEnv(values, "GOMODCACHE", filepath.Join(privateRoot, "modcache"))
+	values = setEnv(values, "GOFLAGS", "-modcacherw")
 	values = setEnv(values, "GOCACHE", filepath.Join(privateRoot, "buildcache"))
 	values = setEnv(values, "GOTMPDIR", filepath.Join(privateRoot, "tmp"))
 	values = setEnv(values, "CGO_ENABLED", "0")

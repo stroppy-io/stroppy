@@ -35,6 +35,9 @@ type Entry struct {
 	Schema       int       `json:"schema"`
 	Name         string    `json:"name"`
 	Source       string    `json:"source"`
+	Package      string    `json:"package,omitempty"`
+	ModulePath   string    `json:"module_path,omitempty"`
+	ModuleRoot   string    `json:"module_root,omitempty"`
 	BuiltAt      time.Time `json:"built_at"`
 	ArtifactPath string    `json:"artifact_path"`
 	Status       string    `json:"status,omitempty"`
@@ -72,6 +75,15 @@ func (store *Store) Root() string {
 	}
 
 	return store.root
+}
+
+// StroppyRoot returns ~/.stroppy for toolchains, caches, and generated builds.
+func (store *Store) StroppyRoot() string {
+	if store == nil {
+		return ""
+	}
+
+	return filepath.Dir(store.root)
 }
 
 // List returns valid catalog entries ordered by workload name.

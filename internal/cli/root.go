@@ -28,6 +28,7 @@ type Options struct {
 	ExtraCommands   []*cobra.Command
 	ManagedCatalog  *workloadcatalog.Store
 	IncludeList     bool
+	RegisteredRun   bool
 }
 
 // NewRoot creates an independent Stroppy command tree.
@@ -63,6 +64,21 @@ func NewRoot(options Options) *cobra.Command {
 
 	if options.DefaultWorkload == "" {
 		root.AddCommand(run)
+		if options.RegisteredRun {
+			root.DisableFlagParsing = true
+			root.Args = cobra.ArbitraryArgs
+			root.RunE = func(cmd *cobra.Command, args []string) error {
+				run.SetContext(cmd.Context())
+				run.SetOut(cmd.OutOrStdout())
+				run.SetErr(cmd.ErrOrStderr())
+
+				if len(args) == 0 {
+					return root.Help()
+				}
+
+				return run.RunE(run, args)
+			}
+		}
 	} else {
 		root.Args = cobra.ArbitraryArgs
 		root.RunE = func(cmd *cobra.Command, args []string) error {
