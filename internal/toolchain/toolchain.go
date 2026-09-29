@@ -17,15 +17,22 @@ import (
 )
 
 const (
-	PinnedVersion = "1.26.8"
-	minimumMajor  = 1
-	minimumMinor  = 26
+	PinnedVersion   = "1.26.8"
+	minimumMajor    = 1
+	minimumMinor    = 26
+	privateDirPerm  = 0o700
+	privateFilePerm = 0o600
 )
 
 var (
-	ErrConsentRequired = errors.New("private Go toolchain download requires consent")
-	ErrUnsupportedHost = errors.New("private Go toolchain is unavailable for this host")
-	goVersionPattern   = regexp.MustCompile(`go([0-9]+)\.([0-9]+)(?:\.([0-9]+))?`)
+	ErrConsentRequired = errors.New(
+		"private Go toolchain download requires consent; rerun in a terminal or pass -y",
+	)
+	ErrOfflineToolchainUnavailable = errors.New("compatible Go toolchain is unavailable offline")
+	ErrUnsupportedHost             = errors.New("private Go toolchain is unavailable for this host")
+	errToolchainInvalid            = errors.New("installed Go toolchain failed validation")
+	errVersionFormat               = errors.New("unrecognized Go version")
+	goVersionPattern               = regexp.MustCompile(`go(\d+)\.(\d+)(?:\.(\d+))?`)
 )
 
 // Consent controls private toolchain acquisition.
@@ -69,7 +76,12 @@ func Resolve(ctx context.Context, options Options) (*Compiler, error) {
 	if privateAvailable(ctx, private) {
 		return private, nil
 	}
-	if options.Offline || options.Consent == ConsentNever {
+
+	if options.Offline {
+		return nil, ErrOfflineToolchainUnavailable
+	}
+
+	if options.Consent == ConsentNever {
 		return nil, ErrConsentRequired
 	}
 
@@ -78,6 +90,7 @@ func Resolve(ctx context.Context, options Options) (*Compiler, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		if !allowed {
 			return nil, ErrConsentRequired
 		}
@@ -86,8 +99,9 @@ func Resolve(ctx context.Context, options Options) (*Compiler, error) {
 	if err := install(ctx, root, options.Output); err != nil {
 		return nil, err
 	}
+
 	if !privateAvailable(ctx, private) {
-		return nil, errors.New("installed Go toolchain failed validation")
+		return nil, errToolchainInvalid
 	}
 
 	return private, nil
@@ -102,16 +116,19 @@ func (compiler *Compiler) Env(targetOS, targetArch string, offline bool) []strin
 	values = setEnv(values, "GOWORK", "off")
 	values = setEnv(values, "GOPATH", filepath.Join(privateRoot, "gopath"))
 	values = setEnv(values, "GOMODCACHE", filepath.Join(privateRoot, "modcache"))
-	values = setEnv(values, "GOFLAGS", "-modcacherw")
+	values = appendEnvFlag(values, "GOFLAGS", "-modcacherw")
 	values = setEnv(values, "GOCACHE", filepath.Join(privateRoot, "buildcache"))
 	values = setEnv(values, "GOTMPDIR", filepath.Join(privateRoot, "tmp"))
+
 	values = setEnv(values, "CGO_ENABLED", "0")
 	if targetOS != "" {
 		values = setEnv(values, "GOOS", targetOS)
 	}
+
 	if targetArch != "" {
 		values = setEnv(values, "GOARCH", targetArch)
 	}
+
 	if offline {
 		values = setEnv(values, "GOPROXY", "off")
 	}
@@ -122,7 +139,7 @@ func (compiler *Compiler) Env(targetOS, targetArch string, offline bool) []strin
 		filepath.Join(privateRoot, "buildcache"),
 		filepath.Join(privateRoot, "tmp"),
 	} {
-		_ = os.MkdirAll(path, 0o700)
+		_ = os.MkdirAll(path, privateDirPerm)
 	}
 
 	return values
@@ -144,7 +161,9 @@ func compatibleSystemGo(ctx context.Context, root string) (*Compiler, bool) {
 
 func compilerVersion(ctx context.Context, path string) (string, error) {
 	command := exec.CommandContext(ctx, path, "version")
+
 	command.Env = append(os.Environ(), "GOTOOLCHAIN=local", "GOENV=off")
+
 	output, err := command.Output()
 	if err != nil {
 		return "", err
@@ -152,7 +171,7 @@ func compilerVersion(ctx context.Context, path string) (string, error) {
 
 	match := goVersionPattern.FindStringSubmatch(string(output))
 	if len(match) == 0 {
-		return "", fmt.Errorf("unrecognized Go version: %s", strings.TrimSpace(string(output)))
+		return "", fmt.Errorf("%w: %s", errVersionFormat, strings.TrimSpace(string(output)))
 	}
 
 	return strings.TrimPrefix(match[0], "go"), nil
@@ -196,6 +215,7 @@ func resolveRoot(root string) (string, error) {
 		if err != nil {
 			return "", err
 		}
+
 		root = filepath.Join(home, ".stroppy")
 	}
 
@@ -203,7 +223,7 @@ func resolveRoot(root string) (string, error) {
 }
 
 func prompt(input io.Reader, output io.Writer) (bool, error) {
-	if input == nil || output == nil {
+	if !interactive(input, output) {
 		return false, ErrConsentRequired
 	}
 
@@ -232,4 +252,24 @@ func setEnv(values []string, key, value string) []string {
 	}
 
 	return append(values, prefix+value)
+}
+
+func appendEnvFlag(values []string, key, flag string) []string {
+	value := strings.TrimSpace(envValue(values, key))
+	if value == "" {
+		return setEnv(values, key, flag)
+	}
+
+	return setEnv(values, key, value+" "+flag)
+}
+
+func envValue(values []string, key string) string {
+	prefix := key + "="
+	for _, value := range values {
+		if strings.HasPrefix(value, prefix) {
+			return strings.TrimPrefix(value, prefix)
+		}
+	}
+
+	return ""
 }

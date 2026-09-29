@@ -27,12 +27,13 @@ type Options struct {
 	DefaultWorkload string
 	ExtraCommands   []*cobra.Command
 	ManagedCatalog  *workloadcatalog.Store
+	Version         string
 	IncludeList     bool
 	RegisteredRun   bool
 }
 
 // NewRoot creates an independent Stroppy command tree.
-func NewRoot(options Options) *cobra.Command {
+func NewRoot(options *Options) *cobra.Command {
 	cobra.EnableCommandSorting = false
 
 	catalog := options.Catalog
@@ -55,15 +56,17 @@ func NewRoot(options Options) *cobra.Command {
 		catalogResolver(options.ManagedCatalog),
 	)
 	probeCommand := probe.NewCommand(catalog)
-	root.AddCommand(newVersionCommand(), probeCommand, help.NewCommand())
+	root.AddCommand(newVersionCommand(options.Version), probeCommand, help.NewCommand())
 	root.AddCommand(options.ExtraCommands...)
 	addManagedCommands(root, probeCommand, catalog, options.ManagedCatalog)
+
 	if options.IncludeList && options.ManagedCatalog == nil {
 		root.AddCommand(newListCommand(catalog, nil))
 	}
 
 	if options.DefaultWorkload == "" {
 		root.AddCommand(run)
+
 		if options.RegisteredRun {
 			root.DisableFlagParsing = true
 			root.Args = cobra.ArbitraryArgs
@@ -102,7 +105,7 @@ func NewRoot(options Options) *cobra.Command {
 // Execute runs one command tree with caller-owned context and streams.
 func Execute(
 	ctx context.Context,
-	options Options,
+	options *Options,
 	args []string,
 	stdout, stderr io.Writer,
 ) error {
@@ -127,7 +130,7 @@ func ExitCodeFor(cancelCode int, err error) int {
 	return 1
 }
 
-func newVersionCommand() *cobra.Command {
+func newVersionCommand(versionOverride string) *cobra.Command {
 	var jsonOutput bool
 
 	cmd := &cobra.Command{
@@ -135,6 +138,10 @@ func newVersionCommand() *cobra.Command {
 		Short: "Print versions of stroppy components",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			versions := componentVersions()
+			if versionOverride != "" {
+				versions[appName] = versionOverride
+			}
+
 			if jsonOutput {
 				versions["ydb_service_account_key_file"] = "1"
 				encoder := json.NewEncoder(cmd.OutOrStdout())

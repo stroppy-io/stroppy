@@ -15,6 +15,17 @@ import (
 	"strings"
 )
 
+const archiveFilePerm = 0o755
+
+var (
+	downloadClient = http.DefaultClient
+
+	errDownloadStatus    = errors.New("go toolchain download failed")
+	errChecksumMismatch  = errors.New("go toolchain checksum mismatch")
+	errUnsafeArchivePath = errors.New("unsafe Go toolchain archive path")
+	errArchiveEntry      = errors.New("unsupported Go toolchain archive entry")
+)
+
 func install(ctx context.Context, root string, output io.Writer) (returnErr error) {
 	release, err := hostRelease()
 	if err != nil {
@@ -22,7 +33,7 @@ func install(ctx context.Context, root string, output io.Writer) (returnErr erro
 	}
 
 	toolchains := filepath.Join(root, "toolchains")
-	if err := os.MkdirAll(toolchains, 0o700); err != nil {
+	if err := os.MkdirAll(toolchains, privateDirPerm); err != nil {
 		return err
 	}
 
@@ -46,6 +57,7 @@ func install(ctx context.Context, root string, output io.Writer) (returnErr erro
 		if output != nil {
 			fmt.Fprintf(output, "downloading %s%s\n", downloadBaseURL, release.File)
 		}
+
 		if err := download(ctx, downloadBaseURL+release.File, archivePath, release.SHA256); err != nil {
 			return err
 		}
@@ -70,19 +82,19 @@ func install(ctx context.Context, root string, output io.Writer) (returnErr erro
 }
 
 func download(ctx context.Context, sourceURL, destination, checksum string) (returnErr error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, http.NoBody)
 	if err != nil {
 		return err
 	}
 
-	response, err := http.DefaultClient.Do(request)
+	response, err := downloadClient.Do(request)
 	if err != nil {
 		return err
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("download Go toolchain: %s", response.Status)
+		return fmt.Errorf("%w: %s", errDownloadStatus, response.Status)
 	}
 
 	temporary, err := os.CreateTemp(filepath.Dir(destination), ".go-download-*")
@@ -91,6 +103,7 @@ func download(ctx context.Context, sourceURL, destination, checksum string) (ret
 	}
 
 	path := temporary.Name()
+
 	defer func() {
 		if returnErr != nil {
 			returnErr = errors.Join(returnErr, temporary.Close(), os.Remove(path))
@@ -101,12 +114,15 @@ func download(ctx context.Context, sourceURL, destination, checksum string) (ret
 	if _, err := io.Copy(io.MultiWriter(temporary, hash), response.Body); err != nil {
 		return err
 	}
+
 	if hex.EncodeToString(hash.Sum(nil)) != checksum {
-		return errors.New("Go toolchain checksum mismatch")
+		return errChecksumMismatch
 	}
+
 	if err := temporary.Sync(); err != nil {
 		return err
 	}
+
 	if err := temporary.Close(); err != nil {
 		return err
 	}
@@ -129,6 +145,7 @@ func validDigest(path, expected string) bool {
 	return hex.EncodeToString(hash.Sum(nil)) == expected
 }
 
+//nolint:cyclop,gocognit // archive validation and extraction stay together
 func extractTarGz(path, destination string) error {
 	file, err := os.Open(path)
 	if err != nil {
@@ -148,33 +165,47 @@ func extractTarGz(path, destination string) error {
 		if errors.Is(err, io.EOF) {
 			return nil
 		}
+
 		if err != nil {
 			return err
 		}
 
 		name := filepath.Clean(filepath.FromSlash(header.Name))
-		if name == "." || filepath.IsAbs(name) || name == ".." || strings.HasPrefix(name, ".."+string(os.PathSeparator)) {
-			return fmt.Errorf("unsafe Go toolchain archive path %q", header.Name)
+		if name == "." || filepath.IsAbs(name) || filepath.VolumeName(name) != "" || name == ".." ||
+			strings.HasPrefix(name, ".."+string(os.PathSeparator)) {
+			return fmt.Errorf("%w %q", errUnsafeArchivePath, header.Name)
 		}
 
 		target := filepath.Join(destination, name)
+
+		relative, err := filepath.Rel(destination, target)
+		if err != nil || filepath.IsAbs(relative) || relative == ".." ||
+			strings.HasPrefix(relative, ".."+string(os.PathSeparator)) {
+			return fmt.Errorf("%w %q", errUnsafeArchivePath, header.Name)
+		}
+
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0o700); err != nil {
+			if err := os.MkdirAll(target, privateDirPerm); err != nil {
 				return err
 			}
 		case tar.TypeReg:
-			if err := extractFile(archive, target, os.FileMode(header.Mode)&0o755); err != nil {
+			if header.Mode < 0 || header.Mode > 0o777 || header.Size < 0 {
+				return fmt.Errorf("%w %q: invalid metadata", errArchiveEntry, header.Name)
+			}
+
+			permission := os.FileMode(header.Mode) & archiveFilePerm
+			if err := extractFile(io.LimitReader(archive, header.Size), target, permission); err != nil {
 				return err
 			}
 		default:
-			return fmt.Errorf("unsupported Go toolchain archive entry %q", header.Name)
+			return fmt.Errorf("%w %q", errArchiveEntry, header.Name)
 		}
 	}
 }
 
 func extractFile(source io.Reader, target string, permission os.FileMode) (returnErr error) {
-	if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(target), privateDirPerm); err != nil {
 		return err
 	}
 

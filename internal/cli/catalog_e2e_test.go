@@ -28,7 +28,7 @@ func TestManagedCatalogCommands(t *testing.T) {
 	execute := func(args ...string) (string, error) {
 		var stdout, stderr bytes.Buffer
 
-		err := Execute(t.Context(), Options{
+		err := Execute(t.Context(), &Options{
 			Catalog: bench.RegisteredCatalog(), ManagedCatalog: store,
 		}, args, &stdout, &stderr)
 		if err != nil {
@@ -89,6 +89,7 @@ func createWorkloadProject(t *testing.T, repoRoot, name, marker string) (root, p
 	t.Helper()
 
 	root = t.TempDir()
+
 	packageDir = filepath.Join(root, "workload")
 	if err := os.MkdirAll(packageDir, 0o700); err != nil {
 		t.Fatal(err)

@@ -1,4 +1,4 @@
-//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
+//go:build aix || solaris
 
 package toolchain
 
@@ -6,7 +6,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 func lockInstall(root string) (func() error, error) {
@@ -17,13 +18,16 @@ func lockInstall(root string) (func() error, error) {
 		return nil, err
 	}
 
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+	lock := unix.Flock_t{Type: unix.F_WRLCK}
+	if err := unix.FcntlFlock(file.Fd(), unix.F_SETLKW, &lock); err != nil {
 		_ = file.Close()
 
 		return nil, err
 	}
 
 	return func() error {
-		return errors.Join(syscall.Flock(int(file.Fd()), syscall.LOCK_UN), file.Close())
+		lock.Type = unix.F_UNLCK
+
+		return errors.Join(unix.FcntlFlock(file.Fd(), unix.F_SETLKW, &lock), file.Close())
 	}, nil
 }

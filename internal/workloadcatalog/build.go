@@ -51,7 +51,7 @@ func Build(
 		temporary: temporary,
 	}
 
-	if err := BuildRunner(ctx, compiler, RunnerRequest{
+	if err := BuildRunner(ctx, compiler, &RunnerRequest{
 		Packages:    []Package{pkg},
 		Output:      result.Artifact,
 		Offline:     offline,

@@ -17,7 +17,7 @@ name-dispatch/carriage contract.
 
 ```
 make build          # plain go build — never go build ./... (use the target for -ldflags version injection)
-make linter_fix     # run first, auto-fixes formatting — NEVER run casually, it rewrites the whole repo
+make linter_fix     # run first; auto-fixes formatting and may rewrite files across the repo
 make linter         # read-only check after linter_fix
 make tests          # all tests with race detector and coverage
 ```

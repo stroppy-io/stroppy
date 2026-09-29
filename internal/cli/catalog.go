@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime/debug"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -154,7 +154,8 @@ func writeList(
 		items = append(items, item{Name: description.Name, Origin: "built-in"})
 	}
 
-	for _, entry := range custom {
+	for index := range custom {
+		entry := &custom[index]
 		items = append(items, item{
 			Name: entry.Name, Origin: "custom", Source: entry.Source, Artifact: entry.ArtifactPath,
 		})
@@ -261,12 +262,12 @@ func toolchainConsent(yes bool) toolchain.Consent {
 }
 
 func stroppySourceRoot() string {
-	info, ok := debug.ReadBuildInfo()
-	if !ok || info.Main.Path != "github.com/stroppy-io/stroppy/v6" || info.Main.Version != "(devel)" {
+	_, source, _, ok := runtime.Caller(0)
+	if !ok {
 		return ""
 	}
 
-	root, err := moduleRoot(".")
+	root, err := moduleRoot(filepath.Dir(source))
 	if err != nil {
 		return ""
 	}
@@ -289,6 +290,7 @@ func moduleRoot(start string) (string, error) {
 		if parent == path {
 			return "", os.ErrNotExist
 		}
+
 		path = parent
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -16,9 +17,13 @@ import (
 
 var (
 	errExportSelection = errors.New("select workload names or --all")
+	errExportOutput    = errors.New("export output path is required")
 	errMissingSource   = errors.New("workload source package is unavailable")
+	errBrokenWorkload  = errors.New("workload is not ready")
+	errDuplicateExport = errors.New("duplicate workload selection")
 )
 
+//nolint:gocognit // export validation and build sequence stays explicit
 func newExportCommand(store *workloadcatalog.Store) *cobra.Command {
 	var (
 		all     bool
@@ -35,8 +40,9 @@ func newExportCommand(store *workloadcatalog.Store) *cobra.Command {
 			if all == (len(args) > 0) {
 				return errExportSelection
 			}
+
 			if output == "" {
-				return errors.New("export output path is required")
+				return errExportOutput
 			}
 
 			compiler, err := toolchain.Resolve(cmd.Context(), toolchain.Options{
@@ -53,12 +59,14 @@ func newExportCommand(store *workloadcatalog.Store) *cobra.Command {
 			}
 
 			packages := make([]workloadcatalog.Package, 0, len(entries))
-			for _, entry := range entries {
+			for index := range entries {
+				entry := &entries[index]
 				if entry.Package == "" || entry.ModuleRoot == "" {
 					return fmt.Errorf("%w: %s", errMissingSource, entry.Name)
 				}
+
 				if _, err := os.Stat(entry.Source); err != nil {
-					return fmt.Errorf("%w %s: %v", errMissingSource, entry.Name, err)
+					return fmt.Errorf("%w %s: %w", errMissingSource, entry.Name, err)
 				}
 
 				packages = append(packages, workloadcatalog.Package{
@@ -71,6 +79,7 @@ func newExportCommand(store *workloadcatalog.Store) *cobra.Command {
 			if targetOS == "" {
 				targetOS = runtime.GOOS
 			}
+
 			targetArch := os.Getenv("GOARCH")
 			if targetArch == "" {
 				targetArch = runtime.GOARCH
@@ -81,7 +90,9 @@ func newExportCommand(store *workloadcatalog.Store) *cobra.Command {
 				return err
 			}
 
-			if err := workloadcatalog.BuildRunner(cmd.Context(), compiler, workloadcatalog.RunnerRequest{
+			absoluteOutput = targetOutputPath(absoluteOutput, targetOS)
+
+			if err := workloadcatalog.BuildRunner(cmd.Context(), compiler, &workloadcatalog.RunnerRequest{
 				Packages: packages, IncludeBuiltIns: true, Output: absoluteOutput,
 				TargetOS: targetOS, TargetArch: targetArch, Offline: offline,
 				Diagnostics: cmd.ErrOrStderr(), StroppyRoot: stroppySourceRoot(),
@@ -105,6 +116,14 @@ func newExportCommand(store *workloadcatalog.Store) *cobra.Command {
 	return command
 }
 
+func targetOutputPath(path, targetOS string) string {
+	if targetOS == "windows" && !strings.EqualFold(filepath.Ext(path), ".exe") {
+		return path + ".exe"
+	}
+
+	return path
+}
+
 func selectedEntries(
 	store *workloadcatalog.Store,
 	names []string,
@@ -115,9 +134,11 @@ func selectedEntries(
 		if err != nil {
 			return nil, err
 		}
-		for _, entry := range entries {
+
+		for index := range entries {
+			entry := &entries[index]
 			if entry.Status != "ready" {
-				return nil, fmt.Errorf("workload %q is %s", entry.Name, entry.Status)
+				return nil, fmt.Errorf("%w: %s (%s)", errBrokenWorkload, entry.Name, entry.Status)
 			}
 		}
 
@@ -126,16 +147,20 @@ func selectedEntries(
 
 	names = append([]string(nil), names...)
 	slices.Sort(names)
-	entries := make([]workloadcatalog.Entry, 0, len(names))
-	for index, name := range names {
-		if index > 0 && name == names[index-1] {
-			return nil, fmt.Errorf("duplicate workload %q", name)
-		}
 
+	for index := 1; index < len(names); index++ {
+		if names[index] == names[index-1] {
+			return nil, fmt.Errorf("%w: %s", errDuplicateExport, names[index])
+		}
+	}
+
+	entries := make([]workloadcatalog.Entry, 0, len(names))
+	for _, name := range names {
 		entry, err := store.Get(name)
 		if err != nil {
 			return nil, err
 		}
+
 		entries = append(entries, entry)
 	}
 

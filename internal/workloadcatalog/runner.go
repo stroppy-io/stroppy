@@ -11,12 +11,21 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/mod/semver"
+
 	"github.com/stroppy-io/stroppy/v6/internal/toolchain"
 )
 
-const stroppyModulePath = "github.com/stroppy-io/stroppy/v6"
+const (
+	stroppyModulePath = "github.com/stroppy-io/stroppy/v6"
+	runnerDirPerm     = 0o700
+	runnerFilePerm    = 0o600
+)
 
-var ErrReplaceConflict = errors.New("conflicting local module replacements")
+var (
+	ErrReplaceConflict = errors.New("conflicting local module replacements")
+	errEmptyRunner     = errors.New("runner contains no workloads")
+)
 
 // RunnerRequest describes one generated Stroppy executable.
 type RunnerRequest struct {
@@ -31,10 +40,12 @@ type RunnerRequest struct {
 }
 
 // BuildRunner links selected workload packages into one Stroppy executable.
-func BuildRunner(ctx context.Context, compiler *toolchain.Compiler, request RunnerRequest) error {
+func BuildRunner(ctx context.Context, compiler *toolchain.Compiler, request *RunnerRequest) error {
 	if len(request.Packages) == 0 && !request.IncludeBuiltIns {
-		return errors.New("runner contains no workloads")
+		return errEmptyRunner
 	}
+
+	requirements := map[string]string{stroppyModulePath: stroppyModuleVersion()}
 
 	replacements := map[string]string{}
 	if request.StroppyRoot != "" {
@@ -49,15 +60,15 @@ func BuildRunner(ctx context.Context, compiler *toolchain.Compiler, request Runn
 	for _, pkg := range request.Packages {
 		imports = append(imports, pkg.ImportPath)
 
-		values, err := ModuleReplacements(ctx, compiler, pkg, request.Offline)
+		packageRequirements, packageReplacements, err := ModuleConfig(pkg)
 		if err != nil {
 			return err
 		}
-		for module, path := range values {
-			if existing, ok := replacements[module]; ok && existing != path {
-				return fmt.Errorf("%w for %s: %s and %s", ErrReplaceConflict, module, existing, path)
-			}
-			replacements[module] = path
+
+		mergeRequirements(requirements, packageRequirements)
+
+		if err := mergeReplacements(replacements, packageReplacements); err != nil {
+			return err
 		}
 	}
 
@@ -67,12 +78,12 @@ func BuildRunner(ctx context.Context, compiler *toolchain.Compiler, request Runn
 	}
 	defer os.RemoveAll(temporary)
 
-	if err := writeRunnerModule(temporary, imports, replacements); err != nil {
+	if err := writeRunnerModule(temporary, imports, requirements, replacements); err != nil {
 		return err
 	}
 
 	outputDirectory := filepath.Dir(request.Output)
-	if err := os.MkdirAll(outputDirectory, 0o700); err != nil {
+	if err := os.MkdirAll(outputDirectory, runnerDirPerm); err != nil {
 		return err
 	}
 
@@ -80,33 +91,64 @@ func BuildRunner(ctx context.Context, compiler *toolchain.Compiler, request Runn
 	if err != nil {
 		return err
 	}
+
 	temporaryPath := temporaryOutput.Name()
 	if err := temporaryOutput.Close(); err != nil {
 		return err
 	}
+
 	if err := os.Remove(temporaryPath); err != nil {
 		return err
 	}
 	defer os.Remove(temporaryPath)
 
-	command := exec.CommandContext(
-		ctx, compiler.Path, "build", "-trimpath", "-mod=mod", "-o", temporaryPath, ".",
+	arguments := []string{"build", "-trimpath", "-mod=mod", "-o", temporaryPath, "."}
+
+	command := exec.CommandContext( //nolint:gosec // compiler path comes from verified resolver
+		ctx, compiler.Path, arguments...,
 	)
 	command.Dir = temporary
 	command.Env = compiler.Env(request.TargetOS, request.TargetArch, request.Offline)
 	command.Stdout = request.Diagnostics
+
 	command.Stderr = request.Diagnostics
 	if err := command.Run(); err != nil {
 		return fmt.Errorf("build portable Stroppy: %w", err)
 	}
-	if err := os.Chmod(temporaryPath, 0o700); err != nil {
+
+	if err := os.Chmod(temporaryPath, runnerDirPerm); err != nil {
 		return err
 	}
 
 	return os.Rename(temporaryPath, request.Output)
 }
 
-func writeRunnerModule(directory string, imports []string, replacements map[string]string) error {
+func mergeRequirements(destination, source map[string]string) {
+	for path, version := range source {
+		existing, ok := destination[path]
+		if !ok || semver.Compare(version, existing) > 0 {
+			destination[path] = version
+		}
+	}
+}
+
+func mergeReplacements(destination, source map[string]string) error {
+	for module, path := range source {
+		if existing, ok := destination[module]; ok && existing != path {
+			return fmt.Errorf("%w for %s: %s and %s", ErrReplaceConflict, module, existing, path)
+		}
+
+		destination[module] = path
+	}
+
+	return nil
+}
+
+func writeRunnerModule(
+	directory string,
+	imports []string,
+	requirements, replacements map[string]string,
+) error {
 	sort.Strings(imports)
 
 	var mainSource strings.Builder
@@ -114,27 +156,45 @@ func writeRunnerModule(directory string, imports []string, replacements map[stri
 	mainSource.WriteString("\tstroppy \"")
 	mainSource.WriteString(stroppyModulePath)
 	mainSource.WriteString("\"\n")
+
 	for _, importPath := range imports {
 		fmt.Fprintf(&mainSource, "\t_ %q\n", importPath)
 	}
-	mainSource.WriteString(")\n\nfunc main() { stroppy.RegisteredMain() }\n")
+
+	mainSource.WriteString(")\n\nfunc main() { stroppy.RegisteredMain(")
+	fmt.Fprintf(&mainSource, "%q", stroppyVersion())
+	mainSource.WriteString(") }\n")
 
 	var module strings.Builder
 	module.WriteString("module stroppy.local/export\n\ngo 1.26\n\n")
-	fmt.Fprintf(&module, "require %s %s\n", stroppyModulePath, stroppyModuleVersion())
 
-	keys := make([]string, 0, len(replacements))
-	for key := range replacements {
-		keys = append(keys, key)
+	requirementKeys := make([]string, 0, len(requirements))
+	for key := range requirements {
+		requirementKeys = append(requirementKeys, key)
 	}
-	sort.Strings(keys)
-	for _, key := range keys {
+
+	sort.Strings(requirementKeys)
+
+	for _, key := range requirementKeys {
+		fmt.Fprintf(&module, "require %s %s\n", key, requirements[key])
+	}
+
+	replacementKeys := make([]string, 0, len(replacements))
+	for key := range replacements {
+		replacementKeys = append(replacementKeys, key)
+	}
+
+	sort.Strings(replacementKeys)
+
+	for _, key := range replacementKeys {
 		fmt.Fprintf(&module, "replace %s => %s\n", key, replacements[key])
 	}
 
-	if err := os.WriteFile(filepath.Join(directory, "main.go"), []byte(mainSource.String()), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(directory, "main.go"), []byte(mainSource.String()), runnerFilePerm,
+	); err != nil {
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(directory, "go.mod"), []byte(module.String()), 0o600)
+	return os.WriteFile(filepath.Join(directory, "go.mod"), []byte(module.String()), runnerFilePerm)
 }

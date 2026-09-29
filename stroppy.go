@@ -36,7 +36,9 @@ const defaultPostgresURL = "postgres://postgres:postgres@localhost:5432" //nolin
 var (
 	errReservedWorkloadName = errors.New("stroppy: reserved workload name")
 	errNilApplication       = errors.New("stroppy: nil application")
-	reservedWorkloadNames   = map[string]struct{}{"help": {}, "probe": {}, "version": {}}
+	reservedWorkloadNames   = map[string]struct{}{
+		"build": {}, "export": {}, "help": {}, "list": {}, "probe": {}, "remove": {}, "run": {}, "version": {},
+	}
 )
 
 // Application is one standalone Stroppy workload.
@@ -85,7 +87,7 @@ func (a *Application) Execute(
 		return errNilApplication
 	}
 
-	return cli.Execute(ctx, cli.Options{
+	return cli.Execute(ctx, &cli.Options{
 		Catalog: a.catalog, DefaultWorkload: a.name,
 	}, args, stdout, stderr)
 }
@@ -156,21 +158,22 @@ func Main(factory Factory) {
 // RegisteredMain runs every workload registered through [bench.Register].
 // Generated portable Stroppy binaries use this entrypoint after blank-importing
 // built-in and selected custom workload packages.
-func RegisteredMain() {
-	os.Exit(registeredMainExitCode())
+func RegisteredMain(buildVersion string) {
+	os.Exit(registeredMainExitCode(buildVersion))
 }
 
-func registeredMainExitCode() int {
+func registeredMainExitCode(buildVersion string) int {
 	ctx, stop, exitStatus := shutdown.NotifyContext(context.Background(), nil)
 
 	catalog := bench.RegisteredCatalog()
+
 	defaultWorkload := ""
 	if descriptions, err := catalog.DescribeAll(); err == nil && len(descriptions) == 1 {
 		defaultWorkload = descriptions[0].Name
 	}
 
-	err := cli.Execute(ctx, cli.Options{
-		Catalog: catalog, DefaultWorkload: defaultWorkload,
+	err := cli.Execute(ctx, &cli.Options{
+		Catalog: catalog, DefaultWorkload: defaultWorkload, Version: buildVersion,
 		IncludeList: true, RegisteredRun: defaultWorkload == "",
 	}, os.Args[1:], os.Stdout, os.Stderr)
 

@@ -1,4 +1,4 @@
-//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
+//go:build windows
 
 package toolchain
 
@@ -6,7 +6,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
 func lockInstall(root string) (func() error, error) {
@@ -17,13 +18,15 @@ func lockInstall(root string) (func() error, error) {
 		return nil, err
 	}
 
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+	handle := windows.Handle(file.Fd())
+	overlapped := &windows.Overlapped{}
+	if err := windows.LockFileEx(handle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, overlapped); err != nil {
 		_ = file.Close()
 
 		return nil, err
 	}
 
 	return func() error {
-		return errors.Join(syscall.Flock(int(file.Fd()), syscall.LOCK_UN), file.Close())
+		return errors.Join(windows.UnlockFileEx(handle, 0, 1, 0, overlapped), file.Close())
 	}, nil
 }

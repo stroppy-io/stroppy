@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+
+	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
 
 	"github.com/stroppy-io/stroppy/v6/internal/toolchain"
 )
@@ -19,6 +22,20 @@ var (
 	ErrMainPackage       = errors.New("workload package must be importable, not package main")
 	ErrMissingModulePath = errors.New("workload package has no module path")
 )
+
+//nolint:tagliatelle // Go command JSON uses exported Go field names.
+type goListPackage struct {
+	ImportPath string        `json:"ImportPath"`
+	Dir        string        `json:"Dir"`
+	Name       string        `json:"Name"`
+	Module     *goListModule `json:"Module"`
+}
+
+//nolint:tagliatelle // Go command JSON uses exported Go field names.
+type goListModule struct {
+	Path string `json:"Path"`
+	Dir  string `json:"Dir"`
+}
 
 // Package describes one importable workload package and its module.
 type Package struct {
@@ -40,94 +57,144 @@ func DiscoverPackage(
 		return Package{}, err
 	}
 
-	command := exec.CommandContext(ctx, compiler.Path, "list", "-json", ".")
+	command := exec.CommandContext( //nolint:gosec // compiler path comes from verified resolver
+		ctx, compiler.Path, "list", "-mod=readonly", "-json", ".",
+	)
 	command.Dir = absolute
 	command.Env = compiler.Env("", "", offline)
 
 	var stdout, stderr bytes.Buffer
+
 	command.Stdout = &stdout
+
 	command.Stderr = &stderr
 	if err := command.Run(); err != nil {
 		return Package{}, fmt.Errorf("inspect workload package: %w: %s", err, stderr.String())
 	}
 
-	var metadata struct {
-		ImportPath string
-		Dir        string
-		Name       string
-		Module     *struct {
-			Path string
-			Dir  string
-		}
-	}
+	var metadata goListPackage
 	if err := json.Unmarshal(stdout.Bytes(), &metadata); err != nil {
 		return Package{}, fmt.Errorf("decode workload package: %w", err)
 	}
+
 	if metadata.Name == "main" {
 		return Package{}, ErrMainPackage
 	}
+
 	if metadata.Module == nil || metadata.Module.Path == "" || metadata.Module.Dir == "" {
 		return Package{}, ErrMissingModulePath
 	}
 
+	directory, err := filepath.EvalSymlinks(metadata.Dir)
+	if err != nil {
+		return Package{}, err
+	}
+
+	moduleRoot, err := filepath.EvalSymlinks(metadata.Module.Dir)
+	if err != nil {
+		return Package{}, err
+	}
+
 	return Package{
 		ImportPath: metadata.ImportPath,
-		Directory:  metadata.Dir,
+		Directory:  directory,
 		ModulePath: metadata.Module.Path,
-		ModuleRoot: metadata.Module.Dir,
+		ModuleRoot: moduleRoot,
 	}, nil
 }
 
-// ModuleReplacements returns local replace directives declared by package module.
-func ModuleReplacements(
-	ctx context.Context,
-	compiler *toolchain.Compiler,
+// ModuleConfig returns selected module requirements and local replacements without changing source files.
+func ModuleConfig(
 	pkg Package,
-	offline bool,
-) (map[string]string, error) {
-	command := exec.CommandContext(ctx, compiler.Path, "list", "-m", "-json", "all")
-	command.Dir = pkg.ModuleRoot
-	command.Env = compiler.Env("", "", offline)
+) (requirements, replacements map[string]string, err error) {
+	path := filepath.Join(pkg.ModuleRoot, "go.mod")
 
-	output, err := command.Output()
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("inspect workload module graph: %w", err)
+		return nil, nil, err
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(output))
-	replacements := map[string]string{pkg.ModulePath: pkg.ModuleRoot}
+	file, err := modfile.Parse(path, data, nil)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	for {
-		var module struct {
-			Path    string
-			Replace *struct {
-				Path string
-				Dir  string
-			}
-		}
+	requirements = make(map[string]string, len(file.Require)+1)
+	for _, requirement := range file.Require {
+		requirements[requirement.Mod.Path] = requirement.Mod.Version
+	}
 
-		if err := decoder.Decode(&module); errors.Is(err, io.EOF) {
-			break
-		} else if err != nil {
-			return nil, err
-		}
-		if module.Replace == nil || module.Replace.Dir == "" {
+	if _, ok := requirements[pkg.ModulePath]; !ok {
+		requirements[pkg.ModulePath] = moduleVersion(pkg.ModulePath)
+	}
+
+	replacements = map[string]string{pkg.ModulePath: pkg.ModuleRoot}
+
+	for _, replacement := range file.Replace {
+		if !modfile.IsDirectoryPath(replacement.New.Path) {
 			continue
 		}
 
-		path := module.Replace.Dir
-		if !filepath.IsAbs(path) {
-			path = filepath.Join(pkg.ModuleRoot, path)
-		}
-		absolute, err := filepath.Abs(path)
+		resolved, err := resolveLocalModule(pkg.ModuleRoot, replacement.New.Path)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		replacements[module.Path] = absolute
+		replacements[replacement.Old.Path] = resolved
 	}
 
-	return replacements, nil
+	return requirements, replacements, nil
+}
+
+func resolveLocalModule(root, path string) (string, error) {
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(root, path)
+	}
+
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.EvalSymlinks(absolute)
+}
+
+func moduleVersion(path string) string {
+	_, pathMajor, ok := module.SplitPathVersion(path)
+	if !ok || pathMajor == "" {
+		return "v0.0.0"
+	}
+
+	return strings.TrimPrefix(pathMajor, "/") + ".0.0"
+}
+
+func stroppyVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return ""
+	}
+
+	if info.Main.Path == stroppyModulePath && validModuleVersion(info.Main.Version) {
+		return info.Main.Version
+	}
+
+	for _, dependency := range info.Deps {
+		if dependency.Path == stroppyModulePath && validModuleVersion(dependency.Version) {
+			return dependency.Version
+		}
+	}
+
+	settings := make(map[string]string, len(info.Settings))
+	for _, setting := range info.Settings {
+		settings[setting.Key] = setting.Value
+	}
+
+	revision := settings["vcs.revision"]
+	if revision != "" && settings["vcs.modified"] == "true" {
+		return revision + "+dirty"
+	}
+
+	return revision
 }
 
 func stroppyModuleVersion() string {
@@ -135,6 +202,7 @@ func stroppyModuleVersion() string {
 		if info.Main.Path == stroppyModulePath && validModuleVersion(info.Main.Version) {
 			return info.Main.Version
 		}
+
 		for _, dependency := range info.Deps {
 			if dependency.Path == stroppyModulePath && validModuleVersion(dependency.Version) {
 				return dependency.Version
@@ -146,5 +214,6 @@ func stroppyModuleVersion() string {
 }
 
 func validModuleVersion(version string) bool {
-	return version != "" && version != "(devel)" && strings.HasPrefix(version, "v")
+	return version != "" && version != "(devel)" && strings.HasPrefix(version, "v") &&
+		!strings.HasSuffix(version, "+dirty")
 }
