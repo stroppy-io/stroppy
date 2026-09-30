@@ -25,8 +25,8 @@ func TestCompatibleVersion(t *testing.T) {
 	}
 }
 
-func TestCompilerEnvIsIsolated(t *testing.T) {
-	compiler := &Compiler{Root: t.TempDir()}
+func TestPrivateCompilerEnvIsIsolated(t *testing.T) {
+	compiler := &Compiler{Root: t.TempDir(), Private: true}
 	env := compiler.Env("linux", "arm64", true)
 
 	for key, want := range map[string]string{
@@ -42,6 +42,57 @@ func TestCompilerEnvIsIsolated(t *testing.T) {
 		if got := envValue(env, key); !strings.HasPrefix(got, compiler.Root) {
 			t.Errorf("%s = %q, want under %s", key, got, compiler.Root)
 		}
+	}
+}
+
+func TestSystemCompilerUsesNormalGoCaches(t *testing.T) {
+	root := t.TempDir()
+
+	paths := map[string]string{
+		"GOPATH": filepath.Join(root, "gopath"), "GOMODCACHE": filepath.Join(root, "modcache"),
+		"GOCACHE": filepath.Join(root, "buildcache"), "GOTMPDIR": filepath.Join(root, "tmp"),
+	}
+	for key, value := range paths {
+		if err := os.MkdirAll(value, 0o700); err != nil {
+			t.Fatal(err)
+		}
+
+		t.Setenv(key, value)
+	}
+
+	compiler := &Compiler{Root: root}
+	env := compiler.Env("", "", false)
+
+	for key, want := range paths {
+		if got := envValue(env, key); got != want {
+			t.Errorf("%s = %q, want %q", key, got, want)
+		}
+	}
+}
+
+func TestCleanPrivateCaches(t *testing.T) {
+	root := t.TempDir()
+
+	cache := filepath.Join(root, "go", "modcache", "entry")
+	if err := os.MkdirAll(cache, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	toolchain := filepath.Join(root, "toolchains", "go"+PinnedVersion)
+	if err := os.MkdirAll(toolchain, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := CleanPrivateCaches(root); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(cache); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("private cache remains: %v", err)
+	}
+
+	if _, err := os.Stat(toolchain); err != nil {
+		t.Fatalf("private toolchain removed: %v", err)
 	}
 }
 
