@@ -415,3 +415,4 @@ func (store *Store) manifestPath(name string) (string, error) {
 
 func (store *Store) entriesDir() string   { return filepath.Join(store.root, entriesSubDir) }
 func (store *Store) artifactsDir() string { return filepath.Join(store.root, artifactsSubDir) }
+func (store *Store) snapshotsDir() string { return filepath.Join(store.root, "snapshots") }

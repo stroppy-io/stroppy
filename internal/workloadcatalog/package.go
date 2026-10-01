@@ -39,10 +39,11 @@ type goListModule struct {
 
 // Package describes one importable workload package and its module.
 type Package struct {
-	ImportPath string
-	Directory  string
-	ModulePath string
-	ModuleRoot string
+	ImportPath     string
+	Directory      string
+	ModulePath     string
+	ModuleRoot     string
+	SnapshotDigest string
 }
 
 // DiscoverPackage resolves an importable workload package through Go tooling.
@@ -107,7 +108,7 @@ type moduleReplacements map[module.Version]module.Version
 
 // ModuleConfig returns selected module requirements and replacements without changing source files.
 func ModuleConfig(
-	pkg Package,
+	pkg *Package,
 ) (requirements map[string]string, replacements moduleReplacements, err error) {
 	path := filepath.Join(pkg.ModuleRoot, "go.mod")
 

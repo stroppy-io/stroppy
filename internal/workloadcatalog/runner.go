@@ -39,39 +39,30 @@ type RunnerRequest struct {
 	Offline         bool
 	Diagnostics     io.Writer
 	StroppyRoot     string
+	CacheRoot       string
 }
 
 // BuildRunner links selected workload packages into one Stroppy executable.
 func BuildRunner(ctx context.Context, compiler *toolchain.Compiler, request *RunnerRequest) error {
+	if request.CacheRoot != "" {
+		_, _, err := BuildCached(ctx, compiler, request)
+
+		return err
+	}
+
+	return buildRunnerUncached(ctx, compiler, request)
+}
+
+func buildRunnerUncached(ctx context.Context, compiler *toolchain.Compiler, request *RunnerRequest) error {
 	if len(request.Packages) == 0 && !request.IncludeBuiltIns {
 		return errEmptyRunner
 	}
 
-	requirements := map[string]string{stroppyModulePath: stroppyModuleVersion()}
-
-	replacements := moduleReplacements{}
-	if request.StroppyRoot != "" {
-		replacements[module.Version{Path: stroppyModulePath}] = module.Version{Path: request.StroppyRoot}
-	}
-
-	imports := make([]string, 0, len(request.Packages)+1)
-	if request.IncludeBuiltIns {
-		imports = append(imports, stroppyModulePath+"/workloads/all")
-	}
-
-	for _, pkg := range request.Packages {
-		imports = append(imports, pkg.ImportPath)
-
-		packageRequirements, packageReplacements, err := ModuleConfig(pkg)
-		if err != nil {
-			return err
-		}
-
-		mergeRequirements(requirements, packageRequirements)
-
-		if err := mergeReplacements(replacements, packageReplacements); err != nil {
-			return err
-		}
+	mainSource, moduleSource, err := runnerSources(
+		request.Packages, request.IncludeBuiltIns, request.StroppyRoot,
+	)
+	if err != nil {
+		return err
 	}
 
 	temporary, err := os.MkdirTemp("", "stroppy-runner-*")
@@ -80,7 +71,7 @@ func BuildRunner(ctx context.Context, compiler *toolchain.Compiler, request *Run
 	}
 	defer os.RemoveAll(temporary)
 
-	if err := writeRunnerModule(temporary, imports, requirements, replacements); err != nil {
+	if err := writeRunnerSources(temporary, mainSource, moduleSource); err != nil {
 		return err
 	}
 
@@ -125,6 +116,41 @@ func BuildRunner(ctx context.Context, compiler *toolchain.Compiler, request *Run
 	return os.Rename(temporaryPath, request.Output)
 }
 
+func runnerSources(
+	packages []Package,
+	includeBuiltIns bool,
+	stroppyRoot string,
+) (mainSource, moduleSource []byte, err error) {
+	requirements := map[string]string{stroppyModulePath: stroppyModuleVersion()}
+
+	replacements := moduleReplacements{}
+	if stroppyRoot != "" {
+		replacements[module.Version{Path: stroppyModulePath}] = module.Version{Path: stroppyRoot}
+	}
+
+	imports := make([]string, 0, len(packages)+1)
+	if includeBuiltIns {
+		imports = append(imports, stroppyModulePath+"/workloads/all")
+	}
+
+	for _, pkg := range packages {
+		imports = append(imports, pkg.ImportPath)
+
+		packageRequirements, packageReplacements, err := ModuleConfig(&pkg)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		mergeRequirements(requirements, packageRequirements)
+
+		if err := mergeReplacements(replacements, packageReplacements); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return formatRunnerSources(imports, requirements, replacements)
+}
+
 func mergeRequirements(destination, source map[string]string) {
 	for path, version := range source {
 		existing, ok := destination[path]
@@ -149,12 +175,11 @@ func mergeReplacements(destination, source moduleReplacements) error {
 	return nil
 }
 
-func writeRunnerModule(
-	directory string,
+func formatRunnerSources(
 	imports []string,
 	requirements map[string]string,
 	replacements moduleReplacements,
-) error {
+) (main, moduleSource []byte, err error) {
 	sort.Strings(imports)
 
 	var mainSource strings.Builder
@@ -173,11 +198,11 @@ func writeRunnerModule(
 
 	moduleFile := new(modfile.File)
 	if err := moduleFile.AddModuleStmt("stroppy.local/export"); err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	if err := moduleFile.AddGoStmt("1.26"); err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	requirementKeys := make([]string, 0, len(requirements))
@@ -189,7 +214,7 @@ func writeRunnerModule(
 
 	for _, key := range requirementKeys {
 		if err := moduleFile.AddRequire(key, requirements[key]); err != nil {
-			return err
+			return nil, nil, err
 		}
 	}
 
@@ -207,20 +232,36 @@ func writeRunnerModule(
 		if err := moduleFile.AddReplace(
 			oldModule.Path, oldModule.Version, newModule.Path, newModule.Version,
 		); err != nil {
-			return err
+			return nil, nil, err
 		}
 	}
 
-	moduleSource, err := moduleFile.Format()
+	moduleSource, err = moduleFile.Format()
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
-	if err := os.WriteFile(
-		filepath.Join(directory, "main.go"), []byte(mainSource.String()), runnerFilePerm,
-	); err != nil {
+	return []byte(mainSource.String()), moduleSource, nil
+}
+
+func writeRunnerSources(directory string, mainSource, moduleSource []byte) error {
+	if err := os.WriteFile(filepath.Join(directory, "main.go"), mainSource, runnerFilePerm); err != nil {
 		return err
 	}
 
 	return os.WriteFile(filepath.Join(directory, "go.mod"), moduleSource, runnerFilePerm)
+}
+
+func writeRunnerModule(
+	directory string,
+	imports []string,
+	requirements map[string]string,
+	replacements moduleReplacements,
+) error {
+	mainSource, moduleSource, err := formatRunnerSources(imports, requirements, replacements)
+	if err != nil {
+		return err
+	}
+
+	return writeRunnerSources(directory, mainSource, moduleSource)
 }
