@@ -250,8 +250,13 @@ func runnerIdentity(compiler *toolchain.Compiler, request *RunnerRequest) (build
 		}
 	}
 
+	stroppyVersion := request.BuildVersion
+	if stroppyVersion == "" {
+		stroppyVersion = stroppyModuleVersion()
+	}
+
 	return buildIdentity{
-		Schema: BuildSchemaVersion, StroppyVersion: stroppyModuleVersion(),
+		Schema: BuildSchemaVersion, StroppyVersion: stroppyVersion,
 		StroppySource: stroppySource, GoVersion: compiler.Version,
 		TargetOS: targetOS, TargetArch: targetArch,
 		TargetSettings:  targetSettings(targetOS, targetArch),
