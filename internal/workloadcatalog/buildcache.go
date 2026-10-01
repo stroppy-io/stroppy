@@ -309,6 +309,7 @@ func hashPackageInputs(pkg *Package) (string, error) {
 	return canonicalDigest(values)
 }
 
+//nolint:gocognit // tree filtering and symlink hashing stay in one walk
 func hashTree(root string) (string, error) {
 	type fileDigest struct {
 		Path   string `json:"path"`
@@ -340,7 +341,32 @@ func hashTree(root string) (string, error) {
 			return nil
 		}
 
-		if entry.Type()&os.ModeSymlink != 0 || !entry.Type().IsRegular() {
+		if entry.Type()&os.ModeSymlink != 0 {
+			resolved, err := filepath.EvalSymlinks(path)
+			if err != nil {
+				return err
+			}
+
+			info, err := os.Stat(resolved)
+			if err != nil {
+				return err
+			}
+
+			if !info.Mode().IsRegular() {
+				return nil
+			}
+
+			digest, err := digestFile(resolved)
+			if err != nil {
+				return err
+			}
+
+			files = append(files, fileDigest{Path: filepath.ToSlash(relative), SHA256: digest})
+
+			return nil
+		}
+
+		if !entry.Type().IsRegular() {
 			return nil
 		}
 

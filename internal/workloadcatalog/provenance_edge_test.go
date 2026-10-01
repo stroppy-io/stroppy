@@ -39,6 +39,47 @@ func TestLoadModuleFilesAcceptsUnreferencedReplacement(t *testing.T) {
 	}
 }
 
+func TestHashTreeTracksSymlinkTargetChanges(t *testing.T) {
+	root := t.TempDir()
+	firstTarget := filepath.Join(root, "_a.go")
+	secondTarget := filepath.Join(root, "_b.go")
+
+	if err := os.WriteFile(firstTarget, []byte("package example\nconst Value = 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(secondTarget, []byte("package example\nconst Value = 2\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	link := filepath.Join(root, "workload.go")
+	if err := os.Symlink(filepath.Base(firstTarget), link); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	first, err := hashTree(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Symlink(filepath.Base(secondTarget), link); err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := hashTree(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if first == second {
+		t.Fatal("symlink target change did not change tree digest")
+	}
+}
+
 func TestHashTreeIncludesAssetsAndNestedModules(t *testing.T) {
 	root := t.TempDir()
 
