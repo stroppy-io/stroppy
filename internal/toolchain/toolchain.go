@@ -110,17 +110,29 @@ func Resolve(ctx context.Context, options Options) (*Compiler, error) {
 // Env returns isolated Go environment while preserving process credentials and proxy policy.
 func (compiler *Compiler) Env(targetOS, targetArch string, offline bool) []string {
 	values := append([]string(nil), os.Environ()...)
-	privateRoot := filepath.Join(compiler.Root, "go")
 	values = setEnv(values, "GOENV", "off")
 	values = setEnv(values, "GOTOOLCHAIN", "local")
 	values = setEnv(values, "GOWORK", "off")
-	values = setEnv(values, "GOPATH", filepath.Join(privateRoot, "gopath"))
-	values = setEnv(values, "GOMODCACHE", filepath.Join(privateRoot, "modcache"))
-	values = appendEnvFlag(values, "GOFLAGS", "-modcacherw")
-	values = setEnv(values, "GOCACHE", filepath.Join(privateRoot, "buildcache"))
-	values = setEnv(values, "GOTMPDIR", filepath.Join(privateRoot, "tmp"))
-
 	values = setEnv(values, "CGO_ENABLED", "0")
+
+	if compiler.Private {
+		privateRoot := filepath.Join(compiler.Root, "go")
+		values = setEnv(values, "GOPATH", filepath.Join(privateRoot, "gopath"))
+		values = setEnv(values, "GOMODCACHE", filepath.Join(privateRoot, "modcache"))
+		values = appendEnvFlag(values, "GOFLAGS", "-modcacherw")
+		values = setEnv(values, "GOCACHE", filepath.Join(privateRoot, "buildcache"))
+		values = setEnv(values, "GOTMPDIR", filepath.Join(privateRoot, "tmp"))
+
+		for _, path := range []string{
+			filepath.Join(privateRoot, "gopath"),
+			filepath.Join(privateRoot, "modcache"),
+			filepath.Join(privateRoot, "buildcache"),
+			filepath.Join(privateRoot, "tmp"),
+		} {
+			_ = os.MkdirAll(path, privateDirPerm)
+		}
+	}
+
 	if targetOS != "" {
 		values = setEnv(values, "GOOS", targetOS)
 	}
@@ -133,16 +145,24 @@ func (compiler *Compiler) Env(targetOS, targetArch string, offline bool) []strin
 		values = setEnv(values, "GOPROXY", "off")
 	}
 
-	for _, path := range []string{
-		filepath.Join(privateRoot, "gopath"),
-		filepath.Join(privateRoot, "modcache"),
-		filepath.Join(privateRoot, "buildcache"),
-		filepath.Join(privateRoot, "tmp"),
-	} {
-		_ = os.MkdirAll(path, privateDirPerm)
+	return values
+}
+
+// CleanPrivateCaches removes only Go caches owned by Stroppy's private toolchain.
+func CleanPrivateCaches(root string) error {
+	resolved, err := resolveRoot(root)
+	if err != nil {
+		return err
 	}
 
-	return values
+	toolchain := filepath.Join(resolved, "toolchains", "go"+PinnedVersion)
+	if _, err := os.Stat(toolchain); errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	return os.RemoveAll(filepath.Join(resolved, "go"))
 }
 
 func compatibleSystemGo(ctx context.Context, root string) (*Compiler, bool) {

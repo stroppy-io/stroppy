@@ -50,7 +50,7 @@ func TestModuleConfigPreservesReplacements(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, replacements, err := ModuleConfig(Package{
+	_, replacements, err := ModuleConfig(&Package{
 		ModulePath: "example.com/workload", ModuleRoot: moduleRoot,
 	})
 	if err != nil {

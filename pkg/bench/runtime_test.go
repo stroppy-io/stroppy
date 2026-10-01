@@ -20,6 +20,7 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver/stats"
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
 func TestRunScenarioReturnsFatalErrorAndCancelsWorkers(t *testing.T) {
@@ -504,7 +505,7 @@ func TestRunReportCapturesCommonAndCustomData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if runReport.Schema != 1 || runReport.ID != "run-42" || runReport.Status != "completed" {
+	if runReport.Schema != report.SchemaVersion || runReport.ID != "run-42" || runReport.Status != "completed" {
 		t.Fatalf("report identity/status = %#v", runReport)
 	}
 

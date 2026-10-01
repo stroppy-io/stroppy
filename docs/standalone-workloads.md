@@ -82,8 +82,10 @@ stroppy export example/query another/query -o my-stroppy
 ```
 
 Set `GOOS` and `GOARCH` for pure-Go cross-compilation. Windows output receives an
-`.exe` suffix when omitted. Export requires source packages because it relinks
-them; running the last catalog build requires only its stored artifact.
+`.exe` suffix when omitted. Export relinks workload packages from Stroppy-owned
+source snapshots, so original source directories are not required after a
+successful catalog build. Running also uses the published local runtime rather
+than original sources.
 
 Both `build` and `export` prefer system Go 1.26 or newer. If unavailable, Stroppy
 can download verified Go 1.26.8 into `~/.stroppy/toolchains/`. Interactive use
@@ -99,11 +101,34 @@ reports, or logs.
 Custom workload packages are trusted native Go code and run with user privileges;
 Stroppy provides no sandbox.
 
-`stroppy run` uses the last successful build. Source edits require another
-`stroppy build`; an existing name requires `--replace`. Failed builds and failed
-replacements leave the previous artifact active. `remove` deletes only files
-owned by Stroppy under `~/.stroppy/workloads/`, never project source. Once built,
-the workload remains runnable after the source directory is moved or deleted.
+`stroppy run` uses one local Stroppy runtime containing built-ins plus every
+catalog workload. Source edits require another `stroppy build`; an existing name
+requires `--replace`. Stroppy stores immutable compiler-input snapshots, so later
+runtime rebuilds and exports do not require original source directories. Failed
+builds leave previous runtime active. After installed Stroppy changes, refresh the
+local runtime explicitly:
+
+```bash
+stroppy build --refresh
+```
+
+`remove` deletes only Stroppy-owned catalog data and republishes remaining
+workloads; removing final custom workload returns runtime commands to installed
+Stroppy. User source is never removed.
+
+Build and export artifacts are content-addressed under `~/.stroppy/cache/builds/`.
+Inspect secret-free provenance by full or unique digest prefix, or clear reusable
+artifacts and private-toolchain Go caches:
+
+```bash
+stroppy cache inspect DIGEST
+stroppy cache inspect DIGEST -o json
+stroppy cache clean
+```
+
+Cleanup preserves active local runtime, workload snapshots, reports, catalog, and
+private compiler installation. System Go keeps its normal caches. Generated
+runtime reports include `build_digest`; direct installed built-in runs omit it.
 
 Standalone runs use the same configuration, metrics, report, cancellation, and
 `~/.stroppy` storage conventions as installed Stroppy. Constructed run reports

@@ -23,6 +23,7 @@ import (
 // ReportOptions provides report identity owned by the calling application.
 type ReportOptions struct {
 	StroppyVersion string
+	BuildDigest    string
 	RunID          string
 	Metadata       map[string]string
 }
@@ -103,6 +104,7 @@ func newRunReport(
 		ID:             reportID,
 		RunID:          options.RunID,
 		StroppyVersion: options.StroppyVersion,
+		BuildDigest:    options.BuildDigest,
 		StartedAt:      started,
 		Status:         report.StatusFailed,
 		Workload:       name,

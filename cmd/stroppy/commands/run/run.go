@@ -70,6 +70,21 @@ var (
 
 var Cmd = NewCommand(bench.RegisteredCatalog(), "")
 
+const buildDigestAnnotation = "stroppy.build_digest"
+
+// SetBuildDigest attaches generated-artifact identity to reports from command.
+func SetBuildDigest(command *cobra.Command, digest string) {
+	if command == nil || digest == "" {
+		return
+	}
+
+	if command.Annotations == nil {
+		command.Annotations = map[string]string{}
+	}
+
+	command.Annotations[buildDigestAnnotation] = digest
+}
+
 // NewCommand builds a run command over an explicit workload catalog. A non-empty
 // default workload accepts flags without a workload positional.
 func NewCommand(catalog *bench.Catalog, defaultWorkload string) *cobra.Command {
@@ -303,7 +318,7 @@ Signals:
 					withExecuteSQLSource(paramInputs, body, file),
 					driverConfigs,
 					metricsConfig(loadedRunConfig(fileConfig)),
-					reportOptions(loadedRunConfig(fileConfig)),
+					reportOptions(cmd, loadedRunConfig(fileConfig)),
 					parsed.report,
 				)
 			}
@@ -325,7 +340,7 @@ Signals:
 					workloadParamInputs,
 					driverConfigs,
 					metricsConfig(loadedRunConfig(fileConfig)),
-					reportOptions(loadedRunConfig(fileConfig)),
+					reportOptions(cmd, loadedRunConfig(fileConfig)),
 					parsed.report,
 				)
 			}
@@ -798,8 +813,12 @@ func runGoWorkload(
 	return errors.Join(runErr, outputErr)
 }
 
-func reportOptions(cfg *config.RunConfig) bench.ReportOptions {
+func reportOptions(cmd *cobra.Command, cfg *config.RunConfig) bench.ReportOptions {
 	options := bench.ReportOptions{StroppyVersion: version.Resolve()}
+	if cmd != nil {
+		options.BuildDigest = cmd.Annotations[buildDigestAnnotation]
+	}
+
 	if cfg != nil && cfg.Global != nil {
 		options.RunID = cfg.Global.RunID
 		options.Metadata = cfg.Global.Metadata

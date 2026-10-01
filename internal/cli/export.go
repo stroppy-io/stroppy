@@ -45,14 +45,6 @@ func newExportCommand(store *workloadcatalog.Store) *cobra.Command {
 				return errExportOutput
 			}
 
-			compiler, err := toolchain.Resolve(cmd.Context(), toolchain.Options{
-				Root: store.StroppyRoot(), Consent: toolchainConsent(yes),
-				Input: cmd.InOrStdin(), Output: cmd.ErrOrStderr(), Offline: offline,
-			})
-			if err != nil {
-				return err
-			}
-
 			entries, err := selectedEntries(store, args, all)
 			if err != nil {
 				return err
@@ -61,6 +53,17 @@ func newExportCommand(store *workloadcatalog.Store) *cobra.Command {
 			packages := make([]workloadcatalog.Package, 0, len(entries))
 			for index := range entries {
 				entry := &entries[index]
+				if entry.SnapshotDigest != "" {
+					pkg, err := store.Package(entry.SnapshotDigest)
+					if err != nil {
+						return err
+					}
+
+					packages = append(packages, pkg)
+
+					continue
+				}
+
 				if entry.Package == "" || entry.ModuleRoot == "" {
 					return fmt.Errorf("%w: %s", errMissingSource, entry.Name)
 				}
@@ -92,17 +95,30 @@ func newExportCommand(store *workloadcatalog.Store) *cobra.Command {
 
 			absoluteOutput = targetOutputPath(absoluteOutput, targetOS)
 
-			if err := workloadcatalog.BuildRunner(cmd.Context(), compiler, &workloadcatalog.RunnerRequest{
-				Packages: packages, IncludeBuiltIns: true, Output: absoluteOutput,
-				TargetOS: targetOS, TargetArch: targetArch, Offline: offline,
-				Diagnostics: cmd.ErrOrStderr(), StroppyRoot: stroppySourceRoot(),
-			}); err != nil {
+			compiler, err := toolchain.Resolve(cmd.Context(), toolchain.Options{
+				Root: store.StroppyRoot(), Consent: toolchainConsent(yes),
+				Input: cmd.InOrStdin(), Output: cmd.ErrOrStderr(), Offline: offline,
+			})
+			if err != nil {
+				return err
+			}
+
+			manifest, reused, err := workloadcatalog.BuildCached(
+				cmd.Context(), compiler, &workloadcatalog.RunnerRequest{
+					Packages: packages, IncludeBuiltIns: true, Output: absoluteOutput,
+					TargetOS: targetOS, TargetArch: targetArch, Offline: offline,
+					Diagnostics: cmd.ErrOrStderr(), StroppyRoot: stroppySourceRoot(),
+					CacheRoot: store.StroppyRoot(),
+				},
+			)
+			if err != nil {
 				return err
 			}
 
 			_, err = fmt.Fprintf(
-				cmd.OutOrStdout(), "%s\t%s/%s\tgo%s\t%d custom workloads\n",
+				cmd.OutOrStdout(), "%s\t%s/%s\tgo%s\t%d custom workloads\t%s\t%t\n",
 				absoluteOutput, targetOS, targetArch, compiler.Version, len(packages),
+				manifest.Digest, reused,
 			)
 
 			return err
