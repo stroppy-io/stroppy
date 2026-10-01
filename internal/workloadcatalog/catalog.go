@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	SchemaVersion   = 1
+	SchemaVersion   = 2
 	catalogSubDir   = "workloads"
 	entriesSubDir   = "entries"
 	artifactsSubDir = "artifacts"
@@ -32,15 +32,17 @@ var (
 
 // Entry describes one active custom workload artifact.
 type Entry struct {
-	Schema       int       `json:"schema"`
-	Name         string    `json:"name"`
-	Source       string    `json:"source"`
-	Package      string    `json:"package,omitempty"`
-	ModulePath   string    `json:"module_path,omitempty"`
-	ModuleRoot   string    `json:"module_root,omitempty"`
-	BuiltAt      time.Time `json:"built_at"`
-	ArtifactPath string    `json:"artifact_path"`
-	Status       string    `json:"status,omitempty"`
+	Schema         int       `json:"schema"`
+	Name           string    `json:"name"`
+	Source         string    `json:"source"`
+	Package        string    `json:"package,omitempty"`
+	ModulePath     string    `json:"module_path,omitempty"`
+	ModuleRoot     string    `json:"module_root,omitempty"`
+	SnapshotDigest string    `json:"snapshot_digest,omitempty"`
+	BuildDigest    string    `json:"build_digest,omitempty"`
+	BuiltAt        time.Time `json:"built_at"`
+	ArtifactPath   string    `json:"artifact_path,omitempty"`
+	Status         string    `json:"status,omitempty"`
 }
 
 // Store owns one local custom-workload catalog.
@@ -110,13 +112,7 @@ func (store *Store) List() ([]Entry, error) {
 			return nil, err
 		}
 
-		if err := store.validateArtifactPath(entry.ArtifactPath); err != nil {
-			entry.Status = "broken"
-		} else if err := store.validateArtifact(&entry); err != nil {
-			entry.Status = "broken"
-		} else {
-			entry.Status = "ready"
-		}
+		entry.Status = store.entryStatus(&entry)
 
 		entries = append(entries, entry)
 	}
@@ -142,7 +138,11 @@ func (store *Store) Get(name string) (Entry, error) {
 		return Entry{}, err
 	}
 
-	if err := store.validateArtifact(&entry); err != nil {
+	if entry.SnapshotDigest != "" {
+		if _, err := store.readSnapshot(entry.SnapshotDigest); err != nil {
+			return Entry{}, err
+		}
+	} else if err := store.validateArtifact(&entry); err != nil {
 		return Entry{}, err
 	}
 
@@ -151,7 +151,9 @@ func (store *Store) Get(name string) (Entry, error) {
 	return entry, nil
 }
 
-// Publish atomically activates artifact for entry.Name. Source artifact remains caller-owned.
+// Publish atomically activates artifact or source snapshot for entry.Name.
+//
+//nolint:gocognit // publication keeps validation, staging, and replacement atomic
 func (store *Store) Publish(entry *Entry, sourceArtifact string, replace bool) (publishedEntry Entry, returnErr error) {
 	if entry == nil {
 		return Entry{}, ErrInvalidEntry
@@ -190,14 +192,19 @@ func (store *Store) Publish(entry *Entry, sourceArtifact string, replace bool) (
 		return Entry{}, fmt.Errorf("inspect catalog entry %q: %w", entry.Name, err)
 	}
 
-	artifactPath, err := copyStaged(sourceArtifact, store.artifactsDir(), entryID(entry.Name)+"-", executablePerm)
-	if err != nil {
-		return Entry{}, fmt.Errorf("publish workload artifact: %w", err)
+	artifactPath := ""
+	if sourceArtifact != "" {
+		artifactPath, err = copyStaged(sourceArtifact, store.artifactsDir(), entryID(entry.Name)+"-", executablePerm)
+		if err != nil {
+			return Entry{}, fmt.Errorf("publish workload artifact: %w", err)
+		}
+	} else if entry.SnapshotDigest == "" {
+		return Entry{}, ErrInvalidEntry
 	}
 
 	published := false
 	defer func() {
-		if !published {
+		if !published && artifactPath != "" {
 			_ = os.Remove(artifactPath)
 		}
 	}()
@@ -224,7 +231,7 @@ func (store *Store) Publish(entry *Entry, sourceArtifact string, replace bool) (
 
 	published = true
 
-	if previous != nil && previous.ArtifactPath != artifactPath {
+	if previous != nil && previous.ArtifactPath != "" && previous.ArtifactPath != artifactPath {
 		_ = os.Remove(previous.ArtifactPath)
 	}
 
@@ -261,16 +268,18 @@ func (store *Store) Remove(name string) (returnErr error) {
 		return fmt.Errorf("remove catalog entry: %w", err)
 	}
 
-	if err := store.validateArtifactPath(entry.ArtifactPath); err != nil {
-		if errors.Is(err, errOutsideCatalog) || errors.Is(err, fs.ErrNotExist) {
-			return nil
+	if entry.ArtifactPath != "" {
+		if err := store.validateArtifactPath(entry.ArtifactPath); err != nil {
+			if errors.Is(err, errOutsideCatalog) || errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
+
+			return fmt.Errorf("catalog entry removed; artifact left in place: %w", err)
 		}
 
-		return fmt.Errorf("catalog entry removed; artifact left in place: %w", err)
-	}
-
-	if err := os.Remove(entry.ArtifactPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("remove workload artifact: %w", err)
+		if err := os.Remove(entry.ArtifactPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("remove workload artifact: %w", err)
+		}
 	}
 
 	return nil
@@ -287,7 +296,7 @@ func (store *Store) readManifest(path string) (Entry, error) {
 		return Entry{}, fmt.Errorf("%w %q: %w", ErrInvalidEntry, path, err)
 	}
 
-	if entry.Schema != SchemaVersion {
+	if entry.Schema < 1 || entry.Schema > SchemaVersion {
 		return Entry{}, fmt.Errorf("%w %q: schema %d", ErrInvalidEntry, path, entry.Schema)
 	}
 
@@ -295,17 +304,41 @@ func (store *Store) readManifest(path string) (Entry, error) {
 		return Entry{}, fmt.Errorf("%w %q: %w", ErrInvalidEntry, path, err)
 	}
 
-	artifactDir := store.artifactsDir() + string(os.PathSeparator)
-	if !strings.HasPrefix(entry.ArtifactPath, artifactDir) ||
-		!strings.HasPrefix(filepath.Base(entry.ArtifactPath), entryID(entry.Name)+"-") {
-		return Entry{}, fmt.Errorf("%w %q: unexpected artifact path", ErrInvalidEntry, path)
-	}
+	if entry.SnapshotDigest == "" {
+		artifactDir := store.artifactsDir() + string(os.PathSeparator)
+		if !strings.HasPrefix(entry.ArtifactPath, artifactDir) ||
+			!strings.HasPrefix(filepath.Base(entry.ArtifactPath), entryID(entry.Name)+"-") {
+			return Entry{}, fmt.Errorf("%w %q: unexpected artifact path", ErrInvalidEntry, path)
+		}
 
-	if err := store.validateArtifactPath(entry.ArtifactPath); err != nil {
-		return Entry{}, fmt.Errorf("%w %q: unexpected artifact path: %w", ErrInvalidEntry, path, err)
+		if err := store.validateArtifactPath(entry.ArtifactPath); err != nil {
+			return Entry{}, fmt.Errorf("%w %q: unexpected artifact path: %w", ErrInvalidEntry, path, err)
+		}
+	} else if entry.Package == "" || entry.ModulePath == "" {
+		return Entry{}, fmt.Errorf("%w %q: incomplete snapshot metadata", ErrInvalidEntry, path)
 	}
 
 	return entry, nil
+}
+
+func (store *Store) entryStatus(entry *Entry) string {
+	if entry.SnapshotDigest != "" {
+		if _, err := store.readSnapshot(entry.SnapshotDigest); err != nil {
+			return "broken"
+		}
+
+		return "ready"
+	}
+
+	if err := store.validateArtifactPath(entry.ArtifactPath); err != nil {
+		return "broken"
+	}
+
+	if err := store.validateArtifact(entry); err != nil {
+		return "broken"
+	}
+
+	return "ready"
 }
 
 func (store *Store) validateArtifact(entry *Entry) error {
@@ -326,7 +359,7 @@ func (store *Store) validateArtifact(entry *Entry) error {
 }
 
 func (store *Store) ensureDirs() error {
-	for _, path := range []string{store.root, store.entriesDir(), store.artifactsDir()} {
+	for _, path := range []string{store.root, store.entriesDir(), store.artifactsDir(), store.snapshotsDir()} {
 		if err := os.MkdirAll(path, dirPerm); err != nil {
 			return fmt.Errorf("create workload catalog: %w", err)
 		}
@@ -338,6 +371,10 @@ func (store *Store) ensureDirs() error {
 
 	if err := store.validateOwnedPath(store.artifactsDir()); err != nil {
 		return fmt.Errorf("validate workload artifacts directory: %w", err)
+	}
+
+	if err := store.validateOwnedPath(store.snapshotsDir()); err != nil {
+		return fmt.Errorf("validate workload snapshots directory: %w", err)
 	}
 
 	return nil
