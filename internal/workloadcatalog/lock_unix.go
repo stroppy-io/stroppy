@@ -15,7 +15,18 @@ func (store *Store) lockExclusive() (func() error, error) {
 		return nil, fmt.Errorf("create workload catalog lock directory: %w", err)
 	}
 
-	file, err := os.OpenFile(filepath.Join(store.root, ".lock"), os.O_CREATE|os.O_RDWR, filePerm)
+	name := ".lock"
+
+	if store.lockKey != "" && store.lockKey != "catalog" {
+		locks := filepath.Join(store.root, ".locks")
+		if err := os.MkdirAll(locks, dirPerm); err != nil {
+			return nil, fmt.Errorf("create workload lock directory: %w", err)
+		}
+
+		name = filepath.Join(".locks", store.lockKey+".lock")
+	}
+
+	file, err := os.OpenFile(filepath.Join(store.root, name), os.O_CREATE|os.O_RDWR, filePerm)
 	if err != nil {
 		return nil, fmt.Errorf("open workload catalog lock: %w", err)
 	}

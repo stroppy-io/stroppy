@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- Custom workload builds and exports reuse content-addressed artifacts, preserve owned source snapshots, expose secret-free provenance through `stroppy cache inspect`, and identify generated runtime reports by build digest.
 - `stroppy export` creates one portable binary containing every built-in and all or selected custom workload packages, with standard cross-compilation support and a verified private Go 1.26.8 fallback under `~/.stroppy`. ([#185](https://github.com/stroppy-io/stroppy/pull/185))
 - `stroppy build`, `list`, and `remove` manage compiled custom workloads under `~/.stroppy/workloads/`, and registered workloads run or probe by name without their source tree. ([#184](https://github.com/stroppy-io/stroppy/pull/184))
 - Custom Go workloads can run as standalone Stroppy applications with the standard drivers, CLI, probe, version, reports, and programmatic runtime API. ([#183](https://github.com/stroppy-io/stroppy/pull/183))

@@ -96,6 +96,23 @@ func TestCleanPrivateCaches(t *testing.T) {
 	}
 }
 
+func TestCleanPrivateCachesPreservesCachesWithoutPrivateToolchain(t *testing.T) {
+	root := t.TempDir()
+
+	cache := filepath.Join(root, "go", "modcache", "entry")
+	if err := os.MkdirAll(cache, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := CleanPrivateCaches(root); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(cache); err != nil {
+		t.Fatalf("cache without private toolchain removed: %v", err)
+	}
+}
+
 func TestResolveUsesCompatibleSystemGo(t *testing.T) {
 	compiler, err := Resolve(t.Context(), Options{Root: t.TempDir(), Consent: ConsentNever})
 	if err != nil {

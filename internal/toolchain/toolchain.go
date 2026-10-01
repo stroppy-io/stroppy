@@ -155,6 +155,13 @@ func CleanPrivateCaches(root string) error {
 		return err
 	}
 
+	toolchain := filepath.Join(resolved, "toolchains", "go"+PinnedVersion)
+	if _, err := os.Stat(toolchain); errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
 	return os.RemoveAll(filepath.Join(resolved, "go"))
 }
 

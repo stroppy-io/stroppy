@@ -29,8 +29,10 @@ Stroppy still writes the requested report with `status: "failed"` or
 Common fields include report schema and identity, Stroppy version, timestamps,
 host runtime facts, driver types, effective scenario and parameter values,
 parameter sources, step selection and observed step results, measurement time,
-metrics, bounded error groups, and terminal failure information. Driver URLs,
-authentication fields, and OTLP headers are never included.
+metrics, bounded error groups, and terminal failure information. Schema 2 adds
+optional `build_digest` for runs from a cached generated runtime or export;
+direct installed built-in runs omit it. Driver URLs, authentication fields, and
+OTLP headers are never included.
 
 Counters and gauges contain aggregate totals plus dimensioned series. Histograms
 contain count, sum, average, fixed bounds, bucket counts, p50/p90/p95/p99, and
@@ -53,5 +55,5 @@ Built-in typed payloads:
 Skipped or failed workload-specific reporting is explicit through each payload's
 `status` and `reason`; unknown payload kinds remain valid report data.
 
-Envelope schema changes only for breaking contract changes. Additive optional
-fields retain current schema. Each workload payload carries its own schema.
+Envelope schema changes when shared provenance or result contracts evolve. Each
+workload payload carries its own schema.

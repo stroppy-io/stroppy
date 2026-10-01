@@ -47,7 +47,8 @@ type Entry struct {
 
 // Store owns one local custom-workload catalog.
 type Store struct {
-	root string
+	root    string
+	lockKey string
 }
 
 // Open resolves the current user's Stroppy workload catalog.
@@ -67,7 +68,7 @@ func OpenAt(path string) (*Store, error) {
 		return nil, fmt.Errorf("resolve catalog path: %w", err)
 	}
 
-	return &Store{root: absolute}, nil
+	return &Store{root: absolute, lockKey: "catalog"}, nil
 }
 
 // Root returns Stroppy-owned catalog root.

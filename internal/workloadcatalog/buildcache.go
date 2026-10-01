@@ -106,6 +106,10 @@ func (cache *Cache) Inspect(prefix string) (BuildManifest, error) {
 	return cache.readManifest(matches[0])
 }
 
+func (cache *Cache) lockDigest(digest string) (func() error, error) {
+	return (&Store{root: cache.root, lockKey: digest}).lockExclusive()
+}
+
 func (cache *Cache) build(
 	ctx context.Context,
 	compiler *toolchain.Compiler,
@@ -129,7 +133,7 @@ func (cache *Cache) build(
 		return BuildManifest{}, "", false, err
 	}
 
-	unlock, err := lockBuild(cache.root, digest)
+	unlock, err := cache.lockDigest(digest)
 	if err != nil {
 		return BuildManifest{}, "", false, err
 	}
