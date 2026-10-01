@@ -82,8 +82,10 @@ stroppy export example/query another/query -o my-stroppy
 ```
 
 Set `GOOS` and `GOARCH` for pure-Go cross-compilation. Windows output receives an
-`.exe` suffix when omitted. Export requires source packages because it relinks
-them; running the last catalog build requires only its stored artifact.
+`.exe` suffix when omitted. Export relinks workload packages from Stroppy-owned
+source snapshots, so original source directories are not required after a
+successful catalog build. Running also uses the published local runtime rather
+than original sources.
 
 Both `build` and `export` prefer system Go 1.26 or newer. If unavailable, Stroppy
 can download verified Go 1.26.8 into `~/.stroppy/toolchains/`. Interactive use

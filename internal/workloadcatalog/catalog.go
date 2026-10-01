@@ -286,6 +286,38 @@ func (store *Store) Remove(name string) (returnErr error) {
 	return nil
 }
 
+// Restore atomically restores a previously read catalog manifest without copying artifacts.
+func (store *Store) Restore(entry *Entry) (returnErr error) {
+	if entry == nil {
+		return ErrInvalidEntry
+	}
+
+	if err := store.ensureDirs(); err != nil {
+		return err
+	}
+
+	unlock, err := store.lockExclusive()
+	if err != nil {
+		return err
+	}
+	defer func() { returnErr = errors.Join(returnErr, unlock()) }()
+
+	restored := *entry
+	restored.Schema = SchemaVersion
+
+	data, err := json.MarshalIndent(restored, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	path, err := store.manifestPath(restored.Name)
+	if err != nil {
+		return err
+	}
+
+	return writeAtomic(path, append(data, '\n'), filePerm)
+}
+
 func (store *Store) readManifest(path string) (Entry, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

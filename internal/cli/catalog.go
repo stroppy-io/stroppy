@@ -107,12 +107,14 @@ func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 				stroppySourceRoot(), version.Resolve(),
 			)
 			if err != nil {
-				_ = store.Remove(result.Name)
+				removeErr := store.Remove(result.Name)
+
+				var restoreErr error
 				if previousErr == nil {
-					_, _ = store.Publish(&previous, previous.ArtifactPath, false)
+					restoreErr = store.Restore(&previous)
 				}
 
-				return err
+				return errors.Join(err, removeErr, restoreErr)
 			}
 
 			_, err = fmt.Fprintf(

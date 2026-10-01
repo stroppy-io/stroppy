@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -52,7 +51,7 @@ func (store *Store) Packages() ([]Package, error) {
 	for index := range entries {
 		entry := &entries[index]
 		if entry.SnapshotDigest == "" {
-			return nil, fmt.Errorf("%w: workload %s has no source snapshot", ErrInvalidEntry, entry.Name)
+			continue
 		}
 
 		snapshot, err := store.readSnapshot(entry.SnapshotDigest)

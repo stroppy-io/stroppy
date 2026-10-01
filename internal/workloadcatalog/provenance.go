@@ -81,6 +81,7 @@ type BuildManifest struct {
 	IncludeBuiltIns bool              `json:"include_built_ins"`
 	Workloads       []string          `json:"workloads"`
 	SnapshotDigests []string          `json:"snapshot_digests,omitempty"`
+	SourceDigests   []string          `json:"source_digests,omitempty"`
 	Modules         []ModuleIdentity  `json:"modules"`
 	RunnerSHA256    string            `json:"runner_sha256"`
 	DriverBundle    string            `json:"driver_bundle"`
@@ -88,20 +89,22 @@ type BuildManifest struct {
 
 //nolint:tagliatelle // Go command JSON uses exported Go field names.
 type listedPackage struct {
-	Dir          string        `json:"Dir"`
-	GoFiles      []string      `json:"GoFiles"`
-	CgoFiles     []string      `json:"CgoFiles"`
-	CFiles       []string      `json:"CFiles"`
-	CXXFiles     []string      `json:"CXXFiles"`
-	MFiles       []string      `json:"MFiles"`
-	HFiles       []string      `json:"HFiles"`
-	FFiles       []string      `json:"FFiles"`
-	SFiles       []string      `json:"SFiles"`
-	SwigFiles    []string      `json:"SwigFiles"`
-	SwigCXXFiles []string      `json:"SwigCXXFiles"`
-	SysoFiles    []string      `json:"SysoFiles"`
-	EmbedFiles   []string      `json:"EmbedFiles"`
-	Module       *listedModule `json:"Module"`
+	Dir               string        `json:"Dir"`
+	GoFiles           []string      `json:"GoFiles"`
+	IgnoredGoFiles    []string      `json:"IgnoredGoFiles"`
+	IgnoredOtherFiles []string      `json:"IgnoredOtherFiles"`
+	CgoFiles          []string      `json:"CgoFiles"`
+	CFiles            []string      `json:"CFiles"`
+	CXXFiles          []string      `json:"CXXFiles"`
+	MFiles            []string      `json:"MFiles"`
+	HFiles            []string      `json:"HFiles"`
+	FFiles            []string      `json:"FFiles"`
+	SFiles            []string      `json:"SFiles"`
+	SwigFiles         []string      `json:"SwigFiles"`
+	SwigCXXFiles      []string      `json:"SwigCXXFiles"`
+	SysoFiles         []string      `json:"SysoFiles"`
+	EmbedFiles        []string      `json:"EmbedFiles"`
+	Module            *listedModule `json:"Module"`
 }
 
 //nolint:tagliatelle // Go command JSON uses exported Go field names.
@@ -341,14 +344,16 @@ func discoverLocalInputs(
 }
 
 func (listed *listedPackage) files() []string {
-	count := len(listed.GoFiles) + len(listed.CgoFiles) + len(listed.CFiles) +
-		len(listed.CXXFiles) + len(listed.MFiles) + len(listed.HFiles) +
-		len(listed.FFiles) + len(listed.SFiles) + len(listed.SwigFiles) +
-		len(listed.SwigCXXFiles) + len(listed.SysoFiles) + len(listed.EmbedFiles)
+	count := len(listed.GoFiles) + len(listed.IgnoredGoFiles) + len(listed.IgnoredOtherFiles) +
+		len(listed.CgoFiles) + len(listed.CFiles) + len(listed.CXXFiles) +
+		len(listed.MFiles) + len(listed.HFiles) + len(listed.FFiles) +
+		len(listed.SFiles) + len(listed.SwigFiles) + len(listed.SwigCXXFiles) +
+		len(listed.SysoFiles) + len(listed.EmbedFiles)
 
 	files := make([]string, 0, count)
 	for _, group := range [][]string{
-		listed.GoFiles, listed.CgoFiles, listed.CFiles, listed.CXXFiles, listed.MFiles,
+		listed.GoFiles, listed.IgnoredGoFiles, listed.IgnoredOtherFiles,
+		listed.CgoFiles, listed.CFiles, listed.CXXFiles, listed.MFiles,
 		listed.HFiles, listed.FFiles, listed.SFiles, listed.SwigFiles,
 		listed.SwigCXXFiles, listed.SysoFiles, listed.EmbedFiles,
 	} {
@@ -438,20 +443,29 @@ func discoverLocalModules(root string) ([]*localModule, error) {
 }
 
 func loadModuleFiles(local *localModule, files map[string]struct{}) error {
+	if files == nil {
+		files = map[string]struct{}{}
+	}
+
 	files["go.mod"] = struct{}{}
 	if _, err := os.Stat(filepath.Join(local.root, "go.sum")); err == nil {
 		files["go.sum"] = struct{}{}
 	}
 
+	moduleRoot, err := filepath.EvalSymlinks(local.root)
+	if err != nil {
+		return err
+	}
+
 	for relative := range files {
-		path := filepath.Join(local.root, relative)
+		path := filepath.Join(moduleRoot, relative)
 
 		resolved, err := filepath.EvalSymlinks(path)
 		if err != nil {
 			return err
 		}
 
-		inside, err := filepath.Rel(local.root, resolved)
+		inside, err := filepath.Rel(moduleRoot, resolved)
 		if err != nil || filepath.IsAbs(inside) || inside == ".." ||
 			strings.HasPrefix(inside, ".."+string(os.PathSeparator)) {
 			return fmt.Errorf("%w: %s", errUnsafeSource, path)

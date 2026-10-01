@@ -52,6 +52,109 @@ func TestBuildCachedReusesCompletedArtifact(t *testing.T) {
 	}
 }
 
+func TestBuildCachedRebuildsCorruptEntry(t *testing.T) {
+	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	compiler, err := toolchain.Resolve(t.Context(), toolchain.Options{
+		Root: t.TempDir(), Consent: toolchain.ConsentNever,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cacheRoot := t.TempDir()
+	request := &RunnerRequest{
+		IncludeBuiltIns: true, Output: filepath.Join(t.TempDir(), "stroppy"),
+		CacheRoot: cacheRoot, StroppyRoot: repoRoot, Diagnostics: &bytes.Buffer{},
+	}
+
+	first, _, err := BuildCached(t.Context(), compiler, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entry := filepath.Join(cacheRoot, "cache", "builds", first.Digest)
+	if err := os.WriteFile(filepath.Join(entry, "stroppy"), []byte("corrupt"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(filepath.Join(entry, "leftover"), []byte("partial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	second, reused, err := BuildCached(t.Context(), compiler, request)
+	if err != nil || reused {
+		t.Fatalf("repair build = %#v reused=%t error=%v", second, reused, err)
+	}
+
+	if second.Digest != first.Digest {
+		t.Fatalf("repair digest = %s, want %s", second.Digest, first.Digest)
+	}
+
+	if _, err := os.Stat(filepath.Join(entry, "leftover")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("corrupt entry was not replaced: %v", err)
+	}
+}
+
+func TestBuildCachedInvalidatesUnsnappedSource(t *testing.T) {
+	moduleRoot := t.TempDir()
+
+	moduleData := []byte("module example.com/input\n\ngo 1.26\n")
+	if err := os.WriteFile(filepath.Join(moduleRoot, "go.mod"), moduleData, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	source := filepath.Join(moduleRoot, "workload.go")
+	if err := os.WriteFile(source, []byte("package input\nconst Value = 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler, err := toolchain.Resolve(t.Context(), toolchain.Options{
+		Root: t.TempDir(), Consent: toolchain.ConsentNever,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pkg, err := DiscoverPackage(t.Context(), compiler, moduleRoot, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	request := &RunnerRequest{Packages: []Package{pkg}, IncludeBuiltIns: true}
+
+	first, err := runnerIdentity(compiler, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(source, []byte("package input\nconst Value = 2\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := runnerIdentity(compiler, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	firstDigest, err := canonicalDigest(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	secondDigest, err := canonicalDigest(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if firstDigest == secondDigest {
+		t.Fatal("source edit did not invalidate build identity")
+	}
+}
+
 func TestBuildCachedConcurrentWritersShareArtifact(t *testing.T) {
 	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {

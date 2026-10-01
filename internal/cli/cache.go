@@ -29,7 +29,7 @@ func newCacheInspectCommand(store *workloadcatalog.Store) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			manifest, err := workloadcatalog.InspectBuild(store.StroppyRoot(), args[0])
-			if err != nil {
+			if errors.Is(err, workloadcatalog.ErrBuildNotFound) {
 				if active, activeErr := store.ActiveRuntime(); activeErr == nil &&
 					len(args[0]) <= len(active.BuildDigest) && active.BuildDigest[:len(args[0])] == args[0] {
 					manifest, err = workloadcatalog.InspectBuild(store.StroppyRoot(), active.BuildDigest)

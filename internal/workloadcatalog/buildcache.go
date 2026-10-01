@@ -29,6 +29,7 @@ type buildIdentity struct {
 	IncludeBuiltIns bool              `json:"include_built_ins"`
 	Workloads       []string          `json:"workloads"`
 	SnapshotDigests []string          `json:"snapshot_digests,omitempty"`
+	SourceDigests   []string          `json:"source_digests,omitempty"`
 	Modules         []ModuleIdentity  `json:"modules"`
 	RunnerSHA256    string            `json:"runner_sha256"`
 	DriverBundle    string            `json:"driver_bundle"`
@@ -172,7 +173,8 @@ func (cache *Cache) build(
 		TargetOS: identity.TargetOS, TargetArch: identity.TargetArch,
 		TargetSettings: identity.TargetSettings, GOFLAGSSHA256: identity.GOFLAGSSHA256,
 		IncludeBuiltIns: identity.IncludeBuiltIns, Workloads: identity.Workloads,
-		SnapshotDigests: identity.SnapshotDigests, Modules: identity.Modules,
+		SnapshotDigests: identity.SnapshotDigests, SourceDigests: identity.SourceDigests,
+		Modules:      identity.Modules,
 		RunnerSHA256: identity.RunnerSHA256, DriverBundle: identity.DriverBundle,
 	}
 
@@ -186,6 +188,10 @@ func (cache *Cache) build(
 	}
 
 	entry := filepath.Join(cache.root, digest)
+	if err := os.RemoveAll(entry); err != nil {
+		return BuildManifest{}, "", false, err
+	}
+
 	if err := os.Rename(staging, entry); err != nil {
 		if existing, readErr := cache.readManifest(digest); readErr == nil {
 			return existing, cache.artifactPath(digest), true, nil
@@ -202,11 +208,19 @@ func runnerIdentity(compiler *toolchain.Compiler, request *RunnerRequest) (build
 	workloads := make([]string, 0, len(request.Packages))
 	snapshots := make([]string, 0, len(request.Packages))
 	modules := make([]ModuleIdentity, 0)
+	sourceDigests := make([]string, 0, len(request.Packages))
 
 	for _, pkg := range request.Packages {
 		workloads = append(workloads, pkg.ImportPath)
 		if pkg.SnapshotDigest != "" {
 			snapshots = append(snapshots, pkg.SnapshotDigest)
+		} else {
+			sourceDigest, err := hashPackageInputs(&pkg)
+			if err != nil {
+				return buildIdentity{}, err
+			}
+
+			sourceDigests = append(sourceDigests, sourceDigest)
 		}
 
 		requirements, replacements, err := ModuleConfig(&pkg)
@@ -227,6 +241,7 @@ func runnerIdentity(compiler *toolchain.Compiler, request *RunnerRequest) (build
 
 	sort.Strings(workloads)
 	sort.Strings(snapshots)
+	sort.Strings(sourceDigests)
 	sort.Slice(modules, func(left, right int) bool {
 		if modules[left].Path != modules[right].Path {
 			return modules[left].Path < modules[right].Path
@@ -262,10 +277,36 @@ func runnerIdentity(compiler *toolchain.Compiler, request *RunnerRequest) (build
 		TargetSettings:  targetSettings(targetOS, targetArch),
 		GOFLAGSSHA256:   digestBytes([]byte(os.Getenv("GOFLAGS"))),
 		IncludeBuiltIns: request.IncludeBuiltIns, Workloads: workloads,
-		SnapshotDigests: snapshots, Modules: modules,
+		SnapshotDigests: snapshots, SourceDigests: sourceDigests, Modules: modules,
 		RunnerSHA256: digestBytes(append(runnerSource, moduleSource...)),
 		DriverBundle: driverBundleVersion,
 	}, nil
+}
+
+func hashPackageInputs(pkg *Package) (string, error) {
+	modules, err := discoverLocalModules(pkg.ModuleRoot)
+	if err != nil {
+		return "", err
+	}
+
+	type moduleDigest struct {
+		Path   string `json:"path"`
+		SHA256 string `json:"sha256"`
+	}
+
+	values := make([]moduleDigest, 0, len(modules))
+	for _, module := range modules {
+		digest, err := hashTree(module.root)
+		if err != nil {
+			return "", err
+		}
+
+		values = append(values, moduleDigest{Path: module.path, SHA256: digest})
+	}
+
+	sort.Slice(values, func(left, right int) bool { return values[left].Path < values[right].Path })
+
+	return canonicalDigest(values)
 }
 
 func hashTree(root string) (string, error) {
@@ -287,15 +328,15 @@ func hashTree(root string) (string, error) {
 		}
 
 		if entry.IsDir() {
-			if relative != "." && (entry.Name() == ".git" || entry.Name() == "build" || entry.Name() == ".claude") {
+			if entry.Name() == ".git" || entry.Name() == ".hg" || entry.Name() == ".svn" ||
+				entry.Name() == ".claude" || relative == "build" {
 				return filepath.SkipDir
 			}
 
 			return nil
 		}
 
-		isModuleFile := relative == "go.mod" || relative == "go.sum"
-		if entry.Type()&os.ModeSymlink != 0 || !strings.HasSuffix(path, ".go") && !isModuleFile {
+		if entry.Type()&os.ModeSymlink != 0 || !entry.Type().IsRegular() {
 			return nil
 		}
 
@@ -314,9 +355,7 @@ func hashTree(root string) (string, error) {
 
 	sort.Slice(files, func(left, right int) bool { return files[left].Path < files[right].Path })
 
-	digest, err := canonicalDigest(files)
-
-	return digest, err
+	return canonicalDigest(files)
 }
 
 func (cache *Cache) readManifest(digest string) (BuildManifest, error) {
