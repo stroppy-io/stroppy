@@ -336,6 +336,10 @@ func hashTree(root string) (string, error) {
 			return nil
 		}
 
+		if relative == "coverage.out" || relative == "cpu.out" || relative == "mem.out" {
+			return nil
+		}
+
 		if entry.Type()&os.ModeSymlink != 0 || !entry.Type().IsRegular() {
 			return nil
 		}
