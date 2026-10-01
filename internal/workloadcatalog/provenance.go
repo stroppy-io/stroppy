@@ -603,6 +603,16 @@ func (store *Store) readSnapshot(digest string) (Snapshot, error) {
 	return snapshot, nil
 }
 
+// Package resolves one owned source snapshot to an importable package.
+func (store *Store) Package(digest string) (Package, error) {
+	snapshot, err := store.readSnapshot(digest)
+	if err != nil {
+		return Package{}, err
+	}
+
+	return store.snapshotPackage(&snapshot)
+}
+
 func (store *Store) snapshotPackage(snapshot *Snapshot) (Package, error) {
 	var module SnapshotModule
 

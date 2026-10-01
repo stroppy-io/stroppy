@@ -51,7 +51,7 @@ func TestRuntimeRebuildAndForward(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	active, reused, err := store.RebuildRuntime(t.Context(), compiler, &diagnostics, false, repoRoot)
+	active, reused, err := store.RebuildRuntime(t.Context(), compiler, &diagnostics, false, repoRoot, "test-version")
 	if err != nil || reused {
 		t.Fatalf("rebuild runtime = %#v reused=%t error=%v\n%s", active, reused, err, diagnostics.String())
 	}
@@ -62,7 +62,7 @@ func TestRuntimeRebuildAndForward(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err = store.RunRuntime(context.Background(), []string{
+	err = store.RunRuntime(context.Background(), active.StroppyVersion, []string{
 		"run", "runtime/example", "-d", "noop", "--iterations", "1", "--no-report",
 	}, &RuntimeProcess{Stdout: &stdout, Stderr: &stderr, Dir: t.TempDir()})
 	if err != nil {
@@ -73,7 +73,7 @@ func TestRuntimeRebuildAndForward(t *testing.T) {
 		t.Fatalf("runtime stderr = %q", stderr.String())
 	}
 
-	second, reused, err := store.RebuildRuntime(t.Context(), compiler, &diagnostics, false, repoRoot)
+	second, reused, err := store.RebuildRuntime(t.Context(), compiler, &diagnostics, false, repoRoot, "test-version")
 	if err != nil || !reused || second.BuildDigest != active.BuildDigest {
 		t.Fatalf("second runtime = %#v reused=%t error=%v", second, reused, err)
 	}

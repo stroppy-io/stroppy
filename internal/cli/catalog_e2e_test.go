@@ -95,14 +95,19 @@ func createWorkloadProject(t *testing.T, repoRoot, name, marker string) (root, p
 		t.Fatal(err)
 	}
 
-	goMod := fmt.Sprintf(`module example.com/managed
+	rootMod, err := os.ReadFile(filepath.Join(repoRoot, "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
 
-go 1.26
-
-require github.com/stroppy-io/stroppy/v6 v6.0.0
-
-replace github.com/stroppy-io/stroppy/v6 => %s
-`, repoRoot)
+	replacement := fmt.Sprintf(
+		"module example.com/managed\n\nrequire github.com/stroppy-io/stroppy/v6 v6.0.0\n\n"+
+			"replace github.com/stroppy-io/stroppy/v6 => %s",
+		repoRoot,
+	)
+	goMod := strings.Replace(
+		string(rootMod), "module github.com/stroppy-io/stroppy/v6", replacement, 1,
+	)
 
 	workloadSource := `package workload
 
@@ -122,6 +127,15 @@ func init() { bench.Register(New) }
 `
 
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte(goMod), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	goSum, err := os.ReadFile(filepath.Join(repoRoot, "go.sum"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(filepath.Join(root, "go.sum"), goSum, 0o600); err != nil {
 		t.Fatal(err)
 	}
 

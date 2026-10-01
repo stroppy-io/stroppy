@@ -81,7 +81,7 @@ func (store *Store) RebuildRuntime(
 	compiler *toolchain.Compiler,
 	diagnostics io.Writer,
 	offline bool,
-	stroppyRoot string,
+	stroppyRoot, buildVersion string,
 ) (ActiveRuntime, bool, error) {
 	packages, err := store.Packages()
 	if err != nil {
@@ -123,7 +123,7 @@ func (store *Store) RebuildRuntime(
 	manifest, reused, err := BuildCached(ctx, compiler, &RunnerRequest{
 		Packages: packages, IncludeBuiltIns: true, Output: artifact,
 		Offline: offline, Diagnostics: diagnostics, StroppyRoot: stroppyRoot,
-		CacheRoot: store.StroppyRoot(),
+		CacheRoot: store.StroppyRoot(), BuildVersion: buildVersion,
 	})
 	if err != nil {
 		return ActiveRuntime{}, false, err
@@ -134,9 +134,14 @@ func (store *Store) RebuildRuntime(
 		return ActiveRuntime{}, false, err
 	}
 
+	activeVersion := manifest.StroppyVersion
+	if buildVersion != "" {
+		activeVersion = buildVersion
+	}
+
 	active := ActiveRuntime{
 		Schema: runtimeSchemaVersion, BuildDigest: manifest.Digest,
-		StroppyVersion: manifest.StroppyVersion, CatalogDigest: catalogDigest,
+		StroppyVersion: activeVersion, CatalogDigest: catalogDigest,
 		ArtifactPath: finalArtifact, BuiltAt: time.Now().UTC(),
 	}
 
@@ -199,11 +204,20 @@ func (store *Store) RuntimeStatus(stroppyVersion string) (ActiveRuntime, bool, e
 	return active, active.StroppyVersion != stroppyVersion || active.CatalogDigest != digest, nil
 }
 
-// RunRuntime starts local Stroppy with direct argument and stream forwarding.
-func (store *Store) RunRuntime(ctx context.Context, args []string, process *RuntimeProcess) error {
-	active, err := store.ActiveRuntime()
+// RunRuntime starts current local Stroppy with direct argument and stream forwarding.
+func (store *Store) RunRuntime(
+	ctx context.Context,
+	stroppyVersion string,
+	args []string,
+	process *RuntimeProcess,
+) error {
+	active, stale, err := store.RuntimeStatus(stroppyVersion)
 	if err != nil {
 		return err
+	}
+
+	if stale {
+		return ErrRuntimeStale
 	}
 
 	if process == nil {

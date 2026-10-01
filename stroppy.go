@@ -158,11 +158,21 @@ func Main(factory Factory) {
 // RegisteredMain runs every workload registered through [bench.Register].
 // Generated portable Stroppy binaries use this entrypoint after blank-importing
 // built-in and selected custom workload packages.
-func RegisteredMain(buildVersion string) {
-	os.Exit(registeredMainExitCode(buildVersion))
+func RegisteredMain(identity ...string) {
+	buildVersion := ""
+	if len(identity) > 0 {
+		buildVersion = identity[0]
+	}
+
+	buildDigest := ""
+	if len(identity) > 1 {
+		buildDigest = identity[1]
+	}
+
+	os.Exit(registeredMainExitCode(buildVersion, buildDigest))
 }
 
-func registeredMainExitCode(buildVersion string) int {
+func registeredMainExitCode(buildVersion, buildDigest string) int {
 	ctx, stop, exitStatus := shutdown.NotifyContext(context.Background(), nil)
 
 	catalog := bench.RegisteredCatalog()
@@ -174,7 +184,7 @@ func registeredMainExitCode(buildVersion string) int {
 
 	err := cli.Execute(ctx, &cli.Options{
 		Catalog: catalog, DefaultWorkload: defaultWorkload, Version: buildVersion,
-		IncludeList: true, RegisteredRun: defaultWorkload == "",
+		BuildDigest: buildDigest, IncludeList: true, RegisteredRun: defaultWorkload == "",
 	}, os.Args[1:], os.Stdout, os.Stderr)
 
 	stop()

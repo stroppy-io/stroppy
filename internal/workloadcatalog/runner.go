@@ -40,6 +40,8 @@ type RunnerRequest struct {
 	Diagnostics     io.Writer
 	StroppyRoot     string
 	CacheRoot       string
+	BuildVersion    string
+	BuildDigest     string
 }
 
 // BuildRunner links selected workload packages into one Stroppy executable.
@@ -60,6 +62,7 @@ func buildRunnerUncached(ctx context.Context, compiler *toolchain.Compiler, requ
 
 	mainSource, moduleSource, err := runnerSources(
 		request.Packages, request.IncludeBuiltIns, request.StroppyRoot,
+		request.BuildVersion, request.BuildDigest,
 	)
 	if err != nil {
 		return err
@@ -119,7 +122,7 @@ func buildRunnerUncached(ctx context.Context, compiler *toolchain.Compiler, requ
 func runnerSources(
 	packages []Package,
 	includeBuiltIns bool,
-	stroppyRoot string,
+	stroppyRoot, buildVersion, buildDigest string,
 ) (mainSource, moduleSource []byte, err error) {
 	requirements := map[string]string{stroppyModulePath: stroppyModuleVersion()}
 
@@ -148,7 +151,11 @@ func runnerSources(
 		}
 	}
 
-	return formatRunnerSources(imports, requirements, replacements)
+	if buildVersion == "" {
+		buildVersion = stroppyVersion()
+	}
+
+	return formatRunnerSources(imports, requirements, replacements, buildVersion, buildDigest)
 }
 
 func mergeRequirements(destination, source map[string]string) {
@@ -179,6 +186,7 @@ func formatRunnerSources(
 	imports []string,
 	requirements map[string]string,
 	replacements moduleReplacements,
+	buildVersion, buildDigest string,
 ) (main, moduleSource []byte, err error) {
 	sort.Strings(imports)
 
@@ -193,7 +201,7 @@ func formatRunnerSources(
 	}
 
 	mainSource.WriteString(")\n\nfunc main() { stroppy.RegisteredMain(")
-	fmt.Fprintf(&mainSource, "%q", stroppyVersion())
+	fmt.Fprintf(&mainSource, "%q, %q", buildVersion, buildDigest)
 	mainSource.WriteString(") }\n")
 
 	moduleFile := new(modfile.File)
@@ -258,7 +266,9 @@ func writeRunnerModule(
 	requirements map[string]string,
 	replacements moduleReplacements,
 ) error {
-	mainSource, moduleSource, err := formatRunnerSources(imports, requirements, replacements)
+	mainSource, moduleSource, err := formatRunnerSources(
+		imports, requirements, replacements, stroppyVersion(), "",
+	)
 	if err != nil {
 		return err
 	}

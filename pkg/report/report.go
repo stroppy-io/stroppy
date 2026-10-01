@@ -8,7 +8,7 @@ import (
 
 const (
 	// SchemaVersion is the current run report envelope version.
-	SchemaVersion = 1
+	SchemaVersion = 2
 	// Kind identifies a benchmark run report among future report families.
 	Kind = "run"
 )
@@ -41,6 +41,7 @@ type Run struct {
 	ID                 string            `json:"id"`
 	RunID              string            `json:"run_id,omitempty"`
 	StroppyVersion     string            `json:"stroppy_version"`
+	BuildDigest        string            `json:"build_digest,omitempty"`
 	StartedAt          time.Time         `json:"started_at"`
 	FinishedAt         time.Time         `json:"finished_at"`
 	Status             Status            `json:"status"`

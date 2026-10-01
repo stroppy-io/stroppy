@@ -18,6 +18,7 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
 	_ "github.com/stroppy-io/stroppy/v6/workloads/simple"
 )
 
@@ -764,7 +765,7 @@ func TestJSONReportStdoutAndFile(t *testing.T) {
 	var fileReport map[string]any
 	require.NoError(t, json.Unmarshal(fileData, &fileReport))
 	require.Equal(t, stdoutReport, fileReport)
-	require.InDelta(t, 1, stdoutReport["schema"], 0)
+	require.InDelta(t, report.SchemaVersion, stdoutReport["schema"], 0)
 	require.Equal(t, "run", stdoutReport["kind"])
 	require.Equal(t, "simple", stdoutReport["workload"])
 	require.Equal(t, "noop", stdoutReport["driver"])

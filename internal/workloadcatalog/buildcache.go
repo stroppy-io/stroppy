@@ -148,6 +148,8 @@ func (cache *Cache) build(
 	artifact = filepath.Join(staging, "stroppy")
 	uncached := *request
 	uncached.CacheRoot = ""
+	uncached.BuildVersion = identity.StroppyVersion
+	uncached.BuildDigest = digest
 
 	uncached.Output = artifact
 	if err := buildRunnerUncached(ctx, compiler, &uncached); err != nil {
@@ -230,7 +232,7 @@ func runnerIdentity(compiler *toolchain.Compiler, request *RunnerRequest) (build
 	})
 
 	runnerSource, moduleSource, err := runnerSources(
-		request.Packages, request.IncludeBuiltIns, request.StroppyRoot,
+		request.Packages, request.IncludeBuiltIns, request.StroppyRoot, "", "",
 	)
 	if err != nil {
 		return buildIdentity{}, err

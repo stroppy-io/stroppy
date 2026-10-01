@@ -28,6 +28,7 @@ type Options struct {
 	ExtraCommands   []*cobra.Command
 	ManagedCatalog  *workloadcatalog.Store
 	Version         string
+	BuildDigest     string
 	IncludeList     bool
 	RegisteredRun   bool
 }
@@ -55,8 +56,14 @@ func NewRoot(options *Options) *cobra.Command {
 		options.DefaultWorkload,
 		catalogResolver(options.ManagedCatalog),
 	)
+	runcommand.SetBuildDigest(run, options.BuildDigest)
+
 	probeCommand := probe.NewCommand(catalog)
-	root.AddCommand(newVersionCommand(options.Version), probeCommand, help.NewCommand())
+	root.AddCommand(
+		newVersionCommand(options.Version, options.ManagedCatalog),
+		probeCommand,
+		help.NewCommand(),
+	)
 	root.AddCommand(options.ExtraCommands...)
 	addManagedCommands(root, probeCommand, catalog, options.ManagedCatalog)
 
@@ -130,7 +137,8 @@ func ExitCodeFor(cancelCode int, err error) int {
 	return 1
 }
 
-func newVersionCommand(versionOverride string) *cobra.Command {
+//nolint:gocognit // output combines component and optional runtime status formats
+func newVersionCommand(versionOverride string, store *workloadcatalog.Store) *cobra.Command {
 	var jsonOutput bool
 
 	cmd := &cobra.Command{
@@ -142,12 +150,43 @@ func newVersionCommand(versionOverride string) *cobra.Command {
 				versions[appName] = versionOverride
 			}
 
+			var runtimeStatus *struct {
+				Version string `json:"version"`
+				Digest  string `json:"digest"`
+				Stale   bool   `json:"stale"`
+			}
+
+			if store != nil {
+				active, stale, err := store.RuntimeStatus(versions[appName])
+				if err != nil && !errors.Is(err, workloadcatalog.ErrRuntimeNotFound) {
+					return err
+				}
+
+				if err == nil {
+					runtimeStatus = &struct {
+						Version string `json:"version"`
+						Digest  string `json:"digest"`
+						Stale   bool   `json:"stale"`
+					}{active.StroppyVersion, active.BuildDigest, stale}
+				}
+			}
+
 			if jsonOutput {
 				versions["ydb_service_account_key_file"] = "1"
+
+				document := make(map[string]any, len(versions)+1)
+				for name, value := range versions {
+					document[name] = value
+				}
+
+				if runtimeStatus != nil {
+					document["runtime"] = runtimeStatus
+				}
+
 				encoder := json.NewEncoder(cmd.OutOrStdout())
 				encoder.SetIndent("", "  ")
 
-				return encoder.Encode(versions)
+				return encoder.Encode(document)
 			}
 
 			for _, item := range []struct{ name, value string }{
@@ -159,6 +198,15 @@ func newVersionCommand(versionOverride string) *cobra.Command {
 						return err
 					}
 				}
+			}
+
+			if runtimeStatus != nil {
+				_, err := fmt.Fprintf(
+					cmd.OutOrStdout(), "runtime  %s\t%s\tstale=%t\n",
+					runtimeStatus.Version, runtimeStatus.Digest, runtimeStatus.Stale,
+				)
+
+				return err
 			}
 
 			return nil
