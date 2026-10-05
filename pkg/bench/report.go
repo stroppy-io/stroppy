@@ -254,17 +254,18 @@ func finalizeRunReport(
 		run.Failure = &report.Failure{Phase: phase, Reason: boundReportError(runErr)}
 	}
 
-	snapshots := aggregateMetricSnapshots(data, root.metricsPrefix)
-	run.WorkloadReports = buildWorkloadReports(definitions, ReportContext{
-		Metrics:      snapshots,
-		Series:       run.Metrics,
-		Steps:        slices.Clone(run.Steps),
-		Measurements: maps.Clone(run.Measurements),
-		Status:       run.Status,
+	run.WorkloadReports = buildWorkloadReports(definitions, func() ReportContext {
+		return ReportContext{
+			Metrics:      aggregateMetricSnapshots(data, root.metricsPrefix),
+			Series:       reportMetrics(data, root.metricsPrefix),
+			Steps:        slices.Clone(run.Steps),
+			Measurements: maps.Clone(run.Measurements),
+			Status:       run.Status,
+		}
 	})
 }
 
-func buildWorkloadReports(definitions []reportDefinition, reportContext ReportContext) []report.WorkloadReport {
+func buildWorkloadReports(definitions []reportDefinition, snapshot func() ReportContext) []report.WorkloadReport {
 	out := make([]report.WorkloadReport, 0, len(definitions))
 	for _, definition := range definitions {
 		item := report.WorkloadReport{
@@ -277,7 +278,7 @@ func buildWorkloadReports(definitions []reportDefinition, reportContext ReportCo
 			continue
 		}
 
-		contribution, err := definition.contributor(reportContext)
+		contribution, err := definition.contributor(snapshot())
 		if err != nil {
 			item.Status = report.WorkloadReportError
 			item.Reason = boundReportError(err)

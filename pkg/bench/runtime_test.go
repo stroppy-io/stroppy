@@ -118,6 +118,25 @@ func TestDurationDrainAndCleanup(t *testing.T) {
 	require.Equal(t, report.StatusCompletedWithErrors, result.Status)
 }
 
+func TestDrainExpiryCannotBecomeLogicalSuccess(t *testing.T) {
+	test := Test{Name: "drain-success", Define: func(d *Def) error {
+		d.Execution.Step("work", func(ctx context.Context, b *Bench) error {
+			return b.LogicalOperation(func() error {
+				<-ctx.Done()
+
+				return nil
+			})
+		}, ConstantWorkers(1, 10*time.Millisecond, DrainTimeout(0)))
+
+		return d.Execution.Err()
+	}}
+	result, err := RunTest(t.Context(), test, noopRunOptions())
+	require.NoError(t, err)
+	require.Equal(t, report.StatusCompletedWithErrors, result.Status)
+	require.Equal(t, uint64(1), result.Errors.FailedIterations)
+	require.InDelta(t, 0, *result.Metrics["successful_transactions_total"].Total, 0)
+}
+
 func TestParentCancellationAndDetachedCleanup(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.WithValue(t.Context(), testContextKey{}, "retained"))
 

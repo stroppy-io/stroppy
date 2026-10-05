@@ -1,8 +1,8 @@
 package bench
 
 import (
+	"context"
 	"encoding/json"
-	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -49,8 +49,8 @@ func (r DriverRef) SupportsInsert(method InsertStrategy) bool {
 
 // DriverDescription is secret-free authored driver metadata.
 type DriverDescription struct {
-	Name string
-	Kind DriverTypeName
+	Name string         `json:"name"`
+	Kind DriverTypeName `json:"kind"`
 }
 type DriverDeclarations struct {
 	def          *Def
@@ -235,7 +235,7 @@ func (b *Bench) Database(ref DriverRef) *Database {
 	return &Database{Bench: b.execution.bench(b.vu, ref.name)}
 }
 
-func (e *Execution) database(name string) (driver.Driver, *config.DriverConfig, error) {
+func (e *Execution) database(ctx context.Context, name string) (driver.Driver, *config.DriverConfig, error) {
 	e.databaseMu.Lock()
 	defer e.databaseMu.Unlock()
 
@@ -252,7 +252,7 @@ func (e *Execution) database(name string) (driver.Driver, *config.DriverConfig, 
 		return nil, nil, err
 	}
 
-	drv, err := driver.Dispatch(e.ctx, driver.Options{
+	drv, err := driver.Dispatch(ctx, driver.Options{
 		Config:       cfg,
 		Logger:       e.root.lg,
 		DialFunc:     e.root.dialer.DialContext,
@@ -284,12 +284,12 @@ func (e *Execution) configuration(name string) DriverConfig {
 	return resolved
 }
 
-func (b *Bench) ensureDriver() error {
+func (b *Bench) ensureDriver(ctx context.Context) error {
 	if b.drv != nil {
 		return nil
 	}
 
-	drv, cfg, err := b.execution.database(b.databaseName)
+	drv, cfg, err := b.execution.database(ctx, b.databaseName)
 	if err != nil {
 		return err
 	}
@@ -314,8 +314,20 @@ func defaultDriverConfig() DriverConfig {
 }
 
 func copyDriverConfigs(values map[string]DriverConfig) map[string]DriverConfig {
-	out := maps.Clone(values)
-	for name, value := range out {
+	out := make(map[string]DriverConfig, len(values))
+	for name, value := range values {
+		if name != "" && !paramNamePattern.MatchString(name) {
+			invalid("driver configuration", inputError("invalid name %q", name))
+		}
+
+		if name == "default" {
+			name = ""
+		}
+
+		if _, exists := out[name]; exists {
+			invalid("driver configuration", inputError("duplicate default database"))
+		}
+
 		out[name] = mergeDriverDefaults(DriverConfig{}, value)
 	}
 

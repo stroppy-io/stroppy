@@ -694,6 +694,15 @@ func writeParamHelpSection(
 			param.Env,
 			param.Config,
 		)
+
+		if len(param.Aliases) > 0 {
+			fmt.Fprintf(output, "      aliases: --%s (same environment/config projections)\n",
+				strings.Join(param.Aliases, ", --"))
+		}
+
+		for _, constraint := range param.Constraints {
+			fmt.Fprintf(output, "      %s: %v\n", constraint.Kind, constraint.Value)
+		}
 	}
 }
 

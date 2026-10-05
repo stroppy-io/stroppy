@@ -319,7 +319,12 @@ func managedResolver(store *workloadcatalog.Store) runcommand.Resolver {
 
 func managedProbe(catalog *bench.Catalog, store *workloadcatalog.Store) func(*cobra.Command, []string) error {
 	return func(command *cobra.Command, args []string) error {
-		if len(args) == 0 || strings.HasPrefix(args[0], "-") {
+		builtInName := false
+		if len(args) > 0 {
+			_, builtInName = catalog.Test(args[0])
+		}
+
+		if len(args) == 0 || strings.HasPrefix(args[0], "-") || builtInName {
 			builtIn := probe.NewCommand(catalog)
 			builtIn.SetContext(command.Context())
 			builtIn.SetOut(command.OutOrStdout())
@@ -341,7 +346,7 @@ func managedProbe(catalog *bench.Catalog, store *workloadcatalog.Store) func(*co
 		}
 
 		if entry.SnapshotDigest != "" {
-			return executeRuntime(command, store, append([]string{"probe"}, args[1:]...))
+			return executeRuntime(command, store, append([]string{"probe", name}, args[1:]...))
 		}
 
 		return executeCustom(

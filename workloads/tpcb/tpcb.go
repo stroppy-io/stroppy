@@ -205,7 +205,7 @@ func (w *workload) work(ctx context.Context, b *bench.Bench) error {
 		bench.TransactionOptions{
 			Name:      "tpcb",
 			Isolation: w.iso,
-			Retry:     bench.RetryOptions{MaxAttempts: w.retryAttempts},
+			Retry:     w.retryOptions(ctx),
 		},
 		op.Run,
 	)
@@ -264,7 +264,7 @@ func (w *workload) txBody(ctx context.Context, tx *bench.Tx, aid, tid, bid, delt
 // happens inside the procedure — so its metric shape differs from tpcb/tx.
 func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, aid, tid, bid, delta int, hid int64) error {
 	return b.LogicalOperation(func() error {
-		return bench.Retry0(ctx, b.TxRetryPolicy(bench.RetryOptions{MaxAttempts: w.retryAttempts}), func() error {
+		return bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
 			return b.Exec(ctx, w.procQuery, map[string]any{
 				"p_aid": aid, "p_tid": tid, "p_bid": bid, "p_delta": delta, "p_hid": hid,
 			})
@@ -274,6 +274,13 @@ func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, aid, tid, b
 
 func (*workload) Teardown(ctx context.Context, b *bench.Bench) error {
 	return nil
+}
+
+func (w *workload) retryOptions(ctx context.Context) bench.RetryOptions {
+	return bench.RetryOptions{
+		MaxAttempts: w.retryAttempts,
+		OnRetry:     func(int, error, bench.RetryDecision) { w.retryMetric.Add(ctx, 1) },
+	}
 }
 
 // --- config helpers ---

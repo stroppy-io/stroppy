@@ -37,6 +37,10 @@ type Policy struct {
 func (p Policy) Workers() int { return p.workers }
 func (p Policy) Mode() string { return p.mode }
 func (p Policy) applyStep(s *stepOptions) {
+	if p.mode == "" {
+		invalid("step", inputError("zero execution policy"))
+	}
+
 	if s.policy.mode != "" {
 		invalid("step", inputError("multiple execution policies"))
 	}
@@ -75,6 +79,10 @@ func ConstantWorkers(workers int, duration time.Duration, drain Drain) Policy {
 func TryConstantWorkers(workers int, duration time.Duration, drain Drain) (Policy, error) {
 	if workers < 1 || duration <= 0 || !drain.set {
 		return Policy{}, inputError("positive workers/duration and explicit drain are required")
+	}
+
+	if !drain.unlimited && drain.duration > time.Duration(1<<63-1)-duration {
+		return Policy{}, inputError("duration and drain exceed timer capacity")
 	}
 
 	return Policy{

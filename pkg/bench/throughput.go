@@ -138,7 +138,7 @@ func (b *Bench) LogicalOperation(fn func() error) error {
 	}
 
 	err := fn()
-	if outer && window != nil && err == nil {
+	if outer && window != nil && err == nil && b.vu.ctx.Err() == nil {
 		window.transactions.Add(1)
 	}
 

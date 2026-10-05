@@ -3,53 +3,42 @@ package help
 func init() {
 	Register(Topic{
 		Name:  "probe",
-		Short: "List workload schemas, embedded presets, and driver capabilities",
+		Short: "Describe workload schemas, resolved inputs, and driver capabilities",
 		Long: `PROBE
 
-  stroppy probe reports discovery data compiled into the binary. It does not
-  set up a workload, dispatch a driver, or connect to a database.
+  Probe observes definitions without running step actions or opening databases.
+  Default discovery uses declared defaults, independent of ambient input.
 
-  Use probe to:
-    - List registered workloads and their typed parameter flags
-    - Inspect parameter schemas as JSON, including names, scopes, types,
-      descriptions, defaults, environment names, legacy aliases, and config keys
-    - Check embedded SQL dialect and documentation files
-    - See each driver's supported insert methods
+    stroppy probe                         # full compiled catalog
+    stroppy probe -o json                 # machine-readable catalog
+    stroppy probe tpcc/tx -o json          # selected default schema
+    stroppy probe tpcc/tx --resolved --scale-factor 2 -d noop -o json
 
-USAGE
-
-    stroppy probe            # human-readable catalog (default)
-    stroppy probe -o json    # machine-readable JSON
+  --resolved accepts the same typed parameter, config-file, SQL override, and
+  driver inputs as run. It adds effective values, sources, and winning spellings.
+  Supplied run inputs without --resolved are rejected. Driver facts contain no
+  credentials. Do not put secrets in workload parameters.
 
 OUTPUT
 
-  PRESETS lists embedded workload files. WORKLOADS groups each registered
-  workload's flags into shared run parameters and workload parameters. DRIVERS
-  lists supported insert methods by driver type.
+  PRESETS lists embedded workload assets. WORKLOADS lists typed parameters,
+  encountered steps, finite metric declarations, and named driver facts.
+  DRIVERS lists supported insert methods.
 
-  Use the dynamic selected-workload help for full parameter details:
+  JSON contains presets, drivers, and a sorted workloads array. Each workload
+  contains name, params, steps, driver_refs, metrics, and optional values.
+  Parameters include name, flag, scope, type, description, default,
+  default_description, env, aliases, config, and constraints.
+
+  Observation describes the normal input-resolved path, not every possible
+  runtime-result-dependent Go branch. Use dynamic help for full parameter detail:
 
     stroppy run tpcc/tx --help
 
-  JSON output preserves the existing "presets" and "drivers" arrays and adds a
-  sorted "workloads" array. Each workload contains "name" and "params"; each
-  parameter contains:
-
-    name, flag, scope, type, description, default, env,
-    legacy_aliases, config
-
 FLAGS
 
-  -o, --output (human|json)   Output format. Default: human.
-
-  Probe takes no positional arguments.
-
-SEE ALSO
-
-  stroppy run <workload> --help
-  stroppy help envs
-  stroppy help config-file
-  stroppy help drivers
+  -o, --output human|json   Output format; default human
+      --resolved           Resolve inputs for a selected workload
 `,
 	})
 }

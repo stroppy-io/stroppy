@@ -12,6 +12,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- Selected-workload probe can show resolved values, sources, aliases, constraints, steps, and metric schemas without running actions or connecting to databases.
+- Runnable Go authoring examples cover queries, transactional loading, reports, and named databases; the supported API is documented with a v6 minor-release compatibility guarantee.
 - Custom workload builds and exports reuse content-addressed artifacts, preserve owned source snapshots, expose secret-free provenance through `stroppy cache inspect`, and identify generated runtime reports by build digest. ([#186](https://github.com/stroppy-io/stroppy/pull/186))
 - `stroppy export` creates one portable binary containing every built-in and all or selected custom workload packages, with standard cross-compilation support and a verified private Go 1.26.8 fallback under `~/.stroppy`. ([#185](https://github.com/stroppy-io/stroppy/pull/185))
 - `stroppy build`, `list`, and `remove` manage compiled custom workloads under `~/.stroppy/workloads/`, and registered workloads run or probe by name without their source tree. ([#184](https://github.com/stroppy-io/stroppy/pull/184))

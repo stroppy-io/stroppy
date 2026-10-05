@@ -107,12 +107,23 @@ func (c *Catalog) Describe(name string) (Description, error) {
 }
 
 func (c *Catalog) Resolve(name string, inputs ParamInputs, drivers map[string]DriverConfig) (Description, error) {
+	return c.ResolveRun(name, RunOptions{Params: inputs, Drivers: drivers})
+}
+
+// ResolveRun observes effective run inputs, including step selection, without actions.
+// Logger, metrics export and report options do not affect discovery.
+//
+//nolint:gocritic // run inputs are copied operation values.
+func (c *Catalog) ResolveRun(name string, options RunOptions) (description Description, err error) {
+	defer recoverValidation(&err)
+
 	test, ok := c.Test(name)
 	if !ok {
 		return Description{}, fmt.Errorf("%w %q", errNoWorkloadRegistered, name)
 	}
 
-	d, err := observe(test, inputs, drivers, false)
+	d, err := observeSelected(test, options.Params, copyDriverConfigs(options.Drivers), false,
+		options.Steps, options.NoSteps)
 	if err != nil {
 		return Description{}, err
 	}

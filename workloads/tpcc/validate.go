@@ -16,10 +16,12 @@ var errValidatePopulation = errors.New("validate_population")
 // returns an error if any fail.
 func validatePopulation(
 	ctx context.Context, b *bench.Bench, warehouses, warehouseStart, wIDMax int64, maxAttempts int,
+	retries *bench.CounterHandle,
 ) error {
 	reader := &populationReader{Bench: b, policy: b.TxRetryPolicy(bench.TxRetryPolicyOptions{
 		MaxAttempts: maxAttempts,
 		Idempotent:  true,
+		OnRetry:     func(int, error, bench.RetryDecision) { retries.Add(ctx, 1) },
 	})}
 	wRange := fmt.Sprintf("BETWEEN %d AND %d", warehouseStart, wIDMax)
 	wWhere := func(col string) string { return "WHERE " + col + " " + wRange }

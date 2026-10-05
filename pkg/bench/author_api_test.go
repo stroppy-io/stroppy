@@ -61,10 +61,12 @@ func TestInvalidFiniteLabelsReturnRecognizedError(t *testing.T) {
 
 		return d.Execution.Err()
 	}}
-	_, err := RunTest(t.Context(), test, noopRunOptions())
+	result, err := RunTest(t.Context(), test, noopRunOptions())
 
 	var validation *ValidationError
 	require.ErrorAs(t, err, &validation)
+	require.Equal(t, "work", result.Failure.Phase)
+	require.Equal(t, string(Failed), result.Steps[0].Status)
 }
 
 func TestMultipleMeasuredStepsKeepSeparateWindows(t *testing.T) {
@@ -122,6 +124,83 @@ func TestDirectReportCopiesPayload(t *testing.T) {
 	result, err := RunTest(t.Context(), test, noopRunOptions())
 	require.NoError(t, err)
 	require.JSONEq(t, `{"count":1}`, string(result.WorkloadReports[0].Data))
+}
+
+func TestContributorSnapshotsAreIndependent(t *testing.T) {
+	test := Test{Name: "report-copy", Define: func(d *Def) error {
+		counter := d.Metrics.Counter("count")
+		d.Report.Contribute("mutator", 1, func(snapshot ReportContext) (ReportContribution, error) {
+			*snapshot.Series["count"].Total = 999
+			snapshot.Metrics["count"] = MetricSnapshot{Total: 999}
+			delete(snapshot.Measurements, "work")
+
+			return ReportContribution{Data: "changed"}, nil
+		})
+		d.Report.Contribute("reader", 1, func(snapshot ReportContext) (ReportContribution, error) {
+			require.InDelta(t, 1, snapshot.Metrics["count"].Total, 0)
+			require.InDelta(t, 1, *snapshot.Series["count"].Total, 0)
+			require.Positive(t, snapshot.Measurements["work"])
+
+			return ReportContribution{Data: "original"}, nil
+		})
+		d.Execution.Step("work", func(ctx context.Context, _ *Bench) error {
+			counter.Add(ctx, 1)
+
+			return nil
+		}, Measure())
+
+		return d.Execution.Err()
+	}}
+	result, err := RunTest(t.Context(), test, noopRunOptions())
+	require.NoError(t, err)
+	require.InDelta(t, 1, *result.Metrics["count"].Total, 0)
+}
+
+func TestDefaultDriverNameIsNormalized(t *testing.T) {
+	test := Test{Name: "default-name", Define: func(d *Def) error {
+		d.Execution.Step("query", func(ctx context.Context, b *Bench) error {
+			require.Equal(t, DriverNoop, b.DriverTypeName())
+
+			return b.Exec(ctx, "SELECT 1", nil)
+		})
+
+		return d.Execution.Err()
+	}}
+	options := noopRunOptions()
+	options.Drivers = map[string]DriverConfig{"default": {Kind: DriverNoop}}
+	_, err := RunTest(t.Context(), test, options)
+	require.NoError(t, err)
+
+	options.Drivers[""] = DriverConfig{Kind: DriverNoop}
+	_, err = RunTest(t.Context(), test, options)
+
+	var validation *ValidationError
+	require.ErrorAs(t, err, &validation)
+
+	options.Drivers = map[string]DriverConfig{"0": {Kind: DriverNoop}}
+	_, err = RunTest(t.Context(), test, options)
+	require.ErrorAs(t, err, &validation)
+}
+
+func TestInvalidStepReferencesAndPolicies(t *testing.T) {
+	_, err := DescribeTest(Test{Name: "zero-policy", Define: func(d *Def) error {
+		d.Execution.Step("work", func(context.Context, *Bench) error { return nil }, Policy{})
+
+		return nil
+	}})
+
+	var validation *ValidationError
+	require.ErrorAs(t, err, &validation)
+
+	foreign := newDef(ParamInputs{}, true).Drivers.Declare("other", DriverConfig{})
+	_, err = DescribeTest(Test{Name: "foreign-driver", Define: func(d *Def) error {
+		d.Execution.Step("work", func(context.Context, *Bench) error { return nil }, Use(foreign))
+
+		return nil
+	}})
+	require.ErrorAs(t, err, &validation)
+	_, err = TryConstantWorkers(1, time.Duration(1<<63-1), DrainTimeout(time.Second))
+	require.Error(t, err)
 }
 
 func TestFailureCleanupErrorsRemainDistinct(t *testing.T) {

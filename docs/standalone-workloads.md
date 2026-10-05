@@ -1,7 +1,7 @@
 # Standalone Go workloads
 
 A standalone workload is one ordinary Go project. Workload logic lives in an
-importable package that registers its factory:
+importable package that exports and registers a test descriptor:
 
 ```go
 package workload
@@ -12,16 +12,19 @@ import (
     "github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
-type workload struct{}
+var Test = bench.Test{Name: "example/query", Define: define}
 
-func (*workload) Name() string                                 { return "example/query" }
-func (*workload) Define(*bench.Def) error                      { return nil }
-func (*workload) Setup(context.Context, *bench.Bench) error    { return nil }
-func (*workload) Iterate(context.Context, *bench.Bench) error  { return nil }
-func (*workload) Teardown(context.Context, *bench.Bench) error { return nil }
+func init() { bench.Register(Test) }
 
-func New() bench.Workload { return &workload{} }
-func init()               { bench.Register(New) }
+func define(d *bench.Def) error {
+    run := bench.RunParameters(&d.Param, bench.RunDefaults{Iterations: 10})
+    d.Execution.Step("query", query, run.Policy())
+    return d.Execution.Err()
+}
+
+func query(ctx context.Context, b *bench.Bench) error {
+    return b.Exec(ctx, "SELECT :value", map[string]any{"value": b.Iteration()})
+}
 ```
 
 An optional project-owned `main` keeps direct development runnable:
@@ -34,7 +37,7 @@ import (
     "example.com/project/workload"
 )
 
-func main() { stroppy.Main(workload.New) }
+func main() { stroppy.Main(workload.Test) }
 ```
 
 `stroppy build` accepts the importable package directory, not `package main`:
@@ -87,8 +90,8 @@ source snapshots, so original source directories are not required after a
 successful catalog build. Running also uses the published local runtime rather
 than original sources.
 
-Both `build` and `export` prefer system Go 1.26 or newer. If unavailable, Stroppy
-can download verified Go 1.26.8 into `~/.stroppy/toolchains/`. Interactive use
+Both `build` and `export` prefer system Go 1.27 or newer. If unavailable, Stroppy
+can download verified Go 1.27.1 into `~/.stroppy/toolchains/`. Interactive use
 prompts before download; pass `-y` for unattended use. Toolchain, module cache,
 build cache, and temporary files stay under `~/.stroppy`; Stroppy does not change
 `PATH` or persistent Go configuration. `--offline` disables network module access
@@ -139,5 +142,12 @@ history failures only warn on stderr.
 Applications with their own CLI, UI, or service can use `stroppy.New`,
 `Application.Execute`, and `Application.Run` instead of `stroppy.Main`.
 
-This API remains provisional until the workload API stabilization work in #179
-is complete.
+`Application.Run` returns report data without saving history; call `report.Save`
+explicitly if the host wants persistence. It never installs signal handlers or
+exits the process. `Application.Execute` supplies CLI behavior and report history
+but leaves cancellation and process exit to its host.
+
+See [Workload authoring API](workload-authoring-api.md) for the supported package
+boundary, compatibility guarantee, execution semantics, and migration guide.
+Runnable examples cover [queries, transactional loading, telemetry/reporting,
+and named databases](../examples/authoring/README.md).

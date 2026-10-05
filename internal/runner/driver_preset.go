@@ -29,6 +29,9 @@ var (
 	errInsertMethodAliasConflict = errors.New("insert method aliases conflict")
 	errRawInsertMethodNotString  = errors.New("raw insert method must be a string")
 	errNilDriverConfig           = errors.New("nil driver config")
+	errInvalidDriverName         = errors.New("invalid driver name")
+	errDuplicateDefaultDriver    = errors.New("duplicate default driver")
+	driverNamePattern            = regexp.MustCompile(`^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`)
 
 	legacyRawInsertMethodKey = regexp.MustCompile(`([,{]\s*)"insertMethod"(\s*:)`)
 )
@@ -553,7 +556,7 @@ func driverCLIConfigFromFile(fileConfig *config.DriverRunConfig) (DriverCLIConfi
 	return cfg, nil
 }
 
-// DriverCLIConfigs holds parsed driver configurations indexed by driver number.
+// DriverCLIConfigs holds parsed driver configurations by declaration name.
 type DriverCLIConfigs map[string]*DriverCLIConfig
 
 // DriverCLIConfigsFromFile converts config-file drivers into mutable CLI configs.
@@ -561,6 +564,18 @@ func DriverCLIConfigsFromFile(fileDrivers map[string]*config.DriverRunConfig) (D
 	configs := make(DriverCLIConfigs, len(fileDrivers))
 
 	for idx, fileConfig := range fileDrivers {
+		if idx != "" && !driverNamePattern.MatchString(idx) {
+			return nil, fmt.Errorf("%w %q", errInvalidDriverName, idx)
+		}
+
+		if idx == "default" {
+			idx = ""
+		}
+
+		if _, exists := configs[idx]; exists {
+			return nil, errDuplicateDefaultDriver
+		}
+
 		cfg, err := driverCLIConfigFromFile(fileConfig)
 		if err != nil {
 			return nil, fmt.Errorf("convert config file driver %s: %w", idx, err)

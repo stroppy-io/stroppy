@@ -227,8 +227,8 @@ run-scenario-smoke: # Tier 0: scenario-branch smoke on noop (no DB), all workloa
 	@rc=0;                                                                          \
 	for spec in "tpcb/tx 1 -" "tpcc/tx 1 validate_population" "tpcds 0.01 -" "tpch/tx 0.01 validate_answers"; do \
 		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns="--no-steps workload"; [ "$$skip" = "-" ] || ns="--no-steps workload,$$skip"; \
-		$(call smoke_run,noop constant-vus: $$wl,./build/stroppy run $$wl -d noop -e SCALE_FACTOR=$$sf -e DURATION=2s -e VUS=2 $$ns); \
-		$(call smoke_run,noop shared-iters: $$wl,./build/stroppy run $$wl -d noop -e SCALE_FACTOR=$$sf -e VUS=2 -e ITER=1 $$ns); \
+		$(call smoke_run,noop constant-vus: $$wl,./build/stroppy run $$wl -d noop --scale-factor $$sf --executor constant-vus --duration 2s --vus 2 $$ns); \
+		$(call smoke_run,noop shared-iters: $$wl,./build/stroppy run $$wl -d noop --scale-factor $$sf --executor shared-iterations --vus 2 --iterations 1 $$ns); \
 	done;                                                                           \
 	exit $$rc
 
@@ -247,8 +247,8 @@ run-workload-branches: # Tier 1: real-Postgres smoke of both branches (tpcb/tpcc
 	@rc=0;                                                                          \
 	for spec in "tpcb/tx 1 -" "tpcc/tx 1 -" "tpch/tx 0.01 validate_answers"; do \
 		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns=""; [ "$$skip" = "-" ] || ns="--no-steps $$skip"; \
-		$(call smoke_run,pg constant-vus: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e DURATION=2s -e VUS=1 $$ns); \
-		$(call smoke_run,pg shared-iters: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e VUS=2 -e ITER=1 $$ns); \
+		$(call smoke_run,pg constant-vus: $$wl,./build/stroppy run $$wl --scale-factor $$sf --executor constant-vus --duration 2s --vus 1 $$ns); \
+		$(call smoke_run,pg shared-iters: $$wl,./build/stroppy run $$wl --scale-factor $$sf --executor shared-iterations --vus 2 --iterations 1 $$ns); \
 	done;                                                                           \
 	exit $$rc
 

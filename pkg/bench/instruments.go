@@ -64,12 +64,12 @@ func LabelValues(name string, values ...string) MetricOption {
 
 // MetricSchema is copied instrument metadata for discovery.
 type MetricSchema struct {
-	Name        string
-	Kind        string
-	Unit        string
-	Description string
-	Bounds      []float64
-	Labels      map[string][]string
+	Name        string              `json:"name"`
+	Kind        string              `json:"kind"`
+	Unit        string              `json:"unit,omitempty"`
+	Description string              `json:"description,omitempty"`
+	Bounds      []float64           `json:"bounds,omitempty"`
+	Labels      map[string][]string `json:"labels"`
 }
 
 // MetricDeclarations registers typed instruments during definition.

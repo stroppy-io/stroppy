@@ -81,8 +81,8 @@ type ParamSchema struct {
 
 // Constraint describes a discoverable parameter restriction.
 type Constraint struct {
-	Kind  string
-	Value any
+	Kind  string `json:"kind"`
+	Value any    `json:"value"`
 }
 
 type resolvedParam struct {

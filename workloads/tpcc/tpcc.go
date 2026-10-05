@@ -75,7 +75,7 @@ type metrics struct {
 	paymentRemote, paymentByname, paymentBc                                       *bench.CounterHandle
 	orderStatusByname                                                             *bench.CounterHandle
 	remoteLineTotal, remoteLineRemote                                             *bench.CounterHandle
-	retryAttempts                                                                 *bench.CounterHandle
+	retryAttempts, populationRetryAttempts                                        *bench.CounterHandle
 	newOrderDur, paymentDur, orderStatusDur, deliveryDur, stockLevelDur           *bench.HistogramHandle
 }
 
@@ -212,7 +212,15 @@ func (w *workload) validate(ctx context.Context, b *bench.Bench) error {
 		w.warehouseStart,
 		w.wIDMax,
 		w.retryAttempts,
+		w.m.populationRetryAttempts,
 	)
+}
+
+func (w *workload) retryOptions(ctx context.Context) bench.RetryOptions {
+	return bench.RetryOptions{
+		MaxAttempts: w.retryAttempts,
+		OnRetry:     func(int, error, bench.RetryDecision) { w.m.retryAttempts.Add(ctx, 1) },
+	}
 }
 
 // renderDDL expands the ydb.sql {partition_keys}/{partition_count} tablet-split
@@ -253,25 +261,26 @@ func (w *workload) initSteady() *steady {
 // initMetrics wires the per-transaction counters and duration trends.
 func (w *workload) initMetrics(b *bench.MetricDeclarations) *metrics {
 	return &metrics{
-		newOrderTotal:     b.Counter("tpcc_new_order_total"),
-		paymentTotal:      b.Counter("tpcc_payment_total"),
-		orderStatusTotal:  b.Counter("tpcc_order_status_total"),
-		deliveryTotal:     b.Counter("tpcc_delivery_total"),
-		stockLevelTotal:   b.Counter("tpcc_stock_level_total"),
-		rollbackDecided:   b.Counter("tpcc_rollback_decided"),
-		rollbackDone:      b.Counter("tpcc_rollback_done"),
-		paymentRemote:     b.Counter("tpcc_payment_remote"),
-		paymentByname:     b.Counter("tpcc_payment_byname"),
-		paymentBc:         b.Counter("tpcc_payment_bc"),
-		orderStatusByname: b.Counter("tpcc_order_status_byname"),
-		remoteLineTotal:   b.Counter("tpcc_remote_line_total"),
-		remoteLineRemote:  b.Counter("tpcc_remote_line_remote"),
-		retryAttempts:     b.Counter("tpcc_retry_attempts"),
-		newOrderDur:       b.Histogram("tpcc_new_order_duration"),
-		paymentDur:        b.Histogram("tpcc_payment_duration"),
-		orderStatusDur:    b.Histogram("tpcc_order_status_duration"),
-		deliveryDur:       b.Histogram("tpcc_delivery_duration"),
-		stockLevelDur:     b.Histogram("tpcc_stock_level_duration"),
+		newOrderTotal:           b.Counter("tpcc_new_order_total"),
+		paymentTotal:            b.Counter("tpcc_payment_total"),
+		orderStatusTotal:        b.Counter("tpcc_order_status_total"),
+		deliveryTotal:           b.Counter("tpcc_delivery_total"),
+		stockLevelTotal:         b.Counter("tpcc_stock_level_total"),
+		rollbackDecided:         b.Counter("tpcc_rollback_decided"),
+		rollbackDone:            b.Counter("tpcc_rollback_done"),
+		paymentRemote:           b.Counter("tpcc_payment_remote"),
+		paymentByname:           b.Counter("tpcc_payment_byname"),
+		paymentBc:               b.Counter("tpcc_payment_bc"),
+		orderStatusByname:       b.Counter("tpcc_order_status_byname"),
+		remoteLineTotal:         b.Counter("tpcc_remote_line_total"),
+		remoteLineRemote:        b.Counter("tpcc_remote_line_remote"),
+		retryAttempts:           b.Counter("tpcc_retry_attempts"),
+		populationRetryAttempts: b.Counter("tpcc_population_retry_attempts"),
+		newOrderDur:             b.Histogram("tpcc_new_order_duration"),
+		paymentDur:              b.Histogram("tpcc_payment_duration"),
+		orderStatusDur:          b.Histogram("tpcc_order_status_duration"),
+		deliveryDur:             b.Histogram("tpcc_delivery_duration"),
+		stockLevelDur:           b.Histogram("tpcc_stock_level_duration"),
 	}
 }
 
@@ -450,7 +459,7 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) er
 		lineIID[olCnt-1] = items + 1 // nonexistent item → sentinel rollback
 	}
 
-	if err := bench.Retry0(ctx, b.TxRetryPolicy(bench.RetryOptions{MaxAttempts: w.retryAttempts}), func() error {
+	if err := bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
 		tx, err := b.Begin(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"})
 		if err != nil {
 			return err
@@ -755,7 +764,7 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) err
 
 	var wasBC bool
 
-	err := bench.Retry0(ctx, b.TxRetryPolicy(bench.RetryOptions{MaxAttempts: w.retryAttempts}), func() error {
+	err := bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
 		wasBC = false
 
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "payment"}, func(tx *bench.Tx) error {
@@ -1017,7 +1026,7 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 	}
 
 	bynameObserved := false
-	err := bench.Retry0(ctx, b.TxRetryPolicy(bench.RetryOptions{MaxAttempts: w.retryAttempts}), func() error {
+	err := bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
 		bynameObserved = false
 
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "order_status"}, func(tx *bench.Tx) error {
@@ -1110,7 +1119,7 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) er
 	wID := vs.homeWID
 	carrierID := vs.ri(vs.dCarrier, 1, 10)
 
-	return bench.Retry0(ctx, b.TxRetryPolicy(bench.RetryOptions{MaxAttempts: w.retryAttempts}), func() error {
+	return bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, func(tx *bench.Tx) error {
 			for dID := int64(1); dID <= districtsPerWarehouse; dID++ {
 				minRow, err := tx.RawRow(ctx, w.q("workload_tx_delivery", "get_min_new_order"), map[string]any{
@@ -1193,7 +1202,7 @@ func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) 
 	dID := vs.ri(vs.slDID, 1, districtsPerWarehouse)
 	threshold := vs.ri(vs.slThreshold, 10, 20)
 
-	return bench.Retry0(ctx, b.TxRetryPolicy(bench.RetryOptions{MaxAttempts: w.retryAttempts}), func() error {
+	return bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "stock_level"}, func(tx *bench.Tx) error {
 			nextOIDv, err := tx.QueryValue[any](ctx, w.q("workload_tx_stock_level", "get_district"), map[string]any{
 				"w_id": wID, "d_id": dID,

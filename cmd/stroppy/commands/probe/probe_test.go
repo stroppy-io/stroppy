@@ -3,6 +3,7 @@ package probe
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -43,6 +44,56 @@ func TestHumanCatalogIncludesGroupedWorkloads(t *testing.T) {
 		if !strings.Contains(text, want) {
 			t.Errorf("human output does not contain %q\n%s", want, text)
 		}
+	}
+}
+
+func TestSelectedAndResolvedProbe(t *testing.T) {
+	t.Setenv("SCALE_FACTOR", "3")
+
+	for _, test := range []struct {
+		args     []string
+		resolved bool
+	}{
+		{[]string{"tpcc/tx", "-o", "json"}, false},
+		{[]string{"tpcc/tx", "--resolved", "--scale-factor", "2", "-d", "noop", "-o", "json"}, true},
+	} {
+		command := NewCommand(bench.RegisteredCatalog())
+
+		var output bytes.Buffer
+		command.SetOut(&output)
+		command.SetArgs(test.args)
+
+		if err := command.Execute(); err != nil {
+			t.Fatal(err)
+		}
+
+		catalog := decodeCatalog(t, output.Bytes())
+		if len(catalog.Workloads) != 1 {
+			t.Fatal("selected probe returned other workloads")
+		}
+
+		workload := catalog.Workloads[0]
+		if len(workload.Steps) == 0 || len(workload.Params) == 0 {
+			t.Fatal("missing observation")
+		}
+
+		if test.resolved {
+			value := workload.Values["scale-factor"]
+			if value.Value != float64(2) || value.Source != bench.ParamSourceCLI || value.Spelling != "scale-factor" {
+				t.Fatalf("value = %#v", value)
+			}
+		} else if len(workload.Values) != 0 || findParam(t, workload.Params, "scale-factor").Default != float64(1) {
+			t.Fatal("default discovery used ambient input")
+		}
+	}
+}
+
+func TestProbeRejectsInputsWithoutResolution(t *testing.T) {
+	command := NewCommand(bench.RegisteredCatalog())
+	command.SetArgs([]string{"tpcc/tx", "--scale-factor", "2"})
+
+	if err := command.Execute(); !errors.Is(err, errProbeResolution) {
+		t.Fatalf("error = %v", err)
 	}
 }
 
@@ -104,7 +155,7 @@ func assertRepresentativeParams(t *testing.T, workloads []workloadEntry) {
 		scaleFactor.Description != "Number of warehouses." ||
 		scaleFactor.Default != float64(1) ||
 		scaleFactor.Env != "SCALE_FACTOR" ||
-		!slices.Equal(scaleFactor.LegacyAliases, []string{"warehouses"}) ||
+		!slices.Equal(scaleFactor.Aliases, []string{"warehouses"}) ||
 		scaleFactor.Config != "scaleFactor" {
 		t.Fatalf("tpcc scale-factor schema = %#v", scaleFactor)
 	}

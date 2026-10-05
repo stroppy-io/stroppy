@@ -2501,8 +2501,9 @@ These resolve previously provisional details without reopening accepted directio
   observation; execution reads the same input snapshot. Arbitrary Go outside Step is still
   replayed and author-owned. Defaults can remain contextual; new runtime-only branches are
   not treated as an exhaustive precomputed graph.
-- **Default driver:** empty host/config driver key is the implicit default; authored
-  `"default"` reference addresses that driver. Explicit names use named short flags.
+- **Default driver:** `"default"` is the public host/config name; an empty key also addresses
+  that database and is normalized internally. Supplying both is rejected. Authored
+  `"default"` references address the same driver. Explicit names use named short flags.
   Driver initialization is lazy at first database operation, so pure metrics or non-database
   actions do not connect merely because Bench exists. Backend failures remain ordinary
   errors, not arbitrary user panics. Configuration is copied before merging.
@@ -2540,9 +2541,43 @@ These resolve previously provisional details without reopening accepted directio
   port exclusions follow their moved directories. Auto-fix reports an invalid wsl edit;
   read-only lint is authoritative and must pass without disabling checks.
 
+- **External coverage:** runnable query, accounts, and mirror examples are copied into a
+  separate module and tested with race detection against a release-shaped module archive,
+  without `replace` or internal/backend/built-in imports. Accounts exercises generation,
+  insertion, managed transactions, metrics and report builders; mirror exercises independent
+  named databases. Tagged PostgreSQL/MySQL coverage additionally verifies owned generic reads.
+- **Resolved discovery:** selected `probe --resolved` uses the run input parser and
+  secret-free driver facts, including config and step selection, but never executes actions.
+  `Catalog.ResolveRun` extends ordinary resolution with step filters for preflight branches.
+- **Report ownership:** each contributor receives a separate copied snapshot, so mutation
+  cannot affect the run report or another contributor. Cursor reads remain the unbounded-
+  result escape hatch; common QueryValues intentionally collects the full result.
+- **Execution validation:** explicitly passed zero policies and foreign driver references
+  are rejected. Timed policies reject timer overflow. Recognized SDK misuse inside an action
+  records a failed step after worker joining; arbitrary panics remain rethrown. Drain-expired
+  calls cannot turn a nil return into a successful iteration or logical operation.
+- **Backend lifetime:** lazy driver initialization uses the action's context, allowing reached
+  detached cleanup to open a previously unused database after parent cancellation. Existing
+  pools remain framework-owned until final teardown.
+- **Compatibility boundary:** the authoring guide names the supported root/bench/gen/report
+  surface and promises compatibility across remaining v6 minors after the full stack lands.
+  Backend/CLI conversion helpers exposing implementation types are explicitly outside that
+  contract. Built-in embedded-asset registration remains catalog metadata, not a privileged
+  runtime authoring path. Generic methods require Go 1.27.
+- **Migration details:** dedicated TPC-B/C transaction and TPC-C population retry counters
+  retain their scheduled-retry callbacks. Noop smoke commands and operator/help documentation
+  use typed inputs and explicit executors. Default parameter discovery remains ambient-free.
+
 ## Implementation status
 
-Core authoring migration and all built-in definitions compile. Unit tests and initial
-race checks pass; read-only lint is clean. External example/API documentation and final
-validation remain in progress. Mandatory database/Docker integration is not yet verified:
-Docker daemon was unavailable at the first local check. No push or PR has been published.
+All requested implementation, built-in migration, external examples, resolved discovery,
+API documentation, compatibility declaration and migration guidance are in place. Full
+`make tests` race/coverage suite, external release-module race tests, built-in noop smoke,
+and tagged integration compilation pass. Final `make build`, `make tests`, and the required
+lint-fix/read-only lint sequence also pass after the last code edits. The installed
+Go-1.27-compatible linter is selected with `LOCAL_BIN=/Users/ariel/go/bin`; no system Go,
+PATH, or persistent Go configuration is modified. Mandatory integration is blocked,
+not passed: `make tmpfs-up` cannot connect to
+`/Users/ariel/.docker/run/docker.sock` because the Docker daemon is unavailable. The
+PostgreSQL/MySQL/OTEL suite still needs execution with the documented harness. No push or
+PR has been published.

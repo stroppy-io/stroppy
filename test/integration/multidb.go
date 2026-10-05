@@ -16,10 +16,11 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/ydb-platform/ydb-go-sdk/v3"
 	ydbsdk "github.com/ydb-platform/ydb-go-sdk/v3"
+
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 const (

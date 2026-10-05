@@ -37,10 +37,10 @@ type Result struct {
 
 // StepDescription describes one encountered step, not every possible Go branch.
 type StepDescription struct {
-	Name     string
-	Executor string
-	Workers  int
-	Measured bool
+	Name     string `json:"name"`
+	Executor string `json:"executor"`
+	Workers  int    `json:"workers"`
+	Measured bool   `json:"measured"`
 }
 
 // Execution observes or executes steps immediately in ordinary Go order.
@@ -75,7 +75,7 @@ func (e *Execution) Enabled(name string) bool {
 	return true
 }
 
-//nolint:gocognit,cyclop,funlen // immediate step outcomes, filtering and measurement order stay explicit.
+//nolint:gocognit,gocyclo,cyclop,funlen // immediate step outcomes, filtering and measurement order stay explicit.
 func (e *Execution) Step(name string, action Action, options ...StepOption) Result {
 	if name == "" || action == nil {
 		invalid("step", inputError("name and action are required"))
@@ -93,6 +93,10 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 
 	if opts.policy.mode == "" {
 		opts.policy = Policy{mode: "once", workers: 1}
+	}
+
+	if opts.driver.owner != nil && opts.driver.owner != e.def {
+		invalid("step driver", inputError("reference belongs to another definition"))
 	}
 
 	if opts.policy.workers < 1 {
@@ -261,9 +265,15 @@ func (e *Execution) execute(parent context.Context, name string, action Action, 
 		wg.Go(func() {
 			defer func() {
 				if value := recover(); value != nil {
-					panics <- value
+					if validation, ok := value.(*ValidationError); ok {
+						fatal <- validation
 
-					cancel(inputError("action panic"))
+						cancel(validation)
+					} else {
+						panics <- value
+
+						cancel(inputError("action panic"))
+					}
 				}
 			}()
 			//nolint:gosec // worker is nonnegative and bounded by validated policy.
@@ -291,7 +301,12 @@ func (e *Execution) execute(parent context.Context, name string, action Action, 
 				}
 
 				started := time.Now()
+
 				err := action(ctx, b)
+				if err == nil && errors.Is(context.Cause(ctx), errDrainExpired) {
+					err = errDrainExpired
+				}
+
 				vu.iterTest++
 
 				vu.iterScenario++

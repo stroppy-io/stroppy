@@ -1,0 +1,49 @@
+package main
+
+import (
+	"encoding/json"
+	"io"
+	"testing"
+
+	"example.com/stroppy-v6-consumer/authoring"
+	"github.com/stroppy-io/stroppy/v6"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
+)
+
+func TestAuthorCapabilities(t *testing.T) {
+	catalog, err := bench.NewCatalog(authoring.Query, authoring.Accounts, authoring.Mirror)
+	if err != nil { t.Fatal(err) }
+	application, err := stroppy.NewCatalog(catalog)
+	if err != nil { t.Fatal(err) }
+	for _, name := range []string{"example/query", "example/accounts", "example/mirror"} {
+		t.Run(name, func(t *testing.T) {
+			result, err := application.Run(t.Context(), &stroppy.RunRequest{
+				Test: name,
+				Drivers: map[string]bench.DriverConfig{
+					"": {Kind: bench.DriverNoop},
+					"primary": {Kind: bench.DriverNoop},
+					"secondary": {Kind: bench.DriverNoop},
+				},
+				Params: bench.ParamInputs{CLI: map[string]string{"iterations": "7"}},
+				Metrics: &bench.MetricsConfig{Quiet: true, SummaryWriter: io.Discard},
+			})
+			if err != nil { t.Fatal(err) }
+			if result.Status != report.StatusCompleted { t.Fatalf("status = %s", result.Status) }
+			if name == "example/accounts" {
+				if *result.Metrics["account_transfers"].Total != 7 { t.Fatal("transfer count") }
+				if len(result.WorkloadReports) != 1 || !json.Valid(result.WorkloadReports[0].Data) {
+					t.Fatal("missing accounts payload")
+				}
+				if *result.Metrics["insert_rows_total"].Total != 100 { t.Fatal("load count") }
+				if *result.Metrics["successful_transactions_total"].Total != 7 { t.Fatal("logical transaction count") }
+			}
+			if name == "example/mirror" {
+				if *result.Metrics["mirror_queries"].Total != 14 || len(result.Metrics["mirror_queries"].Series) != 2 {
+					t.Fatal("named database metrics")
+				}
+				if len(result.Drivers) != 3 { t.Fatal("named database descriptions") }
+			}
+		})
+	}
+}

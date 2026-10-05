@@ -40,6 +40,7 @@ func TestExternalModuleResolvesV6Release(t *testing.T) {
 		"GOCACHE="+filepath.Join(t.TempDir(), "gocache"),
 	)
 
+	runCommand(t, consumerDir, buildEnv, "go", "test", "-mod=mod", "-race", "./...")
 	runCommand(t, consumerDir, buildEnv, "go", "build", "-mod=mod", "-o", binary, ".")
 
 	home := t.TempDir()
@@ -72,6 +73,16 @@ func prepareConsumer(t *testing.T) string {
 	dir := t.TempDir()
 	copyFile(t, filepath.Join("testdata", "consumer", "go.mod"), filepath.Join(dir, "go.mod"))
 	copyFile(t, filepath.Join("testdata", "consumer", "main.go.txt"), filepath.Join(dir, "main.go"))
+	copyFile(t, filepath.Join("testdata", "consumer", "author_api_test.go.txt"), filepath.Join(dir, "author_api_test.go"))
+
+	examples := filepath.Join(dir, "authoring")
+	if err := os.Mkdir(examples, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, name := range []string{"query.go", "accounts.go", "mirror.go"} {
+		copyFile(t, filepath.Join("..", "..", "examples", "authoring", name), filepath.Join(examples, name))
+	}
 
 	return dir
 }

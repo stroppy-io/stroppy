@@ -111,7 +111,7 @@ func (b *Bench) RawRows(ctx context.Context, sql string, args map[string]any) (_
 }
 
 func (b *Bench) runQuery(ctx context.Context, sql string, args map[string]any) (*driver.QueryResult, error) {
-	if err := b.ensureDriver(); err != nil {
+	if err := b.ensureDriver(ctx); err != nil {
 		return nil, err
 	}
 
@@ -208,7 +208,7 @@ func (b *Bench) insert(ctx context.Context, req *driver.InsertRequest) (*stats.Q
 		return nil, fmt.Errorf("insert: %w", err)
 	}
 
-	if err := b.ensureDriver(); err != nil {
+	if err := b.ensureDriver(ctx); err != nil {
 		return nil, err
 	}
 
@@ -273,7 +273,7 @@ func (b *Bench) newBatchInsertTracker(req *driver.InsertRequest) *insertprogress
 
 // Begin starts a transaction.
 func (b *Bench) Begin(ctx context.Context, opts BeginOpts) (*Tx, error) {
-	if err := b.ensureDriver(); err != nil {
+	if err := b.ensureDriver(ctx); err != nil {
 		return nil, err
 	}
 
