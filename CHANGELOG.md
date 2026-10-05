@@ -20,6 +20,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
+- Workload authors use ordinary test definitions and immediate named steps, with typed parameters, generic query reads, named databases, neutral metrics and reporting, and the same supported API as built-ins.
+- Stroppy requires Go 1.27 and can install verified private Go 1.27.1 under `~/.stroppy`; repeated runs expose explicit drain settings and schema-3 reports record named drivers and measured step windows.
+- Workload inputs use typed flags, process environment, and typed config; legacy `-e` and config `env` are rejected, and additional drivers are configured by name rather than numeric index.
+
 - Go applications can depend on Stroppy v6 through the standard `github.com/stroppy-io/stroppy/v6` module path. ([#181](https://github.com/stroppy-io/stroppy/pull/181))
 
 ## [6.1.1] - 2026-09-28

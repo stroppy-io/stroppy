@@ -24,7 +24,7 @@ func bynameInt(b bool) int64 {
 // the HAS_RETURNING / IS_PICODATA branches of the tx variant are absent here. The
 // by-name / remote-wh / rollback decisions stay client-side (they feed proc params).
 func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, vs *vuState) error {
-	return b.Transaction(func() error {
+	return b.LogicalOperation(func() error {
 		idx := weightedPick(vs.picker, txWeights)
 		name := txNames[idx]
 
@@ -60,14 +60,14 @@ func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, vs *vuState
 }
 
 func (w *workload) procNewOrder(ctx context.Context, b *bench.Bench, vs *vuState) error {
-	w.m.newOrderTotal.Add(1)
+	w.m.newOrderTotal.Add(ctx, 1)
 
 	start := time.Now()
-	defer func() { w.m.newOrderDur.Add(float64(time.Since(start).Milliseconds())) }()
+	defer func() { w.m.newOrderDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
 
 	forceRollback := vs.ri(vs.noRollback, 1, 100) <= 1
 	if forceRollback {
-		w.m.rollbackDecided.Add(1)
+		w.m.rollbackDecided.Add(ctx, 1)
 	}
 
 	dID := vs.ri(vs.noDID, 1, districtsPerWarehouse)
@@ -79,7 +79,7 @@ func (w *workload) procNewOrder(ctx context.Context, b *bench.Bench, vs *vuState
 		"d_id": dID, "c_id": cID, "ol_cnt": olCnt, "force_rollback": forceRollback,
 	}
 
-	err := bench.Retry0(ctx, w.retryPolicy, func() error {
+	err := bench.Retry0(ctx, b.TxRetryPolicy(bench.RetryOptions{MaxAttempts: w.retryAttempts}), func() error {
 		tx, beginErr := b.Begin(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"})
 		if beginErr != nil {
 			return beginErr
@@ -92,7 +92,7 @@ func (w *workload) procNewOrder(ctx context.Context, b *bench.Bench, vs *vuState
 					return result
 				}
 
-				w.m.rollbackDone.Add(1)
+				w.m.rollbackDone.Add(ctx, 1)
 
 				return nil
 			}
@@ -112,10 +112,10 @@ func (w *workload) procNewOrder(ctx context.Context, b *bench.Bench, vs *vuState
 }
 
 func (w *workload) procPayment(ctx context.Context, b *bench.Bench, vs *vuState) error {
-	w.m.paymentTotal.Add(1)
+	w.m.paymentTotal.Add(ctx, 1)
 
 	start := time.Now()
-	defer func() { w.m.paymentDur.Add(float64(time.Since(start).Milliseconds())) }()
+	defer func() { w.m.paymentDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
 
 	dID := vs.ri(vs.payDID, 1, districtsPerWarehouse)
 	amount := vs.rf(vs.payHAmount, 1, 5000)
@@ -123,7 +123,7 @@ func (w *workload) procPayment(ctx context.Context, b *bench.Bench, vs *vuState)
 
 	isRemote := w.warehouses > 1 && vs.ri(vs.payRemote, 1, 100) <= 15
 	if isRemote {
-		w.m.paymentRemote.Add(1)
+		w.m.paymentRemote.Add(ctx, 1)
 	}
 
 	cWID := vs.homeWID
@@ -148,24 +148,24 @@ func (w *workload) procPayment(ctx context.Context, b *bench.Bench, vs *vuState)
 		"p_w_id": vs.homeWID, "p_d_id": dID, "p_c_w_id": cWID, "p_c_d_id": cDID,
 		"p_c_id": cIDPick, "byname": bynameInt(isByName), "h_amount": amount, "c_last": cLastPick, "p_h_id": hID,
 	}
-	err := bench.Retry0(ctx, w.retryPolicy, func() error {
-		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "payment"}, func(tx *bench.TxX) error {
+	err := bench.Retry0(ctx, b.TxRetryPolicy(bench.RetryOptions{MaxAttempts: w.retryAttempts}), func() error {
+		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "payment"}, func(tx *bench.Tx) error {
 			return tx.Exec(ctx, w.q("workload_procs", "payment"), args)
 		})
 	})
 
 	if isByName {
-		w.m.paymentByname.Add(1)
+		w.m.paymentByname.Add(ctx, 1)
 	}
 
 	return err
 }
 
 func (w *workload) procOrderStatus(ctx context.Context, b *bench.Bench, vs *vuState) error {
-	w.m.orderStatusTotal.Add(1)
+	w.m.orderStatusTotal.Add(ctx, 1)
 
 	start := time.Now()
-	defer func() { w.m.orderStatusDur.Add(float64(time.Since(start).Milliseconds())) }()
+	defer func() { w.m.orderStatusDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
 
 	dID := vs.ri(vs.osDID, 1, districtsPerWarehouse)
 	cIDPick := vs.nurand(vs.osCID, 1023, 1, customersPerDistrict, vs.osCIDSalt)
@@ -181,50 +181,54 @@ func (w *workload) procOrderStatus(ctx context.Context, b *bench.Bench, vs *vuSt
 	}
 	bynameObserved := false
 
-	err := bench.Retry0(ctx, w.retryPolicy, func() error {
+	err := bench.Retry0(ctx, b.TxRetryPolicy(bench.RetryOptions{MaxAttempts: w.retryAttempts}), func() error {
 		bynameObserved = false
 
-		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "order_status"}, func(tx *bench.TxX) error {
+		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "order_status"}, func(tx *bench.Tx) error {
 			bynameObserved = isByName
 
 			return tx.Exec(ctx, w.q("workload_procs", "order_status"), args)
 		})
 	})
 	if bynameObserved {
-		w.m.orderStatusByname.Add(1)
+		w.m.orderStatusByname.Add(ctx, 1)
 	}
 
 	return err
 }
 
 func (w *workload) procDelivery(ctx context.Context, b *bench.Bench, vs *vuState) error {
-	w.m.deliveryTotal.Add(1)
+	w.m.deliveryTotal.Add(ctx, 1)
 
 	start := time.Now()
-	defer func() { w.m.deliveryDur.Add(float64(time.Since(start).Milliseconds())) }()
+	defer func() { w.m.deliveryDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
 
 	carrierID := vs.ri(vs.dCarrier, 1, 10)
 	args := map[string]any{"d_w_id": vs.homeWID, "d_o_carrier_id": carrierID}
 
-	return bench.Retry0(ctx, w.retryPolicy, func() error {
-		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, func(tx *bench.TxX) error {
+	return bench.Retry0(ctx, b.TxRetryPolicy(bench.RetryOptions{MaxAttempts: w.retryAttempts}), func() error {
+		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, func(tx *bench.Tx) error {
 			return tx.Exec(ctx, w.q("workload_procs", "delivery"), args)
 		})
 	})
 }
 
 func (w *workload) procStockLevel(ctx context.Context, b *bench.Bench, vs *vuState) error {
-	w.m.stockLevelTotal.Add(1)
+	w.m.stockLevelTotal.Add(ctx, 1)
 
 	start := time.Now()
-	defer func() { w.m.stockLevelDur.Add(float64(time.Since(start).Milliseconds())) }()
+	defer func() { w.m.stockLevelDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
 
 	dID := vs.ri(vs.slDID, 1, districtsPerWarehouse)
 	threshold := vs.ri(vs.slThreshold, 10, 20)
-	args := map[string]any{"st_w_id": vs.homeWID, "st_d_id": dID, "threshold": threshold}
+	args := map[string]any{
+		"st_w_id":   vs.homeWID,
+		"st_d_id":   dID,
+		"threshold": threshold,
+	}
 
-	return bench.Retry0(ctx, w.retryPolicy, func() error {
-		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "stock_level"}, func(tx *bench.TxX) error {
+	return bench.Retry0(ctx, b.TxRetryPolicy(bench.RetryOptions{MaxAttempts: w.retryAttempts}), func() error {
+		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "stock_level"}, func(tx *bench.Tx) error {
 			return tx.Exec(ctx, w.q("workload_procs", "stock_level"), args)
 		})
 	})

@@ -7,8 +7,6 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
-const preset = "tpch"
-
 // tpchTables is the load order: parents before children (FK consistency).
 var tpchTables = [8]string{"region", "nation", "part", "supplier", "partsupp", "customer", "orders", "lineitem"}
 
@@ -36,15 +34,6 @@ func sqlFile(dt bench.DriverTypeName, override string) string {
 	default:
 		return "pg.sql"
 	}
-}
-
-func mustLoadSQL(dt bench.DriverTypeName, override string) *bench.SQL {
-	s, err := bench.LoadSQL(preset, sqlFile(dt, override))
-	if err != nil {
-		panic(err)
-	}
-
-	return s
 }
 
 // shiftDate shifts an ISO date by (days, months, years) in UTC. Picodata and

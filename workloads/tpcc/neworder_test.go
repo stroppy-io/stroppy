@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"go.uber.org/zap"
-
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
@@ -100,7 +98,7 @@ func (d *fakeDriver) ClassifyError(error) driver.ErrorFacts { return driver.Erro
 func (d *fakeDriver) Teardown(context.Context) error        { return nil }
 
 const (
-	fakeDriverType           = config.DriverType(99)
+	fakeDriverType           = config.DriverTypeNoop
 	newOrderTestWorkloadName = "tpcc/test-new-order"
 )
 
@@ -114,7 +112,15 @@ func init() {
 		return currentDriver, nil
 	})
 
-	bench.Register(func() bench.Workload { return currentRunner })
+	bench.Register(bench.Test{Name: newOrderTestWorkloadName, Define: func(d *bench.Def) error {
+		d.Execution.Step(
+			"work",
+			currentRunner.Iterate,
+			bench.SharedIterations(1, 1),
+		)
+
+		return d.Execution.Err()
+	}})
 }
 
 // newOrderRunner is a thin workload that invokes the new-order body once with
@@ -174,17 +180,16 @@ func runNewOrderBody(
 		forceRollback: forceRollback,
 	}
 
-	if err := bench.Run(
+	if _, err := bench.RunCatalog(
 		context.Background(),
+		bench.RegisteredCatalog(),
 		newOrderTestWorkloadName,
-		map[int]*config.DriverConfig{0: {DriverType: fakeDriverType}},
-		bench.ParamInputs{},
-		nil,
-		nil,
-		zap.NewNop(),
-		&bench.MetricsConfig{},
+		bench.RunOptions{
+			Drivers: map[string]bench.DriverConfig{"": {Kind: bench.DriverNoop}},
+			Metrics: &bench.MetricsConfig{Quiet: true},
+		},
 	); err != nil {
-		t.Fatalf("bench.Run failed: %v", err)
+		t.Fatalf("run: %v", err)
 	}
 
 	return currentRunner.err
@@ -217,7 +222,11 @@ func TestNewOrderBodyMissingCustomer(t *testing.T) {
 		"DISTRICT_ROW":  {districtRow()},
 	}), []int64{1}, false)
 	if !errors.Is(err, errNewOrderCustomerMissing) {
-		t.Fatalf("missing customer error = %v, want %v", err, errNewOrderCustomerMissing)
+		t.Fatalf(
+			"missing customer error = %v, want %v",
+			err,
+			errNewOrderCustomerMissing,
+		)
 	}
 }
 
@@ -227,7 +236,11 @@ func TestNewOrderBodyMissingWarehouse(t *testing.T) {
 		"DISTRICT_ROW": {districtRow()},
 	}), []int64{1}, false)
 	if !errors.Is(err, errNewOrderWarehouseMissing) {
-		t.Fatalf("missing warehouse error = %v, want %v", err, errNewOrderWarehouseMissing)
+		t.Fatalf(
+			"missing warehouse error = %v, want %v",
+			err,
+			errNewOrderWarehouseMissing,
+		)
 	}
 }
 
@@ -251,7 +264,11 @@ func TestNewOrderBodyForcedRollbackReportsMissingRegularItem(t *testing.T) {
 		"DISTRICT_ROW":  {districtRow()},
 	}), []int64{10, items + 1}, true)
 	if !errors.Is(err, errItemNotFound) {
-		t.Fatalf("forced rollback with missing regular item error = %v, want %v", err, errItemNotFound)
+		t.Fatalf(
+			"forced rollback with missing regular item error = %v, want %v",
+			err,
+			errItemNotFound,
+		)
 	}
 }
 
@@ -292,7 +309,12 @@ func TestFinishNewOrderPropagatesRollbackError(t *testing.T) {
 
 	err := finishNewOrder(errItemNotFound, rbErr)
 	if !errors.Is(err, errItemNotFound) || !errors.Is(err, rbErr) {
-		t.Fatalf("error %v should wrap both body %v and rollback %v", err, errItemNotFound, rbErr)
+		t.Fatalf(
+			"error %v should wrap both body %v and rollback %v",
+			err,
+			errItemNotFound,
+			rbErr,
+		)
 	}
 }
 

@@ -1,10 +1,11 @@
 package tpcc
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
-	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -95,7 +96,12 @@ type txSpec struct {
 var complianceTxTable = []txSpec{
 	{txNewOrder, "new_order", ceilingNewOrderMillis, mixMinNewOrderPct},
 	{txPayment, "payment", ceilingPaymentMillis, mixMinPaymentPct},
-	{txOrderStatus, "order_status", ceilingOrderStatusMillis, mixMinOrderStatusPct},
+	{
+		txOrderStatus,
+		"order_status",
+		ceilingOrderStatusMillis,
+		mixMinOrderStatusPct,
+	},
 	{txDelivery, "delivery", ceilingDeliveryMillis, mixMinDeliveryPct},
 	{txStockLevel, "stock_level", ceilingStockLevelMillis, mixMinStockLevelPct},
 }
@@ -414,7 +420,10 @@ func computeSteadiness(series steadySeries) Steadiness {
 	active := len(series.counts)
 
 	if active == 0 {
-		return Steadiness{Status: "insufficient", Reason: "no New-Order completions recorded"}
+		return Steadiness{
+			Status: "insufficient",
+			Reason: "no New-Order completions recorded",
+		}
 	}
 
 	if active < minSteadySlots {
@@ -589,10 +598,18 @@ func (r *Report) text() string {
 		fmt.Fprintf(&b, "statistical validity: SUFFICIENT (%d New-Orders, %d measurements)\n",
 			r.Statistical.NewOrders, r.Statistical.TotalMeasurements)
 	} else {
-		fmt.Fprintf(&b, "statistical validity: INSUFFICIENT — %s\n", r.Statistical.Reason)
+		fmt.Fprintf(
+			&b,
+			"statistical validity: INSUFFICIENT — %s\n",
+			r.Statistical.Reason,
+		)
 	}
 
-	fmt.Fprintf(&b, "steadiness (3σ): %s", strings.ToUpper(r.Steadiness.Status))
+	fmt.Fprintf(
+		&b,
+		"steadiness (3σ): %s",
+		strings.ToUpper(r.Steadiness.Status),
+	)
 
 	if r.Steadiness.Status == "pass" || r.Steadiness.Status == "fail" {
 		fmt.Fprintf(&b, " — CV=%.3f σ=%.3f/s μ=%.3f/s over %d windows",
@@ -647,6 +664,10 @@ func (w *workload) complianceContribution(context bench.ReportContext) (bench.Re
 		elapsed = end.Sub(w.measureStart)
 	}
 
+	if seconds, ok := context.Measurements["workload"]; ok {
+		elapsed = time.Duration(seconds * float64(time.Second))
+	}
+
 	var series steadySeries
 	if w.steady != nil {
 		series = w.steady.snapshot(elapsed)
@@ -659,7 +680,16 @@ func (w *workload) complianceContribution(context bench.ReportContext) (bench.Re
 		return bench.ReportContribution{}, err
 	}
 
-	fmt.Fprint(os.Stderr, compliance.text())
-
 	return bench.ReportContribution{Data: compliance}, nil
+}
+
+func renderCompliance(output io.Writer, data json.RawMessage) error {
+	var value Report
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+
+	_, err := io.WriteString(output, value.text())
+
+	return err
 }

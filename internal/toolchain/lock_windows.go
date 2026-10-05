@@ -20,7 +20,14 @@ func lockInstall(root string) (func() error, error) {
 
 	handle := windows.Handle(file.Fd())
 	overlapped := &windows.Overlapped{}
-	if err := windows.LockFileEx(handle, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, overlapped); err != nil {
+	if err := windows.LockFileEx(
+		handle,
+		windows.LOCKFILE_EXCLUSIVE_LOCK,
+		0,
+		1,
+		0,
+		overlapped,
+	); err != nil {
 		_ = file.Close()
 
 		return nil, err

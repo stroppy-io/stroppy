@@ -1,15 +1,14 @@
 package bench
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 var (
-	errUnknownDriverType  = errors.New("unknown driver type")
-	errUnknownTxIsolation = errors.New("unknown tx isolation")
+	errUnknownDriverType  = inputError("unknown driver type")
+	errUnknownTxIsolation = inputError("unknown tx isolation")
 )
 
 // String-typed enums authored by Go workloads and resolved to the config enums

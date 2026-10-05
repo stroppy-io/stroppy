@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/v6/pkg/datagen/tpchgen"
 	"github.com/stroppy-io/stroppy/v6/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/workloads/tpch/tpchgen"
 )
 
 var batchSourceTables = []string{

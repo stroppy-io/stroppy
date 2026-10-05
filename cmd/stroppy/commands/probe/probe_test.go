@@ -35,7 +35,7 @@ func TestHumanCatalogIncludesGroupedWorkloads(t *testing.T) {
 		"PRESETS (embedded workloads)",
 		"WORKLOADS (typed parameters)",
 		"  tpcc/tx\n",
-		"    run:      --duration, --executor, --iterations, --query-timeout, --vus",
+		"    run:      --drain-timeout, --duration, --executor, --iterations, --query-timeout, --vus",
 		"    workload: --load-items",
 		"stroppy run <workload> --help",
 		"DRIVERS (supported insert methods)",
@@ -104,7 +104,7 @@ func assertRepresentativeParams(t *testing.T, workloads []workloadEntry) {
 		scaleFactor.Description != "Number of warehouses." ||
 		scaleFactor.Default != float64(1) ||
 		scaleFactor.Env != "SCALE_FACTOR" ||
-		!slices.Equal(scaleFactor.LegacyAliases, []string{"WAREHOUSES"}) ||
+		!slices.Equal(scaleFactor.LegacyAliases, []string{"warehouses"}) ||
 		scaleFactor.Config != "scaleFactor" {
 		t.Fatalf("tpcc scale-factor schema = %#v", scaleFactor)
 	}
@@ -115,13 +115,13 @@ func assertRepresentativeParams(t *testing.T, workloads []workloadEntry) {
 	}
 
 	duration := findParam(t, tpcc.Params, "duration")
-	if duration.Type != bench.ParamTypeDuration || duration.Default != "0s" {
+	if duration.Type != bench.ParamTypeDuration || duration.Default != "1m0s" {
 		t.Fatalf("duration schema = %#v", duration)
 	}
 
 	loadItems := findParam(t, tpcc.Params, "load-items")
 	if loadItems.Default != nil ||
-		loadItems.DefaultDescription != "true when warehouse-start is 1; false otherwise" {
+		loadItems.DefaultDescription != "true when warehouse-start is 1" {
 		t.Fatalf("load-items schema = %#v", loadItems)
 	}
 }

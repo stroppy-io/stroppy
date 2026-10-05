@@ -26,7 +26,7 @@ func TestLoadRunConfigIsSilentUntilLogged(t *testing.T) {
 
 	path := filepath.Join(t.TempDir(), "config.json")
 	require.NoError(t, os.WriteFile(path, []byte(`{
-		"drivers":{"0":{"driverType":"postgres","url":"host=localhost user=bench password=dsn-secret`+
+		"drivers":{"":{"driverType":"postgres","url":"host=localhost user=bench password=dsn-secret`+
 		` sslmode=require token=token-secret client_secret=client-secret"}}
 	}`), 0o600))
 
@@ -56,7 +56,7 @@ func TestLoadRunConfig_ExplicitPath(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "*.json")
 		require.NoError(t, err)
 
-		_, err = f.WriteString(`{"version":"1","script":"tpcc","env":{"duration":"30m"}}`)
+		_, err = f.WriteString(`{"version":"1","script":"tpcc","run":{"duration":"30m"}}`)
 		require.NoError(t, err)
 		require.NoError(t, f.Close())
 
@@ -64,7 +64,7 @@ func TestLoadRunConfig_ExplicitPath(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, loaded)
 		assert.Equal(t, "tpcc", cfg.RunConfig.GetScript())
-		assert.Equal(t, "30m", cfg.RunConfig.Env["DURATION"]) // key uppercased
+		assert.JSONEq(t, `"30m"`, string(cfg.Run["duration"]))
 	})
 
 	t.Run("file not found", func(t *testing.T) {
@@ -112,7 +112,7 @@ func TestLoadRunConfig_AutoDiscovery(t *testing.T) {
 
 		defer func() { _ = os.Chdir(orig) }()
 
-		content := `{"version":"1","env":{"FOO":"bar"}}`
+		content := `{"version":"1","params":{"foo":"bar"}}`
 		require.NoError(t, os.WriteFile(
 			filepath.Join(dir, runner.DefaultConfigFile),
 			[]byte(content),
@@ -122,7 +122,7 @@ func TestLoadRunConfig_AutoDiscovery(t *testing.T) {
 		cfg, loaded, err := runner.LoadRunConfig("")
 		require.NoError(t, err)
 		assert.True(t, loaded)
-		assert.Equal(t, "bar", cfg.RunConfig.Env["FOO"])
+		assert.JSONEq(t, `"bar"`, string(cfg.Params["foo"]))
 	})
 }
 
@@ -131,7 +131,7 @@ func TestLoadRunConfig_DriverConfig(t *testing.T) {
 	content := `{
         "version": "1",
         "drivers": {
-            "0": {
+            "": {
                 "driverType": "postgres",
                 "url": "postgres://user:pass@localhost:5432/bench",
                 "defaultInsertMethod": "native",
@@ -153,7 +153,7 @@ func TestLoadRunConfig_DriverConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, loaded)
 
-	drv := cfg.RunConfig.Drivers[0]
+	drv := cfg.RunConfig.Drivers[""]
 	require.NotNil(t, drv)
 	assert.Equal(t, "postgres", drv.GetDriverType())
 	assert.Equal(t, "postgres://user:pass@localhost:5432/bench", drv.GetURL())
@@ -211,7 +211,7 @@ func TestLoadRunConfigRejectsCaseInsensitiveEnvCollisions(t *testing.T) {
 
 	_, _, err := runner.LoadRunConfig(path)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `config env keys collide case-insensitively: "VUS" and "vus"`)
+	assert.Contains(t, err.Error(), `unknown field "env"`)
 }
 
 func TestLoadRunConfigRejectsRemovedFieldsAsUnknown(t *testing.T) {
@@ -238,15 +238,15 @@ func TestLoadRunConfigRejectsRemovedDriverFieldAsUnknown(t *testing.T) {
 	for _, field := range []string{"defaultTxIsolation", "default_tx_isolation"} {
 		t.Run(field, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "config.json")
-			doc := `{"drivers":{"0":{"` + field + `":"serializable"}}}`
+			doc := `{"drivers":{"":{"` + field + `":"serializable"}}}`
 			require.NoError(t, os.WriteFile(path, []byte(doc), 0o600))
 
 			_, _, err := runner.LoadRunConfig(path)
 			require.Error(t, err)
 
-			fieldPath := `$.drivers["0"].` + field
+			fieldPath := `$.drivers[""].` + field
 			if strings.Contains(field, "_") {
-				fieldPath = `$.drivers["0"]["` + field + `"]`
+				fieldPath = `$.drivers[""]["` + field + `"]`
 			}
 
 			assert.Contains(t, err.Error(), fieldPath)
@@ -260,7 +260,7 @@ func TestLoadRunConfigCanonicalizesAliases(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, []byte(`{
 		"no_steps":["load_data"],
 		"global":{"run_id":"run-1"},
-		"drivers":{"0":{"driver_type":"postgres","bulk_size":"2e2"}},
+		"drivers":{"":{"driver_type":"postgres","bulk_size":"2e2"}},
 		"run":{"query_timeout":"250ms"},
 		"params":{"scale_factor":1}
 	}`), 0o600))
@@ -270,7 +270,7 @@ func TestLoadRunConfigCanonicalizesAliases(t *testing.T) {
 	require.True(t, found)
 	require.Equal(t, []string{"load_data"}, loaded.RunConfig.NoSteps)
 	require.Equal(t, "run-1", loaded.RunConfig.Global.RunID)
-	require.Equal(t, int32(200), loaded.RunConfig.Drivers[0].GetBulkSize())
+	require.Equal(t, int32(200), loaded.RunConfig.Drivers[""].GetBulkSize())
 	require.JSONEq(t, `"250ms"`, string(loaded.Run["queryTimeout"]))
 	require.JSONEq(t, `1`, string(loaded.Params["scaleFactor"]))
 }
@@ -283,7 +283,7 @@ func TestLoadRunConfigStrictErrors(t *testing.T) {
 	}{
 		{name: "nested duplicate", doc: `{"global":{"runId":"a","runId":"b"}}`, path: `$.global.runId`},
 		{name: "alias collision", doc: `{"global":{"runId":"a","run_id":"b"}}`, path: `$.global.runId`},
-		{name: "wrong case", doc: `{"drivers":{"0":{"BulkSize":1}}}`, path: `$.drivers["0"]["BulkSize"]`},
+		{name: "wrong case", doc: `{"drivers":{"":{"BulkSize":1}}}`, path: `$.drivers[""]["BulkSize"]`},
 		{name: "nested map null", doc: `{"global":{"metadata":{"key":null}}}`, path: `$.global.metadata["key"]`},
 		{name: "scope alias collision", doc: `{"params":{"scaleFactor":1,"scale_factor":2}}`, path: `$.params.scaleFactor`},
 		{name: "scope container", doc: `{"params":{"scaleFactor":[]}}`, path: `$.params.scaleFactor`},

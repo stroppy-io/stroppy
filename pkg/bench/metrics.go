@@ -184,7 +184,12 @@ func (m *txMetrics) tableAttributes(step, table string) metricAttributes {
 }
 
 func (m *txMetrics) txAttributes(step, action, name, isolation string) metricAttributes {
-	key := txAttributeKey{step: step, action: action, name: name, isolation: isolation}
+	key := txAttributeKey{
+		step:      step,
+		action:    action,
+		name:      name,
+		isolation: isolation,
+	}
 
 	return cachedAttributes(
 		&m.txAttrs, key,
@@ -231,8 +236,8 @@ func (m *txMetrics) recordQueryResult(vu *VU, elapsed time.Duration, queryErr er
 		return
 	}
 
-	if vu.root.throughput.active.Load() {
-		vu.root.throughput.queries.Add(1)
+	if window := vu.root.throughput.current.Load(); window != nil {
+		window.queries.Add(1)
 	}
 
 	m.emit(vu, m.queryDuration, elapsed.Seconds()*millisPerSecond, attrs)
@@ -325,12 +330,22 @@ func (m *txMetrics) recordInsert(vu *VU, table string, rows int64) {
 		rows = 0
 	}
 
-	m.emit(vu, m.insertRows, float64(rows), m.tableAttributes(vu.stepTag, table))
+	m.emit(
+		vu,
+		m.insertRows,
+		float64(rows),
+		m.tableAttributes(vu.stepTag, table),
+	)
 }
 
 func (m *txMetrics) record(vu *VU, action, name string, isolation config.TxIsolationLevel) {
 	m.ensureRegistered(vu, vu.root.lg)
-	m.emit(vu, m.transactions, 1, m.txAttributes(vu.stepTag, action, name, txIsolationName(isolation)))
+	m.emit(
+		vu,
+		m.transactions,
+		1,
+		m.txAttributes(vu.stepTag, action, name, txIsolationName(isolation)),
+	)
 }
 
 func txIsolationName(isolation config.TxIsolationLevel) string {

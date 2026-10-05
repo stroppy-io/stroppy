@@ -8,14 +8,15 @@ package baseline
 import (
 	"context"
 	"runtime"
+	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
-	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 const (
-	workloadName = "baseline"
+	workloadName   = "baseline"
+	cleanupTimeout = 30 * time.Second
 
 	probeTable = "stroppy_baseline"
 	rowFiller  = 84
@@ -32,72 +33,82 @@ type workload struct {
 	loadWorkers int
 }
 
-func init() {
-	bench.Register(func() bench.Workload { return &workload{} })
+var Test = bench.Test{Name: workloadName, Define: define}
+
+func init() { bench.Register(Test) }
+func define(d *bench.Def) error {
+	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
+	w := &workload{}
+	w.rows, _ = d.Param.Int64(
+		"rows",
+		defaultRows,
+		"Rows loaded into probe table.",
+		bench.Min(int64(1)),
+	)
+	w.loadWorkers, _ = d.Param.Int(
+		"load-workers",
+		runtime.GOMAXPROCS(0),
+		"Load workers.",
+		bench.Min(1),
+	)
+	iso, _ := d.Param.String("tx-isolation", "", "Transaction isolation override.")
+	db := d.Drivers.Declare("default", bench.DriverConfig{})
+	w.iso = resolveIsolation(db.Kind(), bench.TxIsolationName(iso))
+	d.Execution.Step("drop_schema", w.drop)
+	d.Execution.Step("create_schema", w.create)
+	d.Execution.Step("load_data", w.load)
+	d.Execution.Step("workload", w.work, settings.Policy())
+	d.Execution.Step("cleanup", w.drop, bench.Always(cleanupTimeout))
+
+	return d.Execution.Err()
 }
 
-func (*workload) Name() string { return workloadName }
+func (w *workload) drop(ctx context.Context, b *bench.Bench) error {
+	return b.Exec(ctx, "DROP TABLE IF EXISTS "+probeTable, nil)
+}
 
-func (w *workload) Define(d *bench.Def) error {
-	w.rows = max(d.Param.Int64("rows", defaultRows, "Rows loaded into the probe table.").Value(), 1)
-	w.loadWorkers = max(d.Param.Int(
-		"load-workers", runtime.GOMAXPROCS(0), "Workers used to load the probe table.",
-	).Value(), 1)
-	w.iso = bench.TxIsolationName(d.Param.String(
-		"tx-isolation", "", "Transaction isolation override.",
-	).Value())
+func (w *workload) create(ctx context.Context, b *bench.Bench) error {
+	return b.Exec(
+		ctx,
+		"CREATE TABLE "+probeTable+" (id BIGINT, v BIGINT, filler TEXT)",
+		nil,
+	)
+}
+
+func (w *workload) load(ctx context.Context, b *bench.Bench) error {
+	request := probeInsertRequest(w.rows, w.loadWorkers)
+	_, err := b.Insert(
+		ctx,
+		request.Table,
+		request.Source,
+		bench.InsertMethod(bench.InsertNative),
+		bench.LoadWorkers(w.loadWorkers),
+	)
+
+	return err
+}
+
+func (w *workload) work(ctx context.Context, b *bench.Bench) error {
+	return b.Transaction(
+		ctx,
+		bench.TransactionOptions{Name: "baseline", Isolation: w.iso},
+		w.transaction,
+	)
+}
+
+func (w *workload) transaction(ctx context.Context, tx *bench.Tx) error {
+	for _, sql := range []string{
+		"UPDATE " + probeTable + " SET v = v + 1 WHERE id = 1",
+		"UPDATE " + probeTable + " SET v = v + 2 WHERE id = 2",
+		"UPDATE " + probeTable + " SET filler = 'probe' WHERE id = 3",
+		"INSERT INTO " + probeTable + " (id, v, filler) VALUES (0, 0, 'probe')",
+	} {
+		if err := tx.Exec(ctx, sql, nil); err != nil {
+			return err
+		}
+	}
 
 	return nil
-}
-
-func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
-	w.iso = resolveIsolation(b.DriverTypeName(), w.iso)
-
-	if err := b.Step("drop_schema", func() error {
-		return b.Exec(ctx, "DROP TABLE IF EXISTS "+probeTable, nil)
-	}); err != nil {
-		return err
-	}
-
-	if err := b.Step("create_schema", func() error {
-		return b.Exec(ctx,
-			"CREATE TABLE "+probeTable+" (id BIGINT, v BIGINT, filler TEXT)", nil)
-	}); err != nil {
-		return err
-	}
-
-	return b.Step("load_data", func() error {
-		_, err := b.Insert(ctx, probeInsertRequest(w.rows, w.loadWorkers))
-
-		return err
-	})
-}
-
-// Iterate runs one fixed-shape transaction: three updates and one insert with
-// literal SQL. Statements carry no bind parameters and read no result values,
-// so the same body runs unchanged against real databases, the noop driver,
-// and no-op wire servers that discard I/O.
-func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
-	return b.Transaction(func() error {
-		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "baseline"}, func(tx *bench.TxX) error {
-			for _, stmt := range []string{
-				"UPDATE " + probeTable + " SET v = v + 1 WHERE id = 1",
-				"UPDATE " + probeTable + " SET v = v + 2 WHERE id = 2",
-				"UPDATE " + probeTable + " SET filler = 'probe' WHERE id = 3",
-				"INSERT INTO " + probeTable + " (id, v, filler) VALUES (0, 0, 'probe')",
-			} {
-				if err := tx.Exec(ctx, stmt, nil); err != nil {
-					return err
-				}
-			}
-
-			return nil
-		})
-	})
-}
-
-func (*workload) Teardown(ctx context.Context, b *bench.Bench) error {
-	return b.Exec(ctx, "DROP TABLE IF EXISTS "+probeTable, nil)
 }
 
 func resolveIsolation(dt bench.DriverTypeName, override bench.TxIsolationName) bench.TxIsolationName {
@@ -118,11 +129,11 @@ func resolveIsolation(dt bench.DriverTypeName, override bench.TxIsolationName) b
 // probeInsertRequest builds the typed insert request for the probe table:
 // id is the 1-based row counter, v a uniform int, filler an 84-character
 // [A-Za-z] string.
-func probeInsertRequest(totalRows int64, workers int) *driver.InsertRequest {
+func probeInsertRequest(totalRows int64, workers int) *insertRequest {
 	root := gen.New(seed)
 
-	return &driver.InsertRequest{
-		Table: probeTable, Method: driver.InsertNative, Workers: workers,
+	return &insertRequest{
+		Table: probeTable, Method: bench.InsertNative, Workers: workers,
 		Source: probeSource(root, totalRows),
 	}
 }
@@ -152,5 +163,19 @@ func probeSource(root gen.Root, totalRows int64) *gen.IndexedSource {
 		return nil
 	}
 
-	return gen.NewIndexedSource(schema, root, "baseline/probe@1", totalRows, batchRows, fn)
+	return gen.NewIndexedSource(
+		schema,
+		root,
+		"baseline/probe@1",
+		totalRows,
+		batchRows,
+		fn,
+	)
+}
+
+type insertRequest struct {
+	Table   string
+	Method  bench.InsertStrategy
+	Workers int
+	Source  gen.BatchSource
 }

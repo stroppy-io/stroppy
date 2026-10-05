@@ -209,7 +209,7 @@ func formatRunnerSources(
 		return nil, nil, err
 	}
 
-	if err := moduleFile.AddGoStmt("1.26"); err != nil {
+	if err := moduleFile.AddGoStmt("1.27"); err != nil {
 		return nil, nil, err
 	}
 

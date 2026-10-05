@@ -11,7 +11,18 @@ import (
 // tpccSyllables + cLastDict: spec §4.3.2.3 — C_LAST is a 3-syllable concat indexed
 // by the three base-10 digits of i ∈ [0,999]. 1000 deterministic last names, shared
 // by the load and the by-name lookup branches of payment/order_status.
-var tpccSyllables = [10]string{"BAR", "OUGHT", "ABLE", "PRI", "PRES", "ESE", "ANTI", "CALLY", "ATION", "EING"}
+var tpccSyllables = [10]string{
+	"BAR",
+	"OUGHT",
+	"ABLE",
+	"PRI",
+	"PRES",
+	"ESE",
+	"ANTI",
+	"CALLY",
+	"ATION",
+	"EING",
+}
 
 var cLastDict [1000]string
 

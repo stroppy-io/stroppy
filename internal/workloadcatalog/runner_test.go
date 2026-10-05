@@ -25,7 +25,7 @@ func TestModuleConfigPreservesReplacements(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := file.AddGoStmt("1.26"); err != nil {
+	if err := file.AddGoStmt("1.27"); err != nil {
 		t.Fatal(err)
 	}
 

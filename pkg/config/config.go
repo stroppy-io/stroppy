@@ -338,10 +338,9 @@ type RunConfig struct {
 	Script  *string                     `json:"script,omitempty"`
 	SQL     *string                     `json:"sql,omitempty"`
 	Global  *GlobalConfig               `json:"global,omitempty"`
-	Drivers map[uint32]*DriverRunConfig `json:"drivers,omitempty"`
+	Drivers map[string]*DriverRunConfig `json:"drivers,omitempty"`
 	Run     map[string]json.RawMessage  `configscope:"run"        json:"run,omitempty"`
 	Params  map[string]json.RawMessage  `configscope:"params"     json:"params,omitempty"`
-	Env     map[string]string           `json:"env,omitempty"`
 	Steps   []string                    `json:"steps,omitempty"`
 	NoSteps []string                    `json:"noSteps,omitempty"`
 }

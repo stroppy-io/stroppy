@@ -2485,14 +2485,64 @@ remove superseded sketches, map accepted capabilities to current implementation,
 minimal/custom/built-in cases bottom-up. Ask only about critical design contradictions or
 specific details the user requests.
 
-No implementation code or commits have been made for issue #179. Full DAG scheduling,
-variants/subgraphs/subtests, and new open-loop/pool/per-worker executors remain deferred.
-Current engine/backend/generation algorithms are implementation base. Approved new behavior
-includes explicit duration drain, neutral author facades, generic common reads/row-source
-adapters, named drivers, and Go 1.27 floor.
+Implementation was authorized after the broad walkthrough. Design was committed as
+`c6435ad`. Work remains solo on `feat/issue-179-public-api`, stacked on #186; local commits
+are authorized, publication is not. Full DAG scheduling, variants/subgraphs/subtests, and
+new open-loop/pool/per-worker executors remain deferred.
 
-## Next review unit
+## Implementation decisions for review
 
-**Consolidated API sketch and bottom-up walkthrough.** Begin with a short standalone
-load/query workload, then transactional/multi-driver/report cases. Identify only critical
-remaining interactions before implementation approval.
+These resolve previously provisional details without reopening accepted direction.
+
+- **Compiler:** pin verified private Go 1.27.1 using archive SHA-256 values from official
+  `https://go.dev/dl/?mode=json`. Module and generated runner floor becomes Go 1.27.
+  Existing system/private cache boundaries are unchanged.
+- **Input replay:** snapshot supplied input maps and process environment once before
+  observation; execution reads the same input snapshot. Arbitrary Go outside Step is still
+  replayed and author-owned. Defaults can remain contextual; new runtime-only branches are
+  not treated as an exhaustive precomputed graph.
+- **Default driver:** empty host/config driver key is the implicit default; authored
+  `"default"` reference addresses that driver. Explicit names use named short flags.
+  Driver initialization is lazy at first database operation, so pure metrics or non-database
+  actions do not connect merely because Bench exists. Backend failures remain ordinary
+  errors, not arbitrary user panics. Configuration is copied before merging.
+- **Named-driver settings:** retain structured current backend knobs through documented
+  neutral Bench-facing configuration. Secret-bearing configuration is merged only in memory,
+  never serialized to report/probe provenance. Default operator fields override authored
+  fallback fields; named reference identity is independent of declaration order.
+- **Query mapping:** shallow exported struct fields use `db` tags or lower-case field names;
+  missing required destination columns and ambiguous duplicate columns return errors.
+  Extra result columns may be ignored for structs. Scalars require one column. Pointer
+  destinations represent NULL. Bytes/strings returned by common helpers are owned copies.
+  Advanced raw row collection remains available for heterogeneous canonical answer checks.
+- **Ordinary row sources:** struct generation adapter feeds existing typed batches.
+  Variable-length columns have a bounded per-row budget (4096 bytes by default), adjustable
+  explicitly; excessive content returns error. Existing schema-bound sources retain their
+  allocation-sensitive path and canonical algorithms remain unchanged.
+- **Measurements:** each measured step owns a separate actual elapsed window including drain.
+  Metric series are step-tagged. Nested managed transactions inside a logical operation do
+  not add duplicate logical successes. Reports schema 3 adds named drivers, per-step executor
+  settings and windows; first measured step supplies the convenience single-scenario view.
+- **Report publication:** direct publication encodes a copy at execution time. Disabled
+  reporting skips payload encoding and final builders but not metrics/error accounting.
+  Final snapshots retain label series, step results and windows. An optional writer-based
+  renderer consumes the same payload, keeping TPC-C human output off global stderr.
+- **Runtime cleanup:** framework-owned driver teardown uses detached bounded context, after
+  action workers join. Managed transaction rollback also uses bounded detached context and
+  preserves both original and rollback errors. Recognized SDK misuse is returned at operation
+  boundaries; arbitrary user panic is rethrown after cleanup.
+- **Filtering:** keep coarse include/exclude behavior, including suppression of Always when
+  filtered. Preflight code can inspect `Execution.Enabled` without recording a step; necessary
+  for generated TPC-DS validation to fail before schema changes while allowing load-only runs.
+- **Canonical ownership:** preserve ports/assets/licenses by moving canonical TPC-H/DS sources
+  and query generation into their workloads. No core dependency on those algorithms remains.
+- **Lint tooling:** use golangci-lint 2.14.0 built with Go 1.27.1 for generic methods. Canonical
+  port exclusions follow their moved directories. Auto-fix reports an invalid wsl edit;
+  read-only lint is authoritative and must pass without disabling checks.
+
+## Implementation status
+
+Core authoring migration and all built-in definitions compile. Unit tests and initial
+race checks pass; read-only lint is clean. External example/API documentation and final
+validation remain in progress. Mandatory database/Docker integration is not yet verified:
+Docker daemon was unavailable at the first local check. No push or PR has been published.

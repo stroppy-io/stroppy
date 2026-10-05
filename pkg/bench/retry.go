@@ -190,7 +190,13 @@ func (b *Bench) TxRetryPolicy(opts TxRetryPolicyOptions) RetryPolicy {
 		}
 	}
 
-	return newTxRetryPolicy(b.drv.ClassifyError, opts)
+	return newTxRetryPolicy(func(err error) driver.ErrorFacts {
+		if b.drv != nil {
+			return b.drv.ClassifyError(err)
+		}
+
+		return driver.DefaultErrorFacts(err)
+	}, opts)
 }
 
 func newTxRetryPolicy(
@@ -254,4 +260,44 @@ func pow2(n int) float64 {
 	}
 
 	return r
+}
+
+// Fatal wraps an error with explicit run-stopping intent.
+func Fatal(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	return &FatalError{err: err}
+}
+
+// TransactionOptions combines identity, isolation and opt-in whole-body retry.
+type TransactionOptions struct {
+	Name      string
+	Isolation TxIsolationName
+	Retry     TxRetryPolicyOptions
+}
+
+// RetryOptions is the workload-owned retry configuration.
+type RetryOptions = TxRetryPolicyOptions
+
+// Transaction manages transaction lifecycle and retries as one logical operation.
+//
+//nolint:gocritic // transaction options are isolated operation inputs.
+func (b *Bench) Transaction(
+	ctx context.Context,
+	options TransactionOptions,
+	body func(context.Context, *Tx) error,
+) error {
+	policy := b.TxRetryPolicy(options.Retry)
+
+	return b.LogicalOperation(func() error {
+		return Retry0(ctx, policy, func() error {
+			return b.BeginTx(
+				ctx,
+				BeginOpts{Name: options.Name, Isolation: options.Isolation},
+				func(tx *Tx) error { return body(ctx, tx) },
+			)
+		})
+	})
 }

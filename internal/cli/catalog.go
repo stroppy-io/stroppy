@@ -82,7 +82,7 @@ func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 			}
 			defer result.Cleanup()
 
-			if _, builtIn := catalog.Factory(result.Name); builtIn {
+			if _, builtIn := catalog.Test(result.Name); builtIn {
 				return fmt.Errorf("%w: %s", errBuiltInNameCollision, result.Name)
 			}
 
@@ -173,7 +173,7 @@ func newRemoveCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cob
 		Short: "Remove a custom workload from the local catalog",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if _, builtIn := catalog.Factory(args[0]); builtIn {
+			if _, builtIn := catalog.Test(args[0]); builtIn {
 				return fmt.Errorf("%w %q", errRemoveBuiltIn, args[0])
 			}
 

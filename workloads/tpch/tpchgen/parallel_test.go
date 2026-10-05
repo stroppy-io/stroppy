@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/datagen/source"
-	"github.com/stroppy-io/stroppy/v6/pkg/datagen/tpchgen"
+	"github.com/stroppy-io/stroppy/v6/workloads/tpch/tpchgen"
 )
 
 // drainPartition pulls every row of one partition into stringified form.

@@ -24,7 +24,7 @@ func TestListedPackageFilesIncludeIgnoredPlatformFiles(t *testing.T) {
 func TestLoadModuleFilesAcceptsUnreferencedReplacement(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(
-		filepath.Join(root, "go.mod"), []byte("module example.com/tool\n\ngo 1.26\n"), 0o600,
+		filepath.Join(root, "go.mod"), []byte("module example.com/tool\n\ngo 1.27\n"), 0o600,
 	); err != nil {
 		t.Fatal(err)
 	}

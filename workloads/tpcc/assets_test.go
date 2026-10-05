@@ -8,7 +8,15 @@ import (
 )
 
 func TestEmbeddedAssetContract(t *testing.T) {
-	dialects := []string{"pg.sql", "crdb.sql", "crdb24.sql", "mysql.sql", "pico.sql", "ydb.sql", "ydb_no_indexes.sql"}
+	dialects := []string{
+		"pg.sql",
+		"crdb.sql",
+		"crdb24.sql",
+		"mysql.sql",
+		"pico.sql",
+		"ydb.sql",
+		"ydb_no_indexes.sql",
+	}
 	workloadtest.Files(t, files, append([]string{"README.md"}, dialects...)...)
 
 	sections := []string{
@@ -77,7 +85,11 @@ func TestEmbeddedAssetContract(t *testing.T) {
 			}
 
 			if dialect == "pg.sql" || dialect == "crdb.sql" || dialect == "crdb24.sql" || dialect == "mysql.sql" {
-				dialectSections = append(append([]string(nil), sections...), "create_procedures", "workload_procs")
+				dialectSections = append(
+					append([]string(nil), sections...),
+					"create_procedures",
+					"workload_procs",
+				)
 				for _, name := range txNames {
 					dialectQueries = append(dialectQueries, workloadtest.Query{Section: "workload_procs", Name: name})
 				}
@@ -103,10 +115,18 @@ func TestDurabilitySectionsArePostgresOnly(t *testing.T) {
 				queries := sql.Section(section)
 				if dialect == "pg.sql" {
 					if len(queries) != 9 {
-						t.Errorf("%s: want durability changes for all 9 tables, got %d", section, len(queries))
+						t.Errorf(
+							"%s: want durability changes for all 9 tables, got %d",
+							section,
+							len(queries),
+						)
 					}
 				} else if len(queries) != 0 {
-					t.Errorf("%s: CockroachDB must skip PostgreSQL durability changes, got %d queries", section, len(queries))
+					t.Errorf(
+						"%s: CockroachDB must skip PostgreSQL durability changes, got %d queries",
+						section,
+						len(queries),
+					)
 				}
 			}
 		})

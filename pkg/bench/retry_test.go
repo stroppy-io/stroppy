@@ -20,12 +20,28 @@ func TestDefaultErrorActions(t *testing.T) {
 		kind driver.ErrorKind
 		want ErrorAction
 	}{
-		{name: "serialization", kind: driver.ErrorKindSerialization, want: ErrorActionRetry},
+		{
+			name: "serialization",
+			kind: driver.ErrorKindSerialization,
+			want: ErrorActionRetry,
+		},
 		{name: "deadlock", kind: driver.ErrorKindDeadlock, want: ErrorActionRetry},
-		{name: "lock timeout", kind: driver.ErrorKindLockTimeout, want: ErrorActionRetry},
-		{name: "transient", kind: driver.ErrorKindTransient, want: ErrorActionRetry},
+		{
+			name: "lock timeout",
+			kind: driver.ErrorKindLockTimeout,
+			want: ErrorActionRetry,
+		},
+		{
+			name: "transient",
+			kind: driver.ErrorKindTransient,
+			want: ErrorActionRetry,
+		},
 		{name: "unknown", kind: driver.ErrorKindUnknown, want: ErrorActionError},
-		{name: "unsupported", kind: driver.ErrorKindUnsupported, want: ErrorActionError},
+		{
+			name: "unsupported",
+			kind: driver.ErrorKindUnsupported,
+			want: ErrorActionError,
+		},
 	}
 
 	for _, tt := range tests {
@@ -109,9 +125,15 @@ func TestRetryWithPolicyRetriesClassifiedError(t *testing.T) {
 }
 
 func TestBenchRetryPolicyCountsOnlyScheduledRetries(t *testing.T) {
-	rootState, err := newRootState(zap.NewNop(), context.Background(), nil, nil, &MetricsConfig{})
+	rootState, err := newrootState(
+		zap.NewNop(),
+		context.Background(),
+		nil,
+		nil,
+		&MetricsConfig{},
+	)
 	if err != nil {
-		t.Fatalf("newRootState() error = %v", err)
+		t.Fatalf("newrootState() error = %v", err)
 	}
 
 	t.Cleanup(func() {
@@ -181,7 +203,12 @@ func TestRetryWithPolicyActions(t *testing.T) {
 	}{
 		{name: "error", action: ErrorActionError, wantErr: sentinel},
 		{name: "ignore", action: ErrorActionIgnore},
-		{name: "fatal", action: ErrorActionFatal, wantErr: sentinel, wantFatal: true},
+		{
+			name:      "fatal",
+			action:    ErrorActionFatal,
+			wantErr:   sentinel,
+			wantFatal: true,
+		},
 	}
 
 	for _, tt := range tests {

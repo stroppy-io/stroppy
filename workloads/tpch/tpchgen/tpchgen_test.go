@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/v6/pkg/datagen/tpchgen"
+	"github.com/stroppy-io/stroppy/v6/workloads/tpch/tpchgen"
 )
 
 const sf = 0.01

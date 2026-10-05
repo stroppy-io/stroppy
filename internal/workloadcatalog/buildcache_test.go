@@ -102,7 +102,7 @@ func TestBuildCachedRebuildsCorruptEntry(t *testing.T) {
 func TestBuildCachedInvalidatesUnsnappedSource(t *testing.T) {
 	moduleRoot := t.TempDir()
 
-	moduleData := []byte("module example.com/input\n\ngo 1.26\n")
+	moduleData := []byte("module example.com/input\n\ngo 1.27\n")
 	if err := os.WriteFile(filepath.Join(moduleRoot, "go.mod"), moduleData, 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -15,9 +15,10 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
 const (
@@ -40,7 +41,7 @@ type MetricsConfig struct {
 	// OnSummary receives the final collected metrics snapshot once per Run,
 	// right before the text summary is printed. Optional; programmatic
 	// consumers (stroppy baseline) read structured numbers here.
-	OnSummary func(metricdata.ResourceMetrics)
+	OnSummary func(map[string]report.Metric)
 
 	// Quiet suppresses the final text summary. Programmatic consumers that
 	// read OnSummary render their own report.
@@ -78,7 +79,10 @@ func newMeterProvider(
 
 	if enabled {
 		options = append(options, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(
-			&metadataExporter{Exporter: exporter, attributes: exportedAttributes(config)},
+			&metadataExporter{
+				Exporter:   exporter,
+				attributes: exportedAttributes(config),
+			},
 			sdkmetric.WithInterval(metricExportInterval()),
 		)))
 	}

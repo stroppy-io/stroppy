@@ -8,7 +8,7 @@ import (
 
 	"github.com/stroppy-io/stroppy/v6/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/v6/pkg/gen"
-	"github.com/stroppy-io/stroppy/v6/third_party/gotpcds/dsdgen"
+	"github.com/stroppy-io/stroppy/v6/workloads/tpcds/dsdgen"
 )
 
 // tpcdsBytesBudget is the per-row byte budget for every TPC-DS column. dsdgen's

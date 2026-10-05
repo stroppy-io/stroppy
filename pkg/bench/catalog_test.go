@@ -1,53 +1,23 @@
 package bench
 
 import (
-	"context"
-	"strings"
 	"testing"
 
-	"go.uber.org/zap"
-
-	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stretchr/testify/require"
 )
 
-func TestRunCatalogRejectsFactoryNameChange(t *testing.T) {
-	calls := 0
-	factory := func() Workload {
-		calls++
+func TestCatalogCopiesDescriptorIdentity(t *testing.T) {
+	test := Test{Name: "example", Define: func(*Def) error { return nil }}
+	catalog, err := NewCatalog(test)
+	require.NoError(t, err)
 
-		name := "test/catalog-name"
-		if calls > 1 {
-			name = "test/different-name"
-		}
+	test.Name = "changed"
+	descriptor, found := catalog.Test("example")
+	require.True(t, found)
+	require.Equal(t, "example", descriptor.Name)
 
-		return &catalogTestWorkload{name: name}
-	}
-
-	catalog, err := NewCatalog(factory)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = RunCatalog(
-		t.Context(),
-		catalog,
-		"test/catalog-name",
-		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		ParamInputs{},
-		nil,
-		nil,
-		zap.NewNop(),
-		&MetricsConfig{Quiet: true},
-	)
-	if err == nil || !strings.Contains(err.Error(), "different name") {
-		t.Fatalf("RunCatalog() error = %v", err)
-	}
+	_, err = NewCatalog(test, test)
+	require.Error(t, err)
 }
 
-type catalogTestWorkload struct{ name string }
-
-func (workload *catalogTestWorkload) Name() string                  { return workload.name }
-func (*catalogTestWorkload) Define(*Def) error                      { return nil }
-func (*catalogTestWorkload) Setup(context.Context, *Bench) error    { return nil }
-func (*catalogTestWorkload) Iterate(context.Context, *Bench) error  { return nil }
-func (*catalogTestWorkload) Teardown(context.Context, *Bench) error { return nil }
+func TestRegisteredDescriptorValidation(t *testing.T) { require.Panics(t, func() { Register(Test{}) }) }

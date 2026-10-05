@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	PinnedVersion   = "1.26.8"
+	PinnedVersion   = "1.27.1"
 	minimumMajor    = 1
-	minimumMinor    = 26
+	minimumMinor    = 27
 	privateDirPerm  = 0o700
 	privateFilePerm = 0o600
 )
@@ -247,7 +247,11 @@ func prompt(input io.Reader, output io.Writer) (bool, error) {
 		return false, ErrConsentRequired
 	}
 
-	if _, err := fmt.Fprintf(output, "Download verified Go %s into ~/.stroppy? [y/N] ", PinnedVersion); err != nil {
+	if _, err := fmt.Fprintf(
+		output,
+		"Download verified Go %s into ~/.stroppy? [y/N] ",
+		PinnedVersion,
+	); err != nil {
 		return false, err
 	}
 

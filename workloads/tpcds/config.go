@@ -7,8 +7,6 @@ package tpcds
 
 import "github.com/stroppy-io/stroppy/v6/pkg/bench"
 
-const preset = "tpcds"
-
 // tpcdsTables is the load order: dimensions and static tables first, fan-out fact
 // tables last, each immediately after its parent sales table.
 var tpcdsTables = [24]string{
@@ -43,13 +41,4 @@ func dialectFiles(dt bench.DriverTypeName, schemaOverride, queryOverride string)
 	}
 
 	return schema, queries
-}
-
-func mustLoad(preset, file string) *bench.SQL {
-	s, err := bench.LoadSQL(preset, file)
-	if err != nil {
-		panic(err)
-	}
-
-	return s
 }

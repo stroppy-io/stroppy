@@ -1,4 +1,4 @@
-// Package stroppy turns one workload factory into a standalone Stroppy application.
+// Package stroppy turns one test definition into a standalone Stroppy application.
 package stroppy
 
 import (
@@ -8,14 +8,10 @@ import (
 	"io"
 	"os"
 
-	"go.uber.org/zap"
-
 	"github.com/stroppy-io/stroppy/v6/internal/cli"
 	"github.com/stroppy-io/stroppy/v6/internal/version"
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
-	"github.com/stroppy-io/stroppy/v6/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/v6/pkg/common/shutdown"
-	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/csv"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/mysql"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
@@ -25,16 +21,9 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
-// Factory creates a fresh workload for one description or run.
-type Factory = bench.Factory
-
-// Workload is implemented by a Go-native benchmark.
-type Workload = bench.Workload
-
-const defaultPostgresURL = "postgres://postgres:postgres@localhost:5432" //nolint:gosec // local development default
-
 var (
 	errReservedWorkloadName = errors.New("stroppy: reserved workload name")
+	errTestSelection        = errors.New("test selection required")
 	errNilApplication       = errors.New("stroppy: nil application")
 	reservedWorkloadNames   = map[string]struct{}{
 		"build": {}, "export": {}, "help": {}, "list": {}, "probe": {}, "remove": {}, "run": {}, "version": {},
@@ -44,13 +33,12 @@ var (
 // Application is one standalone Stroppy workload.
 type Application struct {
 	catalog *bench.Catalog
-	factory Factory
 	name    string
 }
 
-// New validates factory and creates a standalone application.
-func New(factory Factory) (*Application, error) {
-	catalog, err := bench.NewCatalog(factory)
+// New validates a Test and creates a standalone application.
+func New(test bench.Test) (*Application, error) {
+	catalog, err := bench.NewCatalog(test)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +53,7 @@ func New(factory Factory) (*Application, error) {
 		return nil, fmt.Errorf("%w %q", errReservedWorkloadName, name)
 	}
 
-	return &Application{catalog: catalog, factory: factory, name: name}, nil
+	return &Application{catalog: catalog, name: name}, nil
 }
 
 // Name returns standalone workload identity.
@@ -94,16 +82,37 @@ func (a *Application) Execute(
 
 // RunRequest contains programmatic inputs for one workload run.
 type RunRequest struct {
-	Drivers       map[int]*config.DriverConfig
+	Test          string
+	Drivers       map[string]bench.DriverConfig
 	Params        bench.ParamInputs
 	Steps         []string
 	NoSteps       []string
-	Logger        *zap.Logger
+	Logger        bench.Logger
 	Metrics       *bench.MetricsConfig
 	ReportOptions bench.ReportOptions
+	NoReport      bool
 }
 
-// Run executes the standalone workload directly and returns its report.
+// NewCatalog creates an application over an explicit catalog without global registration.
+func NewCatalog(catalog *bench.Catalog) (*Application, error) {
+	if catalog == nil {
+		return nil, errNilApplication
+	}
+
+	descriptions, err := catalog.DescribeAll()
+	if err != nil {
+		return nil, err
+	}
+
+	name := ""
+	if len(descriptions) == 1 {
+		name = descriptions[0].Name
+	}
+
+	return &Application{catalog: catalog, name: name}, nil
+}
+
+// Run returns report data without automatic filesystem persistence.
 func (a *Application) Run(ctx context.Context, request *RunRequest) (*report.Run, error) {
 	if a == nil {
 		return nil, errNilApplication
@@ -113,14 +122,13 @@ func (a *Application) Run(ctx context.Context, request *RunRequest) (*report.Run
 		request = &RunRequest{}
 	}
 
-	drivers := request.Drivers
-	if drivers == nil {
-		drivers = defaultDrivers()
+	name := request.Test
+	if name == "" {
+		name = a.name
 	}
 
-	log := request.Logger
-	if log == nil {
-		log = logger.Global()
+	if name == "" {
+		return nil, errTestSelection
 	}
 
 	metrics := &bench.MetricsConfig{}
@@ -132,27 +140,35 @@ func (a *Application) Run(ctx context.Context, request *RunRequest) (*report.Run
 		metrics.ServiceVersion = version.Resolve()
 	}
 
-	reportOptions := request.ReportOptions
-	if reportOptions.StroppyVersion == "" {
-		reportOptions.StroppyVersion = version.Resolve()
+	options := request.ReportOptions
+	if options.StroppyVersion == "" {
+		options.StroppyVersion = version.Resolve()
 	}
 
-	return bench.RunFactoryWithReport(
+	var reportOptions *bench.ReportOptions
+	if !request.NoReport {
+		reportOptions = &options
+	}
+
+	return bench.RunCatalog(
 		ctx,
-		a.factory,
-		drivers,
-		request.Params,
-		request.Steps,
-		request.NoSteps,
-		log,
-		metrics,
-		reportOptions,
+		a.catalog,
+		name,
+		bench.RunOptions{
+			Drivers: request.Drivers,
+			Params:  request.Params,
+			Steps:   request.Steps,
+			NoSteps: request.NoSteps,
+			Logger:  request.Logger,
+			Metrics: metrics,
+			Report:  reportOptions,
+		},
 	)
 }
 
 // Main runs one workload as a standalone process with Stroppy signal semantics.
-func Main(factory Factory) {
-	os.Exit(mainExitCode(factory))
+func Main(test bench.Test) {
+	os.Exit(mainExitCode(test))
 }
 
 // RegisteredMain runs every workload registered through [bench.Register].
@@ -192,8 +208,8 @@ func registeredMainExitCode(buildVersion, buildDigest string) int {
 	return cli.ExitCodeFor(exitStatus(), err)
 }
 
-func mainExitCode(factory Factory) int {
-	application, err := New(factory)
+func mainExitCode(test bench.Test) int {
+	application, err := New(test)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 
@@ -207,12 +223,4 @@ func mainExitCode(factory Factory) int {
 	stop()
 
 	return cli.ExitCodeFor(exitStatus(), err)
-}
-
-func defaultDrivers() map[int]*config.DriverConfig {
-	return map[int]*config.DriverConfig{0: {
-		DriverType:          config.DriverTypePostgres,
-		URL:                 defaultPostgresURL,
-		DefaultInsertMethod: "native",
-	}}
 }

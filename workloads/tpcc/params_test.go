@@ -1,107 +1,60 @@
 package tpcc
 
 import (
-	"context"
 	"os"
 	"testing"
 
-	"go.uber.org/zap"
-
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
-	"github.com/stroppy-io/stroppy/v6/pkg/config"
-	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
 )
-
-type parameterCaptureWorkload struct {
-	*workload
-	name     string
-	captured chan<- *workload
-}
-
-func (w *parameterCaptureWorkload) Name() string { return w.name }
-
-func (w *parameterCaptureWorkload) Setup(context.Context, *bench.Bench) error {
-	w.captured <- w.workload
-
-	return nil
-}
-
-func (*parameterCaptureWorkload) Iterate(context.Context, *bench.Bench) error  { return nil }
-func (*parameterCaptureWorkload) Teardown(context.Context, *bench.Bench) error { return nil }
 
 func TestTypedParameterCompatibility(t *testing.T) {
 	unsetEnv(
 		t,
-		"SCALE_FACTOR", "WAREHOUSES", "WAREHOUSE_START", "LOAD_ITEMS", "LOAD_WORKERS",
-		"EXECUTOR", "VUS", "ITERATIONS", "ITER", "DURATION",
+		"SCALE_FACTOR",
+		"WAREHOUSES",
+		"WAREHOUSE_START",
+		"LOAD_ITEMS",
+		"LOAD_WORKERS",
+		"EXECUTOR",
+		"VUS",
+		"ITERATIONS",
+		"DURATION",
 	)
 
-	const (
-		txName    = "tpcc/test-parameters-tx"
-		procsName = "tpcc/test-parameters-procs"
-	)
-
-	captured := make(chan *workload, 2)
-
-	registerCapture := func(name, variant string) {
-		bench.Register(func() bench.Workload {
-			return &parameterCaptureWorkload{
-				workload: &workload{variant: variant},
-				name:     name, captured: captured,
-			}
-		})
-	}
-	registerCapture(txName, "tx")
-	registerCapture(procsName, "procs")
-
-	tests := []struct {
-		name           string
-		workloadName   string
-		legacy         map[string]string
-		wantWarehouses int64
-	}{
-		{
-			name:           "tx accepts WAREHOUSES alias",
-			workloadName:   txName,
-			legacy:         map[string]string{"WAREHOUSES": "4"},
-			wantWarehouses: 4,
-		},
-		{
-			name:         "procs prefers projected SCALE_FACTOR",
-			workloadName: procsName,
-			legacy: map[string]string{
-				"SCALE_FACTOR": "2", "WAREHOUSES": "4",
-				"WAREHOUSE_START": "2", "LOAD_WORKERS": "0",
-			},
-			wantWarehouses: 2,
-		},
+	catalog, err := bench.NewCatalog(Tx, Procs)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := runCapture(t, tt.workloadName, captured, bench.ParamInputs{LegacyEnv: tt.legacy})
-			if got.warehouses != tt.wantWarehouses {
-				t.Fatalf("warehouses = %d, want %d", got.warehouses, tt.wantWarehouses)
-			}
+	for _, name := range []string{"tpcc/tx", "tpcc/procs"} {
+		description, err := catalog.Resolve(
+			name,
+			bench.ParamInputs{CLI: map[string]string{"warehouses": "4", "warehouse-start": "2"}},
+			map[string]bench.DriverConfig{"": {Kind: bench.DriverNoop}},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			if tt.workloadName == procsName {
-				if got.loadItems {
-					t.Fatal("loadItems = true, want dynamic default false for warehouse-start 2")
-				}
+		found := false
 
-				if got.loadWorkers != 1 {
-					t.Fatalf("loadWorkers = %d, want normalized 1", got.loadWorkers)
-				}
+		for _, p := range description.Params {
+			if p.Name == "scale-factor" {
+				found = len(p.Aliases) == 1 && p.Aliases[0] == "warehouses"
 			}
-		})
+		}
+
+		if !found {
+			t.Fatal("warehouse alias missing")
+		}
 	}
 }
 
 func TestLoadWorkersReachInsertRequests(t *testing.T) {
 	const workers = 7
 
-	requests := map[string]*driver.InsertRequest{
+	requests := map[string]*insertRequest{
 		"warehouse":  warehouseRequest(1, 1, workers),
 		"district":   districtRequest(1, 1, workers),
 		"customer":   customerRequest(1, 1, 1, workers),
@@ -157,31 +110,6 @@ func TestDriverDerivedDefaults(t *testing.T) {
 	if got := sqlFile(bench.DriverPostgres, "custom.sql"); got != "custom.sql" {
 		t.Fatalf("SQL override = %s, want custom.sql", got)
 	}
-}
-
-func runCapture(
-	t *testing.T,
-	name string,
-	captured <-chan *workload,
-	inputs bench.ParamInputs,
-) *workload {
-	t.Helper()
-
-	err := bench.Run(
-		context.Background(),
-		name,
-		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		inputs,
-		nil,
-		nil,
-		zap.NewNop(),
-		&bench.MetricsConfig{},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return <-captured
 }
 
 func unsetEnv(t *testing.T, names ...string) {

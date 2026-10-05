@@ -201,8 +201,8 @@ func TestDefaultInsertMethodInputValidation(t *testing.T) {
 	require.EqualError(t, secondErr, firstErr.Error())
 
 	invalid := "bogus"
-	_, err = runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
-		0: {DefaultInsertMethod: &invalid},
+	_, err = runner.DriverCLIConfigsFromFile(map[string]*config.DriverRunConfig{
+		"": {DefaultInsertMethod: &invalid},
 	})
 	require.ErrorIs(t, err, driver.ErrUnknownInsertMethod)
 

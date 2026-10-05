@@ -3,15 +3,11 @@ package baseline_test
 import (
 	"context"
 	"slices"
-	"strings"
 	"testing"
 
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
-	"go.uber.org/zap"
-
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
-	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
 func TestBaselineDescribeSchema(t *testing.T) {
@@ -39,31 +35,23 @@ func TestBaselineDescribeSchema(t *testing.T) {
 // on: every iteration completes against the noop driver (no result validation
 // to trip on stub rows), and the load reports exactly the requested row count.
 func TestBaselineRunsCleanUnderNoop(t *testing.T) {
-	var captured metricdata.ResourceMetrics
+	var captured map[string]report.Metric
 
 	calls := 0
 
-	err := bench.Run(
-		context.Background(),
-		"baseline",
-		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		bench.ParamInputs{CLI: map[string]string{
+	_, err := bench.RunCatalog(context.Background(), bench.RegisteredCatalog(), "baseline", bench.RunOptions{
+		Drivers: map[string]bench.DriverConfig{"": {Kind: bench.DriverNoop}},
+		Params: bench.ParamInputs{CLI: map[string]string{
 			"rows":         "1000",
 			"load-workers": "2",
 			"iterations":   "25",
 			"vus":          "2",
 		}},
-		nil,
-		nil,
-		zap.NewNop(),
-		&bench.MetricsConfig{
-			Quiet: true,
-			OnSummary: func(data metricdata.ResourceMetrics) {
-				captured = data
-				calls++
-			},
+		Metrics: &bench.MetricsConfig{
+			Quiet:     true,
+			OnSummary: func(data map[string]report.Metric) { captured = data; calls++ },
 		},
-	)
+	})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -91,18 +79,12 @@ func TestBaselineRunsCleanUnderNoop(t *testing.T) {
 	}
 }
 
-func summaryValues(data metricdata.ResourceMetrics) map[string]float64 {
+func summaryValues(data map[string]report.Metric) map[string]float64 {
 	values := map[string]float64{}
 
-	for _, scope := range data.ScopeMetrics {
-		for _, metric := range scope.Metrics {
-			name := strings.TrimPrefix(metric.Name, "stroppy_")
-
-			if sum, ok := metric.Data.(metricdata.Sum[float64]); ok {
-				for _, point := range sum.DataPoints {
-					values[name] += point.Value
-				}
-			}
+	for name, metric := range data {
+		if metric.Total != nil {
+			values[name] = *metric.Total
 		}
 	}
 

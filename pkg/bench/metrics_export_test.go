@@ -57,7 +57,7 @@ func TestOTLPShutdownExportsIdentityAndMetadataForShortRuns(t *testing.T) {
 		provider, _, prefix, err := newMeterProvider(context.Background(), cfg)
 		require.NoError(t, err)
 
-		registry := NewRegistry(provider.Meter("test"), prefix)
+		registry := newmetricRegistry(provider.Meter("test"), prefix)
 		counter, err := registry.NewMetric("iterations_total", Counter)
 		require.NoError(t, err)
 		trend, err := registry.NewMetric("query_duration", Trend)
@@ -80,7 +80,11 @@ func TestOTLPShutdownExportsIdentityAndMetadataForShortRuns(t *testing.T) {
 		}
 
 		require.NotEmpty(t, instance)
-		require.False(t, ids[instance], "separate invocations reused a writer identity")
+		require.False(
+			t,
+			ids[instance],
+			"separate invocations reused a writer identity",
+		)
 		ids[instance] = true
 
 		for _, scope := range resource.ScopeMetrics {
@@ -117,7 +121,10 @@ func TestMetricMetadataPreservesPointDimensions(t *testing.T) {
 
 	got := mergeMetricAttributes(
 		attribute.NewSet(attribute.String("step", "workload")),
-		[]attribute.KeyValue{attribute.String("step", "metadata"), attribute.String("tenant", "test")},
+		[]attribute.KeyValue{
+			attribute.String("step", "metadata"),
+			attribute.String("tenant", "test"),
+		},
 	)
 	value, _ := got.Value("step")
 	require.Equal(t, "workload", value.AsString())

@@ -158,7 +158,7 @@ func describeWorkloads(descriptions []bench.Description) []workloadEntry {
 				Default:            defaultValue,
 				DefaultDescription: param.DefaultDescription,
 				Env:                param.Env,
-				LegacyAliases:      append([]string{}, param.LegacyEnvAliases...),
+				LegacyAliases:      append([]string{}, param.Aliases...),
 				Config:             param.Config,
 			})
 		}

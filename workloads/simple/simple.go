@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
+	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
-	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
@@ -24,79 +24,80 @@ const (
 	demoDomain = "simple/stroppy_demo@1"
 )
 
-type workload struct {
-	pick *rand.Rand
+type workload struct{ workers []*rand.Rand }
+
+var Test = bench.Test{Name: "simple", Define: define}
+
+func init() { bench.Register(Test) }
+func define(d *bench.Def) error {
+	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
+
+	w := &workload{workers: make([]*rand.Rand, settings.Workers)}
+	for i := range w.workers {
+		//nolint:gosec // benchmark data generator, not security randomness.
+		w.workers[i] = rand.New(rand.NewPCG(demoSeed^uint64(i+1), 0))
+	}
+
+	d.Execution.Step("drop_schema", w.drop)
+	d.Execution.Step("create_schema", w.create)
+	d.Execution.Step("load_data", w.load)
+	d.Execution.Step("workload", w.work, settings.Policy())
+	d.Execution.Step("cleanup", w.drop, bench.Always(30*time.Second))
+
+	return d.Execution.Err()
 }
 
-func init() {
-	bench.Register(func() bench.Workload {
-		return &workload{pick: rand.New(rand.NewPCG(demoSeed^1, 0))} //nolint:gosec // G404: data RNG
-	})
+func (w *workload) drop(ctx context.Context, b *bench.Bench) error {
+	return b.Exec(ctx, "DROP TABLE IF EXISTS stroppy_demo", nil)
 }
 
-func (*workload) Name() string { return "simple" }
+func (w *workload) create(ctx context.Context, b *bench.Bench) error {
+	sql := "CREATE TABLE stroppy_demo (id INT PRIMARY KEY, label TEXT, value INT)"
+	if b.DriverTypeName() == bench.DriverYDB {
+		sql = "CREATE TABLE stroppy_demo (id Int64 NOT NULL, label String, value Int64, PRIMARY KEY (id))"
+	}
 
-func (*workload) Define(*bench.Def) error { return nil }
+	return b.Exec(ctx, sql, nil)
+}
 
-func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
-	if err := b.Step("drop_schema", func() error {
-		return b.Exec(ctx, "DROP TABLE IF EXISTS stroppy_demo", nil)
-	}); err != nil {
+func (w *workload) load(ctx context.Context, b *bench.Bench) error {
+	request := demoInsertRequest()
+	_, err := b.Insert(
+		ctx,
+		request.Table,
+		request.Source,
+		bench.InsertMethod(bench.InsertPlainBulk),
+	)
+
+	return err
+}
+
+func (w *workload) work(ctx context.Context, b *bench.Bench) error {
+	count, err := b.QueryValue[int64](ctx, "SELECT COUNT(*) FROM stroppy_demo", nil)
+	if err != nil {
 		return err
 	}
 
-	if err := b.Step("create_schema", func() error {
-		sql := "CREATE TABLE stroppy_demo (id INT PRIMARY KEY, label TEXT, value INT)"
-		if b.DriverTypeName() == bench.DriverYDB {
-			sql = "CREATE TABLE stroppy_demo (id Int64 NOT NULL, label String, value Int64, PRIMARY KEY (id))"
-		}
-
-		return b.Exec(ctx, sql, nil)
-	}); err != nil {
-		return err
+	if count != demoRows {
+		return fmt.Errorf("%w: expected %d, got %v", errRowCount, demoRows, count)
 	}
 
-	if err := b.Step("load_data", func() error {
-		_, err := b.Insert(ctx, demoInsertRequest())
+	for range 3 {
+		id := int64(1 + w.workers[b.Worker()].IntN(demoRows))
 
-		return err
-	}); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
-	return b.StepSilent("workload", func() error {
-		count, err := b.QueryValue(ctx, "SELECT COUNT(*) FROM stroppy_demo", nil)
+		label, err := b.QueryValue[string](
+			ctx,
+			"SELECT label FROM stroppy_demo WHERE id = :id",
+			map[string]any{"id": id},
+		)
 		if err != nil {
 			return err
 		}
 
-		if toInt(count) != demoRows {
-			return fmt.Errorf("%w: expected %d, got %v", errRowCount, demoRows, count)
-		}
+		b.Log.Debug("row selected", "id", id, "label", label)
+	}
 
-		b.Logger().Sugar().Debugf("loaded %v rows into stroppy_demo", count)
-
-		for range 3 {
-			id := int64(1 + w.pick.IntN(demoRows))
-
-			label, err := b.QueryValue(ctx, "SELECT label FROM stroppy_demo WHERE id = :id", map[string]any{"id": id})
-			if err != nil {
-				return err
-			}
-
-			b.Logger().Sugar().Debugf("id=%d → label=%v", id, label)
-		}
-
-		return nil
-	})
-}
-
-func (w *workload) Teardown(ctx context.Context, b *bench.Bench) error {
-	return b.Exec(ctx, "DROP TABLE IF EXISTS stroppy_demo", nil)
+	return nil
 }
 
 // demoInsertRequest builds the typed insert request for stroppy_demo from a
@@ -104,12 +105,12 @@ func (w *workload) Teardown(ctx context.Context, b *bench.Bench) error {
 // [A-Za-z] string, value a uniform int in [0, 999]. The fields derive from
 // the demo seed under a versioned domain, so the dataset is deterministic and
 // seekable; no protobuf spec, expression AST, or scratch buffer appears.
-func demoInsertRequest() *driver.InsertRequest {
+func demoInsertRequest() *insertRequest {
 	root := gen.New(demoSeed)
 
-	return &driver.InsertRequest{
+	return &insertRequest{
 		Table:   "stroppy_demo",
-		Method:  driver.InsertPlainBulk,
+		Method:  bench.InsertPlainBulk,
 		Workers: 1,
 		Source:  demoSource(root, demoRows, 64),
 	}
@@ -166,4 +167,11 @@ func toInt(v any) int {
 	default:
 		return -1
 	}
+}
+
+type insertRequest struct {
+	Table   string
+	Method  bench.InsertStrategy
+	Workers int
+	Source  gen.BatchSource
 }

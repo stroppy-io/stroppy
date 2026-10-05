@@ -68,7 +68,7 @@ func TestInsertUsesDriverFallbackWithoutMutatingRequest(t *testing.T) {
 	}
 	req := &driver.InsertRequest{Table: "t", Workers: 1, Source: validInsertSource()}
 
-	if _, err := b.Insert(context.Background(), req); err != nil {
+	if _, err := b.insert(context.Background(), req); err != nil {
 		t.Fatalf("Insert() error = %v", err)
 	}
 
@@ -107,7 +107,7 @@ func TestInsertWorkloadMethodOverridesDriverFallback(t *testing.T) {
 		Table: "t", Method: driver.InsertPlainQuery, Workers: 1, Source: validInsertSource(),
 	}
 
-	if _, err := b.Insert(context.Background(), req); err != nil {
+	if _, err := b.insert(context.Background(), req); err != nil {
 		t.Fatalf("Insert() error = %v", err)
 	}
 
@@ -135,7 +135,10 @@ func TestInsertRejectsMissingOrUnsupportedEffectiveMethod(t *testing.T) {
 		},
 		{
 			name: "unsupported workload override",
-			cfg:  &config.DriverConfig{DriverType: config.DriverTypeMySQL, DefaultInsertMethod: "plain_bulk"},
+			cfg: &config.DriverConfig{
+				DriverType:          config.DriverTypeMySQL,
+				DefaultInsertMethod: "plain_bulk",
+			},
 			req: &driver.InsertRequest{
 				Table: "t", Method: driver.InsertColumnar, Workers: 1, Source: validInsertSource(),
 			},
@@ -162,7 +165,7 @@ func TestInsertRejectsMissingOrUnsupportedEffectiveMethod(t *testing.T) {
 				cfg:  tc.cfg,
 			}
 
-			_, err := b.Insert(context.Background(), tc.req)
+			_, err := b.insert(context.Background(), tc.req)
 			if !errors.Is(err, tc.err) {
 				t.Fatalf("Insert() error = %v, want %v", err, tc.err)
 			}

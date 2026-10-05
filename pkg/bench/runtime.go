@@ -5,12 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"reflect"
 	"slices"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
@@ -21,442 +17,207 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
-// Factory creates a fresh workload instance for one description or run.
-type Factory func() Workload
+const defaultCleanupTimeout = 30 * time.Second
 
-// Workload is a Go-native benchmark. Define declares and binds typed parameters;
-// Setup runs once (schema + load steps); Iterate is the measured body driven across
-// VUs by the executor; Teardown runs once.
-type Workload interface {
-	Name() string
-	Define(def *Def) error
-	Setup(ctx context.Context, b *Bench) error
-	Iterate(ctx context.Context, b *Bench) error
-	Teardown(ctx context.Context, b *Bench) error
-}
-
-// Bench is the per-VU session handed to a workload: the shared driver (pool-backed,
-// safe for concurrent VUs), the VU's identity/step-tag for metrics, and the SDK API.
+// Bench is a stable step-worker-scoped set of author capabilities. Workers own
+// separate Bench values; workload state remains ordinary Go state.
 type Bench struct {
-	root *RootState
-	vu   *VU
-	lg   *zap.Logger
-	drv  driver.Driver
-	cfg  *config.DriverConfig
-
-	stepStart time.Time
+	root         *rootState
+	vu           *VU
+	lg           *zap.Logger
+	drv          driver.Driver
+	cfg          *config.DriverConfig
+	execution    *Execution
+	Log          Logger
+	logicalDepth int
+	databaseName string
 }
 
-// Driver returns the raw driver (escape hatch).
-func (b *Bench) Driver() driver.Driver { return b.drv }
+func (b *Bench) Worker() int                    { return b.vu.worker }
+func (b *Bench) Iteration() uint64              { return b.vu.iterScenario }
+func (b *Bench) DriverTypeName() DriverTypeName { return DriverTypeNameOf(b.cfg.DriverType) }
 
-// DriverType returns the resolved driver type enum.
-func (b *Bench) DriverType() config.DriverType { return b.cfg.DriverType }
-
-// DriverTypeName returns the driver type as the string enum a workload authors with.
-func (b *Bench) DriverTypeName() DriverTypeName {
-	return DriverTypeNameOf(b.cfg.DriverType)
+// RunOptions is explicit input for one fresh observation/execution operation.
+type RunOptions struct {
+	Drivers map[string]DriverConfig
+	Params  ParamInputs
+	Steps   []string
+	NoSteps []string
+	Logger  Logger
+	Metrics *MetricsConfig
+	Report  *ReportOptions
 }
 
-// VUID returns the 1-based VU id.
-func (b *Bench) VUID() uint64 { return b.vu.VUID() }
+// RunTest observes a definition, validates inputs, then executes a fresh replay.
+// Reports are returned as data; this function never writes report history.
+//
+//nolint:gocognit,nestif,cyclop,funlen,gocritic // observation, execution and finalization form one operation.
+func RunTest(ctx context.Context, test Test, options RunOptions) (result *report.Run, err error) {
+	defer recoverValidation(&err)
 
-// Logger returns the session logger.
-func (b *Bench) Logger() *zap.Logger { return b.lg }
-
-// --- registry ---
-
-var (
-	regMu        sync.RWMutex
-	regWorkloads = map[string]Factory{}
-
-	errNoWorkloadRegistered      = errors.New("bench: no workload registered")
-	errDriverIndexMissing        = errors.New("bench: driver index 0 not configured")
-	errUnsupportedExecutor       = errors.New("unsupported executor")
-	errVUsOutOfRange             = errors.New("vus must be at least 1")
-	errIterationsOutOfRange      = errors.New("iterations must be at least 1")
-	errDurationOutOfRange        = errors.New("duration must be positive")
-	errDurationNeedsExecutor     = errors.New("duration requires an explicit constant-vus executor")
-	errDurationWithWrongExecutor = errors.New("duration is only valid with the constant-vus executor")
-	errConstantVUsNeedsDuration  = errors.New("constant-vus requires duration")
-	errNegativeQueryTimeout      = errors.New("query-timeout must not be negative")
-)
-
-// Register adds a workload factory. Workload packages call it during init.
-func Register(factory Factory) {
-	if factory == nil {
-		panic("bench: register nil workload factory")
-	}
-
-	wl := factory()
-	if nilWorkload(wl) {
-		panic("bench: workload factory returned nil")
-	}
-
-	name := wl.Name()
-	if name == "" {
-		panic("bench: register workload with empty name")
-	}
-
-	regMu.Lock()
-	defer regMu.Unlock()
-
-	if _, exists := regWorkloads[name]; exists {
-		panic(fmt.Sprintf("bench: workload %q already registered", name))
-	}
-
-	regWorkloads[name] = factory
-}
-
-// Lookup returns a fresh instance of a registered Go workload.
-func Lookup(name string) (Workload, bool) {
-	regMu.RLock()
-
-	factory, ok := regWorkloads[name]
-
-	regMu.RUnlock()
-
-	if !ok {
-		return nil, false
-	}
-
-	wl := factory()
-	if nilWorkload(wl) || wl.Name() != name {
-		panic(fmt.Sprintf("bench: workload factory for %q returned an invalid workload", name))
-	}
-
-	return wl, true
-}
-
-func nilWorkload(workload Workload) bool {
-	if workload == nil {
-		return true
-	}
-
-	value := reflect.ValueOf(workload)
-	switch value.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
-		return value.IsNil()
-	default:
-		return false
-	}
-}
-
-// Describe returns a registered workload's deterministic parameter schema without setup or drivers.
-func Describe(name string) (Description, error) {
-	return RegisteredCatalog().Describe(name)
-}
-
-// DescribeFactory returns a workload factory's deterministic parameter schema without setup or drivers.
-func DescribeFactory(factory Factory) (Description, error) {
-	wl := workloadFromFactory(factory)
-	name := wl.Name()
-
-	_, def, err := defineWorkload(wl, ParamInputs{}, true)
-	if err != nil {
-		return Description{}, fmt.Errorf("define workload %q: %w", name, err)
-	}
-
-	return Description{Name: name, Params: def.schema()}, nil
-}
-
-func registeredFactory(name string) (Factory, bool) {
-	regMu.RLock()
-
-	factory, ok := regWorkloads[name]
-
-	regMu.RUnlock()
-
-	return factory, ok
-}
-
-func workloadFromFactory(factory Factory) Workload {
-	if factory == nil {
-		panic("bench: nil workload factory")
-	}
-
-	workload := factory()
-	if nilWorkload(workload) || workload.Name() == "" {
-		panic("bench: workload factory returned an invalid workload")
-	}
-
-	return workload
-}
-
-// DescribeAll returns all registered workload schemas ordered by workload name.
-func DescribeAll() ([]Description, error) {
-	return RegisteredCatalog().DescribeAll()
-}
-
-// teardownTimeout bounds workload Teardown. It runs under a detached context so
-// cancellation that stopped Setup or the scenario does not skip cleanup while
-// caller values remain available.
-const teardownTimeout = 30 * time.Second
-
-// Run looks up a fresh workload instance and executes it: Define and parameter
-// resolution first, Setup once, Iterate across the scenario, then Teardown once.
-// steps/noSteps are the explicit --steps / --no-steps filters; drivers and params
-// flow explicitly through the typed configuration channels.
-func Run(
-	ctx context.Context,
-	name string,
-	drivers map[int]*config.DriverConfig,
-	paramInputs ParamInputs,
-	steps, noSteps []string,
-	lg *zap.Logger,
-	metricsConfig *MetricsConfig,
-) error {
-	factory, ok := registeredFactory(name)
-	if !ok {
-		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
-	}
-
-	_, err := run(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, nil, name)
-
-	return err
-}
-
-// RunFactory executes one fresh workload from factory.
-func RunFactory(
-	ctx context.Context,
-	factory Factory,
-	drivers map[int]*config.DriverConfig,
-	paramInputs ParamInputs,
-	steps, noSteps []string,
-	lg *zap.Logger,
-	metricsConfig *MetricsConfig,
-) error {
-	_, err := run(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, nil, "")
-
-	return err
-}
-
-// RunWithReport executes one registered workload and returns its final common report even
-// when setup, scenario, or teardown fails after report initialization.
-func RunWithReport(
-	ctx context.Context,
-	name string,
-	drivers map[int]*config.DriverConfig,
-	paramInputs ParamInputs,
-	steps, noSteps []string,
-	lg *zap.Logger,
-	metricsConfig *MetricsConfig,
-	reportOptions ReportOptions,
-) (*report.Run, error) {
-	factory, ok := registeredFactory(name)
-	if !ok {
-		return nil, fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
-	}
-
-	return run(
-		ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, &reportOptions, name,
+	observed, err := observeSelected(
+		test,
+		options.Params,
+		copyDriverConfigs(options.Drivers),
+		false,
+		options.Steps,
+		options.NoSteps,
 	)
-}
-
-// RunCatalog executes one fresh workload selected from catalog.
-func RunCatalog(
-	ctx context.Context,
-	catalog *Catalog,
-	name string,
-	drivers map[int]*config.DriverConfig,
-	paramInputs ParamInputs,
-	steps, noSteps []string,
-	lg *zap.Logger,
-	metricsConfig *MetricsConfig,
-) error {
-	factory, ok := catalog.Factory(name)
-	if !ok {
-		return fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
-	}
-
-	_, err := run(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, nil, name)
-
-	return err
-}
-
-// RunCatalogWithReport executes one fresh workload selected from catalog and returns its report.
-func RunCatalogWithReport(
-	ctx context.Context,
-	catalog *Catalog,
-	name string,
-	drivers map[int]*config.DriverConfig,
-	paramInputs ParamInputs,
-	steps, noSteps []string,
-	lg *zap.Logger,
-	metricsConfig *MetricsConfig,
-	reportOptions ReportOptions,
-) (*report.Run, error) {
-	factory, ok := catalog.Factory(name)
-	if !ok {
-		return nil, fmt.Errorf("%w as %q", errNoWorkloadRegistered, name)
-	}
-
-	return run(
-		ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, &reportOptions, name,
-	)
-}
-
-// RunFactoryWithReport executes one fresh workload from factory and returns its final report.
-func RunFactoryWithReport(
-	ctx context.Context,
-	factory Factory,
-	drivers map[int]*config.DriverConfig,
-	paramInputs ParamInputs,
-	steps, noSteps []string,
-	lg *zap.Logger,
-	metricsConfig *MetricsConfig,
-	reportOptions ReportOptions,
-) (*report.Run, error) {
-	return run(ctx, factory, drivers, paramInputs, steps, noSteps, lg, metricsConfig, &reportOptions, "")
-}
-
-//nolint:funlen,gocognit // lifecycle order stays explicit: setup, scenario, teardown, report.
-func run(
-	ctx context.Context,
-	factory Factory,
-	drivers map[int]*config.DriverConfig,
-	paramInputs ParamInputs,
-	steps, noSteps []string,
-	lg *zap.Logger,
-	metricsConfig *MetricsConfig,
-	reportOptions *ReportOptions,
-	expectedName string,
-) (*report.Run, error) {
-	wl := workloadFromFactory(factory)
-	name := wl.Name()
-
-	if expectedName != "" && name != expectedName {
-		return nil, fmt.Errorf("%w: got %q, want %q", errFactoryNameChanged, name, expectedName)
-	}
-
-	scenarioParams, definition, err := defineWorkload(wl, paramInputs, false)
 	if err != nil {
-		return nil, fmt.Errorf("define workload %q: %w", name, err)
+		return nil, fmt.Errorf("define %q: %w", test.Name, err)
 	}
 
-	sc, err := scenarioParams.spec(lg)
+	log := options.Logger.backend
+	if log == nil {
+		log = zap.NewNop()
+	}
+
+	root, err := newrootState(log, ctx, options.Steps, options.NoSteps, options.Metrics)
 	if err != nil {
-		return nil, fmt.Errorf("scenario: %w", err)
+		return nil, err
+	}
+	defer root.shutdownMetrics()
+
+	d := newDef(observed.inputs, false)
+	d.environment = observed.environment
+	d.Drivers.configs = copyDriverConfigs(observed.Drivers.configs)
+	e := &d.Execution
+	e.ctx = ctx
+	e.root = root
+	e.databases = map[string]*databaseSlot{}
+	e.measurements = map[string]float64{}
+	e.policies = map[string]report.Execution{}
+
+	e.reporting = options.Report != nil
+	if options.Report != nil {
+		result = newRunReport(
+			test.Name,
+			observed.resolved,
+			options.Steps,
+			options.NoSteps,
+			*options.Report,
+		)
 	}
 
-	var runReport *report.Run
-	if reportOptions != nil {
-		runReport = newRunReport(name, drivers, definition.resolved, sc, steps, noSteps, *reportOptions)
-	}
+	defer func() {
+		var panicValue any
 
-	root, err := newRootState(lg, ctx, steps, noSteps, metricsConfig)
-	if err != nil {
-		runErr := fmt.Errorf("initialize metrics: %w", err)
-
-		if runReport != nil {
-			runReport.FinishedAt = time.Now().UTC()
-			runReport.Status = report.StatusFailed
-			runReport.Failure = &report.Failure{Phase: "metrics", Reason: boundReportError(runErr)}
+		if value := recover(); value != nil {
+			if failure, ok := value.(*ValidationError); ok {
+				err = errors.Join(err, failure)
+			} else {
+				panicValue = value
+			}
 		}
 
-		return runReport, runErr
-	}
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), defaultCleanupTimeout)
+		for name, slot := range e.databases {
+			if closeErr := slot.drv.Teardown(cleanupCtx); closeErr != nil {
+				err = errors.Join(err, fmt.Errorf("driver %s cleanup: %w", name, closeErr))
+			}
+		}
 
-	phase := "driver"
+		cancel()
 
-	var runErr error
+		err = driver.JoinErrors(err, e.Err(), ctx.Err())
+		if result != nil {
+			result.Measurements = e.measurements
+			result.Executions = e.policies
+			result.Parameters = reportParameters(d.resolved)
+			result.Drivers = nil
+			result.Driver = ""
+			configurations := map[string]DriverConfig{}
 
-	defer func() { root.shutdownMetrics() }()
+			for name, value := range d.Drivers.configs {
+				if name == "default" {
+					name = ""
+				}
 
-	cfg := drivers[0]
-	if cfg == nil {
-		runErr = errDriverIndexMissing
-
-		return finishRun(runReport, root, definition.reports, runErr, phase)
-	}
-
-	queryTimeout := scenarioParams.queryTimeout.Value()
-	if queryTimeout < 0 {
-		runErr = fmt.Errorf("%w, got %s", errNegativeQueryTimeout, queryTimeout)
-
-		return finishRun(runReport, root, definition.reports, runErr, phase)
-	}
-
-	drv, err := driver.Dispatch(ctx, driver.Options{
-		Config:       cfg,
-		Logger:       lg,
-		DialFunc:     root.dialer.DialContext,
-		QueryTimeout: queryTimeout,
-	})
-	if err != nil {
-		runErr = fmt.Errorf("driver dispatch: %w", err)
-
-		return finishRun(runReport, root, definition.reports, runErr, phase)
-	}
-
-	setupVU := &VU{root: root, vuid: 1, initPhase: true, ctx: ctx}
-	setupBench := &Bench{
-		root: root, vu: setupVU,
-		lg:  lg.Named("workload").With(zap.String("workload", name)),
-		drv: drv, cfg: cfg,
-	}
-
-	phase = "setup"
-
-	if err := wl.Setup(ctx, setupBench); err != nil {
-		runErr = fmt.Errorf("setup: %w", err)
-	} else {
-		phase = "scenario"
-
-		if err := runScenario(ctx, root, sc, func(vu *VU) error {
-			b := &Bench{
-				root: root, vu: vu,
-				lg:  lg.Named("workload").With(zap.String("workload", name), zap.Uint64("VUID", vu.VUID())),
-				drv: drv, cfg: cfg,
+				configurations[name] = value
 			}
 
-			return wl.Iterate(vu.Context(), b)
-		}, func(vu *VU, err error) {
-			root.errorReporter.record(vu, terminalErrorIteration, "iteration", err, drv.ClassifyError)
-		}); err != nil {
-			runErr = fmt.Errorf("scenario %q: %w", sc.name, err)
+			for name, value := range d.Drivers.declared {
+				if name == "default" {
+					name = ""
+				}
+
+				configurations[name] = value
+			}
+
+			if _, ok := configurations[""]; !ok {
+				configurations[""] = e.configuration("")
+			}
+
+			names := make([]string, 0, len(configurations))
+			for name := range configurations {
+				names = append(names, name)
+			}
+
+			slices.Sort(names)
+
+			for _, name := range names {
+				value := configurations[name]
+
+				publicName := name
+				if name == "" {
+					publicName = "default"
+					result.Driver = string(value.Kind)
+				}
+
+				result.Drivers = append(result.Drivers, report.Driver{Name: publicName, Type: string(value.Kind)})
+			}
+
+			for _, step := range e.observed {
+				execution, exists := e.policies[step.Name]
+				if !exists {
+					continue
+				}
+
+				result.Scenario = report.Scenario{Executor: execution.Executor, VUs: execution.Workers}
+				if execution.Executor == "shared-iterations" {
+					count := execution.Iterations
+					result.Scenario.IterationsRequested = &count
+				} else {
+					seconds := execution.DurationSeconds
+					result.Scenario.DurationSeconds = &seconds
+				}
+
+				break
+			}
 		}
+
+		phase := e.failurePhase
+		if phase == "" {
+			phase = e.phase
+		}
+
+		result, err = finishRun(result, root, d.reports, err, phase)
+
+		if panicValue != nil {
+			panic(panicValue)
+		}
+	}()
+
+	err = test.Define(d)
+
+	return result, err
+}
+
+// RunCatalog executes one descriptor selected from an explicit catalog.
+//
+//nolint:gocritic // run inputs are copied operation values.
+func RunCatalog(ctx context.Context, catalog *Catalog, name string, options RunOptions) (*report.Run, error) {
+	test, ok := catalog.Test(name)
+	if !ok {
+		return nil, fmt.Errorf("%w %q", errNoWorkloadRegistered, name)
 	}
 
-	terminalPhase := phase
-	phase = "teardown"
-
-	teardownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
-	if err := wl.Teardown(teardownCtx, setupBench); err != nil {
-		if runErr == nil {
-			terminalPhase = phase
-		}
-
-		runErr = errors.Join(runErr, fmt.Errorf("teardown: %w", err))
-	}
-
-	cancel()
-
-	if err := root.Teardown(); err != nil {
-		if runErr == nil {
-			terminalPhase = phase
-		}
-
-		runErr = errors.Join(runErr, fmt.Errorf("shared driver teardown: %w", err))
-	}
-
-	teardownCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), teardownTimeout)
-	if err := drv.Teardown(teardownCtx); err != nil {
-		if runErr == nil {
-			terminalPhase = phase
-		}
-
-		runErr = errors.Join(runErr, fmt.Errorf("driver teardown: %w", err))
-	}
-
-	cancel()
-
-	return finishRun(runReport, root, definition.reports, runErr, terminalPhase)
+	return RunTest(ctx, test, options)
 }
 
 func finishRun(
 	runReport *report.Run,
-	root *RootState,
+	root *rootState,
 	definitions []reportDefinition,
 	runErr error,
 	phase string,
@@ -470,15 +231,22 @@ func finishRun(
 	}
 
 	if root.onSummary != nil {
-		root.onSummary(data)
+		root.onSummary(reportMetrics(data, root.metricsPrefix))
 	}
 
 	if runReport != nil {
 		finalizeRunReport(runReport, root, definitions, data, runErr, phase)
-	} else if len(definitions) > 0 {
-		buildWorkloadReports(definitions, ReportContext{
-			Metrics: aggregateMetricSnapshots(data, root.metricsPrefix),
-		})
+
+		for index, definition := range definitions {
+			if definition.renderer != nil && index < len(runReport.WorkloadReports) &&
+				runReport.WorkloadReports[index].Data != nil {
+				if renderErr := definition.renderer(root.summaryWriter, runReport.WorkloadReports[index].Data); renderErr != nil {
+					item := &runReport.WorkloadReports[index]
+					item.Status = report.WorkloadReportError
+					item.Reason = boundReportError(renderErr)
+				}
+			}
+		}
 	}
 
 	newSummary(root).printDataTo(root.summaryWriter, data)
@@ -486,285 +254,13 @@ func finishRun(
 	return runReport, runErr
 }
 
-// --- scenario ---
-
-type scenarioSpec struct {
-	name       string
-	executor   string
-	vus        int
-	iterations int64
-	duration   time.Duration
-}
-
-type scenarioParams struct {
-	executor   Param[string]
-	vus        Param[int]
-	iterations Param[int64]
-	duration   Param[time.Duration]
-
-	queryTimeout Param[time.Duration]
-}
-
-func defineWorkload(
-	wl Workload,
-	inputs ParamInputs,
-	defaultsOnly bool,
-) (scenarioParams, *Def, error) {
-	def := newDef(inputs, defaultsOnly)
-
-	iterationOptions := []ParamOption{LegacyEnvAliases("ITER")}
-	if !defaultsOnly && effectiveDurationIsLegacy(inputs) {
-		iterationOptions = nil
-	}
-
-	params := scenarioParams{
-		executor: def.Param.String(
-			"executor", "shared-iterations", "Scenario executor: shared-iterations or constant-vus.",
-		),
-		vus: def.Param.Int("vus", 1, "Number of concurrent virtual users."),
-		iterations: def.Param.Int64(
-			"iterations", 1, "Total shared iterations.", iterationOptions...,
-		),
-		duration: def.Param.Duration("duration", 0, "Duration of a constant-vus scenario."),
-		queryTimeout: def.Param.Duration(
-			"query-timeout", 0,
-			"Per-statement query deadline (e.g. 30s, 5s, 500ms); 0 disables it.",
-		),
-	}
-
-	def.scope = ParamScopeWorkload
-	defineErr := wl.Define(def)
-
-	return params, def, errors.Join(defineErr, def.finish())
-}
-
-func effectiveDurationIsLegacy(inputs ParamInputs) bool {
-	if _, ok := inputs.CLI["duration"]; ok {
-		return false
-	}
-
-	_, processDuration := os.LookupEnv("DURATION")
-	_, legacyEnvDuration := inputs.LegacyEnv["DURATION"]
-	_, runConfigDuration := inputs.RunConfig["duration"]
-	_, configEnvDuration := inputs.LegacyConfigEnv["DURATION"]
-
-	switch {
-	case processDuration, legacyEnvDuration:
-		return true
-	case runConfigDuration:
-		return false
-	default:
-		return configEnvDuration
-	}
-}
-
-func (params *scenarioParams) spec(lg *zap.Logger) (scenarioSpec, error) {
-	executor := params.executor.Value()
-	legacyDuration := params.duration.Explicit() && slices.Contains([]ParamSource{
-		ParamSourceProcessEnv,
-		ParamSourceLegacyEnv,
-		ParamSourceLegacyConfigEnv,
-	}, params.duration.Source())
-
-	if legacyDuration && !params.executor.Explicit() {
-		executor = "constant-vus"
-
-		if lg != nil {
-			lg.Warn(
-				"legacy DURATION inferred the constant-vus executor; set executor explicitly",
-				zap.String("source", string(params.duration.Source())),
-			)
-		}
-	}
-
-	if params.vus.Value() < 1 {
-		return scenarioSpec{}, fmt.Errorf("%w, got %d", errVUsOutOfRange, params.vus.Value())
-	}
-
-	if params.iterations.Value() < 1 {
-		return scenarioSpec{}, fmt.Errorf("%w, got %d", errIterationsOutOfRange, params.iterations.Value())
-	}
-
-	if params.duration.Explicit() && params.duration.Value() <= 0 {
-		return scenarioSpec{}, fmt.Errorf("%w, got %s", errDurationOutOfRange, params.duration.Value())
-	}
-
-	if params.duration.Explicit() && !legacyDuration &&
-		(!params.executor.Explicit() || executor != "constant-vus") {
-		return scenarioSpec{}, errDurationNeedsExecutor
-	}
-
-	spec := scenarioSpec{
-		name:       "workload",
-		executor:   executor,
-		vus:        params.vus.Value(),
-		iterations: params.iterations.Value(),
-		duration:   params.duration.Value(),
-	}
-
-	switch executor {
-	case "shared-iterations":
-		if params.duration.Explicit() {
-			return scenarioSpec{}, errDurationWithWrongExecutor
-		}
-	case "constant-vus":
-		if !params.duration.Explicit() {
-			return scenarioSpec{}, errConstantVUsNeedsDuration
-		}
-	default:
-		return scenarioSpec{}, fmt.Errorf("%w %q", errUnsupportedExecutor, executor)
-	}
-
-	return spec, nil
-}
-
-// --- executor (shared-iterations + constant-vus) ---
-
-func runScenario(
-	ctx context.Context,
-	root *RootState,
-	sc scenarioSpec,
-	iterate func(*VU) error,
-	onIterationError func(*VU, error),
-) error {
-	if err := root.startThroughput(); err != nil {
-		return err
-	}
-	defer root.throughput.stop()
-
-	vu := &VU{root: root, ctx: ctx}
-	root.txMetrics.ensureRegistered(vu, root.lg)
-
-	for _, metric := range []*metric{
-		root.txMetrics.failedIterations, root.txMetrics.failedQueries,
-		root.txMetrics.terminalErrors, root.txMetrics.retryAttempts,
-	} {
-		root.txMetrics.emit(vu, metric, 0, metricAttributes{})
-	}
-
-	scenarioCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	fatalErrors := make(chan error, 1)
-
-	var wg sync.WaitGroup
-
-	startWorker := func(vuid int, keep func() bool) {
-		wg.Go(func() {
-			if err := runWorker(scenarioCtx, root, vuid, iterate, keep, onIterationError); IsFatalError(err) {
-				select {
-				case fatalErrors <- err:
-					cancel()
-				default:
-				}
-			}
-		})
-	}
-
-	switch sc.executor {
-	case "shared-iterations":
-		remaining := sc.iterations
-		for i := range sc.vus {
-			startWorker(i+1, func() bool {
-				return atomic.AddInt64(&remaining, -1) >= 0
-			})
-		}
-	case "constant-vus":
-		deadline := time.Now().Add(sc.duration)
-		for i := range sc.vus {
-			startWorker(i+1, func() bool {
-				return time.Now().Before(deadline)
-			})
-		}
-	default:
-		return fmt.Errorf("%w %q", errUnsupportedExecutor, sc.executor)
-	}
-
-	wg.Wait()
-
-	select {
-	case err := <-fatalErrors:
-		return err
-	default:
-	}
-
-	return ctx.Err()
-}
-
-func runWorker(
-	ctx context.Context,
-	root *RootState,
-	vuid int,
-	iterate func(*VU) error,
-	keep func() bool,
-	onIterationError func(*VU, error),
-) error {
-	vu := &VU{root: root, vuid: uint64(vuid), ctx: ctx} //nolint:gosec // G115: scale-bound, no overflow
-	for keep() {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		vu.iterTest++
-		vu.iterScenario++
-
-		start := time.Now()
-		err := iterate(vu)
-		root.txMetrics.recordIteration(vu, time.Since(start))
-		root.throughput.iterations.Add(1)
-
-		if err == nil {
-			continue
-		}
-
-		if IsFatalError(err) {
-			return err
-		}
-
-		if canceledError(ctx, err) {
-			return ctx.Err()
-		}
-
-		if onIterationError != nil {
-			onIterationError(vu, err)
-		}
-	}
-
-	return nil
-}
-
-// --- metric handles (Counter/Trend/Rate) ---
-
-type Metric struct {
-	root *RootState
-	m    *metric
-}
-
-func (b *Bench) Counter(name string) *Metric { return b.newMetric(name, Counter) }
-func (b *Bench) Trend(name string) *Metric   { return b.newMetric(name, Trend) }
-func (b *Bench) Rate(name string) *Metric    { return b.newMetric(name, Rate) }
-
-func (b *Bench) newMetric(name string, typ metricType) *Metric {
-	m, err := b.root.registry.NewMetric(name, typ)
-	if err != nil {
-		b.lg.Fatal("can't register metric", zap.String("name", name), zap.Error(err))
-	}
-
-	return &Metric{root: b.root, m: m}
-}
-
-// Add records a value with optional tag key/value pairs.
-func (m *Metric) Add(value float64, tags ...string) {
-	m.m.add(context.Background(), value, m.m.taggedAttributes(tags))
-}
-
 // --- summary ---
 
 type summary struct {
-	root *RootState
+	root *rootState
 }
 
-func newSummary(root *RootState) *summary { return &summary{root: root} }
+func newSummary(root *rootState) *summary { return &summary{root: root} }
 
 func (s *summary) printTo(out io.Writer) {
 	var data metricdata.ResourceMetrics
@@ -777,7 +273,7 @@ func (s *summary) printTo(out io.Writer) {
 	}
 
 	if s.root.onSummary != nil {
-		s.root.onSummary(data)
+		s.root.onSummary(reportMetrics(data, s.root.metricsPrefix))
 	}
 
 	s.printDataTo(out, data)

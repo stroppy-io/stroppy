@@ -116,14 +116,14 @@ import (
     "github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
-type workload struct{}
-func (*workload) Name() string { return "` + name + `" }
-func (*workload) Define(*bench.Def) error { return nil }
-func (*workload) Setup(context.Context, *bench.Bench) error { return nil }
-func (*workload) Iterate(context.Context, *bench.Bench) error { return nil }
-func (*workload) Teardown(context.Context, *bench.Bench) error { return nil }
-func New() bench.Workload { _ = "` + marker + `"; return &workload{} }
-func init() { bench.Register(New) }
+var Test = bench.Test{Name: "` + name + `", Define: func(d *bench.Def) error {
+    _ = "` + marker + `"
+    settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
+    d.Execution.Step("workload", work, settings.Policy())
+    return d.Execution.Err()
+}}
+func work(context.Context, *bench.Bench) error { return nil }
+func init() { bench.Register(Test) }
 `
 
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte(goMod), 0o600); err != nil {

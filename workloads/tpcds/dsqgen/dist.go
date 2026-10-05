@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/stroppy-io/stroppy/v6/third_party/gotpcds/dsdgen"
+	"github.com/stroppy-io/stroppy/v6/workloads/tpcds/dsdgen"
 )
 
 // distFile maps a template distribution name to the vendored .dst filename.

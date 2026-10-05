@@ -8,8 +8,9 @@ import (
 // per-iteration ctx + identity; sinks live on root. Step tag and iteration
 // counters are read by the metrics layer and exposed to workloads via Bench.
 type VU struct {
-	root *RootState
-	vuid uint64
+	root   *rootState
+	vuid   uint64
+	worker int
 
 	// initPhase distinguishes shared Setup drivers from per-VU Iterate drivers.
 	initPhase bool

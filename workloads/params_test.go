@@ -23,7 +23,7 @@ func TestBuiltInWorkloadParameterSchemas(t *testing.T) {
 		want []bench.ParamSchema
 	}{
 		{"execute_sql", []bench.ParamSchema{
-			param("sql-body", bench.ParamTypeString, "", "SQL_BODY", "sqlBody", "STROPPY_SQL_BODY"),
+			param("sql-body", bench.ParamTypeString, "", "SQL_BODY", "sqlBody"),
 			param("sql-file", bench.ParamTypeString, "", "SQL_FILE", "sqlFile"),
 		}},
 		{"simple", []bench.ParamSchema{}},
@@ -39,7 +39,7 @@ func TestBuiltInWorkloadParameterSchemas(t *testing.T) {
 		{"tpcds", []bench.ParamSchema{
 			param("load-workers", bench.ParamTypeInt, 0, "LOAD_WORKERS", "loadWorkers"),
 			param("pg-unlogged", bench.ParamTypeBool, false, "PG_UNLOGGED", "pgUnlogged"),
-			param("query-seed", bench.ParamTypeInt, 19620718, "QUERY_SEED", "querySeed"),
+			param("query-seed", bench.ParamTypeInt64, int64(19620718), "QUERY_SEED", "querySeed"),
 			param("query-stream", bench.ParamTypeInt, 0, "QUERY_STREAM", "queryStream"),
 			param("scale-factor", bench.ParamTypeFloat64, float64(1), "SCALE_FACTOR", "scaleFactor"),
 			param("schema-file", bench.ParamTypeString, "", "SCHEMA_FILE", "schemaFile"),
@@ -144,13 +144,13 @@ func tpccParamSchema() []bench.ParamSchema {
 			bench.ParamTypeBool,
 			"LOAD_ITEMS",
 			"loadItems",
-			"true when warehouse-start is 1; false otherwise",
+			"true when warehouse-start is 1",
 		),
 		param("load-workers", bench.ParamTypeInt, 1, "LOAD_WORKERS", "loadWorkers"),
 		param("pacing", bench.ParamTypeBool, false, "PACING", "pacing"),
 		param("pg-unlogged", bench.ParamTypeBool, false, "PG_UNLOGGED", "pgUnlogged"),
 		param("retry-attempts", bench.ParamTypeInt, 3, "RETRY_ATTEMPTS", "retryAttempts"),
-		param("scale-factor", bench.ParamTypeInt, 1, "SCALE_FACTOR", "scaleFactor", "WAREHOUSES"),
+		param("scale-factor", bench.ParamTypeInt, 1, "SCALE_FACTOR", "scaleFactor", "warehouses"),
 		param("sql-file", bench.ParamTypeString, "", "SQL_FILE", "sqlFile"),
 		param("tx-isolation", bench.ParamTypeString, "", "TX_ISOLATION", "txIsolation"),
 		param("warehouse-start", bench.ParamTypeInt, 1, "WAREHOUSE_START", "warehouseStart"),
@@ -167,7 +167,7 @@ func param(
 	return bench.ParamSchema{
 		Name: name, Flag: "--" + name, Scope: bench.ParamScopeWorkload,
 		Type: typ, Default: defaultValue, Env: env,
-		LegacyEnvAliases: aliases, Config: config,
+		Aliases: aliases, Config: config,
 	}
 }
 

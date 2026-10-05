@@ -20,7 +20,7 @@ import (
 	"io"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/datagen/source"
-	"github.com/stroppy-io/stroppy/v6/third_party/gotpc/dbgen"
+	"github.com/stroppy-io/stroppy/v6/workloads/tpch/dbgen"
 )
 
 // ErrUnknownTable is returned by New when the requested table is not a TPC-H

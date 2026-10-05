@@ -1,20 +1,12 @@
 package main
 
 import (
-	"context"
-
-	stroppy "github.com/stroppy-io/stroppy/v6"
-	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+ "context"
+ stroppy "github.com/stroppy-io/stroppy/v6"
+ "github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
-type workload struct{}
-
-func (*workload) Name() string                                 { return "external/fixture" }
-func (*workload) Define(*bench.Def) error                      { return nil }
-func (*workload) Setup(context.Context, *bench.Bench) error    { return nil }
-func (*workload) Iterate(context.Context, *bench.Bench) error  { return nil }
-func (*workload) Teardown(context.Context, *bench.Bench) error { return nil }
-
-func main() {
-	stroppy.Main(func() bench.Workload { return &workload{} })
-}
+var Test=bench.Test{Name:"external/fixture",Define:define}
+func define(d *bench.Def)error{settings:=bench.RunParameters(&d.Param,bench.RunDefaults{});d.Execution.Step("workload",work,settings.Policy());return d.Execution.Err()}
+func work(context.Context,*bench.Bench)error{return nil}
+func main(){stroppy.Main(Test)}

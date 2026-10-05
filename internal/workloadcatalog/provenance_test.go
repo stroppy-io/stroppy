@@ -46,14 +46,12 @@ import (
 //go:embed query.sql
 var query string
 
-type workload struct{}
-func (*workload) Name() string { return "snapshot/example" }
-func (*workload) Define(*bench.Def) error { return nil }
-func (*workload) Setup(context.Context, *bench.Bench) error { return nil }
-func (*workload) Iterate(context.Context, *bench.Bench) error { _ = query; return nil }
-func (*workload) Teardown(context.Context, *bench.Bench) error { return nil }
-func New() bench.Workload { return &workload{} }
-func init() { bench.Register(New) }
+var Test = bench.Test{Name: "snapshot/example", Define: func(d *bench.Def) error {
+    d.Execution.Step("workload", work)
+    return d.Execution.Err()
+}}
+func work(context.Context, *bench.Bench) error { _ = query; return nil }
+func init() { bench.Register(Test) }
 `
 	for path, data := range map[string]string{
 		filepath.Join(moduleRoot, "go.mod"):       goMod,
@@ -128,7 +126,7 @@ func TestSnapshotDigestChangesWithEmbedAsset(t *testing.T) {
 	digest := func(content string) string {
 		moduleRoot := t.TempDir()
 
-		moduleData := []byte("module example.com/asset\n\ngo 1.26\n")
+		moduleData := []byte("module example.com/asset\n\ngo 1.27\n")
 		if err := os.WriteFile(filepath.Join(moduleRoot, "go.mod"), moduleData, 0o600); err != nil {
 			t.Fatal(err)
 		}

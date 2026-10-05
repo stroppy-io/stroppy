@@ -53,7 +53,13 @@ func renderText(out io.Writer, report *Report) {
 
 	for idx := range report.Verdicts {
 		verdict := &report.Verdicts[idx]
-		fmt.Fprintf(out, "  %-4s %s: %s\n", verdict.Status, verdict.Check, verdict.Detail)
+		fmt.Fprintf(
+			out,
+			"  %-4s %s: %s\n",
+			verdict.Status,
+			verdict.Check,
+			verdict.Detail,
+		)
 	}
 }
 

@@ -39,7 +39,11 @@ func TestMetricsConfig(t *testing.T) {
 	require.True(t, got.Insecure)
 	require.Equal(t, prefix, got.Prefix)
 	require.Equal(t, "run-42", got.RunID)
-	require.Equal(t, map[string]string{"environment": "test"}, got.ResourceAttributes)
+	require.Equal(
+		t,
+		map[string]string{"environment": "test"},
+		got.ResourceAttributes,
+	)
 }
 
 func TestMetricsConfigWithGlobalWithoutExporter(t *testing.T) {

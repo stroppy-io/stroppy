@@ -8,7 +8,7 @@ import (
 
 const (
 	// SchemaVersion is the current run report envelope version.
-	SchemaVersion = 2
+	SchemaVersion = 3
 	// Kind identifies a benchmark run report among future report families.
 	Kind = "run"
 )
@@ -36,36 +36,38 @@ const (
 // Run is one complete benchmark result. WorkloadReports remain opaque to the
 // common envelope so new workload payloads do not require storage migrations.
 type Run struct {
-	Schema             int               `json:"schema"`
-	Kind               string            `json:"kind"`
-	ID                 string            `json:"id"`
-	RunID              string            `json:"run_id,omitempty"`
-	StroppyVersion     string            `json:"stroppy_version"`
-	BuildDigest        string            `json:"build_digest,omitempty"`
-	StartedAt          time.Time         `json:"started_at"`
-	FinishedAt         time.Time         `json:"finished_at"`
-	Status             Status            `json:"status"`
-	Workload           string            `json:"workload"`
-	Driver             string            `json:"driver"`
-	Drivers            []Driver          `json:"drivers"`
-	Metadata           map[string]string `json:"metadata,omitempty"`
-	Custom             map[string]string `json:"custom,omitempty"`
-	Host               Host              `json:"host"`
-	Scenario           Scenario          `json:"scenario"`
-	Parameters         Parameters        `json:"parameters"`
-	StepSelection      StepSelection     `json:"step_selection"`
-	Steps              []Step            `json:"steps"`
-	MeasurementSeconds float64           `json:"measurement_seconds"`
-	Metrics            map[string]Metric `json:"metrics"`
-	Errors             ErrorSummary      `json:"errors"`
-	Failure            *Failure          `json:"failure,omitempty"`
-	WorkloadReports    []WorkloadReport  `json:"workload_reports"`
+	Schema             int                  `json:"schema"`
+	Kind               string               `json:"kind"`
+	ID                 string               `json:"id"`
+	RunID              string               `json:"run_id,omitempty"`
+	StroppyVersion     string               `json:"stroppy_version"`
+	BuildDigest        string               `json:"build_digest,omitempty"`
+	StartedAt          time.Time            `json:"started_at"`
+	FinishedAt         time.Time            `json:"finished_at"`
+	Status             Status               `json:"status"`
+	Workload           string               `json:"workload"`
+	Driver             string               `json:"driver"`
+	Drivers            []Driver             `json:"drivers"`
+	Metadata           map[string]string    `json:"metadata,omitempty"`
+	Custom             map[string]string    `json:"custom,omitempty"`
+	Host               Host                 `json:"host"`
+	Scenario           Scenario             `json:"scenario"`
+	Parameters         Parameters           `json:"parameters"`
+	StepSelection      StepSelection        `json:"step_selection"`
+	Steps              []Step               `json:"steps"`
+	Measurements       map[string]float64   `json:"measurements"`
+	Executions         map[string]Execution `json:"executions"`
+	MeasurementSeconds float64              `json:"measurement_seconds"`
+	Metrics            map[string]Metric    `json:"metrics"`
+	Errors             ErrorSummary         `json:"errors"`
+	Failure            *Failure             `json:"failure,omitempty"`
+	WorkloadReports    []WorkloadReport     `json:"workload_reports"`
 }
 
 // Driver identifies one configured driver without persisting connection data.
 type Driver struct {
-	Index int    `json:"index"`
-	Type  string `json:"type"`
+	Name string `json:"name"`
+	Type string `json:"type"`
 }
 
 // Host fingerprints the runtime environment used for a run.
@@ -166,4 +168,16 @@ type WorkloadReport struct {
 	Status WorkloadReportStatus `json:"status"`
 	Reason string               `json:"reason,omitempty"`
 	Data   json.RawMessage      `json:"data,omitempty"`
+}
+
+// Execution records the configured policy and actual completion window of a step.
+type Execution struct {
+	Executor            string   `json:"executor"`
+	Workers             int      `json:"workers"`
+	Iterations          int64    `json:"iterations,omitempty"`
+	DurationSeconds     float64  `json:"duration_seconds,omitempty"`
+	DrainTimeoutSeconds *float64 `json:"drain_timeout_seconds"`
+	DrainUnlimited      bool     `json:"drain_unlimited,omitempty"`
+	MeasurementSeconds  float64  `json:"measurement_seconds"`
+	DrainSeconds        float64  `json:"drain_seconds,omitempty"`
 }

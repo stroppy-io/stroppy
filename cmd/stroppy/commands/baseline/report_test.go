@@ -26,7 +26,13 @@ func counterMetric(name string, value float64) metricdata.Metrics {
 	}
 }
 
-func histogramMetric(name string, count uint64, sum float64, bounds []float64, buckets []uint64) metricdata.Metrics {
+func histogramMetric(
+	name string,
+	count uint64,
+	sum float64,
+	bounds []float64,
+	buckets []uint64,
+) metricdata.Metrics {
 	return metricdata.Metrics{
 		Name: metricsPrefix + name,
 		Data: metricdata.Histogram[float64]{
@@ -45,8 +51,20 @@ func TestExtractMetrics(t *testing.T) {
 		counterMetric("iterations_total", 42),
 		counterMetric("failed_iterations_total", 2),
 		counterMetric("insert_rows_total", 1000),
-		histogramMetric("insert_duration", 1, 5, []float64{1, 10}, []uint64{0, 1, 0}),
-		histogramMetric("iteration_duration", 42, 21, []float64{0.1, 1}, []uint64{10, 30, 2}),
+		histogramMetric(
+			"insert_duration",
+			1,
+			5,
+			[]float64{1, 10},
+			[]uint64{0, 1, 0},
+		),
+		histogramMetric(
+			"iteration_duration",
+			42,
+			21,
+			[]float64{0.1, 1},
+			[]uint64{10, 30, 2},
+		),
 		metricdata.Metrics{Name: "unrelated", Data: metricdata.Sum[float64]{}},
 	)
 
@@ -260,7 +278,10 @@ func TestSaveReportSameSecondCollision(t *testing.T) {
 func TestLoadPreviousUsesNewestSameSecondReport(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
-	report := &Report{Schema: reportSchema, Time: time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)}
+	report := &Report{
+		Schema: reportSchema,
+		Time:   time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC),
+	}
 	for _, version := range []string{"first", "second", "third"} {
 		report.Stroppy = version
 		if _, err := saveReport(report); err != nil {
@@ -395,7 +416,11 @@ func TestPlanRunRejectsNegativeDurationAndRows(t *testing.T) {
 		set  func()
 		want error
 	}{
-		{name: "duration", set: func() { opts.duration = -time.Second }, want: errDurationOutOfRange},
+		{
+			name: "duration",
+			set:  func() { opts.duration = -time.Second },
+			want: errDurationOutOfRange,
+		},
 		{name: "rows", set: func() { opts.rows = -1 }, want: errRowsOutOfRange},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -431,7 +456,11 @@ func TestEmitReportKeepsJSONPure(t *testing.T) {
 
 	var decoded Report
 	if err := json.Unmarshal([]byte(out.String()), &decoded); err != nil {
-		t.Fatalf("stdout is not valid JSON in --json mode: %v\noutput: %q", err, out.String())
+		t.Fatalf(
+			"stdout is not valid JSON in --json mode: %v\noutput: %q",
+			err,
+			out.String(),
+		)
 	}
 }
 
@@ -466,7 +495,11 @@ func TestEmitReportPropagatesOutputErrors(t *testing.T) {
 	for _, jsonOut := range []bool{false, true} {
 		opts = options{jsonOut: jsonOut, noSave: true}
 		if err := emitReport(failingWriter{}, report); !errors.Is(err, errOutputSink) {
-			t.Fatalf("emitReport(json=%t) error = %v, want output failure", jsonOut, err)
+			t.Fatalf(
+				"emitReport(json=%t) error = %v, want output failure",
+				jsonOut,
+				err,
+			)
 		}
 	}
 }

@@ -9,28 +9,26 @@ import (
 
 	stroppy "github.com/stroppy-io/stroppy/v6"
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
-	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
-type namedWorkload struct{ name string }
+func newWorkload() bench.Test {
+	return bench.Test{Name: "external/example", Define: func(d *bench.Def) error {
+		settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
+		d.Execution.Step("workload", func(context.Context, *bench.Bench) error { return nil }, settings.Policy())
 
-func (workload *namedWorkload) Name() string                        { return workload.name }
-func (*namedWorkload) Define(*bench.Def) error                      { return nil }
-func (*namedWorkload) Setup(context.Context, *bench.Bench) error    { return nil }
-func (*namedWorkload) Iterate(context.Context, *bench.Bench) error  { return nil }
-func (*namedWorkload) Teardown(context.Context, *bench.Bench) error { return nil }
-
-func newWorkload() bench.Workload { return &namedWorkload{name: "external/example"} }
+		return d.Execution.Err()
+	}}
+}
 
 func TestNewRejectsReservedWorkloadName(t *testing.T) {
-	_, err := stroppy.New(func() bench.Workload { return &namedWorkload{name: "probe"} })
+	_, err := stroppy.New(bench.Test{Name: "probe", Define: func(*bench.Def) error { return nil }})
 	if err == nil || !strings.Contains(err.Error(), "reserved workload name") {
 		t.Fatalf("New() error = %v", err)
 	}
 }
 
 func TestApplicationRun(t *testing.T) {
-	app, err := stroppy.New(newWorkload)
+	app, err := stroppy.New(newWorkload())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +36,7 @@ func TestApplicationRun(t *testing.T) {
 	metrics := &bench.MetricsConfig{Quiet: true}
 
 	report, err := app.Run(t.Context(), &stroppy.RunRequest{
-		Drivers: map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
+		Drivers: map[string]bench.DriverConfig{"": {Kind: bench.DriverNoop}},
 		Params:  bench.ParamInputs{CLI: map[string]string{"iterations": "2"}},
 		Metrics: metrics,
 	})
@@ -58,7 +56,7 @@ func TestApplicationRun(t *testing.T) {
 func TestApplicationExecute(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
-	app, err := stroppy.New(newWorkload)
+	app, err := stroppy.New(newWorkload())
 	if err != nil {
 		t.Fatal(err)
 	}

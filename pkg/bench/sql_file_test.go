@@ -2,61 +2,34 @@ package bench
 
 import (
 	"os"
-	"path/filepath"
-	"sync"
 	"testing"
 	"testing/fstest"
 
-	"github.com/stroppy-io/stroppy/v6/workloads"
+	"github.com/stretchr/testify/require"
 )
 
-var registerSQLResolutionPreset sync.Once
+func TestQueryFilesLocalAndExplicitOverride(t *testing.T) {
+	t.Chdir(t.TempDir())
 
-func TestLoadSQLUsesLocalOverrideBeforeEmbeddedFallback(t *testing.T) {
-	const (
-		preset       = "bench-sql-resolution-test"
-		fileName     = "dialect.sql"
-		embeddedBody = "--+ query\n--= body\nSELECT 'embedded';\n"
-		localBody    = "--+ query\n--= body\nSELECT 'local';\n"
-	)
+	files := fstest.MapFS{"dialect.sql": &fstest.MapFile{Data: []byte("--+ query\n--= body\nSELECT 'embedded';")}}
+	sql, err := (QueryFiles{}).Load(files, "dialect.sql")
+	require.NoError(t, err)
+	require.Equal(t, "SELECT 'embedded';", sql.Require("query", "body").Text)
+	require.NoError(t, os.WriteFile(
+		"dialect.sql",
+		[]byte("--+ query\n--= body\nSELECT 'local';"),
+		0o600,
+	))
 
-	registerSQLResolutionPreset.Do(func() {
-		workloads.Register(preset, fstest.MapFS{
-			fileName: &fstest.MapFile{Data: []byte(embeddedBody)},
-		})
-	})
+	sql, err = (QueryFiles{}).Load(files, "dialect.sql")
+	require.NoError(t, err)
+	require.Equal(t, "SELECT 'local';", sql.Require("query", "body").Text)
 
-	t.Run("embedded fallback", func(t *testing.T) {
-		t.Chdir(t.TempDir())
+	_, err = (QueryFiles{}).Override("missing.sql")
+	require.Error(t, err)
+	require.Panics(t, func() { sql.Require("missing", "body") })
 
-		assertSQLBody(t, preset, fileName, "SELECT 'embedded';")
-	})
-
-	t.Run("local workload file", func(t *testing.T) {
-		directory := t.TempDir()
-		t.Chdir(directory)
-
-		if err := os.MkdirAll(filepath.Join("workloads", preset), 0o755); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := os.WriteFile(filepath.Join("workloads", preset, fileName), []byte(localBody), 0o600); err != nil {
-			t.Fatal(err)
-		}
-
-		assertSQLBody(t, preset, fileName, "SELECT 'local';")
-	})
-}
-
-func assertSQLBody(t *testing.T, preset, fileName, want string) {
-	t.Helper()
-
-	sql, err := LoadSQL(preset, fileName)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if got, ok := sql.Query("query", "body"); !ok || got != want {
-		t.Fatalf("query body = %q, %v; want %q, true", got, ok, want)
-	}
+	_, found := sql.Lookup("missing", "body")
+	require.False(t, found)
+	require.Empty(t, sql.Section("missing"))
 }

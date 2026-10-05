@@ -4,8 +4,6 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
-const preset = "tpcc"
-
 // TPC-C population constants.
 const (
 	districtsPerWarehouse = 10
@@ -77,13 +75,4 @@ func sqlFile(dt bench.DriverTypeName, override string) string {
 	default:
 		return "pg.sql"
 	}
-}
-
-func mustLoadSQL(dt bench.DriverTypeName, override string) *bench.SQL {
-	s, err := bench.LoadSQL(preset, sqlFile(dt, override))
-	if err != nil {
-		panic(err)
-	}
-
-	return s
 }

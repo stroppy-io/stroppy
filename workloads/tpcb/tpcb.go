@@ -16,11 +16,9 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
-	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
@@ -53,8 +51,6 @@ var (
 )
 
 const (
-	preset = "tpcb"
-
 	branchesFiller = 88
 	tellersFiller  = 84
 	accountFiller  = 84
@@ -79,123 +75,146 @@ type workload struct {
 	sqlFile       string
 	loadWorkers   int
 
-	retryMetricOnce sync.Once
-	retryMetric     *bench.Metric
-	retryPolicy     bench.RetryPolicy
+	retryMetric *bench.CounterHandle
 
-	vuStates sync.Map // uint64 -> *vuState
+	vuStates []*vuState
 }
 
-func init() {
-	bench.Register(func() bench.Workload { return &workload{variant: "tx"} })
-	bench.Register(func() bench.Workload { return &workload{variant: "procs"} })
-}
+var (
+	Tx    = bench.Test{Name: "tpcb/tx", Define: defineTx}
+	Procs = bench.Test{Name: "tpcb/procs", Define: defineProcs}
+)
 
-func (w *workload) Name() string { return "tpcb/" + w.variant }
-
-func (w *workload) Define(d *bench.Def) error {
-	w.scale = int64(max(d.Param.Int("scale-factor", 1, "TPC-B scale factor.").Value(), 1))
-	w.retryAttempts = d.Param.Int("retry-attempts", 3, "Maximum transaction attempts.").Value()
-	w.iso = bench.TxIsolationName(d.Param.String("tx-isolation", "", "Transaction isolation override.").Value())
-	w.sqlFile = d.Param.String("sql-file", "", "SQL dialect file override.").Value()
-	w.loadWorkers = d.Param.Int("load-workers", 1, "Workers used to load each table.").Value()
+func init()                          { bench.Register(Tx); bench.Register(Procs) }
+func defineTx(d *bench.Def) error    { return define(d, "tx") }
+func defineProcs(d *bench.Def) error { return define(d, "procs") }
+func define(d *bench.Def, variant string) error {
+	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
+	w := &workload{variant: variant, vuStates: make([]*vuState, settings.Workers)}
+	scale, _ := d.Param.Int("scale-factor", 1, "TPC-B scale factor.")
+	w.scale = int64(max(scale, 1))
+	w.retryAttempts, _ = d.Param.Int("retry-attempts", 3, "Maximum transaction attempts.")
+	iso, _ := d.Param.String("tx-isolation", "", "Transaction isolation override.")
+	w.sqlFile, _ = d.Param.String("sql-file", "", "SQL dialect file override.")
+	w.loadWorkers, _ = d.Param.Int("load-workers", 1, "Workers used to load each table.")
 	w.loadWorkers = max(w.loadWorkers, 1)
+	db := d.Drivers.Declare("default", bench.DriverConfig{})
+	w.driverType = db.Kind()
+
+	w.iso = resolveIsolation(w.driverType, bench.TxIsolationName(iso))
+	if variant == "procs" && !procsSupported(w.driverType) {
+		return errProcsDriverUnsupported
+	}
+
+	var err error
+	if w.sqlFile != "" {
+		w.sql, err = d.Queries.Override(w.sqlFile)
+	} else {
+		w.sql, err = d.Queries.Load(files, sqlFile(w.driverType, ""))
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if queryErr := w.resolveSQLQueries(); queryErr != nil {
+		return queryErr
+	}
+
+	w.retryMetric = d.Metrics.Counter("tpcb_retry_attempts")
+	for _, name := range []string{"drop_schema", "create_schema"} {
+		section := sqlSection{sql: w.sql, name: name}
+		d.Execution.Step(name, section.Run)
+	}
+
+	if variant == "procs" {
+		section := sqlSection{sql: w.sql, name: "create_procedures"}
+		d.Execution.Step(section.name, section.Run)
+	}
+
+	d.Execution.Step("load_data", w.load)
+
+	for _, name := range []string{"create_indexes", "create_foreign_keys", "analyze"} {
+		section := sqlSection{sql: w.sql, name: name}
+		d.Execution.Step(name, section.Run)
+	}
+
+	d.Execution.Step("workload", w.work, settings.Policy())
+
+	return d.Execution.Err()
+}
+
+type sqlSection struct {
+	sql  *bench.SQL
+	name string
+}
+
+func (s sqlSection) Run(ctx context.Context, b *bench.Bench) error {
+	for _, q := range s.sql.Section(s.name) {
+		if err := b.Exec(ctx, q, nil); err != nil {
+			return fmt.Errorf("%s: %w", s.name, err)
+		}
+	}
 
 	return nil
 }
 
-func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
-	w.driverType = b.DriverTypeName()
-	if w.variant == "procs" && !procsSupported(w.driverType) {
-		return errProcsDriverUnsupported
-	}
-
-	w.iso = resolveIsolation(w.driverType, w.iso)
-	w.sql = mustLoadSQL(w.driverType, w.sqlFile)
-
-	if err := w.resolveSQLQueries(); err != nil {
-		return err
-	}
-
-	runSection := func(name string) error {
-		for _, q := range w.sql.Section(name) {
-			if err := b.Exec(ctx, q, nil); err != nil {
-				return fmt.Errorf("%s: %w", name, err)
-			}
-		}
-
-		return nil
-	}
-
-	type step struct {
-		name string
-		fn   func() error
-	}
-
-	steps := []step{
-		{"drop_schema", func() error { return runSection("drop_schema") }},
-		{"create_schema", func() error { return runSection("create_schema") }},
-	}
-	if w.variant == "procs" {
-		steps = append(steps, step{"create_procedures", func() error { return runSection("create_procedures") }})
-	}
-
-	steps = append(steps,
-		step{"load_data", func() error {
-			if _, err := b.Insert(ctx, branchesRequest(w.scale, w.loadWorkers)); err != nil {
-				return err
-			}
-
-			if _, err := b.Insert(ctx, tellersRequest(w.scale, w.loadWorkers)); err != nil {
-				return err
-			}
-
-			if _, err := b.Insert(ctx, accountsRequest(w.scale, w.loadWorkers)); err != nil {
-				return err
-			}
-
-			return nil
-		}},
-		step{"create_indexes", func() error { return runSection("create_indexes") }},
-		step{"create_foreign_keys", func() error { return runSection("create_foreign_keys") }},
-		step{"analyze", func() error { return runSection("analyze") }},
-	)
-
-	for _, s := range steps {
-		if err := b.Step(s.name, s.fn); err != nil {
+func (w *workload) load(ctx context.Context, b *bench.Bench) error {
+	for _, request := range []*insertRequest{
+		branchesRequest(w.scale, w.loadWorkers),
+		tellersRequest(w.scale, w.loadWorkers),
+		accountsRequest(w.scale, w.loadWorkers),
+	} {
+		if _, err := b.Insert(
+			ctx,
+			request.Table,
+			request.Source,
+			bench.InsertMethod(request.Method),
+			bench.LoadWorkers(request.Workers),
+		); err != nil {
 			return err
 		}
 	}
 
-	w.retryPolicy = b.TxRetryPolicy(bench.TxRetryPolicyOptions{
-		MaxAttempts: w.retryAttempts,
-		OnRetry:     func(int, error, bench.RetryDecision) { w.retryCounter(b).Add(1) },
-	})
-
 	return nil
 }
 
-func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
-	vs := w.vuState(b.VUID())
-	aid, tid, bid, delta, hid := vs.txParams(w.scale)
+type tpcbOperation struct {
+	workload             *workload
+	aid, tid, bid, delta int
+	hid                  int64
+}
 
+func (o tpcbOperation) Run(ctx context.Context, tx *bench.Tx) error {
+	return o.workload.txBody(ctx, tx, o.aid, o.tid, o.bid, o.delta, o.hid)
+}
+
+func (w *workload) work(ctx context.Context, b *bench.Bench) error {
+	//nolint:gosec // worker is nonnegative and bounded by allocated worker state.
+	vs := w.vuState(uint64(b.Worker() + 1))
+
+	aid, tid, bid, delta, hid := vs.txParams(w.scale)
 	if w.variant == "procs" {
 		return w.iterateProcs(ctx, b, aid, tid, bid, delta, hid)
 	}
 
-	return b.Transaction(func() error {
-		return bench.Retry0(ctx, w.retryPolicy, func() error {
-			return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "tpcb"}, func(tx *bench.TxX) error {
-				return w.txBody(ctx, tx, aid, tid, bid, delta, hid)
-			})
-		})
-	})
+	op := tpcbOperation{w, aid, tid, bid, delta, hid}
+
+	return b.Transaction(
+		ctx,
+		bench.TransactionOptions{
+			Name:      "tpcb",
+			Isolation: w.iso,
+			Retry:     bench.RetryOptions{MaxAttempts: w.retryAttempts},
+		},
+		op.Run,
+	)
 }
 
 // txBody runs the ordered DML of one client-side TPC-B transaction: update
 // account, read balance, update teller, update branch, insert history. Extracted
 // from Iterate to keep the transaction body out of the retry/begin closures.
-func (w *workload) txBody(ctx context.Context, tx *bench.TxX, aid, tid, bid, delta int, hid int64) error {
+func (w *workload) txBody(ctx context.Context, tx *bench.Tx, aid, tid, bid, delta int, hid int64) error {
 	updateAccount, _ := w.sql.Query("workload_tx_tpcb", "update_account")
 	getBalance, _ := w.sql.Query("workload_tx_tpcb", "get_balance")
 	updateTeller, _ := w.sql.Query("workload_tx_tpcb", "update_teller")
@@ -206,7 +225,7 @@ func (w *workload) txBody(ctx context.Context, tx *bench.TxX, aid, tid, bid, del
 		return err
 	}
 
-	abalance, err := tx.QueryValue(ctx, getBalance, map[string]any{"aid": aid})
+	abalance, err := tx.QueryValue[any](ctx, getBalance, map[string]any{"aid": aid})
 	if err != nil {
 		return err
 	}
@@ -223,7 +242,17 @@ func (w *workload) txBody(ctx context.Context, tx *bench.TxX, aid, tid, bid, del
 		return err
 	}
 
-	return tx.Exec(ctx, insertHistory, map[string]any{"hid": hid, "tid": tid, "bid": bid, "aid": aid, "delta": delta})
+	return tx.Exec(
+		ctx,
+		insertHistory,
+		map[string]any{
+			"hid":   hid,
+			"tid":   tid,
+			"bid":   bid,
+			"aid":   aid,
+			"delta": delta,
+		},
+	)
 }
 
 // iterateProcs executes the stored procedure tpcb_transaction as a single
@@ -234,8 +263,8 @@ func (w *workload) txBody(ctx context.Context, tx *bench.TxX, aid, tid, bid, del
 // variant therefore emits no client-side commit/rollback metric — the commit
 // happens inside the procedure — so its metric shape differs from tpcb/tx.
 func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, aid, tid, bid, delta int, hid int64) error {
-	return b.Transaction(func() error {
-		return bench.Retry0(ctx, w.retryPolicy, func() error {
+	return b.LogicalOperation(func() error {
+		return bench.Retry0(ctx, b.TxRetryPolicy(bench.RetryOptions{MaxAttempts: w.retryAttempts}), func() error {
 			return b.Exec(ctx, w.procQuery, map[string]any{
 				"p_aid": aid, "p_tid": tid, "p_bid": bid, "p_delta": delta, "p_hid": hid,
 			})
@@ -299,7 +328,7 @@ func sqlFile(dt bench.DriverTypeName, override string) string {
 }
 
 func mustLoadSQL(dt bench.DriverTypeName, override string) *bench.SQL {
-	s, err := bench.LoadSQL(preset, sqlFile(dt, override))
+	s, err := (bench.QueryFiles{}).Load(files, sqlFile(dt, override))
 	if err != nil {
 		panic(err)
 	}
@@ -363,10 +392,8 @@ type vuState struct {
 }
 
 func (w *workload) vuState(vuid uint64) *vuState {
-	if v, ok := w.vuStates.Load(vuid); ok {
-		vs, _ := v.(*vuState)
-
-		return vs
+	if w.vuStates[vuid-1] != nil {
+		return w.vuStates[vuid-1]
 	}
 
 	vs := &vuState{
@@ -376,10 +403,9 @@ func (w *workload) vuState(vuid uint64) *vuState {
 		delta: rand.New(rand.NewPCG(seedOf("delta", vuid), seedOf("delta", vuid))), //nolint:gosec // G404: benchmark RNG
 	}
 	vs.hid.Store(int64(vuid) * 1_000_000_000) //nolint:gosec // G115: value bounded by scale factor, no overflow path
-	actual, _ := w.vuStates.LoadOrStore(vuid, vs)
-	stored, _ := actual.(*vuState)
+	w.vuStates[vuid-1] = vs
 
-	return stored
+	return vs
 }
 
 func (v *vuState) nextHid() int64 { return v.hid.Add(1) }
@@ -405,10 +431,11 @@ func seedOf(slot string, vuid uint64) uint64 {
 	return (vuid * 0x9e3779b9) ^ uint64(h)
 }
 
-func (w *workload) retryCounter(b *bench.Bench) *bench.Metric {
-	w.retryMetricOnce.Do(func() { w.retryMetric = b.Counter("tpcb_retry_attempts") })
-
-	return w.retryMetric
+type insertRequest struct {
+	Table   string
+	Method  bench.InsertStrategy
+	Workers int
+	Source  gen.BatchSource
 }
 
 // --- typed insert requests (plain Go row formulas) ---
@@ -417,29 +444,29 @@ func (w *workload) retryCounter(b *bench.Bench) *bench.Metric {
 // bid is the 1-based row counter, bbalance is 0, filler is a fixed-width
 // [A-Za-z] string. Preserves the legacy table name, method (NATIVE), and
 // seedBranches derivation.
-func branchesRequest(scale int64, workers int) *driver.InsertRequest {
+func branchesRequest(scale int64, workers int) *insertRequest {
 	root := gen.New(seedBranches)
 
-	return &driver.InsertRequest{
-		Table: "pgbench_branches", Method: driver.InsertNative, Workers: workers,
+	return &insertRequest{
+		Table: "pgbench_branches", Method: bench.InsertNative, Workers: workers,
 		Source: branchesSource(root, branches(scale)),
 	}
 }
 
-func tellersRequest(scale int64, workers int) *driver.InsertRequest {
+func tellersRequest(scale int64, workers int) *insertRequest {
 	root := gen.New(seedTellers)
 
-	return &driver.InsertRequest{
-		Table: "pgbench_tellers", Method: driver.InsertNative, Workers: workers,
+	return &insertRequest{
+		Table: "pgbench_tellers", Method: bench.InsertNative, Workers: workers,
 		Source: tellersSource(root, tellers(scale)),
 	}
 }
 
-func accountsRequest(scale int64, workers int) *driver.InsertRequest {
+func accountsRequest(scale int64, workers int) *insertRequest {
 	root := gen.New(seedAccounts)
 
-	return &driver.InsertRequest{
-		Table: "pgbench_accounts", Method: driver.InsertNative, Workers: workers,
+	return &insertRequest{
+		Table: "pgbench_accounts", Method: bench.InsertNative, Workers: workers,
 		Source: accountsSource(root, accounts(scale)),
 	}
 }

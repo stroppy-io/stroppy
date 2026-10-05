@@ -17,7 +17,10 @@ func TestPicodataPoolUsesPGX(t *testing.T) {
 
 	for _, specific := range []bool{false, true} {
 		t.Run(map[bool]string{false: "common", true: "postgres_override"}[specific], func(t *testing.T) {
-			cfg := &config.DriverConfig{DriverType: config.DriverTypePicodata, URL: "postgres://admin:test@localhost:4327"}
+			cfg := &config.DriverConfig{
+				DriverType: config.DriverTypePicodata,
+				URL:        "postgres://admin:test@localhost:4327",
+			}
 			file := &config.DriverRunConfig{Pool: &config.PoolConfig{DefaultQueryExecMode: &mode, MaxConns: &maxConnections}}
 			want := pgx.QueryExecModeExec
 
@@ -27,7 +30,7 @@ func TestPicodataPoolUsesPGX(t *testing.T) {
 				want = pgx.QueryExecModeSimpleProtocol
 			}
 
-			require.NoError(t, applyDriverRunConfigExtras(0, cfg, file))
+			require.NoError(t, applyDriverRunConfigExtras("", cfg, file))
 			require.NotNil(t, cfg.Postgres)
 			require.Nil(t, cfg.SQL)
 			parsed, err := pool.ParseConfig(cfg, zap.NewExample())

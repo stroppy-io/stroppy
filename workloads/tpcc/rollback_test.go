@@ -12,8 +12,16 @@ import (
 func TestProtocolRollbackSentinel(t *testing.T) {
 	pg := &pgconn.PgError{Code: "P0001", Message: errRollbackSentinel.Error()}
 
-	my := &mysql.MySQLError{Number: 1644, SQLState: [5]byte{'4', '5', '0', '0', '0'}, Message: errRollbackSentinel.Error()}
-	for name, err := range map[string]error{"native": errRollbackSentinel, "postgres": pg, "mysql": my} {
+	my := &mysql.MySQLError{
+		Number:   1644,
+		SQLState: [5]byte{'4', '5', '0', '0', '0'},
+		Message:  errRollbackSentinel.Error(),
+	}
+	for name, err := range map[string]error{
+		"native":   errRollbackSentinel,
+		"postgres": pg,
+		"mysql":    my,
+	} {
 		t.Run(name, func(t *testing.T) {
 			wrapped := fmt.Errorf("new_order: %w", err)
 			if !isRollbackSentinel(wrapped) || finishNewOrder(wrapped, nil) != nil {

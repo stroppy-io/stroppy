@@ -36,7 +36,7 @@ REQUIRED_BINS = git go curl unzip docker
 install-linter: # Install golangci-lint
 	$(info Installing golangci-lint...)
 	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
 .PHONY: install-bin-deps
 install-bin-deps: install-linter # Install binary dependencies in ./bin
@@ -92,7 +92,7 @@ gen-tpcds-json: # Regenerate workloads/tpcds/distributions.json from upstream .d
 	go run ./cmd/dstparse -in $(TPCDS_TOOLS_DIR) -out workloads/tpcds/distributions.json
 
 gen-tpcds-streams: # Generate TPC-DS query streams (DIALECT, SCALE, SEED, STREAMS, OUT)
-	go run ./third_party/gotpcds/dsqgen/cmd/dsqgen \
+	go run ./workloads/tpcds/dsqgen/cmd/dsqgen \
 		-dialect $(or $(DIALECT),postgres) -scale $(or $(SCALE),1) \
 		-seed $(or $(SEED),19620718) -streams $(or $(STREAMS),1) \
 		-out $(or $(OUT),./tpcds-streams)

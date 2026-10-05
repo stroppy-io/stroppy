@@ -554,19 +554,19 @@ func driverCLIConfigFromFile(fileConfig *config.DriverRunConfig) (DriverCLIConfi
 }
 
 // DriverCLIConfigs holds parsed driver configurations indexed by driver number.
-type DriverCLIConfigs map[int]*DriverCLIConfig
+type DriverCLIConfigs map[string]*DriverCLIConfig
 
 // DriverCLIConfigsFromFile converts config-file drivers into mutable CLI configs.
-func DriverCLIConfigsFromFile(fileDrivers map[uint32]*config.DriverRunConfig) (DriverCLIConfigs, error) {
+func DriverCLIConfigsFromFile(fileDrivers map[string]*config.DriverRunConfig) (DriverCLIConfigs, error) {
 	configs := make(DriverCLIConfigs, len(fileDrivers))
 
 	for idx, fileConfig := range fileDrivers {
 		cfg, err := driverCLIConfigFromFile(fileConfig)
 		if err != nil {
-			return nil, fmt.Errorf("convert config file driver %d: %w", idx, err)
+			return nil, fmt.Errorf("convert config file driver %s: %w", idx, err)
 		}
 
-		configs[int(idx)] = &cfg
+		configs[idx] = &cfg
 	}
 
 	return configs, nil

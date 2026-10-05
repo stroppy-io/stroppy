@@ -1,6 +1,6 @@
 version: "2"
 run:
-  go: "1.24"
+  go: "1.27"
   relative-path-mode: gomod
 
 output:
@@ -181,7 +181,7 @@ linters:
         text: json\(snake\)
       - linters:
           - tagliatelle
-        path: pkg/config/.*\.go
+        path: (pkg/config/.*|pkg/bench/database)\.go
         text: json\(snake\)
         # camelCase JSON tags preserve the established v5 JSON format (see #143)
       - linters:
@@ -212,6 +212,8 @@ linters:
         text: in package name
     paths:
       - ^third_party/
+      - ^workloads/tpch/dbgen/
+      - ^workloads/tpcds/(dsdgen|dsqgen)/
 issues:
   max-same-issues: 50
 formatters:
@@ -233,3 +235,5 @@ formatters:
     generated: lax
     paths:
       - ^third_party/
+      - ^workloads/tpch/dbgen/
+      - ^workloads/tpcds/(dsdgen|dsqgen)/

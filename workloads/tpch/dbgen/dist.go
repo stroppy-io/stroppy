@@ -1,6 +1,6 @@
 package dbgen
 
-import "github.com/stroppy-io/stroppy/v6/third_party/gotpc/dbgen/dist"
+import "github.com/stroppy-io/stroppy/v6/workloads/tpch/dbgen/dist"
 
 var (
 	nations      distribution
