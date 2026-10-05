@@ -114,7 +114,12 @@ func (m *txMetrics) ensureRegistered(vu *VU, lg *zap.Logger) {
 	m.txTotalDuration = newMetric("tx_total_duration", Trend)
 	m.txCommits = newMetric("tx_commits_total", Counter)
 	m.txErrors = newMetric("tx_errors_total", Counter)
+
 	m.txQueriesPerTx = newMetric("tx_queries_per_tx", Trend)
+	for _, metric := range []*metric{m.failedIterations, m.failedQueries, m.terminalErrors, m.retryAttempts} {
+		m.emit(vu, metric, 0, metricAttributes{})
+	}
+
 	m.registered.Store(true)
 }
 

@@ -25,7 +25,7 @@ func TestTPCDSGeneratedPostgresAllQueries(t *testing.T) {
 		"--executor", "shared-iterations", "--iterations", "1", "--vus", "1",
 		"--report-file", reportFile,
 	)
-	matches := regexp.MustCompile(`\[tpcds\] query(\d+)(?:_[abc])?: ok`).FindAllStringSubmatch(out, -1)
+	matches := regexp.MustCompile(`query completed\s+\{[^\n]*"query": "query(\d+)(?:_[abc])?"`).FindAllStringSubmatch(out, -1)
 	if len(matches) != 103 {
 		t.Fatalf("got %d successful SQL statements, want 103\n%s", len(matches), out)
 	}

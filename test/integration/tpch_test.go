@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -444,14 +445,17 @@ func assertTpchQueriesLogged(t *testing.T, out string) {
 }
 
 func validateTpchQueryLogs(out string) error {
+	records := regexp.MustCompile(`query (completed|skipped)\s+\{[^\n]*"query": "(q\d+)"`).FindAllStringSubmatch(out, -1)
+	completed := map[string]int{}
+	for _, record := range records {
+		if record[1] == "skipped" {
+			return fmt.Errorf("%s was skipped", record[2])
+		}
+		completed[record[2]]++
+	}
 	for number := 1; number <= 22; number++ {
 		query := fmt.Sprintf("q%d", number)
-		if skipped := "[tpch] " + query + ": skipped"; strings.Contains(out, skipped) {
-			return fmt.Errorf("%s was skipped", query)
-		}
-
-		success := "[tpch] " + query + ": ok in "
-		if count := strings.Count(out, success); count != 1 {
+		if count := completed[query]; count != 1 {
 			return fmt.Errorf("%s success markers = %d, want 1", query, count)
 		}
 	}
@@ -464,7 +468,7 @@ func TestValidateTpchQueryLogs(t *testing.T) {
 
 	var complete strings.Builder
 	for number := 1; number <= 22; number++ {
-		fmt.Fprintf(&complete, "[tpch] q%d: ok in 1ms\n", number)
+		fmt.Fprintf(&complete, "query completed\t{\"query\": \"q%d\", \"milliseconds\": 1}\n", number)
 	}
 
 	valid := complete.String()
@@ -476,20 +480,20 @@ func TestValidateTpchQueryLogs(t *testing.T) {
 		{name: "all queries", output: valid},
 		{
 			name:    "missing q22",
-			output:  strings.Replace(valid, "[tpch] q22: ok in 1ms\n", "", 1),
+			output:  strings.Replace(valid, "query completed\t{\"query\": \"q22\", \"milliseconds\": 1}\n", "", 1),
 			wantErr: true,
 		},
 		{
 			name: "skipped q22",
 			output: strings.Replace(
 				valid,
-				"[tpch] q22: ok in 1ms\n",
-				"[tpch] q22: skipped (no body in SQL file)\n",
+				"query completed\t{\"query\": \"q22\", \"milliseconds\": 1}\n",
+				"query skipped\t{\"query\": \"q22\"}\n",
 				1,
 			),
 			wantErr: true,
 		},
-		{name: "duplicate q1", output: valid + "[tpch] q1: ok in 2ms\n", wantErr: true},
+		{name: "duplicate q1", output: valid + "query completed\t{\"query\": \"q1\", \"milliseconds\": 2}\n", wantErr: true},
 	}
 
 	for _, test := range tests {

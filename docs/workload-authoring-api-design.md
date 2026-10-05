@@ -2576,8 +2576,14 @@ API documentation, compatibility declaration and migration guidance are in place
 and tagged integration compilation pass. Final `make build`, `make tests`, and the required
 lint-fix/read-only lint sequence also pass after the last code edits. The installed
 Go-1.27-compatible linter is selected with `LOCAL_BIN=/Users/ariel/go/bin`; no system Go,
-PATH, or persistent Go configuration is modified. Mandatory integration is blocked,
-not passed: `make tmpfs-up` cannot connect to
-`/Users/ariel/.docker/run/docker.sock` because the Docker daemon is unavailable. The
-PostgreSQL/MySQL/OTEL suite still needs execution with the documented harness. No push or
-PR has been published.
+PATH, or persistent Go configuration is modified.
+
+On 2026-10-05, the mandatory `make tmpfs-up`, `make build`, `make integration` suite
+passed with PostgreSQL, MySQL, CSV and OTEL, including the accounts authoring example on
+both SQL databases. Integration exposed and fixed disabled-logger PostgreSQL tracing and
+missing explicit zero error/retry counters. Exact OTEL expectations now include the authored
+step dimension; TPC-H/TPC-DS query assertions match the neutral structured completion logs
+while retaining complete query-count and missing/skipped/duplicate checks. Full race/coverage
+and the required lint sequence pass after these fixes. `make tmpfs-down` completed and
+removed the baseline harness. Optional Picodata/YDB and heavy SF=1 suites were not selected.
+No push or PR has been published.

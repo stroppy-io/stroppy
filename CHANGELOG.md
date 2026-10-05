@@ -28,6 +28,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 - Go applications can depend on Stroppy v6 through the standard `github.com/stroppy-io/stroppy/v6` module path. ([#181](https://github.com/stroppy-io/stroppy/pull/181))
 
+### Fixed
+
+- Programmatic PostgreSQL workloads work with logging disabled, and successful runs still export explicit zero error and retry counters.
+
 ## [6.1.1] - 2026-09-28
 
 ### Added

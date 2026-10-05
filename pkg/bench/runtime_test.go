@@ -59,6 +59,25 @@ func TestRunContinuesAfterOrdinaryErrors(t *testing.T) {
 	require.Equal(t, uint64(9), result.Errors.FailedIterations)
 }
 
+func TestSuccessfulRunExportsZeroErrorCounters(t *testing.T) {
+	test := Test{Name: "zero-errors", Define: func(d *Def) error {
+		d.Execution.Step("work", func(context.Context, *Bench) error { return nil }, SharedIterations(1, 1))
+
+		return d.Execution.Err()
+	}}
+	result, err := RunTest(t.Context(), test, noopRunOptions())
+	require.NoError(t, err)
+
+	for _, name := range []string{
+		"failed_iterations_total", "failed_queries_total", "terminal_errors_total", "retry_attempts_total",
+	} {
+		metric, exists := result.Metrics[name]
+		require.True(t, exists, name)
+		require.NotNil(t, metric.Total, name)
+		require.InDelta(t, 0, *metric.Total, 0, name)
+	}
+}
+
 func TestRunFatalCancelsWorkersAndBlocksLaterWork(t *testing.T) {
 	var (
 		calls atomic.Int64

@@ -18,6 +18,12 @@ func TestNewLoggerTracer(t *testing.T) {
 	require.NotNil(t, tracer)
 }
 
+func TestNewLoggerTracerWithDisabledLogger(t *testing.T) {
+	tracer, err := newLoggerTracer(zap.NewNop())
+	require.NoError(t, err)
+	require.Equal(t, tracelog.LogLevelNone, tracer.LogLevel)
+}
+
 func TestPgxExtLogger_Log(_ *testing.T) {
 	log := zap.NewNop()
 	pl := &pgxExtLogger{logger: log}
