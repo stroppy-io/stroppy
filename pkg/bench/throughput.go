@@ -127,10 +127,10 @@ func (t *throughput) stop() {
 // LogicalOperation counts one successful logical operation, including its retries.
 // Nested managed transactions do not double-count that operation.
 func (b *Bench) LogicalOperation(fn func() error) error {
-	outer := b.logicalDepth == 0
+	outer := b.vu.logicalDepth == 0
 
-	b.logicalDepth++
-	defer func() { b.logicalDepth-- }()
+	b.vu.logicalDepth++
+	defer func() { b.vu.logicalDepth-- }()
 
 	window := b.root.throughput.current.Load()
 	if outer && window != nil {

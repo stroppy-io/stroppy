@@ -20,6 +20,7 @@ type VU struct {
 	stepTag      string
 	iterTest     uint64
 	iterScenario uint64
+	logicalDepth int
 }
 
 func (v *VU) Context() context.Context { return v.ctx }

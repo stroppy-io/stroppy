@@ -2568,6 +2568,14 @@ These resolve previously provisional details without reopening accepted directio
   retain their scheduled-retry callbacks. Noop smoke commands and operator/help documentation
   use typed inputs and explicit executors. Default parameter discovery remains ambient-free.
 
+- **Review hardening:** named databases inherit native insertion only when neither author nor
+  operator supplied a fallback. Logical-operation nesting belongs to the step worker and is
+  shared by its database facades. Framework metric names and rate-generated names are reserved
+  during observation; automatic registration errors use the SDK validation path, never process
+  exit. Neutral loggers synchronize their supplied writer. Insertion workers capture panics,
+  cancel siblings, join, finish progress tracking and rethrow on the caller; protected cursors
+  extend this to backend-owned PostgreSQL COPY goroutines.
+
 ## Implementation status
 
 All requested implementation, built-in migration, external examples, resolved discovery,
@@ -2586,4 +2594,7 @@ step dimension; TPC-H/TPC-DS query assertions match the neutral structured compl
 while retaining complete query-count and missing/skipped/duplicate checks. Full race/coverage
 and the required lint sequence pass after these fixes. `make tmpfs-down` completed and
 removed the baseline harness. Optional Picodata/YDB and heavy SF=1 suites were not selected.
-No push or PR has been published.
+All five dedicated review findings are fixed with regressions. Full race/coverage and the
+required lint sequence pass; mandatory integration passes again (40.3 seconds), including
+native COPY row-panic propagation, reached cleanup and driver connection closure. The baseline
+harness was removed. No push or PR has been published.

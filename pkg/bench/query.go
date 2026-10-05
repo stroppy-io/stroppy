@@ -233,6 +233,13 @@ func (b *Bench) insert(ctx context.Context, req *driver.InsertRequest) (*stats.Q
 	if tracker.Enabled() {
 		runCtx = insertprogress.ContextWithTracker(ctx, tracker)
 		tracker.Start(runCtx)
+
+		defer func() {
+			if value := recover(); value != nil {
+				tracker.Finish(inputError("insert action panicked"))
+				panic(value)
+			}
+		}()
 	}
 
 	result, err := b.drv.Insert(runCtx, &effectiveReq)

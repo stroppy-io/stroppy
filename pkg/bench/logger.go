@@ -21,7 +21,7 @@ var errOddFields = errors.New("fields must be nonempty string/value pairs")
 func NewLogger(output io.Writer) Logger {
 	encoder := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
 
-	return Logger{zap.New(zapcore.NewCore(encoder, zapcore.AddSync(output), zapcore.DebugLevel))}
+	return Logger{zap.New(zapcore.NewCore(encoder, zapcore.Lock(zapcore.AddSync(output)), zapcore.DebugLevel))}
 }
 
 // With returns a logger with copied additional fields.

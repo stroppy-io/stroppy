@@ -97,11 +97,25 @@ func (d *MetricDeclarations) declare(name string, kind metricType, options []Met
 		d.names = map[string]bool{}
 	}
 
-	if d.names[name] {
-		invalid("metric", inputError("duplicate %q", name))
+	names := []string{name}
+	if kind == Rate {
+		names = append(names, name+"_events_total", name+"_true_total")
 	}
 
-	d.names[name] = true
+	for _, candidate := range names {
+		if frameworkMetricNames[candidate] {
+			invalid("metric", inputError("framework name %q is reserved", candidate))
+		}
+
+		if d.names[candidate] {
+			invalid("metric", inputError("duplicate %q", candidate))
+		}
+	}
+
+	for _, candidate := range names {
+		d.names[candidate] = true
+	}
+
 	i := &instrument{name: name, root: d.def.Execution.root}
 
 	for _, option := range options {

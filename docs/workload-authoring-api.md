@@ -236,7 +236,8 @@ facade. References belong to the current definition replay. Use `Kind()` and
 `SupportsInsert()` for ordinary Go capability checks. Operator configuration
 overrides authored soft defaults. `DriverConfig` supports neutral kind, URL,
 insertion fallback, bulk size, backend tuning, and optional authentication/TLS
-fields; credentials are not included in driver discovery or reports.
+fields; credentials are not included in driver discovery or reports. Named and
+default databases use native insertion when no fallback is configured.
 
 CLI uses `-d`/`-D` for the default and `-dprimary`/`-Dprimary` for named drivers.
 Config uses driver names, with `"default"` for the default database. Numeric
@@ -339,6 +340,9 @@ finite declared keys/values; unknown/missing labels and nonfinite numbers fail.
 The framework owns the `step` dimension. The metric pipeline also has a bounded
 series capacity; choose small dimensions instead of row IDs or unbounded values.
 Database operations and logical transactions already emit automatic telemetry.
+Framework metric names, including native throughput and iteration/error counters,
+are reserved and rejected during observation. Rate instruments also reserve their
+`_events_total` and `_true_total` names against other declarations.
 
 Each measured step has its own elapsed window, including actual drain time.
 `measurement_seconds`, successful logical transaction totals, and native rates

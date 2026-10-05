@@ -5,8 +5,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver/insertprogress"
 )
@@ -19,6 +17,34 @@ const (
 	p95             = 0.95
 	p99             = 0.99
 )
+
+var frameworkMetricNames = map[string]bool{
+	"transactions_total":              true,
+	"run_query_operations_total":      true,
+	"run_query_errors_total":          true,
+	"insert_rows_total":               true,
+	"insert_progress_rows_total":      true,
+	"insert_progress_rows_per_second": true,
+	"run_query_duration":              true,
+	"insert_operations_total":         true,
+	"insert_errors_total":             true,
+	"insert_duration":                 true,
+	"iteration_duration":              true,
+	"iterations_total":                true,
+	"terminal_errors_total":           true,
+	"failed_iterations_total":         true,
+	"failed_queries_total":            true,
+	"retry_attempts_total":            true,
+	"tx_total_duration":               true,
+	"tx_commits_total":                true,
+	"tx_errors_total":                 true,
+	"tx_queries_per_tx":               true,
+	"tps":                             true,
+	"iterations_per_second":           true,
+	"queries_per_second":              true,
+	"measurement_seconds":             true,
+	"successful_transactions_total":   true,
+}
 
 type txMetrics struct {
 	mu         sync.Mutex
@@ -73,7 +99,7 @@ type progressAttributeKey struct {
 	step, table, method, event, rowKind string
 }
 
-func (m *txMetrics) ensureRegistered(vu *VU, lg *zap.Logger) {
+func (m *txMetrics) ensureRegistered(vu *VU) {
 	if m.registered.Load() {
 		return
 	}
@@ -89,7 +115,7 @@ func (m *txMetrics) ensureRegistered(vu *VU, lg *zap.Logger) {
 	newMetric := func(name string, typ metricType) *metric {
 		mm, err := r.NewMetric(name, typ)
 		if err != nil {
-			lg.Fatal("can't register "+name+" metric", zap.Error(err))
+			invalid("framework metric "+name, err)
 		}
 
 		return mm
@@ -231,7 +257,7 @@ func (m *txMetrics) progressAttributes(snapshot *insertprogress.Snapshot, step s
 }
 
 func (m *txMetrics) recordQueryResult(vu *VU, elapsed time.Duration, queryErr error) {
-	m.ensureRegistered(vu, vu.root.lg)
+	m.ensureRegistered(vu)
 	attrs := m.stepAttributes(vu.stepTag)
 	m.emit(vu, m.queryOperations, 1, attrs)
 
@@ -249,7 +275,7 @@ func (m *txMetrics) recordQueryResult(vu *VU, elapsed time.Duration, queryErr er
 }
 
 func (m *txMetrics) recordInsertResult(vu *VU, table string, elapsed time.Duration, insertErr error) {
-	m.ensureRegistered(vu, vu.root.lg)
+	m.ensureRegistered(vu)
 
 	if table == "" {
 		table = "unknown"
@@ -268,14 +294,14 @@ func (m *txMetrics) recordInsertResult(vu *VU, table string, elapsed time.Durati
 }
 
 func (m *txMetrics) recordIteration(vu *VU, elapsed time.Duration) {
-	m.ensureRegistered(vu, vu.root.lg)
+	m.ensureRegistered(vu)
 	attrs := m.stepAttributes(vu.stepTag)
 	m.emit(vu, m.iterationDur, elapsed.Seconds()*millisPerSecond, attrs)
 	m.emit(vu, m.iterations, 1, attrs)
 }
 
 func (m *txMetrics) recordTerminalError(vu *VU, scope terminalErrorScope, group errorGroup) {
-	m.ensureRegistered(vu, vu.root.lg)
+	m.ensureRegistered(vu)
 	attrs := m.errorAttributes(group)
 	m.emit(vu, m.terminalErrors, 1, attrs)
 
@@ -288,7 +314,7 @@ func (m *txMetrics) recordTerminalError(vu *VU, scope terminalErrorScope, group 
 }
 
 func (m *txMetrics) recordRetry(vu *VU) {
-	m.ensureRegistered(vu, vu.root.lg)
+	m.ensureRegistered(vu)
 	m.emit(vu, m.retryAttempts, 1, metricAttributes{})
 }
 
@@ -300,7 +326,7 @@ func (m *txMetrics) recordTxEnd(
 	queries int,
 	committed bool,
 ) {
-	m.ensureRegistered(vu, vu.root.lg)
+	m.ensureRegistered(vu)
 
 	attrs := m.txAttributes(vu.stepTag, action, name, txIsolationName(isolation))
 	if committed {
@@ -314,7 +340,7 @@ func (m *txMetrics) recordTxEnd(
 }
 
 func (m *txMetrics) recordInsertProgress(vu *VU, snapshot *insertprogress.Snapshot) {
-	m.ensureRegistered(vu, vu.root.lg)
+	m.ensureRegistered(vu)
 
 	attrs := m.progressAttributes(snapshot, vu.stepTag)
 	if snapshot.DeltaRows > 0 {
@@ -325,7 +351,7 @@ func (m *txMetrics) recordInsertProgress(vu *VU, snapshot *insertprogress.Snapsh
 }
 
 func (m *txMetrics) recordInsert(vu *VU, table string, rows int64) {
-	m.ensureRegistered(vu, vu.root.lg)
+	m.ensureRegistered(vu)
 
 	if table == "" {
 		table = "unknown"
@@ -344,7 +370,7 @@ func (m *txMetrics) recordInsert(vu *VU, table string, rows int64) {
 }
 
 func (m *txMetrics) record(vu *VU, action, name string, isolation config.TxIsolationLevel) {
-	m.ensureRegistered(vu, vu.root.lg)
+	m.ensureRegistered(vu)
 	m.emit(
 		vu,
 		m.transactions,

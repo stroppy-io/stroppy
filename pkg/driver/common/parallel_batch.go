@@ -57,10 +57,30 @@ func RunParallelBatch(
 	insertprogress.SetTotal(ctx, totalRows)
 	insertprogress.SetWorkers(ctx, len(chunks))
 
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	group, groupCtx := errgroup.WithContext(ctx)
+	panics := make(chan any, 1)
+	capturePanic := func(value any) {
+		select {
+		case panics <- value:
+		default:
+		}
+
+		cancel()
+	}
 
 	for _, chunk := range chunks {
-		group.Go(func() error {
+		group.Go(func() (err error) {
+			defer func() {
+				if value := recover(); value != nil {
+					capturePanic(value)
+
+					err = errBatchPanic
+				}
+			}()
+
 			workerCtx := insertprogress.ContextWithWorker(groupCtx, chunk.Index)
 
 			cur, err := src.Prepare(chunk.Start, chunk.Count, batchRows)
@@ -68,7 +88,7 @@ func RunParallelBatch(
 				return fmt.Errorf("common: worker %d prepare at %d: %w", chunk.Index, chunk.Start, err)
 			}
 
-			if err := fn(workerCtx, chunk, cur); err != nil {
+			if err := fn(workerCtx, chunk, &panicCursor{Cursor: cur, capture: capturePanic}); err != nil {
 				return fmt.Errorf("common: worker %d: %w", chunk.Index, err)
 			}
 
@@ -76,9 +96,37 @@ func RunParallelBatch(
 		})
 	}
 
-	if err := group.Wait(); err != nil {
+	err := group.Wait()
+
+	select {
+	case value := <-panics:
+		panic(value)
+	default:
+	}
+
+	if err != nil {
 		return 0, err
 	}
 
 	return totalRows, nil
+}
+
+var errBatchPanic = errors.New("common: batch worker panicked")
+
+// panicCursor also protects callbacks consumed by backend-owned goroutines.
+type panicCursor struct {
+	gen.Cursor
+	capture func(any)
+}
+
+func (c *panicCursor) Next() (batch *gen.Batch, err error) {
+	defer func() {
+		if value := recover(); value != nil {
+			c.capture(value)
+
+			err = errBatchPanic
+		}
+	}()
+
+	return c.Cursor.Next()
 }

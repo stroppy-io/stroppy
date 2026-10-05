@@ -90,6 +90,10 @@ func (d *DriverDeclarations) Declare(name string, defaults DriverConfig) DriverR
 		invalid("driver "+name, err)
 	}
 
+	if effective.DefaultInsertMethod == 0 {
+		effective.DefaultInsertMethod = InsertNative
+	}
+
 	d.declared[name] = effective
 
 	return DriverRef{name: name, owner: d.def, kind: effective.Kind}

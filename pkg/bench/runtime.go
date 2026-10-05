@@ -29,7 +29,6 @@ type Bench struct {
 	cfg          *config.DriverConfig
 	execution    *Execution
 	Log          Logger
-	logicalDepth int
 	databaseName string
 }
 
