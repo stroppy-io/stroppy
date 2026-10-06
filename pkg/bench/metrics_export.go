@@ -32,6 +32,8 @@ func exportedAttributes(config *MetricsConfig) []attribute.KeyValue {
 }
 
 func (e *metadataExporter) Export(ctx context.Context, data *metricdata.ResourceMetrics) error {
+	mergeMetricWriters(data)
+
 	for i := range data.ScopeMetrics {
 		for j := range data.ScopeMetrics[i].Metrics {
 			m := &data.ScopeMetrics[i].Metrics[j]

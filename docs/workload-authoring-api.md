@@ -344,8 +344,10 @@ latency := d.Metrics.Histogram("latency", bench.Unit("s"), bench.Bounds(.001, .0
 
 Record with explicit action context: `Add`, `Record`, or `Set`. Labels must use
 finite declared keys/values; unknown/missing labels and nonfinite numbers fail.
-The framework owns the `step` dimension. The metric pipeline also has a bounded
-series capacity; choose small dimensions instead of row IDs or unbounded values.
+The framework owns `step` and reserves `stroppy.internal.metric_writer` for
+private aggregation; the latter never appears in exported metric dimensions.
+The metric pipeline also has a bounded series capacity; choose small dimensions
+instead of row IDs or unbounded values.
 Database operations and logical transactions already emit automatic telemetry.
 Framework metric names, including native throughput and iteration/error counters,
 are reserved and rejected during observation. Rate instruments also reserve their

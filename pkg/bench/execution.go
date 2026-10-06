@@ -154,7 +154,7 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 
 	measured := opts.measured || opts.policy.mode != "once"
 	if measured {
-		if err := e.root.startThroughput(name); err != nil {
+		if err := e.root.startThroughput(name, opts.policy.workers); err != nil {
 			e.err = errors.Join(e.err, err)
 
 			return Result{Status: Failed, Err: err}
@@ -279,12 +279,14 @@ func (e *Execution) execute(parent context.Context, name string, action Action, 
 			//nolint:gosec // worker is nonnegative and bounded by validated policy.
 			vu := &VU{
 				root:      e.root,
-				ctx:       ctx,
+				ctx:       metricWorkerContext(ctx, worker, opts.policy.workers),
 				vuid:      uint64(worker) + 1,
 				worker:    worker,
 				stepTag:   name,
 				initPhase: opts.policy.mode == "once",
 			}
+			vu.metricWriter, _ = vu.ctx.Value(metricWriterContextKey{}).(*metricWriter)
+			vu.metricStepAttrs = e.root.txMetrics.stepAttributes(name)
 			b := e.bench(vu, opts.driver.name)
 
 			for {
@@ -302,7 +304,7 @@ func (e *Execution) execute(parent context.Context, name string, action Action, 
 
 				started := time.Now()
 
-				err := action(ctx, b)
+				err := action(vu.ctx, b)
 				if err == nil && errors.Is(context.Cause(ctx), errDrainExpired) {
 					err = errDrainExpired
 				}
@@ -314,7 +316,7 @@ func (e *Execution) execute(parent context.Context, name string, action Action, 
 					e.root.txMetrics.recordIteration(vu, time.Since(started))
 
 					if window := e.root.throughput.current.Load(); window != nil {
-						window.iterations.Add(1)
+						window.writer(worker).iterations.Add(1)
 					}
 				}
 

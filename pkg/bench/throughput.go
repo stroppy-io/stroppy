@@ -13,13 +13,44 @@ import (
 
 // Each measured step owns a wall-clock window including its graceful drain.
 type measurement struct {
-	name          string
-	started       time.Time
-	elapsed       atomic.Int64
+	name    string
+	started time.Time
+	elapsed atomic.Int64
+	writers []measurementWriter
+}
+
+const measurementWriterPadding = 128
+
+// Padding keeps concurrently updated writers on separate cache lines.
+type measurementWriter struct {
 	transactions  atomic.Int64
 	iterations    atomic.Int64
 	queries       atomic.Int64
 	transactional atomic.Bool
+	_             [measurementWriterPadding]byte
+}
+
+type measurementTotals struct {
+	transactions, iterations, queries int64
+	transactional                     bool
+}
+
+func (m *measurement) writer(worker int) *measurementWriter {
+	return &m.writers[worker%len(m.writers)]
+}
+
+func (m *measurement) totals() measurementTotals {
+	var total measurementTotals
+
+	for i := range m.writers {
+		writer := &m.writers[i]
+		total.transactions += writer.transactions.Load()
+		total.iterations += writer.iterations.Load()
+		total.queries += writer.queries.Load()
+		total.transactional = total.transactional || writer.transactional.Load()
+	}
+
+	return total
 }
 
 func (m *measurement) seconds() float64 {
@@ -38,7 +69,7 @@ type throughput struct {
 	registered bool
 }
 
-func (r *rootState) startThroughput(name string) error {
+func (r *rootState) startThroughput(name string, workers int) error {
 	t := &r.throughput
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -74,29 +105,30 @@ func (r *rootState) startThroughput(name string) error {
 
 			for _, window := range t.windows {
 				seconds := window.seconds()
+				total := window.totals()
 
 				options := []otelmetric.ObserveOption{otelmetric.WithAttributes(attribute.String("step", window.name))}
-				if window.transactional.Load() {
+				if total.transactional {
 					observer.ObserveFloat64(
 						completed,
-						float64(window.transactions.Load()),
+						float64(total.transactions),
 						options...,
 					)
 					observer.ObserveFloat64(
 						gauges[0],
-						float64(window.transactions.Load())/seconds,
+						float64(total.transactions)/seconds,
 						options...,
 					)
 				}
 
 				observer.ObserveFloat64(
 					gauges[1],
-					float64(window.iterations.Load())/seconds,
+					float64(total.iterations)/seconds,
 					options...,
 				)
 				observer.ObserveFloat64(
 					gauges[2],
-					float64(window.queries.Load())/seconds,
+					float64(total.queries)/seconds,
 					options...,
 				)
 				observer.ObserveFloat64(gauges[3], seconds, options...)
@@ -111,7 +143,10 @@ func (r *rootState) startThroughput(name string) error {
 		t.registered = true
 	}
 
-	window := &measurement{name: name, started: time.Now()}
+	window := &measurement{
+		name: name, started: time.Now(),
+		writers: make([]measurementWriter, min(workers, metricWriterLimit)),
+	}
 	t.windows = append(t.windows, window)
 	t.current.Store(window)
 
@@ -133,13 +168,18 @@ func (b *Bench) LogicalOperation(fn func() error) error {
 	defer func() { b.vu.logicalDepth-- }()
 
 	window := b.root.throughput.current.Load()
+
+	var writer *measurementWriter
 	if outer && window != nil {
-		window.transactional.Store(true)
+		writer = window.writer(b.vu.worker)
+		if !writer.transactional.Load() {
+			writer.transactional.Store(true)
+		}
 	}
 
 	err := fn()
-	if outer && window != nil && err == nil && b.vu.ctx.Err() == nil {
-		window.transactions.Add(1)
+	if writer != nil && err == nil && b.vu.ctx.Err() == nil {
+		writer.transactions.Add(1)
 	}
 
 	return err

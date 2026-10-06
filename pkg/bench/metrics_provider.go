@@ -59,11 +59,15 @@ func newMeterProvider(
 		config = &MetricsConfig{}
 	}
 
-	manualReader := sdkmetric.NewManualReader()
-	options := []sdkmetric.Option{
-		sdkmetric.WithReader(manualReader),
-		sdkmetric.WithCardinalityLimit(metricCardinalityLimit),
-	}
+	limits := sdkmetric.WithCardinalityLimitSelector(func(kind sdkmetric.InstrumentKind) (int, bool) {
+		if kind == sdkmetric.InstrumentKindCounter || kind == sdkmetric.InstrumentKindHistogram {
+			return metricCardinalityLimit*(metricWriterLimit+1) + 1, false
+		}
+
+		return metricCardinalityLimit, false
+	})
+	manualReader := sdkmetric.NewManualReader(limits)
+	options := []sdkmetric.Option{sdkmetric.WithReader(manualReader)}
 
 	res, err := metricsResource(config)
 	if err != nil {
@@ -84,6 +88,7 @@ func newMeterProvider(
 				attributes: exportedAttributes(config),
 			},
 			sdkmetric.WithInterval(metricExportInterval()),
+			limits,
 		)))
 	}
 
@@ -155,6 +160,10 @@ func metricsResource(config *MetricsConfig) (*resource.Resource, error) {
 	}
 
 	for key, value := range config.ResourceAttributes {
+		if key == metricWriterKey {
+			return nil, inputError("%s is reserved for metric aggregation", key)
+		}
+
 		attrs = append(attrs, attribute.String(key, value))
 	}
 

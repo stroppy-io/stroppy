@@ -62,8 +62,12 @@ func TestOTLPShutdownExportsIdentityAndMetadataForShortRuns(t *testing.T) {
 		require.NoError(t, err)
 		trend, err := registry.NewMetric("query_duration", Trend)
 		require.NoError(t, err)
-		counter.add(context.Background(), 3, attributes("step", "workload"))
-		trend.add(context.Background(), 2, attributes("step", "workload"))
+
+		for worker := range 3 {
+			ctx := metricWorkerContext(context.Background(), worker, 3)
+			counter.add(ctx, 1, attributes("step", "workload"))
+			trend.add(ctx, 2, attributes("step", "workload"))
+		}
 		// Shorter than the periodic interval: Shutdown must flush the real OTLP exporter.
 		require.NoError(t, provider.Shutdown(context.Background()))
 
@@ -102,6 +106,8 @@ func TestOTLPShutdownExportsIdentityAndMetadataForShortRuns(t *testing.T) {
 					histogram := metric.GetHistogram()
 					require.NotNil(t, histogram)
 					require.Len(t, histogram.DataPoints, 1)
+					require.Equal(t, uint64(3), histogram.DataPoints[0].Count)
+					require.InDelta(t, 6, histogram.DataPoints[0].GetSum(), 0)
 
 					for _, attr := range histogram.DataPoints[0].Attributes {
 						attrs[attr.Key] = attr.Value.GetStringValue()

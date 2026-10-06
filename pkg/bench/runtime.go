@@ -232,6 +232,8 @@ func finishRun(
 		phase = "report"
 	}
 
+	mergeMetricWriters(&data)
+
 	if root.onSummary != nil {
 		root.onSummary(reportMetrics(data, root.metricsPrefix))
 	}
@@ -273,6 +275,8 @@ func (s *summary) printTo(out io.Writer) {
 
 		return
 	}
+
+	mergeMetricWriters(&data)
 
 	if s.root.onSummary != nil {
 		s.root.onSummary(reportMetrics(data, s.root.metricsPrefix))

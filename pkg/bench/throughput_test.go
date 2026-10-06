@@ -3,11 +3,38 @@ package bench
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestMeasurementWritersAggregateConcurrently(t *testing.T) {
+	measurement := &measurement{writers: make([]measurementWriter, 8)}
+
+	var workers sync.WaitGroup
+	for worker := range 24 {
+		workers.Go(func() {
+			writer := measurement.writer(worker)
+			writer.transactional.Store(true)
+
+			for range 1000 {
+				writer.transactions.Add(1)
+				writer.iterations.Add(1)
+				writer.queries.Add(4)
+			}
+		})
+	}
+
+	for range 10 {
+		total := measurement.totals()
+		require.LessOrEqual(t, total.transactions, int64(24000))
+	}
+
+	workers.Wait()
+	require.Equal(t, measurementTotals{24000, 24000, 96000, true}, measurement.totals())
+}
 
 func TestLogicalThroughputCountsSuccessOnce(t *testing.T) {
 	var calls atomic.Int64

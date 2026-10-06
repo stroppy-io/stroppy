@@ -16,11 +16,13 @@ type VU struct {
 	initPhase bool
 
 	// per-iteration mutable
-	ctx          context.Context //nolint:containedctx // per-VU request/cancel lifecycle ctx, intentional
-	stepTag      string
-	iterTest     uint64
-	iterScenario uint64
-	logicalDepth int
+	ctx             context.Context //nolint:containedctx // per-VU request/cancel lifecycle ctx, intentional
+	stepTag         string
+	iterTest        uint64
+	iterScenario    uint64
+	logicalDepth    int
+	metricWriter    *metricWriter
+	metricStepAttrs metricAttributes
 }
 
 func (v *VU) Context() context.Context { return v.ctx }

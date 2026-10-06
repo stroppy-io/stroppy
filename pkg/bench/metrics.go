@@ -151,7 +151,7 @@ func (m *txMetrics) ensureRegistered(vu *VU) {
 
 func (m *txMetrics) emit(vu *VU, metric *metric, value float64, attrs metricAttributes) {
 	if metric != nil {
-		metric.add(vu.Context(), value, attrs)
+		metric.addWriter(vu.Context(), value, attrs, vu.metricWriter)
 	}
 }
 
@@ -195,6 +195,14 @@ func cachedAttributes(cache *attributeCache, key any, tags ...string) metricAttr
 	}
 
 	return result
+}
+
+func (m *txMetrics) workerStepAttributes(vu *VU) metricAttributes {
+	if vu.metricStepAttrs.set != nil {
+		return vu.metricStepAttrs
+	}
+
+	return m.stepAttributes(vu.stepTag)
 }
 
 func (m *txMetrics) stepAttributes(step string) metricAttributes {
@@ -258,7 +266,7 @@ func (m *txMetrics) progressAttributes(snapshot *insertprogress.Snapshot, step s
 
 func (m *txMetrics) recordQueryResult(vu *VU, elapsed time.Duration, queryErr error) {
 	m.ensureRegistered(vu)
-	attrs := m.stepAttributes(vu.stepTag)
+	attrs := m.workerStepAttributes(vu)
 	m.emit(vu, m.queryOperations, 1, attrs)
 
 	if queryErr != nil {
@@ -268,7 +276,7 @@ func (m *txMetrics) recordQueryResult(vu *VU, elapsed time.Duration, queryErr er
 	}
 
 	if window := vu.root.throughput.current.Load(); window != nil {
-		window.queries.Add(1)
+		window.writer(vu.worker).queries.Add(1)
 	}
 
 	m.emit(vu, m.queryDuration, elapsed.Seconds()*millisPerSecond, attrs)
@@ -295,7 +303,7 @@ func (m *txMetrics) recordInsertResult(vu *VU, table string, elapsed time.Durati
 
 func (m *txMetrics) recordIteration(vu *VU, elapsed time.Duration) {
 	m.ensureRegistered(vu)
-	attrs := m.stepAttributes(vu.stepTag)
+	attrs := m.workerStepAttributes(vu)
 	m.emit(vu, m.iterationDur, elapsed.Seconds()*millisPerSecond, attrs)
 	m.emit(vu, m.iterations, 1, attrs)
 }

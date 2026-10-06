@@ -39,7 +39,7 @@ var (
 )
 
 type metricAttributes struct {
-	set    attribute.Set
+	set    *attribute.Set
 	add    []otelmetric.AddOption
 	record []otelmetric.RecordOption
 }
@@ -61,9 +61,35 @@ type metric struct {
 	overflow   metricAttributes
 	tagAttrs   sync.Map
 	tagCount   atomic.Int64
+	seriesMu   sync.Mutex
+	series     map[attribute.Distinct]struct{}
+	writers    [metricWriterLimit + 1]atomic.Pointer[metricWriterBinding]
+	bindings   sync.Map
 }
 
 func (m *metric) add(ctx context.Context, value float64, attrs metricAttributes) {
+	writer, _ := ctx.Value(metricWriterContextKey{}).(*metricWriter)
+	m.addWriter(ctx, value, attrs, writer)
+}
+
+func (m *metric) addWriter(ctx context.Context, value float64, attrs metricAttributes, writer *metricWriter) {
+	if m.Type != Gauge {
+		if attrs.set == nil {
+			attrs = m.emptyAttrs
+		}
+
+		id := metricWriterLimit
+		if writer != nil {
+			id = writer.id
+		}
+
+		if cached := m.writers[id].Load(); cached != nil && cached.original == attrs.set {
+			attrs = cached.bound
+		} else {
+			attrs = m.bindSeries(id, attrs)
+		}
+	}
+
 	switch m.Type {
 	case Counter:
 		m.counter.Add(ctx, value, attrs.add...)
@@ -235,8 +261,12 @@ func attributes(tags ...string) metricAttributes {
 		set = attribute.NewSet()
 	}
 
+	return metricAttributesFromSet(set)
+}
+
+func metricAttributesFromSet(set attribute.Set) metricAttributes {
 	return metricAttributes{
-		set:    set,
+		set:    &set,
 		add:    []otelmetric.AddOption{otelmetric.WithAttributeSet(set)},
 		record: []otelmetric.RecordOption{otelmetric.WithAttributeSet(set)},
 	}

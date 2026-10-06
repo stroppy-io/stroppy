@@ -54,8 +54,8 @@ func LabelValues(name string, values ...string) MetricOption {
 			seen[value] = true
 		}
 
-		if name == "step" {
-			invalid("metric labels", inputError("step is framework-owned"))
+		if name == "step" || name == metricWriterKey {
+			invalid("metric labels", inputError("%s is framework-owned", name))
 		}
 
 		i.labels[name] = values
