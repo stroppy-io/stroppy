@@ -4,8 +4,8 @@ package testkit
 import (
 	"context"
 	"io"
-	"maps"
 
+	"github.com/stroppy-io/stroppy/v6/internal/testdriver"
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/recording"
@@ -17,7 +17,7 @@ import (
 //
 //nolint:gocritic // run inputs are copied operation values.
 func Run(ctx context.Context, test bench.Test, options bench.RunOptions) (*report.Run, error) {
-	return run(ctx, test, options, nil)
+	return run(testdriver.WithContext(ctx, testdriver.Binding{Kind: string(bench.DriverNoop)}), test, options)
 }
 
 // Record executes against recording with explicit canned answers and owned snapshots.
@@ -30,52 +30,13 @@ func Record(
 		recorder = &record.Recorder{}
 	}
 
-	return run(ctx, test, options, recorder)
+	return run(testdriver.WithContext(ctx, testdriver.Binding{
+		Kind: string(bench.DriverRecording), Recorder: recorder,
+	}), test, options)
 }
 
 //nolint:gocritic // run inputs are copied operation values.
-func run(
-	ctx context.Context, test bench.Test, options bench.RunOptions, recorder *record.Recorder,
-) (*report.Run, error) {
-	kind := bench.DriverNoop
-	if recorder != nil {
-		kind = bench.DriverRecording
-	}
-
-	drivers := maps.Clone(options.Drivers)
-	if drivers == nil {
-		drivers = map[string]bench.DriverConfig{}
-	}
-
-	drivers["default"] = bench.DriverConfig{Kind: kind, Recording: recorder}
-	delete(drivers, "")
-
-	description, err := bench.DescribeTest(test)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, database := range description.Drivers {
-		drivers[database.Name] = bench.DriverConfig{Kind: kind, Recording: recorder}
-	}
-
-	catalog, err := bench.NewCatalog(test)
-	if err != nil {
-		return nil, err
-	}
-
-	description, err = catalog.ResolveRun(test.Name, bench.RunOptions{
-		Params: options.Params, Drivers: drivers, Steps: options.Steps, NoSteps: options.NoSteps,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	for _, database := range description.Drivers {
-		drivers[database.Name] = bench.DriverConfig{Kind: kind, Recording: recorder}
-	}
-
-	options.Drivers = drivers
+func run(ctx context.Context, test bench.Test, options bench.RunOptions) (*report.Run, error) {
 	if options.Metrics == nil {
 		options.Metrics = &bench.MetricsConfig{Quiet: true, SummaryWriter: io.Discard}
 	}

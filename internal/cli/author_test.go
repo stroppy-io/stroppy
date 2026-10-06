@@ -109,6 +109,26 @@ var Test = bench.Test{Name: "unpublished", Define: func(*bench.Def) error { retu
 	require.Equal(t, "keep", string(data))
 }
 
+func TestInitRejectsReservedWorkloadBeforeWriting(t *testing.T) {
+	for _, name := range []string{
+		"build", "cache", "export", "help", "init", "eject", "list", "probe", "remove", "run", "version",
+	} {
+		t.Run(name, func(t *testing.T) {
+			destination := filepath.Join(t.TempDir(), name)
+			command := newInitCommand()
+			command.SetArgs([]string{destination, "--sdk-version", "v6.0.0-test"})
+
+			var output bytes.Buffer
+			command.SetOut(&output)
+			command.SetErr(&output)
+			require.ErrorContains(t, command.Execute(), "reserved workload name")
+
+			_, err := os.Lstat(destination)
+			require.ErrorIs(t, err, os.ErrNotExist)
+		})
+	}
+}
+
 func TestSDKVersionRequiresExplicitVersionForDevelopment(t *testing.T) {
 	_, err := authorVersion("not-a-version")
 	require.Error(t, err)

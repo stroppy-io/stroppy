@@ -5,14 +5,19 @@ import (
 	"io/fs"
 	"slices"
 	"sync"
+
+	"github.com/stroppy-io/stroppy/v6/internal/testdriver"
 )
 
 // Test is an ordinary definition value. Mutable run state belongs inside Define.
 type Test struct {
 	Name   string
 	Define func(*Def) error
-	// Source publishes package-relative files for ejection. Nil means unpublished.
+	// Source publishes package-relative files or a complete project for ejection.
+	// Nil means unpublished.
 	Source fs.FS
+	// SourcePackage is the original import path of a package-relative publication.
+	SourcePackage string
 }
 
 var (
@@ -222,6 +227,7 @@ func observeSelected(
 	drivers map[string]DriverConfig,
 	defaults bool,
 	steps, noSteps []string,
+	bindings ...testdriver.Binding,
 ) (d *Def, err error) {
 	defer recoverValidation(&err)
 
@@ -230,6 +236,10 @@ func observeSelected(
 	}
 
 	d = newDef(inputs, defaults)
+	if len(bindings) != 0 {
+		d.Drivers.testBackend = bindings[0]
+	}
+
 	d.Execution.filter = newStepFilter(steps, noSteps)
 
 	d.Drivers.configs = copyDriverConfigs(drivers)

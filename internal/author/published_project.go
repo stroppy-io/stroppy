@@ -1,7 +1,6 @@
 package author
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 
@@ -26,7 +25,15 @@ func publishedProject(modulePath, version string, published map[string][]byte) (
 
 	for filename, data := range published {
 		if strings.HasSuffix(filename, ".go") {
-			data = bytes.ReplaceAll(data, []byte(moduleFile.Module.Mod.Path+"/"), []byte(modulePath+"/"))
+			data, err = rewriteImports(data, moduleFile.Module.Mod.Path, modulePath)
+			if err != nil {
+				return nil, err
+			}
+
+			data, err = relocateSourcePackage(data, moduleFile.Module.Mod.Path, modulePath)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		files[filename] = data

@@ -95,7 +95,16 @@ func TestPublishedProjectsCompileAsExternalModules(t *testing.T) {
 		files map[string][]byte
 	}, 0, 1+len(descriptions))
 
-	starter, err := author.Project("starter", "example.com/starter", version, author.Starter("starter"))
+	publishedStarter := author.Starter("starter", "example.com/starter/workload")
+	publishedStarter["workload.go"] = []byte(strings.ReplaceAll(strings.ReplaceAll(
+		string(publishedStarter["workload.go"]), `"context"`,
+		"\"context\"\n\"example.com/starter/workload/helper\""),
+		"*.go LICENSE README.md", "*.go LICENSE README.md helper"))
+	publishedStarter["workload.go"] = []byte(strings.ReplaceAll(string(publishedStarter["workload.go"]),
+		`"value": b.Iteration()`, `"value": helper.Value`))
+	publishedStarter["helper/helper.go"] = []byte("package helper\nconst Value = 7\n")
+
+	starter, err := author.Project("starter", "example.com/starter", version, publishedStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,6 +152,9 @@ func TestPublishedProjectsCompileAsExternalModules(t *testing.T) {
 				runCommand(t, directory, env, runner, "eject", "starter", fork)
 				runCommand(t, fork, env, "go", "test", "-race", "./...")
 				runCommand(t, fork, env, "go", "run", ".", "--iterations", "2", "--no-report")
+				repeated := filepath.Join(t.TempDir(), "repeated")
+				runCommand(t, fork, env, "go", "run", ".", "eject", "starter", repeated)
+				runCommand(t, repeated, env, "go", "test", "-race", "./...")
 				initialized := filepath.Join(t.TempDir(), "initialized")
 				runCommand(t, directory, env, runner, "init", initialized)
 				runCommand(t, initialized, env, "go", "test", "-race", "./...")

@@ -67,8 +67,11 @@ result, err := testkit.Run(ctx, workload.Test, bench.RunOptions{
 })
 ```
 
-The helper selects noop for default and declared databases, suppresses the normal
-summary by default, and returns a report without history persistence. Cancellation
+The helper forces noop for default and every database declaration during the
+actual input-resolved observation and execution, including backend-dependent
+branches and runtime-only declarations. Supplied parameters need not have usable
+defaults. It suppresses the normal summary by default and returns a report without
+history persistence. Cancellation
 is caller-owned: cancel `ctx` and assert the returned error, step outcome and your
 reached cleanup state. SDK validation and user panics retain normal runtime behavior.
 No separate lifecycle or database simulator is involved.
@@ -129,6 +132,7 @@ var Test = bench.Test{
     Name: "example/query",
     Define: define,
     Source: source,
+    SourcePackage: "example.org/project/workload",
 }
 ```
 
@@ -140,8 +144,14 @@ compiler-input snapshots. Exported/managed binaries retain linked publications.
 The filesystem is package-relative. Ejection restores it under `workload/` and
 adds root module/entrypoint scaffolding. Export a conventional `Test` value, or a
 named descriptor literal whose `Name` matches the selected workload. Root main
-selects that descriptor. Include every helper, asset and local subpackage needed
-for an editable fork. Omitted/private dependencies cannot be reconstructed;
+selects that descriptor. Set `SourcePackage` to the package's original import
+path when published files import their own helpers/subpackages. Ejection relocates
+those import paths into the new `workload/` tree; SQL, workload identities, canned
+reply keys and other authored literals remain unchanged. `init` sets this metadata
+for its conventional package. Literal `SourcePackage` metadata is updated on
+restoration so the fork can be ejected again; computed metadata must likewise
+resolve to the fork's package. Include every helper, asset and local subpackage
+needed for an editable fork. Omitted/private dependencies cannot be reconstructed;
 module resolution reports them rather than substituting source.
 
 If the publication contains `go.mod` and `main.go`, it is a complete project:

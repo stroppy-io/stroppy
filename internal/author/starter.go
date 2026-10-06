@@ -10,7 +10,12 @@ import (
 //go:embed LICENSE
 var starterLicense []byte
 
-func Starter(name string) map[string][]byte {
+func Starter(name string, sourcePackage ...string) map[string][]byte {
+	origin := ""
+	if len(sourcePackage) != 0 {
+		origin = sourcePackage[0]
+	}
+
 	source := fmt.Sprintf(`// Package workload defines a standalone database stress test.
 package workload
 
@@ -24,7 +29,7 @@ import (
 //go:embed *.go LICENSE README.md
 var source embed.FS
 
-var Test = bench.Test{Name: %q, Define: define, Source: source}
+var Test = bench.Test{Name: %q, Define: define, Source: source, SourcePackage: %q}
 
 func init() { bench.Register(Test) }
 
@@ -38,7 +43,7 @@ func define(d *bench.Def) error {
 func query(ctx context.Context, b *bench.Bench) error {
  return b.Exec(ctx, "SELECT :value", map[string]any{"value": b.Iteration()})
 }
-`, name)
+`, name, origin)
 	test := `package workload
 
 import (

@@ -2,7 +2,6 @@
 package author
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -105,8 +104,10 @@ func Read(source fs.FS) (map[string][]byte, error) {
 
 // Project creates root main/module files and restores package-relative publication.
 //
-//nolint:gocognit // project scaffold and authored package remain one result.
-func Project(name, modulePath, version string, published map[string][]byte) (map[string][]byte, error) {
+//nolint:gocognit,cyclop,funlen // project scaffold and authored package remain one result.
+func Project(
+	name, modulePath, version string, published map[string][]byte, sourcePackage ...string,
+) (map[string][]byte, error) {
 	if err := module.CheckPath(modulePath); err != nil {
 		return nil, err
 	}
@@ -117,9 +118,35 @@ func Project(name, modulePath, version string, published map[string][]byte) (map
 		return publishedProject(modulePath, version, published)
 	}
 
+	origin := ""
+	if len(sourcePackage) != 0 {
+		origin = sourcePackage[0]
+	}
+
+	if origin != "" {
+		if err := module.CheckImportPath(origin); err != nil {
+			return nil, err
+		}
+	}
+
 	for name, data := range published {
 		if strings.HasSuffix(name, ".go") {
-			data = bytes.ReplaceAll(data, []byte(localImports), []byte(modulePath+"/workload"))
+			var err error
+
+			data, err = rewriteImports(data, localImports, modulePath+"/workload")
+			if err != nil {
+				return nil, err
+			}
+
+			data, err = rewriteImports(data, origin, modulePath+"/workload")
+			if err != nil {
+				return nil, err
+			}
+
+			data, err = relocateSourcePackage(data, origin, modulePath+"/workload")
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		destination := path.Join("workload", name)

@@ -31,7 +31,9 @@ The supported authoring surface is:
 - `bench/testkit`: database-free execution through noop or the repository-provided
   recording driver, with ordinary run inputs and reports.
 - `record`: structured operation snapshots, typed values and explicit query replies.
-  `Test.Source` optionally publishes an `fs.FS` for safe source ejection. See
+  `Test.Source` optionally publishes an `fs.FS` for safe source ejection;
+  `Test.SourcePackage` explicitly identifies a package-relative publication's
+  original import root. See
   [author tooling](author-tooling.md).
 - `gen`: general scalar/draw primitives, coordinate-based sources, `FromRows`
   and its options, schemas, rows, batches, and cursor/source interfaces.

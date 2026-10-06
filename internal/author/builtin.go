@@ -68,11 +68,17 @@ func (s *builtinSource) ReadFile(name string) ([]byte, error) {
 		return data, nil
 	}
 
-	data = bytes.ReplaceAll(data, []byte(SDK+"/workloads/"+s.origin), []byte(localImports))
-	data = bytes.ReplaceAll(data,
-		[]byte(SDK+"/workloads/internal/workloadtest"), []byte(localImports+"/published/workloadtest"))
+	for _, mapping := range [][2]string{
+		{SDK + "/workloads/" + s.origin, localImports},
+		{SDK + "/workloads/internal/workloadtest", localImports + "/published/workloadtest"},
+		{SDK + "/pkg/datagen/source", localImports + "/published/source"},
+	} {
+		data, err = rewriteImports(data, mapping[0], mapping[1])
+		if err != nil {
+			return nil, err
+		}
+	}
 
-	data = bytes.ReplaceAll(data, []byte(SDK+"/pkg/datagen/source"), []byte(localImports+"/published/source"))
 	if strings.Contains(name, "/") {
 		return data, nil
 	}

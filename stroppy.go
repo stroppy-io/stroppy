@@ -23,13 +23,8 @@ import (
 )
 
 var (
-	errReservedWorkloadName = errors.New("stroppy: reserved workload name")
-	errTestSelection        = errors.New("test selection required")
-	errNilApplication       = errors.New("stroppy: nil application")
-	reservedWorkloadNames   = map[string]struct{}{
-		"build": {}, "export": {}, "help": {}, "init": {}, "eject": {},
-		"list": {}, "probe": {}, "remove": {}, "run": {}, "version": {},
-	}
+	errTestSelection  = errors.New("test selection required")
+	errNilApplication = errors.New("stroppy: nil application")
 )
 
 // Application is one standalone Stroppy workload.
@@ -51,8 +46,8 @@ func New(test bench.Test) (*Application, error) {
 	}
 
 	name := descriptions[0].Name
-	if _, reserved := reservedWorkloadNames[name]; reserved {
-		return nil, fmt.Errorf("%w %q", errReservedWorkloadName, name)
+	if err := cli.ValidateWorkloadName(name); err != nil {
+		return nil, err
 	}
 
 	return &Application{catalog: catalog, name: name}, nil

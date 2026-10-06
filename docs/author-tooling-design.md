@@ -185,8 +185,10 @@ requires them.
   The repository-provided `recording` backend writes schema-1 JSON or uses a
   caller-owned recorder. `DriverConfig.Recording` is nonserialized run-local input,
   not a generic backend injection or plugin contract.
-- `pkg/bench/testkit.Run` and `Record` select noop/recording across declared
-  databases and use the real runtime. Discovery remains the existing public API;
+- `pkg/bench/testkit.Run` and `Record` force noop/recording with an internal per-run
+  context binding at every effective driver declaration and operation. Observation
+  uses supplied inputs, not a prerequisite default replay or finite name-discovery
+  passes. Backend-dependent and execution-only declarations remain database-free. Discovery remains the existing public API;
   no redundant Validate wrapper or extra lifecycle model was added.
 - Recorder sorting keeps step/worker/iteration streams while preserving cross-
   database local operation order. No timestamps, runtime IDs or credential
@@ -202,7 +204,10 @@ requires them.
   interfaces are explicitly copied into publication subdirectories, not recovered
   from caches or external paths. Ejected imports point into the restored project.
 - Destination copying uses os.Root confinement and O_EXCL, refusing non-empty/
-  symlink destinations. Rollback checks created file identity before removal.
+  symlink destinations, including trailing-slash spellings after path cleaning.
+  Rollback checks file, directory and root identities before removal, preserving
+  concurrent replacements. Reused parent directories must still match their owned
+  identities.
   Copy validation is separate from subsequent Go dependency resolution; dependency
   failure leaves the created project for repair and reports that partial outcome.
 - Init/eject resolve actual project imports/test imports using `go list -mod=mod
@@ -217,6 +222,23 @@ requires them.
   root assumption. Its 13 exact copied output files were verified against their
   original inputs and removed; no unrelated main-checkout files were changed.
   Generation now uses the current repository root explicitly.
+
+## Dedicated review fixes
+
+All seven findings have focused regressions: trailing-slash symlink refusal,
+changed directory/root preservation, explicit self-import relocation, executable
+literal preservation, reserved starter identity rejection before writing, supplied
+parameter execution without default validation, and backend-dependent declaration
+forcing. `Test.SourcePackage` declares the original package import root; no source
+origin is inferred from machine paths. Parsed import literals are relocated, not
+SQL/names/reply keys/comments. Literal SourcePackage metadata in typed Test
+values is updated for repeated ejection; computed metadata remains author-owned.
+Starter publication includes this metadata. The release-module fixture now imports
+an embedded helper, ejects it under a new module and repeats ejection successfully.
+Review fixes pass focused race regressions, the full make tests race/coverage suite,
+required lint sequence, make build, noop smoke and tagged integration compilation.
+The mandatory harness was attempted after the fixes and remains blocked by the
+unavailable Docker daemon; it is not marked passed.
 
 Passed: focused race tests, full make tests race/coverage suite, external
 release-shaped starter and every builtin fork compilation plus restored short-test

@@ -33,6 +33,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Source ejection rejects trailing-slash symlink targets, preserves concurrently replaced directories, and relocates published self-imports without changing query data; starters reject reserved names before writing, and testkit runs honor supplied inputs while keeping every database declaration offline.
 - Programmatic PostgreSQL workloads work with logging disabled, and successful runs still export explicit zero error and retry counters. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
 - Named databases default to native insertion, nested database facades count one logical operation, framework metric-name collisions fail before actions, concurrent logs are serialized, and row-generator panics propagate after workers and resources are cleaned up. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
 

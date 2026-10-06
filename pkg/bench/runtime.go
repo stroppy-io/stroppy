@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap"
 
+	"github.com/stroppy-io/stroppy/v6/internal/testdriver"
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 	"github.com/stroppy-io/stroppy/v6/pkg/report"
@@ -61,6 +62,7 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 		false,
 		options.Steps,
 		options.NoSteps,
+		testdriver.FromContext(ctx),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("define %q: %w", test.Name, err)
@@ -80,6 +82,7 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 	d := newDef(observed.inputs, false)
 	d.environment = observed.environment
 	d.Drivers.configs = copyDriverConfigs(observed.Drivers.configs)
+	d.Drivers.testBackend = observed.Drivers.testBackend
 	e := &d.Execution
 	e.ctx = ctx
 	e.root = root

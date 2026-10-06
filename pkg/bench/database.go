@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stroppy-io/stroppy/v6/internal/testdriver"
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 	"github.com/stroppy-io/stroppy/v6/pkg/record"
@@ -59,6 +60,7 @@ type DriverDeclarations struct {
 	configs      map[string]DriverConfig
 	declared     map[string]DriverConfig
 	queryTimeout time.Duration
+	testBackend  testdriver.Binding
 }
 
 //nolint:gocritic // immutable declaration defaults are copied.
@@ -84,6 +86,7 @@ func (d *DriverDeclarations) Declare(name string, defaults DriverConfig) DriverR
 		effective = mergeDriverDefaults(effective, d.configs[""])
 	}
 
+	effective = d.bindTestBackend(effective)
 	if effective.Kind == "" {
 		effective.Kind = DriverPostgres
 	}
@@ -99,6 +102,17 @@ func (d *DriverDeclarations) Declare(name string, defaults DriverConfig) DriverR
 	d.declared[name] = effective
 
 	return DriverRef{name: name, owner: d.def, kind: effective.Kind}
+}
+
+//nolint:gocritic // configuration stays a copied operation value.
+func (d *DriverDeclarations) bindTestBackend(value DriverConfig) DriverConfig {
+	if d.testBackend.Kind != "" {
+		value.Kind = DriverTypeName(d.testBackend.Kind)
+		value.URL = ""
+		value.Recording = d.testBackend.Recorder
+	}
+
+	return value
 }
 
 func (d *DriverDeclarations) description() []DriverDescription {
@@ -294,7 +308,7 @@ func (e *Execution) configuration(name string) DriverConfig {
 		resolved = mergeDriverDefaults(defaultDriverConfig(), e.def.Drivers.configs[name])
 	}
 
-	return resolved
+	return e.def.Drivers.bindTestBackend(resolved)
 }
 
 func (b *Bench) operationContext(ctx context.Context) context.Context {

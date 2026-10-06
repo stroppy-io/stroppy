@@ -33,6 +33,10 @@ func newInitCommand() *cobra.Command {
 		Use: "init PATH", Short: "Create a minimal standalone workload project", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := filepath.Base(filepath.Clean(args[0]))
+			if err := ValidateWorkloadName(name); err != nil {
+				return err
+			}
+
 			if modulePath == "" {
 				modulePath = author.ModuleName(name)
 			}
@@ -42,7 +46,7 @@ func newInitCommand() *cobra.Command {
 				return err
 			}
 
-			files, err := author.Project(name, modulePath, selected, author.Starter(name))
+			files, err := author.Project(name, modulePath, selected, author.Starter(name, modulePath+"/workload"))
 			if err != nil {
 				return err
 			}
@@ -128,7 +132,7 @@ func newEjectCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 				modulePath = author.ModuleName(filepath.Base(filepath.Clean(args[1])))
 			}
 
-			files, err := author.Project(test.Name, modulePath, selected, published)
+			files, err := author.Project(test.Name, modulePath, selected, published, test.SourcePackage)
 			if err != nil {
 				return err
 			}

@@ -19,11 +19,32 @@ const (
 
 var ErrDestination = errors.New("destination must be a new or empty real directory")
 
+type ownedDirectory struct {
+	name string
+	info fs.FileInfo
+}
+
+func removeOwnedDirectory(root *os.Root, directory ownedDirectory) {
+	current, err := root.Lstat(directory.name)
+	if err == nil && current.IsDir() && os.SameFile(directory.info, current) {
+		_ = root.Remove(directory.name)
+	}
+}
+
+func removeOwnedRoot(destination string, identity fs.FileInfo) {
+	current, err := os.Lstat(destination)
+	if err == nil && current.IsDir() && os.SameFile(identity, current) {
+		_ = os.Remove(destination)
+	}
+}
+
 // Write creates files exclusively beneath an opened destination directory.
 // Rollback removes only unchanged files created by this operation.
 //
 //nolint:gocognit,gocyclo,cyclop,funlen,nestif,maintidx // exclusive file creation and owned-file rollback.
 func Write(destination string, files map[string][]byte) (returnErr error) {
+	destination = filepath.Clean(destination)
+
 	for name := range files {
 		if !fs.ValidPath(name) || name == "." || strings.ContainsAny(name, "\\:") {
 			return fmt.Errorf("%w: path %q", ErrInvalidSource, name)
@@ -97,7 +118,7 @@ func Write(destination string, files map[string][]byte) (returnErr error) {
 	}
 
 	owned := map[string]fs.FileInfo{}
-	directories := []string{}
+	directories := []ownedDirectory{}
 
 	defer func() {
 		if returnErr == nil {
@@ -113,11 +134,11 @@ func Write(destination string, files map[string][]byte) (returnErr error) {
 		}
 
 		for i := len(directories) - 1; i >= 0; i-- {
-			_ = root.Remove(directories[i])
+			removeOwnedDirectory(root, directories[i])
 		}
 
 		if created {
-			_ = os.Remove(destination)
+			removeOwnedRoot(destination, openedInfo)
 		}
 	}()
 
@@ -139,12 +160,21 @@ func Write(destination string, files map[string][]byte) (returnErr error) {
 
 			parent = path.Join(parent, component)
 			if err := root.Mkdir(parent, projectDirectoryMode); err == nil {
-				directories = append(directories, parent)
+				parentInfo, err := root.Lstat(parent)
+				if err != nil {
+					return err
+				}
+
+				if !parentInfo.IsDir() {
+					return ErrDestination
+				}
+
+				directories = append(directories, ownedDirectory{parent, parentInfo})
 			} else if !errors.Is(err, os.ErrExist) {
 				return err
 			} else {
-				ownedDirectory := slices.Contains(directories, parent)
-				if !ownedDirectory {
+				index := slices.IndexFunc(directories, func(entry ownedDirectory) bool { return entry.name == parent })
+				if index < 0 {
 					return ErrDestination
 				}
 
@@ -153,7 +183,7 @@ func Write(destination string, files map[string][]byte) (returnErr error) {
 					return err
 				}
 
-				if !parentInfo.IsDir() || parentInfo.Mode()&os.ModeSymlink != 0 {
+				if !parentInfo.IsDir() || !os.SameFile(directories[index].info, parentInfo) {
 					return ErrDestination
 				}
 			}
