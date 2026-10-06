@@ -1,8 +1,8 @@
 # Workload author tooling — issue #180
 
-Status: implementation complete and locally validated; mandatory Docker/database
-integration is blocked by the unavailable daemon. Concrete choices and validation
-limits are recorded at the end.
+Status: implementation complete and locally validated, including mandatory
+PostgreSQL/MySQL/CSV/OTEL integration. Concrete choices and validation limits
+are recorded at the end.
 
 Issue: https://github.com/stroppy-io/stroppy/issues/180
 Parent: https://github.com/stroppy-io/stroppy/issues/171
@@ -237,8 +237,8 @@ Starter publication includes this metadata. The release-module fixture now impor
 an embedded helper, ejects it under a new module and repeats ejection successfully.
 Review fixes pass focused race regressions, the full make tests race/coverage suite,
 required lint sequence, make build, noop smoke and tagged integration compilation.
-The mandatory harness was attempted after the fixes and remains blocked by the
-unavailable Docker daemon; it is not marked passed.
+The mandatory harness initially could not start because Docker was unavailable.
+After the daemon became available, the suite passed on the reviewed code.
 
 Passed: focused race tests, full make tests race/coverage suite, external
 release-shaped starter and every builtin fork compilation plus restored short-test
@@ -247,10 +247,12 @@ init/eject/restored-run/test round trips, managed root-build/export/eject/restor
 build fixture, build, builtin noop smoke, and required lint-fix/read-only sequence.
 The full release-shaped workflow also builds the installed CLI, registers/runs the
 initialized project, exports it, ejects from that collection, and runs/tests the
-restored project without local module replacements. Final build, full race/coverage suite and required lint sequence passed after the
-last code edits. Mandatory integration was attempted again
-on 2026-10-06 but is blocked, not passed: Docker daemon socket
-`/Users/ariel/.docker/run/docker.sock` is absent. Tagged integration compiles;
-the PostgreSQL/MySQL/CSV/OTEL suite still needs the documented harness. No skip
-or weakened assertion was introduced. Local commits are authorized; no push or
-PR publication is authorized. Heartbeat is deleted after implementation finishes.
+restored project without local module replacements. Final build, full race/coverage
+suite and required lint sequence passed after the last code edits.
+
+On 2026-10-06, `make tmpfs-up`, `make build`, and `make integration` passed at
+`c45c91c` with the mandatory PostgreSQL/MySQL/CSV/OTEL suite (32.973 seconds).
+`make tmpfs-down` completed afterward; baseline containers/network were removed.
+Optional Picodata/YDB and heavy SF=1 suites were not selected. No skip or weakened
+assertion was introduced. Local commits are authorized; no push or PR publication
+is authorized. The implementation heartbeat was deleted after completion.
