@@ -24,8 +24,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
-- Parallel workloads spend less time contending on metric updates while retaining the same public counters, histogram buckets, gauges, and sampled trace exemplars.
-- Repeated SQL queries avoid allocating cache keys after warmup, and combining absent errors no longer allocates.
+- Parallel workloads spend less time contending on metric updates while retaining the same public counters, histogram buckets, gauges, and sampled trace exemplars. ([#189](https://github.com/stroppy-io/stroppy/pull/189))
+- Repeated SQL queries avoid allocating cache keys after warmup, and combining absent errors no longer allocates. ([#189](https://github.com/stroppy-io/stroppy/pull/189))
 - `stroppy build PATH` accepts a standalone project root by checking its conventional `workload/` package when the root is not importable. ([#188](https://github.com/stroppy-io/stroppy/pull/188))
 - Workload authors use ordinary test definitions and immediate named steps, with typed parameters, generic query reads, named databases, neutral metrics and reporting, and the same supported API as built-ins. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
 - Stroppy requires Go 1.27 and can install verified private Go 1.27.1 under `~/.stroppy`; repeated runs expose explicit drain settings and schema-3 reports record named drivers and measured step windows. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
