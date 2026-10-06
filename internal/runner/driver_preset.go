@@ -82,6 +82,9 @@ var driverPresets = map[string]DriverPreset{
 		DefaultInsertMethod: "native",
 		PoolKind:            "sql",
 	},
+	"recording": {
+		DriverType: "recording", URL: "recording.json", DefaultInsertMethod: "native",
+	},
 	"noop": {
 		DriverType:          "noop",
 		URL:                 "noop://localhost",

@@ -81,11 +81,14 @@ Resolution order for SQL files: **cwd → `~/.stroppy/` → embedded**.
 | `cmd/stroppy/commands/run/` | arg parsing, driver/env/step resolution, dispatch to `bench.Run` |
 | `cmd/stroppy/commands/baseline/` | machine-baseline command: two-tier orchestration, verdicts, history reports |
 | `internal/pgnoop/` | pg-noop server resolution (embed/cache/download) + process lifecycle |
+| `internal/author/` | shared init/eject scaffold, published source validation, exclusive confined project writes |
+| `pkg/bench/testkit/` | real-runtime noop and recording workload execution helpers |
+| `pkg/record/` | typed deterministic operation snapshots and explicit query replies |
 | `pkg/bench/` | Go-native engine: `Workload` interface, `Run`, scenario executor, VU/Bench SDK, metrics sink + summary |
 | `workloads/<name>/` | one package per built-in workload, containing Go implementation/tests plus owned SQL/JSON/README assets |
 | `workloads/all/` | explicit blank-import aggregation for built-in workload registration |
 | `pkg/driver/dispatcher.go` | driver registry: `RegisterDriver()` + `Dispatch()` |
-| `pkg/driver/{postgres,mysql,picodata,ydb,noop,csv}/` | driver implementations |
+| `pkg/driver/{postgres,mysql,picodata,ydb,noop,csv,recording}/` | driver implementations |
 | `pkg/driver/sqldriver/` | shared sql.DB-backed base (mysql, ydb use this) |
 | `pkg/gen/` | imperative generation primitives: Root/Domain/Field scalars, reusable typed Batches, IndexedSource, Permute/SplitMix64 |
 | `pkg/datagen/` | row-production seam: `source` (Partitionable/RowSource) + canonical TPC-DS/TPC-H generator adapters (`tpcdsgen`, `tpchgen`) |
@@ -93,6 +96,21 @@ Resolution order for SQL files: **cwd → `~/.stroppy/` → embedded**.
 | `pkg/config/` | plain-Go application config types + strict recursive JSON normalizer; schema source for `docs/jsonschema/run.schema.json` |
 | `workloads/` | shared embedded-asset registry and catalog |
 | `docs/parallelism.md` | InsertRequest parallelism contract and tuning |
+
+## Author tooling
+
+`stroppy init PATH` scaffolds a noop-default standalone project; `build PATH` checks
+PATH then PATH/workload for an importable package. `Test.Source fs.FS` optionally
+publishes package-local source or a complete project containing go.mod/main.go.
+`eject NAME PATH` restores only published files, refuses non-empty/symlink targets,
+and resolves project imports after exclusive confined copying. Dependency errors
+retain the created project and report the retry command. See docs/author-tooling.md.
+
+Recording is repository-provided (`-d recording -D url=recording.json`), not a plugin
+API. Set testkit/recording options before running; query replies are explicit and
+unknown reads have no rows. Recordings may contain authored query data, never put
+credentials there. Refresh explicit builtin license/test-support copies with
+`go run ./internal/author/generate` from repository root.
 
 ## Drivers
 

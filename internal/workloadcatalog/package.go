@@ -58,6 +58,27 @@ func DiscoverPackage(
 		return Package{}, err
 	}
 
+	result, err := discoverPackageAt(ctx, compiler, absolute, offline)
+	if err == nil {
+		return result, nil
+	}
+
+	child := filepath.Join(absolute, "workload")
+	if _, childErr := os.Stat(child); childErr == nil {
+		fallback, fallbackErr := discoverPackageAt(ctx, compiler, child, offline)
+		if fallbackErr == nil {
+			return fallback, nil
+		}
+
+		return Package{}, errors.Join(err, fmt.Errorf("conventional workload package: %w", fallbackErr))
+	}
+
+	return Package{}, err
+}
+
+func discoverPackageAt(
+	ctx context.Context, compiler *toolchain.Compiler, absolute string, offline bool,
+) (Package, error) {
 	command := exec.CommandContext( //nolint:gosec // compiler path comes from verified resolver
 		ctx, compiler.Path, "list", "-mod=readonly", "-json", ".",
 	)

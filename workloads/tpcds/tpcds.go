@@ -48,7 +48,7 @@ type namedQuery struct {
 	sql  string
 }
 
-var Test = bench.Test{Name: "tpcds", Define: define}
+var Test = bench.Test{Name: "tpcds", Define: define, Source: publication("Test")}
 
 func init() { bench.Register(Test) }
 
@@ -383,7 +383,7 @@ func (w *workload) analyze(ctx context.Context, b *bench.Bench) func() error {
 					return fmt.Errorf("analyze %s: %w", table, err)
 				}
 			}
-		case bench.DriverPicodata, bench.DriverYDB, bench.DriverNoop, bench.DriverCSV:
+		case bench.DriverPicodata, bench.DriverYDB, bench.DriverNoop, bench.DriverCSV, bench.DriverRecording:
 			// no ANALYZE; planner runs on index stats from create_indexes.
 		}
 		// ydb/picodata: no ANALYZE; planner runs on index stats from create_indexes.

@@ -40,9 +40,14 @@ import (
 func main() { stroppy.Main(workload.Test) }
 ```
 
-`stroppy build` accepts the importable package directory, not `package main`:
+Create the minimal project with `stroppy init my-workload` (see
+[author tooling](author-tooling.md)). `stroppy build PATH` checks the provided
+importable package first, then its conventional `workload/` directory; root
+`package main` is not imported directly:
 
 ```bash
+stroppy build .
+# Explicit importable package path is also supported:
 stroppy build ./workload
 ```
 

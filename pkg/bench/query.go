@@ -115,7 +115,7 @@ func (b *Bench) runQuery(ctx context.Context, sql string, args map[string]any) (
 		return nil, err
 	}
 
-	res, err := b.drv.RunQuery(ctx, sql, args)
+	res, err := b.drv.RunQuery(b.operationContext(ctx), sql, args)
 	if err != nil {
 		return nil, fmt.Errorf("query: %w", err)
 	}
@@ -242,7 +242,7 @@ func (b *Bench) insert(ctx context.Context, req *driver.InsertRequest) (*stats.Q
 		}()
 	}
 
-	result, err := b.drv.Insert(runCtx, &effectiveReq)
+	result, err := b.drv.Insert(b.operationContext(runCtx), &effectiveReq)
 	if tracker.Enabled() {
 		tracker.Finish(err)
 	}
@@ -293,7 +293,7 @@ func (b *Bench) Begin(ctx context.Context, opts BeginOpts) (*Tx, error) {
 		return &Tx{tx: nil, b: b, iso: iso, name: opts.Name, start: time.Now()}, nil
 	}
 
-	tx, err := b.drv.Begin(ctx, iso)
+	tx, err := b.drv.Begin(b.operationContext(ctx), iso)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
@@ -402,7 +402,7 @@ func (t *Tx) runQuery(ctx context.Context, sql string, args map[string]any) (*dr
 	t.queries++
 	if t.tx == nil {
 		// NONE mode: delegate to the parent driver.
-		res, err := t.b.drv.RunQuery(ctx, sql, args)
+		res, err := t.b.drv.RunQuery(t.b.operationContext(ctx), sql, args)
 		if err != nil {
 			return nil, fmt.Errorf("query: %w", err)
 		}
@@ -410,7 +410,7 @@ func (t *Tx) runQuery(ctx context.Context, sql string, args map[string]any) (*dr
 		return res, nil
 	}
 
-	res, err := t.tx.RunQuery(ctx, sql, args)
+	res, err := t.tx.RunQuery(t.b.operationContext(ctx), sql, args)
 	if err != nil {
 		return nil, fmt.Errorf("tx query: %w", err)
 	}
@@ -426,7 +426,7 @@ func (t *Tx) Commit(ctx context.Context) error {
 	committed := true
 
 	if t.tx != nil {
-		if err := t.tx.Commit(ctx); err != nil {
+		if err := t.tx.Commit(t.b.operationContext(ctx)); err != nil {
 			return err
 		}
 	}
@@ -445,7 +445,7 @@ func (t *Tx) Rollback(ctx context.Context) error {
 	}
 
 	if t.tx != nil {
-		if err := t.tx.Rollback(ctx); err != nil {
+		if err := t.tx.Rollback(t.b.operationContext(ctx)); err != nil {
 			return err
 		}
 	}

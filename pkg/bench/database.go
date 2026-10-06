@@ -9,23 +9,25 @@ import (
 
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/record"
 )
 
 // DriverConfig supplies soft defaults or explicit host configuration.
 // Secrets are consumed by backends, never emitted by driver discovery.
 type DriverConfig struct {
-	Kind                  DriverTypeName  `json:"kind,omitempty"`
-	URL                   string          `json:"url,omitempty"`
-	DefaultInsertMethod   InsertStrategy  `json:"defaultInsertMethod,omitempty"`
-	BulkSize              *int32          `json:"bulkSize,omitempty"`
-	Postgres              *PostgresConfig `json:"postgres,omitempty"`
-	SQL                   *SQLConfig      `json:"sql,omitempty"`
-	CaCertFile            *string         `json:"caCertFile,omitempty"`
-	AuthToken             *string         `json:"authToken,omitempty"`
-	ServiceAccountKeyFile *string         `json:"serviceAccountKeyFile,omitempty"`
-	AuthUser              *string         `json:"authUser,omitempty"`
-	AuthPassword          *string         `json:"authPassword,omitempty"`
-	TLSInsecureSkipVerify *bool           `json:"tlsInsecureSkipVerify,omitempty"`
+	Kind                  DriverTypeName   `json:"kind,omitempty"`
+	URL                   string           `json:"url,omitempty"`
+	DefaultInsertMethod   InsertStrategy   `json:"defaultInsertMethod,omitempty"`
+	BulkSize              *int32           `json:"bulkSize,omitempty"`
+	Postgres              *PostgresConfig  `json:"postgres,omitempty"`
+	SQL                   *SQLConfig       `json:"sql,omitempty"`
+	CaCertFile            *string          `json:"caCertFile,omitempty"`
+	AuthToken             *string          `json:"authToken,omitempty"`
+	ServiceAccountKeyFile *string          `json:"serviceAccountKeyFile,omitempty"`
+	AuthUser              *string          `json:"authUser,omitempty"`
+	AuthPassword          *string          `json:"authPassword,omitempty"`
+	TLSInsecureSkipVerify *bool            `json:"tlsInsecureSkipVerify,omitempty"`
+	Recording             *record.Recorder `json:"-"`
 }
 type (
 	PostgresConfig = config.PostgresConfig
@@ -143,6 +145,11 @@ func mergeDriverDefaults(base, override DriverConfig) DriverConfig {
 		invalid("driver configuration", err)
 	}
 
+	out.Recording = base.Recording
+	if override.Recording != nil {
+		out.Recording = override.Recording
+	}
+
 	return out
 }
 
@@ -197,6 +204,7 @@ func (c DriverConfig) runtime() (*config.DriverConfig, error) {
 		AuthUser:              c.AuthUser,
 		AuthPassword:          c.AuthPassword,
 		TLSInsecureSkipVerify: c.TLSInsecureSkipVerify,
+		Recording:             c.Recording,
 	}, nil
 }
 
@@ -225,6 +233,7 @@ func DriverConfiguration(c *config.DriverConfig) DriverConfig {
 		AuthUser:              c.AuthUser,
 		AuthPassword:          c.AuthPassword,
 		TLSInsecureSkipVerify: c.TLSInsecureSkipVerify,
+		Recording:             c.Recording,
 	})
 }
 
@@ -286,6 +295,21 @@ func (e *Execution) configuration(name string) DriverConfig {
 	}
 
 	return resolved
+}
+
+func (b *Bench) operationContext(ctx context.Context) context.Context {
+	if b.cfg == nil || b.cfg.DriverType != config.DriverTypeRecording {
+		return ctx
+	}
+
+	name := b.databaseName
+	if name == "" {
+		name = "default"
+	}
+
+	return record.WithScope(ctx, record.Scope{
+		Database: name, Step: b.vu.stepTag, Worker: b.Worker(), Iteration: b.Iteration(),
+	})
 }
 
 func (b *Bench) ensureDriver(ctx context.Context) error {

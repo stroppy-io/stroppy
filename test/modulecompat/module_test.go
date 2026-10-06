@@ -11,6 +11,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stroppy-io/stroppy/v6/internal/author"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	_ "github.com/stroppy-io/stroppy/v6/workloads/all"
 )
 
 const (
@@ -64,6 +68,99 @@ func TestExternalModuleResolvesV6Release(t *testing.T) {
 	history, err := filepath.Glob(filepath.Join(home, ".stroppy", "reports", "*.json"))
 	if err != nil || len(history) != 1 {
 		t.Fatalf("report history = %v, error = %v", history, err)
+	}
+}
+
+func TestPublishedProjectsCompileAsExternalModules(t *testing.T) {
+	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	proxyDir := t.TempDir()
+	writeModuleProxy(t, proxyDir, repoRoot)
+	proxyURL := (&url.URL{Scheme: "file", Path: proxyDir}).String()
+	moduleCache := filepath.Join(t.TempDir(), "modcache")
+	t.Cleanup(func() { makeWritable(t, moduleCache) })
+	env := append(os.Environ(), "GOPROXY="+proxyURL+",https://proxy.golang.org,direct", "GONOSUMDB="+modulePath,
+		"GOWORK=off", "GOMODCACHE="+moduleCache, "GOCACHE="+filepath.Join(t.TempDir(), "gocache"))
+
+	descriptions, err := bench.DescribeAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checks := make([]struct {
+		name  string
+		files map[string][]byte
+	}, 0, 1+len(descriptions))
+
+	starter, err := author.Project("starter", "example.com/starter", version, author.Starter("starter"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checks = append(checks, struct {
+		name  string
+		files map[string][]byte
+	}{"starter", starter})
+
+	for _, description := range descriptions {
+		test, _ := bench.Lookup(description.Name)
+
+		published, err := author.Read(test.Source)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		files, err := author.Project(description.Name, "example.com/fork", version, published)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		checks = append(checks, struct {
+			name  string
+			files map[string][]byte
+		}{description.Name, files})
+	}
+
+	for _, check := range checks {
+		t.Run(check.name, func(t *testing.T) {
+			directory := filepath.Join(t.TempDir(), "project")
+			if err := author.Write(directory, check.files); err != nil {
+				t.Fatal(err)
+			}
+
+			runCommand(t, directory, env, "go", "list", "-mod=mod", "-deps", "-test", "./...")
+			runCommand(t, directory, env, "go", "test", "-short", "./...")
+			runCommand(t, directory, env, "go", "build", "-o", filepath.Join(directory, "workload-runner"), ".")
+
+			if check.name == "starter" {
+				runCommand(t, directory, env, "go", "test", "-race", "./...")
+				runner := filepath.Join(directory, "workload-runner")
+				runCommand(t, directory, env, runner, "--iterations", "2", "--no-report")
+				fork := filepath.Join(t.TempDir(), "restored")
+				runCommand(t, directory, env, runner, "eject", "starter", fork)
+				runCommand(t, fork, env, "go", "test", "-race", "./...")
+				runCommand(t, fork, env, "go", "run", ".", "--iterations", "2", "--no-report")
+				initialized := filepath.Join(t.TempDir(), "initialized")
+				runCommand(t, directory, env, runner, "init", initialized)
+				runCommand(t, initialized, env, "go", "test", "-race", "./...")
+				runCommand(t, initialized, env, "go", "run", ".", "--iterations", "2", "--no-report")
+
+				installed := filepath.Join(directory, "stroppy")
+				runCommand(t, directory, env, "go", "build", "-mod=mod", "-o", installed, modulePath+"/cmd/stroppy")
+				managedEnv := append(env, "HOME="+t.TempDir())
+				runCommand(t, directory, managedEnv, installed, "build", initialized)
+				runCommand(t, directory, managedEnv, installed, "run", "initialized", "--iterations", "2", "--no-report")
+				portable := filepath.Join(directory, "portable")
+				runCommand(t, directory, managedEnv, installed, "export", "initialized", "-o", portable)
+				restored := filepath.Join(t.TempDir(), "exported-fork")
+				runCommand(t, directory, managedEnv, portable, "eject", "initialized", restored)
+				runCommand(t, restored, env, "go", "test", "-race", "./...")
+				runCommand(t, restored, env, "go", "run", ".", "--iterations", "2", "--no-report")
+			}
+		})
 	}
 }
 
@@ -183,7 +280,8 @@ func writeModuleProxy(t *testing.T, proxyDir, repoRoot string) {
 }
 
 func moduleArchiveFile(path string) bool {
-	if path == "go.mod" || path == "go.sum" || path == "LICENSE" {
+	if path == "go.mod" || path == "go.sum" || path == "LICENSE" ||
+		path == "internal/author/LICENSE" || path == "internal/pgnoop/release.sha256" {
 		return true
 	}
 

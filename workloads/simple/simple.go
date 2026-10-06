@@ -26,7 +26,7 @@ const (
 
 type workload struct{ workers []*rand.Rand }
 
-var Test = bench.Test{Name: "simple", Define: define}
+var Test = bench.Test{Name: "simple", Define: define, Source: publication("Test")}
 
 func init() { bench.Register(Test) }
 func define(d *bench.Def) error {

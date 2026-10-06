@@ -12,6 +12,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- `stroppy init` creates a minimal standalone Go workload, and `stroppy eject` restores explicitly published workload source into a new or empty directory, including built-in sources and exported collections.
+- Workload tests can use public noop/recording helpers and a recording driver that captures typed query arguments, transactions, and inserts without a database.
 - Selected-workload probe can show resolved values, sources, aliases, constraints, steps, and metric schemas without running actions or connecting to databases. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
 - Runnable Go authoring examples cover queries, transactional loading, reports, and named databases; the supported API is documented with a v6 minor-release compatibility guarantee. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
 - Custom workload builds and exports reuse content-addressed artifacts, preserve owned source snapshots, expose secret-free provenance through `stroppy cache inspect`, and identify generated runtime reports by build digest. ([#186](https://github.com/stroppy-io/stroppy/pull/186))
@@ -22,6 +24,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
+- `stroppy build PATH` accepts a standalone project root by checking its conventional `workload/` package when the root is not importable.
 - Workload authors use ordinary test definitions and immediate named steps, with typed parameters, generic query reads, named databases, neutral metrics and reporting, and the same supported API as built-ins. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
 - Stroppy requires Go 1.27 and can install verified private Go 1.27.1 under `~/.stroppy`; repeated runs expose explicit drain settings and schema-3 reports record named drivers and measured step windows. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
 - Workload inputs use typed flags, process environment, and typed config; legacy `-e` and config `env` are rejected, and additional drivers are configured by name rather than numeric index. ([#187](https://github.com/stroppy-io/stroppy/pull/187))

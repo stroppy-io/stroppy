@@ -19,7 +19,7 @@ type workload struct {
 	names []string
 }
 
-var Test = bench.Test{Name: "execute_sql", Define: define}
+var Test = bench.Test{Name: "execute_sql", Define: define, Source: publication("Test")}
 
 func init() { bench.Register(Test) }
 func define(d *bench.Def) error {

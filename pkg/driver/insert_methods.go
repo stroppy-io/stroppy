@@ -55,6 +55,9 @@ var insertMethodsByDriver = map[config.DriverType][]InsertMethod{
 	config.DriverTypeCSV: {
 		InsertNative,
 	},
+	config.DriverTypeRecording: {
+		InsertPlainQuery, InsertPlainBulk, InsertColumnar, InsertNative,
+	},
 }
 
 // InsertCapabilities returns the driver→insert-method matrix ordered by

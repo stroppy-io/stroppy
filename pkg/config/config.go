@@ -13,6 +13,8 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+
+	"github.com/stroppy-io/stroppy/v6/pkg/record"
 )
 
 // DriverType identifies a database driver implementation.
@@ -26,6 +28,7 @@ const (
 	DriverTypeYDB         DriverType = 4
 	DriverTypeNoop        DriverType = 5
 	DriverTypeCSV         DriverType = 6
+	DriverTypeRecording   DriverType = 7
 )
 
 var driverTypeNames = map[DriverType]string{
@@ -36,6 +39,7 @@ var driverTypeNames = map[DriverType]string{
 	DriverTypeYDB:         "ydb",
 	DriverTypeNoop:        "noop",
 	DriverTypeCSV:         "csv",
+	DriverTypeRecording:   "recording",
 }
 
 func (d DriverType) String() string {
@@ -56,6 +60,7 @@ func DriverTypeValues() []DriverType {
 		DriverTypeYDB,
 		DriverTypeNoop,
 		DriverTypeCSV,
+		DriverTypeRecording,
 	}
 }
 
@@ -599,6 +604,7 @@ type DriverConfig struct {
 	AuthPassword          *string               `json:"authPassword,omitempty"`
 	TLSInsecureSkipVerify *bool                 `json:"tlsInsecureSkipVerify,omitempty"`
 	InsertProgress        *InsertProgressConfig `json:"insertProgress,omitempty"`
+	Recording             *record.Recorder      `json:"-"`
 }
 
 func (c *DriverConfig) GetDefaultInsertMethod() string {

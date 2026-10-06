@@ -41,7 +41,7 @@ type queryMetrics struct {
 	elapsedTotal *bench.CounterHandle
 }
 
-var Test = bench.Test{Name: "tpch/tx", Define: define}
+var Test = bench.Test{Name: "tpch/tx", Define: define, Source: publication("Test")}
 
 func init() { bench.Register(Test) }
 func define(d *bench.Def) error {

@@ -17,6 +17,7 @@ import (
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/picodata"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/postgres"
+	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/recording"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/ydb"
 	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
@@ -26,7 +27,8 @@ var (
 	errTestSelection        = errors.New("test selection required")
 	errNilApplication       = errors.New("stroppy: nil application")
 	reservedWorkloadNames   = map[string]struct{}{
-		"build": {}, "export": {}, "help": {}, "list": {}, "probe": {}, "remove": {}, "run": {}, "version": {},
+		"build": {}, "export": {}, "help": {}, "init": {}, "eject": {},
+		"list": {}, "probe": {}, "remove": {}, "run": {}, "version": {},
 	}
 )
 

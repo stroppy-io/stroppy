@@ -7,6 +7,7 @@ import (
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/picodata"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/postgres"
+	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/recording"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/ydb"
 )
 

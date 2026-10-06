@@ -33,7 +33,7 @@ type workload struct {
 	loadWorkers int
 }
 
-var Test = bench.Test{Name: workloadName, Define: define}
+var Test = bench.Test{Name: workloadName, Define: define, Source: publication("Test")}
 
 func init() { bench.Register(Test) }
 func define(d *bench.Def) error {

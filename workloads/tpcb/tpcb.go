@@ -81,8 +81,8 @@ type workload struct {
 }
 
 var (
-	Tx    = bench.Test{Name: "tpcb/tx", Define: defineTx}
-	Procs = bench.Test{Name: "tpcb/procs", Define: defineProcs}
+	Tx    = bench.Test{Name: "tpcb/tx", Define: defineTx, Source: publication("Tx")}
+	Procs = bench.Test{Name: "tpcb/procs", Define: defineProcs, Source: publication("Procs")}
 )
 
 func init()                          { bench.Register(Tx); bench.Register(Procs) }

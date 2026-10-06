@@ -2,6 +2,7 @@ package bench
 
 import (
 	"fmt"
+	"io/fs"
 	"slices"
 	"sync"
 )
@@ -10,6 +11,8 @@ import (
 type Test struct {
 	Name   string
 	Define func(*Def) error
+	// Source publishes package-relative files for ejection. Nil means unpublished.
+	Source fs.FS
 }
 
 var (

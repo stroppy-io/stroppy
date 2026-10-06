@@ -80,8 +80,8 @@ type metrics struct {
 }
 
 var (
-	Tx    = bench.Test{Name: "tpcc/tx", Define: defineTx}
-	Procs = bench.Test{Name: "tpcc/procs", Define: defineProcs}
+	Tx    = bench.Test{Name: "tpcc/tx", Define: defineTx, Source: publication("Tx")}
+	Procs = bench.Test{Name: "tpcc/procs", Define: defineProcs, Source: publication("Procs")}
 )
 
 func init()                          { bench.Register(Tx); bench.Register(Procs) }

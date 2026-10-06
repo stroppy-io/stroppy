@@ -112,7 +112,9 @@ inference are removed. Named multi-driver workloads use `-dprimary`/`-Dprimary`.
 Custom Go workloads use the supported [authoring API](docs/workload-authoring-api.md)
 and [standalone application shell](docs/standalone-workloads.md). Runnable
 [examples](examples/authoring/README.md) cover queries, loading, transactions,
-telemetry, reports, and named databases.
+telemetry, reports, and named databases. [Author tooling](docs/author-tooling.md)
+covers `stroppy init`, ordinary noop/recording tests, and safe `stroppy eject` of
+explicitly published workload sources.
 
 Every workload can emit one versioned JSON report containing effective inputs,
 host details, steps, metrics, bounded errors, and workload-specific results:
