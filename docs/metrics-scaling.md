@@ -66,6 +66,38 @@ macOS profiles charge substantial samples to runtime sleep/syscall functions, so
 profile percentages are not treated as portable scaling estimates. Driver/retry
 allocation costs remain outside this change.
 
+## Allocation-free SQL and successful error paths
+
+Warm SQL cache lookups use a comparable value key containing SQL text and dialect
+syntax, rather than constructing a new combined string. Cold insertion is kept
+outside the lookup path so the key remains stack-resident on cache hits.
+`JoinErrors` builds its distinct-cause slice only when a non-nil cause is found.
+Neither change uses object pools; error unwrapping and deduplication remain intact.
+
+On the same machine, three paired five-second noop baseline repetitions compared
+commit `106c8ad` against these two fast-path changes with the settings above:
+
+| Workers | Before TPS | After TPS | Ratio |
+|---:|---:|---:|---:|
+| 1 | 645,205 | 659,312 | 1.02× |
+| 8 | 2,755,972 | 3,191,703 | 1.16× |
+| 18 | 3,074,890 | 4,074,491 | 1.33× |
+| 24 | 3,091,888 | 4,143,270 | 1.34× |
+
+All iterations succeeded. Separate setup-free 24-worker profiling runs measured
+approximately 1,212 bytes / 28 allocations per transaction before and 748 bytes /
+20 allocations afterward. The complete transaction path is not allocation-free:
+retry-policy construction, transaction attributes, query results, and transaction
+objects still allocate. Cold SQL parsing and parameter-value slices can also
+allocate; zero-allocation guarantees here concern warm cache lookup, argument-free
+warm query preparation, and all-nil error combination.
+
+Focused serial benchmarks measured warm SQL lookup at about 22.6 ns / 48 bytes /
+one allocation before and 20 ns / zero allocations afterward; all-nil
+`JoinErrors` fell from about 12 ns / 48 bytes / one allocation to 4 ns / zero
+allocations. Tests assert these zero-allocation paths after warmup, while existing
+error and argument regressions preserve behavior.
+
 ## Reproduction
 
 Build each revision with `make build`, keep its binary under a distinct name, and

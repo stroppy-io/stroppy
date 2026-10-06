@@ -41,7 +41,7 @@ func DefaultErrorFacts(err error) ErrorFacts {
 
 // JoinErrors combines distinct error causes while preserving errors.Is behavior.
 func JoinErrors(errs ...error) error {
-	unique := make([]error, 0, len(errs))
+	var unique []error
 	for _, err := range errs {
 		appendDistinctError(&unique, err)
 	}

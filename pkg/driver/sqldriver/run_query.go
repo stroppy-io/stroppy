@@ -34,7 +34,13 @@ type parsedQuery struct {
 	referencedArgs map[string]struct{} // unique set of arg names for extra-arg detection
 }
 
-// sqlCache stores *parsedQuery values keyed by cacheKey(dialect, sqlStr).
+type sqlCacheKey struct {
+	placeholder string
+	sql         string
+	deduplicate bool
+}
+
+// sqlCache stores *parsedQuery values keyed by dialect syntax and SQL text.
 // sync.Map is used because the load-test workload is read-heavy after warmup.
 var (
 	sqlCache     sync.Map
@@ -48,18 +54,24 @@ const sqlCacheMaxSize = 1000
 // cache reaches sqlCacheMaxSize to guard against unbounded growth from
 // dynamically constructed SQL strings.
 func lookupOrParse(dialect queries.Dialect, sqlStr string) *parsedQuery {
-	key := dialect.Placeholder(0) + "|" + sqlStr
+	key := sqlCacheKey{dialect.Placeholder(0), sqlStr, dialect.Deduplicate()}
 
 	if v, ok := sqlCache.Load(key); ok {
 		return v.(*parsedQuery) //nolint:errcheck,forcetypeassert // map stores only *parsedQuery values
 	}
 
-	pq := parseQueryTemplate(dialect, sqlStr)
+	return cacheParsedQuery(key, dialect)
+}
+
+func cacheParsedQuery(key sqlCacheKey, dialect queries.Dialect) *parsedQuery {
+	pq := parseQueryTemplate(dialect, key.sql)
 
 	if sqlCacheSize.Load() < sqlCacheMaxSize {
-		if _, loaded := sqlCache.LoadOrStore(key, pq); !loaded {
-			sqlCacheSize.Add(1)
+		if cached, loaded := sqlCache.LoadOrStore(key, pq); loaded {
+			return cached.(*parsedQuery) //nolint:errcheck,forcetypeassert // map stores only *parsedQuery values
 		}
+
+		sqlCacheSize.Add(1)
 	}
 
 	return pq

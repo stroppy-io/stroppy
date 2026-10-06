@@ -10,6 +10,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestJoinErrorsNilAllocations(t *testing.T) {
+	allocations := testing.AllocsPerRun(1000, func() {
+		if got := JoinErrors(nil, nil, nil); got != nil {
+			t.Fatalf("JoinErrors(nil, nil, nil) = %v, want nil", got)
+		}
+	})
+	if allocations != 0 {
+		t.Fatalf("all-nil JoinErrors allocations = %v, want 0", allocations)
+	}
+}
+
+func BenchmarkJoinErrorsNil(b *testing.B) {
+	b.ReportAllocs()
+
+	for b.Loop() {
+		JoinErrors(nil, nil, nil)
+	}
+}
+
 func TestDefaultErrorFacts(t *testing.T) {
 	t.Parallel()
 
