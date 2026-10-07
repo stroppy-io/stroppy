@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
-- `stroppy build`, `stroppy remove`, and `stroppy export` accept `--source-root PATH` (or `STROPPY_SOURCE_ROOT`) to compile local artifacts against a Stroppy source tree instead of the pinned SDK module, and every build states which SDK the activated runtime uses.
+- `stroppy build`, `stroppy remove`, and `stroppy export` accept `--source-root PATH` (or `STROPPY_SOURCE_ROOT`) to compile local artifacts against a Stroppy source tree instead of the pinned SDK module, and every build states which SDK the activated runtime uses. ([#191](https://github.com/stroppy-io/stroppy/pull/191))
 - `stroppy init` creates a minimal standalone Go workload, and `stroppy eject` restores explicitly published workload source into a new or empty directory, including built-in sources and exported collections. ([#188](https://github.com/stroppy-io/stroppy/pull/188))
 - Workload tests can use public noop/recording helpers and a recording driver that captures typed query arguments, transactions, and inserts without a database. ([#188](https://github.com/stroppy-io/stroppy/pull/188))
 - Selected-workload probe can show resolved values, sources, aliases, constraints, steps, and metric schemas without running actions or connecting to databases. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
@@ -36,9 +36,9 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
-- Custom workload builds no longer infer the SDK source tree from the working directory, which made `stroppy build` inside a workload project replace the SDK with that project and fail.
-- Selected-workload help no longer advertises the optional positional SQL file for workloads that reject it, and omits an empty "Workload parameters" section for workloads that declare none.
-- `stroppy run <name> --help` prints the selected workload's parameters and steps for custom compiled workloads too, instead of reporting that the workload is unknown.
+- Custom workload builds no longer infer the SDK source tree from the working directory, which made `stroppy build` inside a workload project replace the SDK with that project and fail. ([#191](https://github.com/stroppy-io/stroppy/pull/191))
+- Selected-workload help no longer advertises the optional positional SQL file for workloads that reject it, and omits an empty "Workload parameters" section for workloads that declare none. ([#191](https://github.com/stroppy-io/stroppy/pull/191))
+- `stroppy run <name> --help` prints the selected workload's parameters and steps for custom compiled workloads too, instead of reporting that the workload is unknown. ([#191](https://github.com/stroppy-io/stroppy/pull/191))
 - Source ejection rejects trailing-slash symlink targets, preserves concurrently replaced directories, and relocates published self-imports without changing query data; starters reject reserved names before writing, and testkit runs honor supplied inputs while keeping every database declaration offline. ([#188](https://github.com/stroppy-io/stroppy/pull/188))
 - Programmatic PostgreSQL workloads work with logging disabled, and successful runs still export explicit zero error and retry counters. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
 - Named databases default to native insertion, nested database facades count one logical operation, framework metric-name collisions fail before actions, concurrent logs are serialized, and row-generator panics propagate after workers and resources are cleaned up. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
