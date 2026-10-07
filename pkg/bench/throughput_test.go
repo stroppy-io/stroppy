@@ -3,106 +3,81 @@ package bench
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
-	"go.uber.org/zap"
 )
 
-func TestThroughputCountsLogicalSuccessAndFreezesBeforeTeardown(t *testing.T) {
-	t.Parallel()
+func TestMeasurementWritersAggregateConcurrently(t *testing.T) {
+	measurement := &measurement{writers: make([]measurementWriter, 8)}
 
-	root, err := newRootState(zap.NewNop(), context.Background(), nil, nil, nil)
-	require.NoError(t, err)
-	t.Cleanup(root.shutdownMetrics)
+	var workers sync.WaitGroup
+	for worker := range 24 {
+		workers.Go(func() {
+			writer := measurement.writer(worker)
+			writer.transactional.Store(true)
 
-	var attempts atomic.Int64
-
-	err = runScenario(context.Background(), root,
-		scenarioSpec{executor: "shared-iterations", vus: 4, iterations: 100},
-		func(vu *VU) error {
-			b := &Bench{root: root, vu: vu, lg: zap.NewNop()}
-
-			return b.Transaction(func() error {
-				if attempts.Add(1)%4 == 0 {
-					return errors.New("terminal transaction error")
-				}
-				// Internal retry attempts do not create extra logical transactions.
-				root.txMetrics.recordRetry(vu)
-				root.txMetrics.recordQueryResult(vu, time.Millisecond, nil)
-
-				return nil
-			})
-		}, nil)
-	require.NoError(t, err)
-
-	var data metricdata.ResourceMetrics
-	require.NoError(t, root.manualReader.Collect(context.Background(), &data))
-	require.InDelta(t, 75.0, findSum(t, data, "stroppy_successful_transactions_total"), 0)
-	seconds := throughputGauge(t, data, "stroppy_measurement_seconds")
-	require.Positive(t, seconds)
-	require.InDelta(t, 75/seconds, throughputGauge(t, data, "stroppy_tps"), 0.00001)
-	require.InDelta(t, 100/seconds, throughputGauge(t, data, "stroppy_iterations_per_second"), 0.00001)
-	require.InDelta(t, 75/seconds, throughputGauge(t, data, "stroppy_queries_per_second"), 0.00001)
-	// Teardown work must not change the numerator or measurement window.
-	b := &Bench{root: root, vu: &VU{root: root, ctx: context.Background()}, lg: zap.NewNop()}
-	require.NoError(t, b.Transaction(func() error { return nil }))
-
-	var after metricdata.ResourceMetrics
-	require.NoError(t, root.manualReader.Collect(context.Background(), &after))
-	require.InDelta(t, seconds, throughputGauge(t, after, "stroppy_measurement_seconds"), 0)
-	require.InDelta(t, 75.0, findSum(t, after, "stroppy_successful_transactions_total"), 0)
-}
-
-func TestFilteredTransactionDoesNotPublishTPS(t *testing.T) {
-	t.Parallel()
-
-	root, err := newRootState(zap.NewNop(), context.Background(), nil, []string{"workload"}, nil)
-	require.NoError(t, err)
-	t.Cleanup(root.shutdownMetrics)
-	require.NoError(t, runScenario(context.Background(), root,
-		scenarioSpec{executor: "shared-iterations", vus: 1, iterations: 1},
-		func(vu *VU) error {
-			b := &Bench{root: root, vu: vu, lg: zap.NewNop()}
-
-			return b.Transaction(func() error {
-				t.Error("filtered transaction ran")
-
-				return nil
-			})
-		}, nil))
-
-	var data metricdata.ResourceMetrics
-	require.NoError(t, root.manualReader.Collect(context.Background(), &data))
-
-	for _, scope := range data.ScopeMetrics {
-		for _, metric := range scope.Metrics {
-			require.NotEqual(t, "stroppy_tps", metric.Name)
-		}
-	}
-
-	require.Zero(t, findSum(t, data, "stroppy_failed_iterations_total"))
-}
-
-func throughputGauge(t *testing.T, data metricdata.ResourceMetrics, name string) float64 {
-	t.Helper()
-
-	for _, scope := range data.ScopeMetrics {
-		for _, metric := range scope.Metrics {
-			if metric.Name == name {
-				gauge, ok := metric.Data.(metricdata.Gauge[float64])
-				require.True(t, ok)
-				require.Len(t, gauge.DataPoints, 1)
-
-				return gauge.DataPoints[0].Value
+			for range 1000 {
+				writer.transactions.Add(1)
+				writer.iterations.Add(1)
+				writer.queries.Add(4)
 			}
-		}
+		})
 	}
 
-	t.Fatalf("missing gauge %s", name)
+	for range 10 {
+		total := measurement.totals()
+		require.LessOrEqual(t, total.transactions, int64(24000))
+	}
 
-	return 0
+	workers.Wait()
+	require.Equal(t, measurementTotals{24000, 24000, 96000, true}, measurement.totals())
+}
+
+func TestLogicalThroughputCountsSuccessOnce(t *testing.T) {
+	var calls atomic.Int64
+
+	test := Test{Name: "throughput", Define: func(d *Def) error {
+		d.Execution.Step("work", func(ctx context.Context, b *Bench) error {
+			return b.LogicalOperation(func() error {
+				if calls.Add(1)%4 == 0 {
+					return errors.New("failed")
+				}
+
+				return nil
+			})
+		}, SharedIterations(4, 100))
+
+		return d.Execution.Err()
+	}}
+	result, err := RunTest(t.Context(), test, noopRunOptions())
+	require.NoError(t, err)
+
+	successes := *result.Metrics["successful_transactions_total"].Total
+	seconds := *result.Metrics["measurement_seconds"].Total
+
+	require.InDelta(t, 75., successes, 0)
+	require.Positive(t, seconds)
+	require.InDelta(t, 75/seconds, *result.Metrics["tps"].Total, 0.0001)
+}
+
+func TestFilteredMeasuredStepDoesNotPublishThroughput(t *testing.T) {
+	test := Test{Name: "filtered", Define: func(d *Def) error {
+		d.Execution.Step("work", func(context.Context, *Bench) error {
+			t.Fatal("filtered action ran")
+
+			return nil
+		}, SharedIterations(1, 1))
+
+		return nil
+	}}
+	options := noopRunOptions()
+	options.NoSteps = []string{"work"}
+	result, err := RunTest(t.Context(), test, options)
+	require.NoError(t, err)
+
+	_, found := result.Metrics["tps"]
+	require.False(t, found)
 }

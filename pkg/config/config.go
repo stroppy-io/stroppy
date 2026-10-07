@@ -5,7 +5,7 @@
 //
 // Regenerate the committed file-envelope schema after changing these types.
 //
-//go:generate go run github.com/stroppy-io/stroppy/internal/jsonschema-gen -out ../../docs/jsonschema/run.schema.json
+//go:generate go run github.com/stroppy-io/stroppy/v6/internal/jsonschema-gen -out ../../docs/jsonschema/run.schema.json
 package config
 
 import (
@@ -13,6 +13,8 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+
+	"github.com/stroppy-io/stroppy/v6/pkg/record"
 )
 
 // DriverType identifies a database driver implementation.
@@ -26,6 +28,7 @@ const (
 	DriverTypeYDB         DriverType = 4
 	DriverTypeNoop        DriverType = 5
 	DriverTypeCSV         DriverType = 6
+	DriverTypeRecording   DriverType = 7
 )
 
 var driverTypeNames = map[DriverType]string{
@@ -36,6 +39,7 @@ var driverTypeNames = map[DriverType]string{
 	DriverTypeYDB:         "ydb",
 	DriverTypeNoop:        "noop",
 	DriverTypeCSV:         "csv",
+	DriverTypeRecording:   "recording",
 }
 
 func (d DriverType) String() string {
@@ -56,6 +60,7 @@ func DriverTypeValues() []DriverType {
 		DriverTypeYDB,
 		DriverTypeNoop,
 		DriverTypeCSV,
+		DriverTypeRecording,
 	}
 }
 
@@ -338,10 +343,9 @@ type RunConfig struct {
 	Script  *string                     `json:"script,omitempty"`
 	SQL     *string                     `json:"sql,omitempty"`
 	Global  *GlobalConfig               `json:"global,omitempty"`
-	Drivers map[uint32]*DriverRunConfig `json:"drivers,omitempty"`
+	Drivers map[string]*DriverRunConfig `json:"drivers,omitempty"`
 	Run     map[string]json.RawMessage  `configscope:"run"        json:"run,omitempty"`
 	Params  map[string]json.RawMessage  `configscope:"params"     json:"params,omitempty"`
-	Env     map[string]string           `json:"env,omitempty"`
 	Steps   []string                    `json:"steps,omitempty"`
 	NoSteps []string                    `json:"noSteps,omitempty"`
 }
@@ -600,6 +604,7 @@ type DriverConfig struct {
 	AuthPassword          *string               `json:"authPassword,omitempty"`
 	TLSInsecureSkipVerify *bool                 `json:"tlsInsecureSkipVerify,omitempty"`
 	InsertProgress        *InsertProgressConfig `json:"insertProgress,omitempty"`
+	Recording             *record.Recorder      `json:"-"`
 }
 
 func (c *DriverConfig) GetDefaultInsertMethod() string {

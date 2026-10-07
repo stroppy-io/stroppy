@@ -17,7 +17,7 @@ name-dispatch/carriage contract.
 
 ```
 make build          # plain go build — never go build ./... (use the target for -ldflags version injection)
-make linter_fix     # run first, auto-fixes formatting — NEVER run casually, it rewrites the whole repo
+make linter_fix     # run first; auto-fixes formatting and may rewrite files across the repo
 make linter         # read-only check after linter_fix
 make tests          # all tests with race detector and coverage
 ```
@@ -81,11 +81,14 @@ Resolution order for SQL files: **cwd → `~/.stroppy/` → embedded**.
 | `cmd/stroppy/commands/run/` | arg parsing, driver/env/step resolution, dispatch to `bench.Run` |
 | `cmd/stroppy/commands/baseline/` | machine-baseline command: two-tier orchestration, verdicts, history reports |
 | `internal/pgnoop/` | pg-noop server resolution (embed/cache/download) + process lifecycle |
+| `internal/author/` | shared init/eject scaffold, published source validation, exclusive confined project writes |
+| `pkg/bench/testkit/` | real-runtime noop and recording workload execution helpers |
+| `pkg/record/` | typed deterministic operation snapshots and explicit query replies |
 | `pkg/bench/` | Go-native engine: `Workload` interface, `Run`, scenario executor, VU/Bench SDK, metrics sink + summary |
 | `workloads/<name>/` | one package per built-in workload, containing Go implementation/tests plus owned SQL/JSON/README assets |
 | `workloads/all/` | explicit blank-import aggregation for built-in workload registration |
 | `pkg/driver/dispatcher.go` | driver registry: `RegisterDriver()` + `Dispatch()` |
-| `pkg/driver/{postgres,mysql,picodata,ydb,noop,csv}/` | driver implementations |
+| `pkg/driver/{postgres,mysql,picodata,ydb,noop,csv,recording}/` | driver implementations |
 | `pkg/driver/sqldriver/` | shared sql.DB-backed base (mysql, ydb use this) |
 | `pkg/gen/` | imperative generation primitives: Root/Domain/Field scalars, reusable typed Batches, IndexedSource, Permute/SplitMix64 |
 | `pkg/datagen/` | row-production seam: `source` (Partitionable/RowSource) + canonical TPC-DS/TPC-H generator adapters (`tpcdsgen`, `tpchgen`) |
@@ -93,6 +96,21 @@ Resolution order for SQL files: **cwd → `~/.stroppy/` → embedded**.
 | `pkg/config/` | plain-Go application config types + strict recursive JSON normalizer; schema source for `docs/jsonschema/run.schema.json` |
 | `workloads/` | shared embedded-asset registry and catalog |
 | `docs/parallelism.md` | InsertRequest parallelism contract and tuning |
+
+## Author tooling
+
+`stroppy init PATH` scaffolds a noop-default standalone project; `build PATH` checks
+PATH then PATH/workload for an importable package. `Test.Source fs.FS` optionally
+publishes package-local source or a complete project containing go.mod/main.go.
+`eject NAME PATH` restores only published files, refuses non-empty/symlink targets,
+and resolves project imports after exclusive confined copying. Dependency errors
+retain the created project and report the retry command. See docs/author-tooling.md.
+
+Recording is repository-provided (`-d recording -D url=recording.json`), not a plugin
+API. Set testkit/recording options before running; query replies are explicit and
+unknown reads have no rows. Recordings may contain authored query data, never put
+credentials there. Refresh explicit builtin license/test-support copies with
+`go run ./internal/author/generate` from repository root.
 
 ## Drivers
 
@@ -146,16 +164,15 @@ diagnostic-only. The removed `errorMode` driver field and alias are rejected.
 - `-d <preset>` — driver preset: `pg`, `mysql`, `pico`, `ydb`, `noop`
 - `-d '{"url":"...","bulkSize":20}'` — raw JSON driver config
 - `-D key=value` — override driver field (url, driverType, bulkSize, pool.*, postgres.*, sql.*, caCertFile, authToken, authUser, authPassword, tlsInsecureSkipVerify); multiple `-D` accumulate
-- `-d1 <preset>`, `-D1 key=value` — same for second driver index (multi-driver workloads)
+- `-dprimary <preset>`, `-Dprimary key=value` — configure a named driver declared by a multi-driver workload; numeric suffixes are rejected
 
 **Workload and run parameters:**
 - Registered workloads expose typed `--name VALUE` flags. Run
   `stroppy run <workload> --help` to see the selected workload's schema.
-- Shared run flags: `--executor`, `--vus`, `--iterations`, `--duration`, `--query-timeout`.
+- Built-in run flags: `--executor`, `--vus`, `--iterations`, `--duration`, `--drain-timeout`, `--query-timeout`.
 - Workload flags include `--scale-factor`, `--load-workers`, and other
   workload-specific declarations.
-- `-e KEY=VALUE` remains a compatibility input; keys are uppercased. Multiple
-  `-e` flags accumulate.
+- Typed inputs are CLI flags, projected process environment, typed config, then defaults. `-e` and config `env` are removed.
 
 **Step control:**
 - `--steps step1,step2` — run only listed steps
@@ -165,11 +182,9 @@ diagnostic-only. The removed `errorMode` driver field and alias are rejected.
 **Config file:**
 - Default: `stroppy-config.json` in cwd (auto-loaded if present)
 - `-f prod.json` — explicit path
-- Typed scenario parameters go under `run`; selected-workload parameters go
-  under `params`. The legacy string-valued `env` map remains compatible.
-- Typed parameter precedence (highest→lowest): typed CLI > process env > `-e` >
-  matching typed config (`run`/`params`) > config `env` > declared default.
-- Driver precedence is `-d/-D` > config `drivers`.
+- Typed scenario parameters go under `run`; selected-workload parameters go under `params`.
+- Typed parameter precedence: typed CLI > process env > matching typed config (`run`/`params`) > declared default.
+- Driver precedence is `-d/-D` > config `drivers`; map keys are names, with `default` for the default database.
 
 ```json
 {
@@ -244,8 +259,11 @@ Section layout (must be identical across dialects):
   --= step2
 ```
 
-Each Go workload implements the `bench.Workload` interface (`Setup`, `Iterate`,
-`Teardown`) in `workloads/<name>/`, beside its tests and owned assets. Asset-bearing
+Each Go workload exports a `bench.Test` descriptor with `Define(*bench.Def)` in
+`workloads/<name>/`, beside its tests and owned assets. Definition observes then
+executes immediate `d.Execution.Step` calls with the same input snapshot. Mutable
+workload state is ordinary Go state created in `Define`; actions run only during
+execution. See `docs/workload-authoring-api.md` for the supported v6 boundary. Asset-bearing
 packages embed only their local SQL/JSON/README files, register the filesystem with
 `workloads.Register`, and add a blank import to `workloads/all/import.go`. Contract
 tests in each package pin required files, sections, and named queries. TPC-B and
@@ -258,9 +276,9 @@ SF=1 answer validation is PostgreSQL-only, while load/query execution has
 pg/mysql/pico/ydb dialect files. TPC-DS (`tpcds`) loads all 24 tables and runs
 the 99 query suite.
 
-Relational loads use `b.Step("load_data", ...)` and `b.Insert(ctx, req)` with
-a `driver.InsertRequest`. `LOAD_WORKERS` controls the per-request worker
-fan-out where wired:
+Relational loads use once-only `d.Execution.Step("load_data", ...)` and
+`b.Insert(ctx, table, source, options...)`. `LOAD_WORKERS` controls the per-request
+worker fan-out where wired:
 ```bash
 ./build/stroppy run tpcc/tx -d pg --load-workers 8 --steps drop_schema,create_schema,load_data
 ```
@@ -269,21 +287,20 @@ fan-out where wired:
 - `--executor shared-iterations --iterations N` → power run; VUs share N iterations.
 - `--executor constant-vus --vus N --duration 60s` → throughput run.
 - `--vus` applies to either executor. There are no k6 shortflags.
-- Legacy `DURATION` without an explicit executor still infers `constant-vus` and
-  emits a warning; use an explicit executor in new invocations and config.
+- `DURATION` alone does not infer an executor. Timed policies require explicit drain; the standard helper defaults to 30 seconds.
 
 **`--scale-factor` semantics** differ by workload: tpcb and tpcc take an INTEGER (≥1, = branch/warehouse count); tpch and tpcds take a FRACTIONAL row-scale (0.01 ok). tpcds also carries fixed-size static dims (~1.9M rows for `customer_demographics`) that do not shrink with SF.
 
-**Setup vs executor:** the data load lives in the workload body guarded by
-`GlobalOnce` (a once-per-process barrier), not in a separate setup phase with
-no live metrics. Load progress emits metrics as it runs.
+**Setup vs executor:** data loads are explicit once-only steps before repeated
+work. Load progress emits metrics as it runs; measured steps have separate
+wall-clock windows including actual drain.
 
 Isolation by driver in the `tx` variants:
 - postgres → `read_committed`
 - mysql → `read_committed`
 - picodata → `"none"` (**not** `"conn"` — `Begin()` always errors)
 - ydb → `serializable`
-- Override: `--tx-isolation <name>` (`-e TX_ISOLATION=...` remains compatible)
+- Override: `--tx-isolation <name>` or process `TX_ISOLATION`
 
 Full isolation type names: `read_uncommitted`, `read_committed`, `repeatable_read`, `serializable`, `db_default`, `conn`, `none`
 
@@ -311,7 +328,7 @@ Full isolation type names: `read_uncommitted`, `read_committed`, `repeatable_rea
 ```bash
 go doc github.com/jackc/pgx/v5.Rows        # pgx Rows interface
 go doc ./pkg/driver Rows                    # local interface
-go doc ./pkg/bench Workload                 # workload interface
+go doc ./pkg/bench Test                     # workload descriptor
 go doc ./pkg/config RunConfig               # plain application config envelope
 ```
 

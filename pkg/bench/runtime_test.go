@@ -3,745 +3,264 @@ package bench
 import (
 	"context"
 	"errors"
-	"io"
-	"os"
-	"strings"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest/observer"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
-	"github.com/stroppy-io/stroppy/pkg/driver/stats"
+	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
-func TestRunScenarioReturnsFatalErrorAndCancelsWorkers(t *testing.T) {
-	rootState := newRuntimeTestRoot(t)
-
-	sentinel := errors.New("fatal")
-
-	var calls atomic.Int64
-
-	err := runScenario(context.Background(), rootState, scenarioSpec{
-		executor:   "shared-iterations",
-		vus:        4,
-		iterations: 100,
-	}, func(vu *VU) error {
-		if calls.Add(1) == 1 {
-			return &FatalError{err: sentinel}
-		}
-
-		<-vu.Context().Done()
-
-		return vu.Context().Err()
-	}, nil)
-
-	if !errors.Is(err, sentinel) {
-		t.Fatalf("runScenario() error = %v, want sentinel", err)
-	}
-
-	if !IsFatalError(err) {
-		t.Fatalf("runScenario() error = %T, want FatalError", err)
+func noopRunOptions() RunOptions {
+	return RunOptions{
+		Drivers: map[string]DriverConfig{"": {Kind: DriverNoop}},
+		Metrics: &MetricsConfig{Quiet: true},
+		Report:  &ReportOptions{},
 	}
 }
 
-func TestRunScenarioContinuesAfterOrdinaryErrors(t *testing.T) {
-	rootState := newRuntimeTestRoot(t)
-
-	var (
-		calls    atomic.Int64
-		failures atomic.Int64
-	)
-
-	err := runScenario(context.Background(), rootState, scenarioSpec{
-		executor:   "shared-iterations",
-		vus:        1,
-		iterations: 5,
-	}, func(*VU) error {
-		calls.Add(1)
-
-		return errors.New("iteration")
-	}, func(*VU, error) {
-		failures.Add(1)
-	})
-	if err != nil {
-		t.Fatalf("runScenario() error = %v, want nil", err)
-	}
-
-	if calls.Load() != 5 || failures.Load() != 5 {
-		t.Fatalf("calls = %d, failures = %d, want 5 each", calls.Load(), failures.Load())
-	}
-}
-
-func TestRunContinuesAndSummarizesOrdinaryErrors(t *testing.T) {
-	registerOrdinaryErrorWorkload()
-
-	core, logs := observer.New(zapcore.WarnLevel)
-
-	var captured metricdata.ResourceMetrics
-
-	err := Run(
-		context.Background(),
-		"test/ordinary-errors-continue",
-		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		ParamInputs{CLI: map[string]string{"iterations": "6", "vus": "2"}},
-		nil,
-		nil,
-		zap.New(core),
-		&MetricsConfig{OnSummary: func(data metricdata.ResourceMetrics) { captured = data }},
-	)
-	if err != nil {
-		t.Fatalf("Run() error = %v, want nil", err)
-	}
-
-	if ordinaryErrorWorkloadRun.calls.Load() != 6 {
-		t.Fatalf("iteration calls = %d, want 6", ordinaryErrorWorkloadRun.calls.Load())
-	}
-
-	if terminal := findSum(t, captured, "stroppy_terminal_errors_total"); terminal != 6 {
-		t.Fatalf("terminal errors = %v, want 6", terminal)
-	}
-
-	if failed := findSum(t, captured, "stroppy_failed_iterations_total"); failed != 6 {
-		t.Fatalf("failed iterations = %v, want 6", failed)
-	}
-
-	if got := logs.FilterMessage("nonfatal error; continuing").Len(); got != 1 {
-		t.Fatalf("initial nonfatal warnings = %d, want 1", got)
-	}
-
-	if got := logs.FilterLevelExact(zapcore.ErrorLevel).Len(); got != 0 {
-		t.Fatalf("error-level logs = %d, want 0", got)
-	}
-}
-
-var (
-	registerOrdinaryErrorWorkloadOnce sync.Once
-	ordinaryErrorWorkloadRun          *ordinaryErrorWorkload
-)
-
-func registerOrdinaryErrorWorkload() {
-	registerOrdinaryErrorWorkloadOnce.Do(func() {
-		Register(func() Workload {
-			ordinaryErrorWorkloadRun = &ordinaryErrorWorkload{}
-
-			return ordinaryErrorWorkloadRun
-		})
-	})
-}
-
-type ordinaryErrorWorkload struct {
-	calls atomic.Int64
-}
-
-func (*ordinaryErrorWorkload) Name() string                        { return "test/ordinary-errors-continue" }
-func (*ordinaryErrorWorkload) Define(*Def) error                   { return nil }
-func (*ordinaryErrorWorkload) Setup(context.Context, *Bench) error { return nil }
-func (w *ordinaryErrorWorkload) Iterate(context.Context, *Bench) error {
-	w.calls.Add(1)
-
-	return errors.New("ordinary iteration failure")
-}
-func (*ordinaryErrorWorkload) Teardown(context.Context, *Bench) error { return nil }
-
-func TestRunRejectsNegativeQueryTimeout(t *testing.T) {
-	Register(func() Workload { return &paramTestWorkload{name: "test/query-timeout-negative"} })
-
-	err := Run(
-		context.Background(),
-		"test/query-timeout-negative",
-		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		ParamInputs{CLI: map[string]string{"query-timeout": "-5s"}},
-		nil,
-		nil,
-		zap.NewNop(),
-		&MetricsConfig{},
-	)
-	if err == nil || !strings.Contains(err.Error(), "query-timeout must not be negative") {
-		t.Fatalf("Run() error = %v, want negative query-timeout", err)
-	}
-}
-
-func TestRunScenarioReturnsParentCancellation(t *testing.T) {
-	rootState := newRuntimeTestRoot(t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	err := runScenario(ctx, rootState, scenarioSpec{
-		executor:   "shared-iterations",
-		vus:        1,
-		iterations: 1,
-	}, func(*VU) error { return nil }, nil)
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("runScenario() error = %v, want context.Canceled", err)
-	}
-}
-
-func TestRunPassesScenarioCancellationToWorkload(t *testing.T) {
-	var workload *fatalContextWorkload
-
-	Register(func() Workload {
-		workload = &fatalContextWorkload{secondStarted: make(chan struct{})}
-
-		return workload
-	})
-
-	err := Run(
-		context.Background(),
-		"test/fatal-context",
-		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		ParamInputs{LegacyEnv: map[string]string{"VUS": "2", "ITER": "2"}},
-		nil,
-		nil,
-		zap.NewNop(),
-		&MetricsConfig{},
-	)
-	if !errors.Is(err, workload.fatalErr) {
-		t.Fatalf("Run() error = %v, want fatal sentinel", err)
-	}
-
-	if !workload.canceled.Load() {
-		t.Fatal("workload did not receive scenario cancellation")
-	}
-}
-
-type fatalContextWorkload struct {
-	calls         atomic.Int64
-	canceled      atomic.Bool
-	secondStarted chan struct{}
-	fatalErr      error
-}
-
-func (*fatalContextWorkload) Name() string { return "test/fatal-context" }
-
-func (*fatalContextWorkload) Define(*Def) error { return nil }
-
-func (w *fatalContextWorkload) Setup(context.Context, *Bench) error {
-	w.fatalErr = errors.New("fatal iteration")
-
-	return nil
-}
-
-func (w *fatalContextWorkload) Iterate(ctx context.Context, _ *Bench) error {
-	if w.calls.Add(1) == 1 {
-		<-w.secondStarted
-
-		return &FatalError{err: w.fatalErr}
-	}
-
-	close(w.secondStarted)
-
-	select {
-	case <-ctx.Done():
-		w.canceled.Store(true)
-
-		return ctx.Err()
-	case <-time.After(100 * time.Millisecond):
-		return errors.New("scenario context was not canceled")
-	}
-}
-
-func (*fatalContextWorkload) Teardown(context.Context, *Bench) error { return nil }
-
-const teardownLifecycleDriverType config.DriverType = 1000
-
-type driverTeardownContextKey struct{}
-
-var (
-	registerTeardownLifecycleOnce sync.Once
-	teardownLifecycleDriverRun    *teardownLifecycleDriver
-	teardownLifecycleWorkloadRun  *teardownLifecycleWorkload
-	errTeardownLifecycleBegin     = errors.New("test driver does not support transactions")
-)
-
-func registerTeardownLifecycleTest() {
-	registerTeardownLifecycleOnce.Do(func() {
-		driver.RegisterDriver(teardownLifecycleDriverType, func(context.Context, driver.Options) (driver.Driver, error) {
-			if teardownLifecycleDriverRun == nil {
-				return &teardownLifecycleDriver{}, nil
-			}
-
-			return teardownLifecycleDriverRun, nil
-		})
-		Register(func() Workload {
-			if teardownLifecycleWorkloadRun == nil {
-				return &teardownLifecycleWorkload{}
-			}
-
-			return teardownLifecycleWorkloadRun
-		})
-	})
-}
-
-func TestRunFinalizesDriverAfterWorkload(t *testing.T) {
-	registerTeardownLifecycleTest()
-
-	setupErr := errors.New("setup sentinel")
-	workloadErr := errors.New("workload teardown sentinel")
-	driverErr := errors.New("driver teardown sentinel")
-	recorder := &teardownLifecycleRecorder{}
-
-	teardownLifecycleWorkloadRun = &teardownLifecycleWorkload{
-		recorder:    recorder,
-		setupErr:    setupErr,
-		teardownErr: workloadErr,
-	}
-	teardownLifecycleDriverRun = &teardownLifecycleDriver{
-		recorder:    recorder,
-		teardownErr: driverErr,
-	}
-
-	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), driverTeardownContextKey{}, "retained"))
-	cancel()
-
-	err := Run(
-		ctx,
-		"test/driver-teardown-lifecycle",
-		map[int]*config.DriverConfig{0: {DriverType: teardownLifecycleDriverType}},
-		ParamInputs{},
-		nil,
-		nil,
-		zap.NewNop(),
-		&MetricsConfig{},
-	)
-	for _, want := range []error{setupErr, workloadErr, driverErr} {
-		if !errors.Is(err, want) {
-			t.Errorf("Run() error = %v, want joined %v", err, want)
-		}
-	}
-
-	if got := strings.Join(recorder.order, ","); got != "workload,driver" {
-		t.Fatalf("teardown order = %q, want workload,driver", got)
-	}
-
-	if recorder.workloadCalls != 1 || recorder.driverCalls != 1 {
-		t.Fatalf("teardown calls = workload:%d driver:%d, want one each", recorder.workloadCalls, recorder.driverCalls)
-	}
-
-	if !recorder.workloadDetached || !recorder.driverDetached {
-		t.Fatalf("detached contexts = workload:%t driver:%t, want true", recorder.workloadDetached, recorder.driverDetached)
-	}
-
-	if !recorder.workloadDeadline || !recorder.driverDeadline {
-		t.Fatalf("deadline contexts = workload:%t driver:%t, want true", recorder.workloadDeadline, recorder.driverDeadline)
-	}
-
-	if teardownLifecycleWorkloadRun.contextValue != "retained" || teardownLifecycleDriverRun.contextValue != "retained" {
-		t.Fatalf(
-			"teardown context values = workload:%v driver:%v, want retained",
-			teardownLifecycleWorkloadRun.contextValue,
-			teardownLifecycleDriverRun.contextValue,
-		)
-	}
-}
-
-type teardownLifecycleRecorder struct {
-	order            []string
-	workloadCalls    int
-	driverCalls      int
-	workloadDetached bool
-	driverDetached   bool
-	workloadDeadline bool
-	driverDeadline   bool
-}
-
-type teardownLifecycleWorkload struct {
-	recorder     *teardownLifecycleRecorder
-	setupErr     error
-	teardownErr  error
-	contextValue any
-}
-
-func (*teardownLifecycleWorkload) Name() string                          { return "test/driver-teardown-lifecycle" }
-func (*teardownLifecycleWorkload) Define(*Def) error                     { return nil }
-func (w *teardownLifecycleWorkload) Setup(context.Context, *Bench) error { return w.setupErr }
-func (*teardownLifecycleWorkload) Iterate(context.Context, *Bench) error { return nil }
-func (w *teardownLifecycleWorkload) Teardown(ctx context.Context, _ *Bench) error {
-	if w.recorder == nil {
-		return w.teardownErr
-	}
-
-	w.recorder.order = append(w.recorder.order, "workload")
-	w.recorder.workloadCalls++
-	w.recorder.workloadDetached = ctx.Err() == nil
-	_, w.recorder.workloadDeadline = ctx.Deadline()
-	w.contextValue = ctx.Value(driverTeardownContextKey{})
-
-	return w.teardownErr
-}
-
-type teardownLifecycleDriver struct {
-	recorder     *teardownLifecycleRecorder
-	teardownErr  error
-	contextValue any
-}
-
-func (*teardownLifecycleDriver) Insert(context.Context, *driver.InsertRequest) (*stats.Query, error) {
-	return &stats.Query{}, nil
-}
-
-func (*teardownLifecycleDriver) RunQuery(context.Context, string, map[string]any) (*driver.QueryResult, error) {
-	return &driver.QueryResult{}, nil
-}
-
-func (*teardownLifecycleDriver) Begin(context.Context, config.TxIsolationLevel) (driver.Tx, error) {
-	return nil, errTeardownLifecycleBegin
-}
-
-func (*teardownLifecycleDriver) ClassifyError(err error) driver.ErrorFacts {
-	return driver.DefaultErrorFacts(err)
-}
-
-func (d *teardownLifecycleDriver) Teardown(ctx context.Context) error {
-	if d.recorder == nil {
-		return d.teardownErr
-	}
-
-	d.recorder.order = append(d.recorder.order, "driver")
-	d.recorder.driverCalls++
-	d.recorder.driverDetached = ctx.Err() == nil
-	_, d.recorder.driverDeadline = ctx.Deadline()
-	d.contextValue = ctx.Value(driverTeardownContextKey{})
-
-	return d.teardownErr
-}
-
-func newRuntimeTestRoot(t *testing.T) *RootState {
+func newRuntimeTestRoot(t *testing.T) *rootState {
 	t.Helper()
 
-	testRoot, err := newRootState(zap.NewNop(), context.Background(), nil, nil, &MetricsConfig{})
-	if err != nil {
-		t.Fatalf("newRootState() error = %v", err)
-	}
-
-	t.Cleanup(func() {
-		testRoot.errorReporter.stopAndWait()
-		testRoot.shutdownMetrics()
-	})
-
-	return testRoot
-}
-
-func TestRunReportCapturesMetricsInitializationFailure(t *testing.T) {
-	registerReportTestWorkloadOnce.Do(func() {
-		Register(func() Workload { return &reportTestWorkload{} })
-	})
-
-	runReport, err := RunWithReport(
-		context.Background(),
-		"test/run-report",
-		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		ParamInputs{},
-		nil,
-		nil,
+	root, err := newrootState(
 		zap.NewNop(),
-		&MetricsConfig{Headers: "Authorization=%"},
-		ReportOptions{StroppyVersion: "v-test"},
-	)
-	if err == nil {
-		t.Fatal("RunWithReport() error = nil")
-	}
-
-	if runReport == nil || runReport.Status != "failed" || runReport.FinishedAt.IsZero() {
-		t.Fatalf("report = %#v", runReport)
-	}
-
-	if runReport.Failure == nil || runReport.Failure.Phase != "metrics" {
-		t.Fatalf("failure = %#v", runReport.Failure)
-	}
-}
-
-func TestRunWithoutEnvelopeStillExecutesContributors(t *testing.T) {
-	registerReportTestWorkloadOnce.Do(func() {
-		Register(func() Workload { return &reportTestWorkload{} })
-	})
-	reportContributionCalls.Store(0)
-
-	err := Run(
 		context.Background(),
-		"test/run-report",
-		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		ParamInputs{CLI: map[string]string{"iterations": "1", "vus": "1"}},
 		nil,
 		nil,
-		zap.NewNop(),
 		&MetricsConfig{Quiet: true},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	t.Cleanup(func() { root.errorReporter.stopAndWait(); root.shutdownMetrics() })
 
-	if reportContributionCalls.Load() != 1 {
-		t.Fatalf("contributor calls = %d, want 1", reportContributionCalls.Load())
+	return root
+}
+
+func TestRunContinuesAfterOrdinaryErrors(t *testing.T) {
+	var calls atomic.Int64
+
+	test := Test{Name: "errors", Define: func(d *Def) error {
+		d.Execution.Step("work", func(context.Context, *Bench) error {
+			calls.Add(1)
+
+			return errors.New("ordinary")
+		}, SharedIterations(3, 9))
+
+		return d.Execution.Err()
+	}}
+	result, err := RunTest(t.Context(), test, noopRunOptions())
+	require.NoError(t, err)
+	require.Equal(t, int64(9), calls.Load())
+	require.Equal(t, report.StatusCompletedWithErrors, result.Status)
+	require.Equal(t, uint64(9), result.Errors.FailedIterations)
+}
+
+func TestSuccessfulRunExportsZeroErrorCounters(t *testing.T) {
+	test := Test{Name: "zero-errors", Define: func(d *Def) error {
+		d.Execution.Step("work", func(context.Context, *Bench) error { return nil }, SharedIterations(1, 1))
+
+		return d.Execution.Err()
+	}}
+	result, err := RunTest(t.Context(), test, noopRunOptions())
+	require.NoError(t, err)
+
+	for _, name := range []string{
+		"failed_iterations_total", "failed_queries_total", "terminal_errors_total", "retry_attempts_total",
+	} {
+		metric, exists := result.Metrics[name]
+		require.True(t, exists, name)
+		require.NotNil(t, metric.Total, name)
+		require.InDelta(t, 0, *metric.Total, 0, name)
 	}
 }
 
-func TestRunReportCapturesCommonAndCustomData(t *testing.T) {
-	registerReportTestWorkloadOnce.Do(func() {
-		Register(func() Workload { return &reportTestWorkload{} })
-	})
-
-	runReport, err := RunWithReport(
-		context.Background(),
-		"test/run-report",
-		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		ParamInputs{CLI: map[string]string{"iterations": "2", "vus": "1", "label": "cli-value"}},
-		[]string{"setup", "workload"},
-		nil,
-		zap.NewNop(),
-		&MetricsConfig{Quiet: true},
-		ReportOptions{StroppyVersion: "v-test", RunID: "run-42", Metadata: map[string]string{"env": "test"}},
+func TestRunFatalCancelsWorkersAndBlocksLaterWork(t *testing.T) {
+	var (
+		calls atomic.Int64
+		later atomic.Bool
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	if runReport.Schema != 1 || runReport.ID != "run-42" || runReport.Status != "completed" {
-		t.Fatalf("report identity/status = %#v", runReport)
-	}
+	sentinel := errors.New("fatal")
+	test := Test{Name: "fatal", Define: func(d *Def) error {
+		d.Execution.Step("work", func(ctx context.Context, b *Bench) error {
+			if calls.Add(1) == 1 {
+				return Fatal(sentinel)
+			}
 
-	if runReport.Parameters.Workload["label"].Value != "cli-value" ||
-		runReport.Parameters.Workload["label"].Source != "cli" {
-		t.Fatalf("label parameter = %#v", runReport.Parameters.Workload["label"])
-	}
+			<-ctx.Done()
 
-	if runReport.Custom["observed"] != "yes" {
-		t.Fatalf("custom = %#v", runReport.Custom)
-	}
+			return ctx.Err()
+		}, SharedIterations(4, 100))
+		d.Execution.Step("later", func(context.Context, *Bench) error {
+			later.Store(true)
 
-	if runReport.Metrics["iterations_total"].Total == nil || *runReport.Metrics["iterations_total"].Total != 2 {
-		t.Fatalf("iterations metric = %#v", runReport.Metrics["iterations_total"])
-	}
+			return nil
+		})
 
-	if len(runReport.Steps) != 2 || runReport.Steps[1].Name != "workload" || runReport.Steps[1].Executions != 2 {
-		t.Fatalf("steps = %#v", runReport.Steps)
-	}
-
-	if len(runReport.WorkloadReports) != 1 || runReport.WorkloadReports[0].Kind != "test.payload" {
-		t.Fatalf("workload reports = %#v", runReport.WorkloadReports)
-	}
+		return d.Execution.Err()
+	}}
+	result, err := RunTest(t.Context(), test, noopRunOptions())
+	require.ErrorIs(t, err, sentinel)
+	require.False(t, later.Load())
+	require.Equal(t, "blocked", result.Steps[1].Status)
 }
 
-type reportTestWorkload struct {
-	label string
+func TestDurationDrainAndCleanup(t *testing.T) {
+	var (
+		interrupted atomic.Bool
+		cleaned     atomic.Bool
+	)
+
+	test := Test{Name: "drain", Define: func(d *Def) error {
+		d.Execution.Step("work", func(ctx context.Context, b *Bench) error {
+			<-ctx.Done()
+			interrupted.Store(true)
+
+			return ctx.Err()
+		}, ConstantWorkers(1, 10*time.Millisecond, DrainTimeout(10*time.Millisecond)))
+		d.Execution.Step("cleanup", func(ctx context.Context, b *Bench) error {
+			cleaned.Store(ctx.Err() == nil)
+
+			return nil
+		}, Always(time.Second))
+
+		return d.Execution.Err()
+	}}
+	result, err := RunTest(t.Context(), test, noopRunOptions())
+	require.NoError(t, err)
+	require.True(t, interrupted.Load())
+	require.True(t, cleaned.Load())
+	require.Equal(t, report.StatusCompletedWithErrors, result.Status)
 }
 
-var (
-	registerReportTestWorkloadOnce sync.Once
-	reportContributionCalls        atomic.Int64
-)
+func TestDrainExpiryCannotBecomeLogicalSuccess(t *testing.T) {
+	test := Test{Name: "drain-success", Define: func(d *Def) error {
+		d.Execution.Step("work", func(ctx context.Context, b *Bench) error {
+			return b.LogicalOperation(func() error {
+				<-ctx.Done()
 
-func (*reportTestWorkload) Name() string { return "test/run-report" }
+				return nil
+			})
+		}, ConstantWorkers(1, 10*time.Millisecond, DrainTimeout(0)))
 
-func (w *reportTestWorkload) Define(def *Def) error {
-	w.label = def.Param.String("label", "default", "Report label.").Value()
-	def.Report("test.payload", 1, func(ReportContext) (ReportContribution, error) {
-		reportContributionCalls.Add(1)
-
-		return ReportContribution{Data: map[string]string{"label": w.label}}, nil
-	})
-
-	return nil
+		return d.Execution.Err()
+	}}
+	result, err := RunTest(t.Context(), test, noopRunOptions())
+	require.NoError(t, err)
+	require.Equal(t, report.StatusCompletedWithErrors, result.Status)
+	require.Equal(t, uint64(1), result.Errors.FailedIterations)
+	require.InDelta(t, 0, *result.Metrics["successful_transactions_total"].Total, 0)
 }
 
-func (*reportTestWorkload) Setup(_ context.Context, bench *Bench) error {
-	return bench.Step("setup", func() error {
-		bench.AddReportData("observed", "yes")
+func TestParentCancellationAndDetachedCleanup(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.WithValue(t.Context(), testContextKey{}, "retained"))
+
+	var cleaned bool
+
+	test := Test{Name: "cancel", Define: func(d *Def) error {
+		d.Execution.Step("work", func(ctx context.Context, b *Bench) error {
+			cancel()
+			<-ctx.Done()
+
+			return ctx.Err()
+		}, SharedIterations(1, 1))
+		d.Execution.Step("cleanup", func(ctx context.Context, b *Bench) error {
+			_, deadline := ctx.Deadline()
+			cleaned = ctx.Err() == nil && deadline && ctx.Value(testContextKey{}) == "retained"
+
+			return nil
+		}, Always(time.Second))
+
+		return d.Execution.Err()
+	}}
+	result, err := RunTest(ctx, test, noopRunOptions())
+	require.ErrorIs(t, err, context.Canceled)
+	require.True(t, cleaned)
+	require.Equal(t, report.StatusCanceled, result.Status)
+}
+
+func TestReportsBuilderAndDisabledMode(t *testing.T) {
+	var calls atomic.Int64
+
+	test := Test{Name: "report", Define: func(d *Def) error {
+		d.Report.Contribute("example", 1, func(final ReportContext) (ReportContribution, error) {
+			calls.Add(1)
+
+			return ReportContribution{Data: map[string]string{"status": string(final.Status)}}, nil
+		})
+		d.Execution.Step("work", func(context.Context, *Bench) error { return nil })
+
+		return d.Execution.Err()
+	}}
+	options := noopRunOptions()
+	result, err := RunTest(t.Context(), test, options)
+	require.NoError(t, err)
+	require.Len(t, result.WorkloadReports, 1)
+	require.Equal(t, int64(1), calls.Load())
+
+	options.Report = nil
+	result, err = RunTest(t.Context(), test, options)
+	require.NoError(t, err)
+	require.Nil(t, result)
+	require.Equal(t, int64(1), calls.Load())
+}
+
+func TestRecognizedPanicsReturnAndUserPanicsPropagate(t *testing.T) {
+	test := Test{Name: "invalid", Define: func(d *Def) error {
+		d.Param.Int("bad_name", 1, "")
 
 		return nil
-	})
-}
+	}}
+	_, err := RunTest(t.Context(), test, noopRunOptions())
+	require.Error(t, err)
 
-func (*reportTestWorkload) Iterate(_ context.Context, bench *Bench) error {
-	return bench.StepSilent("workload", func() error { return nil })
-}
+	test = Test{Name: "panic", Define: func(d *Def) error {
+		d.Execution.Step("work", func(context.Context, *Bench) error { panic("user panic") })
 
-func (*reportTestWorkload) Teardown(context.Context, *Bench) error { return nil }
+		return nil
+	}}
 
-func TestRunQuietSummaryDeliversMetricsSilently(t *testing.T) {
-	registerQuietSummaryWorkloadOnce.Do(func() {
-		Register(func() Workload { return &noopIterateWorkload{} })
-	})
-
-	var captured metricdata.ResourceMetrics
-
-	oldStderr := os.Stderr
-
-	pipeRead, pipeWrite, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
-	}
-
-	os.Stderr = pipeWrite
-
-	runErr := Run(
-		context.Background(),
-		"test/quiet-summary",
-		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		ParamInputs{CLI: map[string]string{"iterations": "7", "vus": "1"}},
-		nil,
-		nil,
-		zap.NewNop(),
-		&MetricsConfig{
-			Quiet: true,
-			OnSummary: func(data metricdata.ResourceMetrics) {
-				captured = data
-			},
-		},
+	require.PanicsWithValue(
+		t,
+		"user panic",
+		func() { _, _ = RunTest(t.Context(), test, noopRunOptions()) },
 	)
-
-	pipeWrite.Close()
-
-	os.Stderr = oldStderr
-
-	printed, _ := io.ReadAll(pipeRead)
-
-	pipeRead.Close()
-
-	if runErr != nil {
-		t.Fatalf("Run() error = %v", runErr)
-	}
-
-	if len(printed) != 0 {
-		t.Fatalf("quiet run printed %q to stderr, want silence", printed)
-	}
-
-	if captured.ScopeMetrics == nil {
-		t.Fatal("OnSummary did not receive the final snapshot")
-	}
-
-	var iterations float64
-
-	for _, scope := range captured.ScopeMetrics {
-		for _, metric := range scope.Metrics {
-			if metric.Name != "stroppy_iterations_total" {
-				continue
-			}
-
-			if sum, ok := metric.Data.(metricdata.Sum[float64]); ok {
-				for _, point := range sum.DataPoints {
-					iterations += point.Value
-				}
-			}
-		}
-	}
-
-	if iterations != 7 {
-		t.Fatalf("iterations_total = %v, want 7", iterations)
-	}
 }
 
-type noopIterateWorkload struct{}
+func TestConcurrentRunsAreIsolated(t *testing.T) {
+	test := Test{Name: "concurrent", Define: func(d *Def) error {
+		count, _ := d.Param.Int64("count", 1, "")
+		d.Execution.Step(
+			"work",
+			func(context.Context, *Bench) error { return nil },
+			SharedIterations(2, count),
+		)
 
-var registerQuietSummaryWorkloadOnce sync.Once
+		return d.Execution.Err()
+	}}
 
-func (*noopIterateWorkload) Name() string                        { return "test/quiet-summary" }
-func (*noopIterateWorkload) Define(*Def) error                   { return nil }
-func (*noopIterateWorkload) Setup(context.Context, *Bench) error { return nil }
-func (*noopIterateWorkload) Iterate(context.Context, *Bench) error {
-	return nil
-}
-func (*noopIterateWorkload) Teardown(context.Context, *Bench) error { return nil }
-
-type concurrentRunGate struct {
-	ready   chan struct{}
-	release chan struct{}
-}
-
-type concurrentRunWorkload struct {
-	gate *concurrentRunGate
-}
-
-var (
-	registerConcurrentRunWorkloadOnce sync.Once
-	concurrentRunGateState            atomic.Pointer[concurrentRunGate]
-)
-
-func registerConcurrentRunWorkload(gate *concurrentRunGate) {
-	concurrentRunGateState.Store(gate)
-	registerConcurrentRunWorkloadOnce.Do(func() {
-		Register(func() Workload {
-			return &concurrentRunWorkload{gate: concurrentRunGateState.Load()}
-		})
-	})
-}
-
-func (*concurrentRunWorkload) Name() string      { return "test/concurrent-runs" }
-func (*concurrentRunWorkload) Define(*Def) error { return nil }
-func (w *concurrentRunWorkload) Setup(context.Context, *Bench) error {
-	w.gate.ready <- struct{}{}
-
-	<-w.gate.release
-
-	return nil
-}
-func (*concurrentRunWorkload) Iterate(context.Context, *Bench) error  { return nil }
-func (*concurrentRunWorkload) Teardown(context.Context, *Bench) error { return nil }
-
-func TestConcurrentRunsKeepMetricsIsolated(t *testing.T) {
-	gate := &concurrentRunGate{ready: make(chan struct{}, 2), release: make(chan struct{})}
-
-	registerConcurrentRunWorkload(gate)
-
-	type result struct {
-		metrics metricdata.ResourceMetrics
-		err     error
-	}
-
-	run := func(iterations string) <-chan result {
-		done := make(chan result, 1)
-
-		go func() {
-			var captured metricdata.ResourceMetrics
-
-			err := Run(
-				context.Background(),
-				"test/concurrent-runs",
-				map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-				ParamInputs{CLI: map[string]string{"iterations": iterations, "vus": "2"}},
-				nil,
-				nil,
-				zap.NewNop(),
-				&MetricsConfig{Quiet: true, OnSummary: func(data metricdata.ResourceMetrics) { captured = data }},
+	var wg sync.WaitGroup
+	for _, count := range []int64{17, 29} {
+		wg.Go(func() {
+			options := noopRunOptions()
+			options.Params.CLI = map[string]string{"count": fmtInt(count)}
+			result, err := RunTest(t.Context(), test, options)
+			require.NoError(t, err)
+			require.InDelta(
+				t,
+				float64(count),
+				*result.Metrics["iterations_total"].Total,
+				0,
 			)
-			done <- result{metrics: captured, err: err}
-		}()
-
-		return done
+		})
 	}
 
-	first := run("37")
-	second := run("53")
-
-	for range 2 {
-		select {
-		case <-gate.ready:
-		case <-time.After(time.Second):
-			t.Fatal("concurrent runs did not reach setup barrier")
-		}
-	}
-
-	close(gate.release)
-
-	for _, test := range []struct {
-		result <-chan result
-		want   float64
-	}{{first, 37}, {second, 53}} {
-		got := <-test.result
-		if got.err != nil {
-			t.Fatalf("Run() error = %v", got.err)
-		}
-
-		if iterations := findSum(t, got.metrics, "stroppy_iterations_total"); iterations != test.want {
-			t.Fatalf("iterations = %v, want %v", iterations, test.want)
-		}
-	}
+	wg.Wait()
 }
+func fmtInt(value int64) string { return strconv.FormatInt(value, 10) }
+
+type testContextKey struct{}

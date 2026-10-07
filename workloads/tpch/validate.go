@@ -4,15 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"math"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/report"
-	"github.com/stroppy-io/stroppy/workloads"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
 // The SF=1 answer comparator logs diagnostic deltas without aborting the run.
@@ -31,7 +31,7 @@ type answersFile struct {
 }
 
 func loadAnswers() (*answersFile, error) {
-	data, err := workloads.ReadPresetFile(preset, "answers_sf1.json")
+	data, err := fs.ReadFile(files, "answers_sf1.json")
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +240,7 @@ func validateAnswers(
 	ctx context.Context, b *bench.Bench, sql *bench.SQL,
 	params map[string]map[string]any, scaleFactor float64, dt bench.DriverTypeName,
 ) validationReport {
-	lg := b.Logger().Sugar()
+	lg := b.Log
 
 	if math.Abs(scaleFactor-1) > 1e-9 {
 		const reason = "answers_sf1 is SF=1 only"
@@ -251,14 +251,14 @@ func validateAnswers(
 
 	if dt != bench.DriverPostgres {
 		reason := fmt.Sprintf("answers_sf1 generated against postgres only; driverType=%s", dt)
-		lg.Infof("[tpch_validate] skipped: %s", reason)
+		lg.Info("[tpch_validate] skipped: " + reason)
 
 		return validationReport{Status: "skipped", Reason: reason, Queries: []validationQuery{}}
 	}
 
 	af, err := loadAnswers()
 	if err != nil {
-		lg.Errorf("[tpch_validate] failed to load answers: %v", err)
+		lg.Error(fmt.Sprintf("[tpch_validate] failed to load answers: %v", err))
 
 		return validationReport{Status: "error", Reason: err.Error(), Queries: []validationQuery{}}
 	}
@@ -281,7 +281,7 @@ func validateAnswers(
 			continue
 		}
 
-		rows, qerr := b.QueryRows(ctx, body, params[name])
+		rows, qerr := b.RawRows(ctx, body, params[name])
 		if qerr != nil {
 			results = append(results, compareResult{
 				query: name, status: "error",
@@ -369,5 +369,5 @@ func logSummary(b *bench.Bench, results []compareResult) {
 		"  total=%d  ok=%d  diff=%d  skipped=%d  error=%d",
 		len(results), ok, mismatch, skipped, errN),
 	)
-	b.Logger().Sugar().Info(strings.Join(lines, "\n"))
+	b.Log.Info(strings.Join(lines, "\n"))
 }

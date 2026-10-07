@@ -1,94 +1,49 @@
-// Package execute_sql runs every named query from an inline or file SQL source.
-// Files resolve from cwd before embedded workload assets; markerless sources contain
-// no executable named queries.
+// Package execute_sql runs named queries from inline or file SQL sources.
 package execute_sql
 
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
 var (
-	errNoSQLSource        = errors.New("execute_sql: no SQL source — pass --sql-file <path> or --sql-body <inline sql>")
-	errSQLSourceNoQueries = errors.New("execute_sql: SQL source has no `--= name` queries")
+	errNoSQLSource        = errors.New("execute_sql: pass --sql-file or --sql-body")
+	errSQLSourceNoQueries = errors.New("execute_sql: SQL source has no named queries")
 )
 
 type workload struct {
-	sql     *bench.SQL
-	names   []string
-	preset  string
-	sqlBody string
-	sqlFile string
+	sql   *bench.SQL
+	names []string
 }
 
-func init() { bench.Register(func() bench.Workload { return &workload{} }) }
+var Test = bench.Test{Name: "execute_sql", Define: define, Source: publication("Test")}
 
-func (*workload) Name() string { return "execute_sql" }
-
-func (w *workload) Define(d *bench.Def) error {
-	sqlBody := d.Param.String(
-		"sql-body", "", "Inline SQL to execute.",
-		bench.LegacyEnvAliases("STROPPY_SQL_BODY"),
-	)
-	sqlFile := d.Param.String("sql-file", "", "SQL file to execute.")
-
-	bodyPriority := sqlSourcePriority(sqlBody.Source())
-	filePriority := sqlSourcePriority(sqlFile.Source())
+func init() { bench.Register(Test) }
+func define(d *bench.Def) error {
+	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
+	body, bodyInfo := d.Param.String("sql-body", "", "Inline SQL to execute.")
+	file, fileInfo := d.Param.String("sql-file", "", "SQL file to execute.")
+	w := &workload{}
 
 	switch {
-	case filePriority > bodyPriority:
-		w.sqlFile = sqlFile.Value()
-		w.sqlBody = ""
-	case bodyPriority > filePriority:
-		w.sqlBody = sqlBody.Value()
-		w.sqlFile = ""
-	case sqlFile.Value() != "" && sqlBody.Value() == "":
-		w.sqlFile = sqlFile.Value()
-		w.sqlBody = ""
-	default:
-		w.sqlBody = sqlBody.Value()
-		w.sqlFile = ""
-	}
-
-	return nil
-}
-
-func sqlSourcePriority(source bench.ParamSource) int {
-	switch source {
-	case bench.ParamSourceCLI:
-		return 5
-	case bench.ParamSourceProcessEnv:
-		return 4
-	case bench.ParamSourceLegacyEnv:
-		return 3
-	case bench.ParamSourceConfig:
-		return 2
-	case bench.ParamSourceLegacyConfigEnv:
-		return 1
-	default:
-		return 0
-	}
-}
-
-func (w *workload) Setup(_ context.Context, b *bench.Bench) error {
-	w.preset = "execute_sql"
-
-	switch {
-	case w.sqlBody != "":
-		w.sql = bench.ParseSQL(w.sqlBody)
-	case w.sqlFile != "":
-		s, err := bench.LoadSQL(w.preset, w.sqlFile)
+	case file != "" && (sqlSourcePriority(fileInfo.Source) > sqlSourcePriority(bodyInfo.Source) || body == ""):
+		sql, err := d.Queries.Override(file)
 		if err != nil {
-			return fmt.Errorf("execute_sql: load %s: %w", w.sqlFile, err)
+			return err
 		}
 
-		w.sql = s
+		w.sql = sql
+	case body != "":
+		w.sql = bench.ParseSQL(body)
 	default:
-		return errNoSQLSource
+		// Default-only discovery can describe a SQL runner without a source.
+		d.Execution.Step("validate_source", w.requireSource)
+		d.Execution.Step("workload", w.work, settings.Policy())
+
+		return d.Execution.Err()
 	}
 
 	w.names = w.sql.Names("")
@@ -96,41 +51,57 @@ func (w *workload) Setup(_ context.Context, b *bench.Bench) error {
 		return errSQLSourceNoQueries
 	}
 
+	d.Execution.Step("workload", w.work, settings.Policy())
+
+	return d.Execution.Err()
+}
+
+func sqlSourcePriority(source bench.ParamSource) int {
+	switch source {
+	case bench.ParamSourceCLI:
+		return 3
+	case bench.ParamSourceProcessEnv:
+		return 2
+	case bench.ParamSourceConfig:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func (w *workload) requireSource(context.Context, *bench.Bench) error {
+	if w.sql == nil {
+		return errNoSQLSource
+	}
+
 	return nil
 }
 
-func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
-	return b.StepSilent("workload", func() error {
-		lg := b.Logger().Sugar()
+func (w *workload) work(ctx context.Context, b *bench.Bench) error {
+	if w.sql == nil {
+		return errNoSQLSource
+	}
 
-		for _, name := range w.names {
-			body, ok := w.sql.Query("", name)
-			if !ok {
-				continue
-			}
-
-			start := time.Now()
-			err := b.Exec(ctx, body, nil)
-
-			ms := time.Since(start).Milliseconds()
-
-			if err != nil {
-				if ctx.Err() != nil {
-					return ctx.Err()
-				}
-
-				b.RecordQueryError(name, err)
-
-				continue
-			}
-
-			lg.Infof("[execute_sql] %s: ok in %dms", name, ms)
+	for _, name := range w.names {
+		body, ok := w.sql.Query("", name)
+		if !ok {
+			continue
 		}
 
-		return nil
-	})
-}
+		start := time.Now()
 
-func (*workload) Teardown(_ context.Context, b *bench.Bench) error {
+		if err := b.Exec(ctx, body, nil); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+
+			b.RecordError(name, err)
+
+			continue
+		}
+
+		b.Log.Info("query completed", "query", name, "elapsed", time.Since(start))
+	}
+
 	return nil
 }

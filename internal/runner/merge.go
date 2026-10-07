@@ -1,6 +1,6 @@
 package runner
 
-import "github.com/stroppy-io/stroppy/pkg/config"
+import "github.com/stroppy-io/stroppy/v6/pkg/config"
 
 // UnmarshalStrict validates the full JSON token stream before decoding it.
 func UnmarshalStrict(data []byte, v any) error {

@@ -14,15 +14,15 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/pkg/driver/mysql"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/mysql"
 )
 
 func TestInsertRejectsNilRequest(t *testing.T) {
 	t.Parallel()
 
-	_, err := (&Bench{}).Insert(context.Background(), nil)
+	_, err := (&Bench{}).insert(context.Background(), nil)
 	if !errors.Is(err, driver.ErrNilInsertRequest) {
 		t.Fatalf("Insert error = %v, want ErrNilInsertRequest", err)
 	}
@@ -44,7 +44,7 @@ func TestFirstQueryValueReturnsRowError(t *testing.T) {
 
 	sentinel := errors.New("rows")
 
-	value, err := firstQueryValue(&errorRows{err: sentinel})
+	value, err := firstQueryRow(&errorRows{err: sentinel})
 	if value != nil {
 		t.Fatalf("firstQueryValue() value = %v, want nil", value)
 	}
@@ -56,9 +56,8 @@ func TestFirstQueryValueReturnsRowError(t *testing.T) {
 
 type queryAPI interface {
 	Exec(ctx context.Context, sql string, args map[string]any) error
-	QueryValue(ctx context.Context, sql string, args map[string]any) (any, error)
-	QueryRow(ctx context.Context, sql string, args map[string]any) ([]any, error)
-	QueryRows(ctx context.Context, sql string, args map[string]any) ([][]any, error)
+	RawRow(ctx context.Context, sql string, args map[string]any) ([]any, error)
+	RawRows(ctx context.Context, sql string, args map[string]any) ([][]any, error)
 }
 
 type queryTestDriver struct {
@@ -188,19 +187,19 @@ func TestQueryNilRowsUseNoRowSemantics(t *testing.T) {
 		{
 			name: "query_value",
 			run: func(q queryAPI) (any, error) {
-				return q.QueryValue(context.Background(), "SELECT 1", nil)
+				return testScalar(q)
 			},
 		},
 		{
 			name: "query_row",
 			run: func(q queryAPI) (any, error) {
-				return q.QueryRow(context.Background(), "SELECT 1", nil)
+				return q.RawRow(context.Background(), "SELECT 1", nil)
 			},
 		},
 		{
 			name: "query_rows",
 			run: func(q queryAPI) (any, error) {
-				return q.QueryRows(context.Background(), "SELECT 1", nil)
+				return q.RawRows(context.Background(), "SELECT 1", nil)
 			},
 		},
 	}
@@ -256,7 +255,7 @@ func TestQueryTerminalErrorsAndMetrics(t *testing.T) {
 		{
 			name: "query_value",
 			run: func(q queryAPI) error {
-				_, err := q.QueryValue(context.Background(), "SELECT 1", nil)
+				_, err := testScalar(q)
 
 				return err
 			},
@@ -264,7 +263,7 @@ func TestQueryTerminalErrorsAndMetrics(t *testing.T) {
 		{
 			name: "query_row",
 			run: func(q queryAPI) error {
-				_, err := q.QueryRow(context.Background(), "SELECT 1", nil)
+				_, err := q.RawRow(context.Background(), "SELECT 1", nil)
 
 				return err
 			},
@@ -272,7 +271,7 @@ func TestQueryTerminalErrorsAndMetrics(t *testing.T) {
 		{
 			name: "query_rows",
 			run: func(q queryAPI) error {
-				_, err := q.QueryRows(context.Background(), "SELECT 1", nil)
+				_, err := q.RawRows(context.Background(), "SELECT 1", nil)
 
 				return err
 			},
@@ -297,7 +296,11 @@ func TestQueryTerminalErrorsAndMetrics(t *testing.T) {
 				err := operation.run(target)
 				require.ErrorIs(t, err, context.DeadlineExceeded)
 				require.ErrorIs(t, err, closeFailure)
-				require.Equal(t, 1, strings.Count(err.Error(), context.DeadlineExceeded.Error()))
+				require.Equal(
+					t,
+					1,
+					strings.Count(err.Error(), context.DeadlineExceeded.Error()),
+				)
 				require.False(t, metricsRecordedBeforeClose)
 				require.Equal(t, 1, rows.closeCalls)
 
@@ -456,7 +459,11 @@ func TestMySQLCallTimeoutIsReportedOnce(t *testing.T) {
 
 	err = fx.b.Exec(context.Background(), "CALL "+procedure+"()", nil)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-	require.Equal(t, 1, strings.Count(err.Error(), context.DeadlineExceeded.Error()))
+	require.Equal(
+		t,
+		1,
+		strings.Count(err.Error(), context.DeadlineExceeded.Error()),
+	)
 	require.Equal(t, 1, countingDriver.closeCalls)
 
 	var data metricdata.ResourceMetrics
@@ -465,4 +472,13 @@ func TestMySQLCallTimeoutIsReportedOnce(t *testing.T) {
 		operations: 1,
 		errors:     1,
 	}, collectQueryMetricCounts(t, data, fx.prefix))
+}
+
+func testScalar(q queryAPI) (any, error) {
+	row, err := q.RawRow(context.Background(), "SELECT 1", nil)
+	if err != nil || len(row) == 0 {
+		return nil, err
+	}
+
+	return row[0], nil
 }

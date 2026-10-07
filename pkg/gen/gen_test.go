@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // Golden values lock the derivation so a future change to the mixing core or

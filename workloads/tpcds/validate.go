@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"math"
 	"regexp"
 	"slices"
@@ -12,9 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/report"
-	"github.com/stroppy-io/stroppy/workloads"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
 // The SF=1 answer comparator treats results as multisets. Rows are sorted by a
@@ -36,7 +36,7 @@ type answersFile struct {
 }
 
 func loadAnswers() (*answersFile, error) {
-	data, err := workloads.ReadPresetFile(preset, "answers_sf1.json")
+	data, err := fs.ReadFile(files, "answers_sf1.json")
 	if err != nil {
 		return nil, err
 	}
@@ -297,11 +297,11 @@ func validateAnswers(
 	schema, queries *bench.SQL, names []string,
 	scaleFactor float64, dt bench.DriverTypeName, force bool,
 ) validationReport {
-	lg := b.Logger().Sugar()
+	lg := b.Log
 
 	if dt != bench.DriverPostgres && dt != bench.DriverMySQL {
 		reason := fmt.Sprintf("answers_sf1 validates postgres/mysql only; driverType=%s", dt)
-		lg.Infof("[tpcds_validate] skipped: %s", reason)
+		lg.Info("[tpcds_validate] skipped: " + reason)
 
 		return validationReport{Status: "skipped", Reason: reason, Queries: []validationQuery{}}
 	}
@@ -315,7 +315,7 @@ func validateAnswers(
 
 	af, err := loadAnswers()
 	if err != nil {
-		lg.Errorf("[tpcds_validate] failed to load answers: %v", err)
+		lg.Error(fmt.Sprintf("[tpcds_validate] failed to load answers: %v", err))
 
 		return validationReport{Status: "error", Reason: err.Error(), Queries: []validationQuery{}}
 	}
@@ -352,12 +352,12 @@ func validateAnswers(
 			qerr    error
 		)
 
-		txErr := b.BeginTx(ctx, bench.BeginOpts{Isolation: iso, Name: "tpcds_validate"}, func(tx *bench.TxX) error {
+		txErr := b.BeginTx(ctx, bench.BeginOpts{Isolation: iso, Name: "tpcds_validate"}, func(tx *bench.Tx) error {
 			for _, set := range sets {
 				_ = tx.Exec(ctx, set, nil) // best-effort; a failed SET must not abort
 			}
 
-			gotRows, qerr = tx.QueryRows(ctx, body, nil)
+			gotRows, qerr = tx.RawRows(ctx, body, nil)
 
 			return qerr
 		})
@@ -448,5 +448,5 @@ func logSummary(b *bench.Bench, results []compareResult) {
 		"  total=%d  ok=%d  diff=%d  skipped=%d  error=%d",
 		len(results), ok, mismatch, skipped, errN),
 	)
-	b.Logger().Sugar().Info(strings.Join(lines, "\n"))
+	b.Log.Info(strings.Join(lines, "\n"))
 }

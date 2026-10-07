@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	stroppyconfig "github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/pkg/driver/stats"
+	stroppyconfig "github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/stats"
 )
 
 // ErrCsvDriverNoQuery is returned when a non-DDL query reaches the

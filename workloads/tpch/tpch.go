@@ -11,7 +11,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/workloads/tpch/tpchgen"
 )
 
 var errScaleFactorMustBePositive = errors.New("SCALE_FACTOR must be positive")
@@ -34,101 +35,105 @@ type workload struct {
 }
 
 type queryMetrics struct {
-	duration     *bench.Metric
-	runs         *bench.Metric
-	errors       *bench.Metric
-	elapsedTotal *bench.Metric
+	duration     *bench.HistogramHandle
+	runs         *bench.CounterHandle
+	errors       *bench.CounterHandle
+	elapsedTotal *bench.CounterHandle
 }
 
-func init() { bench.Register(func() bench.Workload { return &workload{} }) }
+var Test = bench.Test{Name: "tpch/tx", Define: define, Source: publication("Test")}
 
-func (*workload) Name() string { return "tpch/tx" }
+func init() { bench.Register(Test) }
+func define(d *bench.Def) error {
+	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
+	w := &workload{}
+	d.Report.Contribute("tpch.validation", 1, w.validationContribution)
+	w.scaleFactor, _ = d.Param.Float64("scale-factor", 1, "TPC-H scale factor.")
+	w.loadWorkers, _ = d.Param.Int("load-workers", 0, "Workers used to load each table.")
+	w.useUnlogged, _ = d.Param.Bool("pg-unlogged", false, "Use unlogged tables while loading.")
+	w.ydbStoreMode, _ = d.Param.String("ydb-store-mode", "column", "YDB table store mode.")
 
-func (w *workload) Define(d *bench.Def) error {
-	d.Report("tpch.validation", 1, w.validationContribution)
-
-	w.scaleFactor = d.Param.Float64("scale-factor", 1, "TPC-H scale factor.").Value()
-	w.loadWorkers = d.Param.Int("load-workers", 0, "Workers used to load each table.").Value()
-	w.useUnlogged = d.Param.Bool("pg-unlogged", false, "Use unlogged PostgreSQL tables while loading.").Value()
-	w.ydbStoreMode = d.Param.String("ydb-store-mode", "column", "YDB table store mode.").Value()
-	w.sqlFile = d.Param.String("sql-file", "", "SQL dialect file override.").Value()
-
+	w.sqlFile, _ = d.Param.String("sql-file", "", "SQL dialect file override.")
 	if w.scaleFactor <= 0 {
 		return fmt.Errorf("%w, got %v", errScaleFactorMustBePositive, w.scaleFactor)
+	}
+
+	db := d.Drivers.Declare("default", bench.DriverConfig{})
+	w.driverType = db.Kind()
+	w.useUnlogged = w.useUnlogged && w.driverType == bench.DriverPostgres
+	w.ydbColumn = w.driverType == bench.DriverYDB && w.ydbStoreMode == "column"
+	w.isPicodata = w.driverType == bench.DriverPicodata
+	w.needsEndDates = w.isPicodata || w.driverType == bench.DriverYDB
+
+	var err error
+	if w.sqlFile != "" {
+		w.sql, err = d.Queries.Override(w.sqlFile)
+	} else {
+		w.sql, err = d.Queries.Load(files, sqlFile(w.driverType, ""))
+	}
+
+	if err != nil {
+		return err
+	}
+
+	w.m = w.initMetrics(&d.Metrics)
+
+	w.params = w.buildParams()
+	for _, name := range []string{"drop_schema", "create_schema"} {
+		section := sqlSection{w, name}
+		d.Execution.Step(name, section.Run)
+	}
+
+	if w.useUnlogged {
+		section := sqlSection{w, "set_unlogged"}
+		d.Execution.Step(section.name, section.Run)
+	}
+
+	d.Execution.Step("load_data", w.load)
+	section := sqlSection{w, "create_indexes"}
+	d.Execution.Step(section.name, section.Run)
+
+	if w.useUnlogged {
+		loggedSection := sqlSection{w, "set_logged"}
+		d.Execution.Step(loggedSection.name, loggedSection.Run)
+	}
+
+	section = sqlSection{w, "analyze"}
+	d.Execution.Step(section.name, section.Run)
+	d.Execution.Step("validate_answers", w.validate)
+	d.Execution.Step("workload", w.runQueries, settings.Policy())
+
+	return d.Execution.Err()
+}
+
+type sqlSection struct {
+	workload *workload
+	name     string
+}
+
+func (s sqlSection) Run(ctx context.Context, b *bench.Bench) error {
+	section := s.name
+	if section == "create_schema" && s.workload.ydbColumn {
+		section = "create_schema_column"
+	}
+
+	for _, q := range s.workload.sql.Section(section) {
+		if err := b.Exec(ctx, q, nil); err != nil {
+			return fmt.Errorf("%s: %w", section, err)
+		}
 	}
 
 	return nil
 }
 
-func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
-	w.driverType = b.DriverTypeName()
-
-	w.initConfig()
-
-	// Per-query metrics (22 × 4).
-	w.m = w.initMetrics(b)
-
-	// Final per-query params: base §2.4 values, with pico/ydb end dates and the
-	// q1 picodata shipdate_cutoff precomputed once.
-	w.params = w.buildParams()
-
-	runSection := func(name string) error {
-		for _, q := range w.sql.Section(name) {
-			if err := b.Exec(ctx, q, nil); err != nil {
-				return fmt.Errorf("%s: %w", name, err)
-			}
+func (w *workload) load(ctx context.Context, b *bench.Bench) error {
+	for _, table := range tpchTables {
+		source, err := tpchgen.NewBatchSource(table, w.scaleFactor)
+		if err != nil {
+			return err
 		}
 
-		return nil
-	}
-
-	type step struct {
-		name string
-		fn   func() error
-	}
-
-	var steps []step
-
-	addStep := func(name string, fn func() error) { steps = append(steps, step{name, fn}) }
-
-	addStep("drop_schema", func() error { return runSection("drop_schema") })
-	addStep("create_schema", func() error {
-		section := "create_schema"
-		if w.ydbColumn {
-			section = "create_schema_column"
-		}
-
-		return runSection(section)
-	})
-
-	if w.useUnlogged {
-		addStep("set_unlogged", func() error { return runSection("set_unlogged") })
-	}
-
-	addStep("load_data", func() error {
-		for _, table := range tpchTables {
-			if _, err := b.InsertTpch(ctx, table, w.scaleFactor, w.loadWorkers); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-	addStep("create_indexes", func() error { return runSection("create_indexes") })
-
-	if w.useUnlogged {
-		addStep("set_logged", func() error { return runSection("set_logged") })
-	}
-
-	addStep("analyze", func() error { return runSection("analyze") })
-	addStep("validate_answers", func() error {
-		w.validation = validateAnswers(ctx, b, w.sql, w.params, w.scaleFactor, w.driverType)
-
-		return nil
-	})
-
-	for _, s := range steps {
-		if err := b.Step(s.name, s.fn); err != nil {
+		if _, err = b.Insert(ctx, table, source, bench.LoadWorkers(max(w.loadWorkers, 1))); err != nil {
 			return err
 		}
 	}
@@ -136,21 +141,18 @@ func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
 	return nil
 }
 
-// initConfig resolves driver-specific workload configuration.
-func (w *workload) initConfig() {
-	w.useUnlogged = w.useUnlogged && w.driverType == bench.DriverPostgres
-	w.ydbColumn = w.driverType == bench.DriverYDB && w.ydbStoreMode == "column"
-	w.isPicodata = w.driverType == bench.DriverPicodata
-	w.needsEndDates = w.isPicodata || w.driverType == bench.DriverYDB
-	w.sql = mustLoadSQL(w.driverType, w.sqlFile)
+func (w *workload) validate(ctx context.Context, b *bench.Bench) error {
+	w.validation = validateAnswers(ctx, b, w.sql, w.params, w.scaleFactor, w.driverType)
+
+	return nil
 }
 
 // initMetrics wires the per-query duration/counters (22 × 4).
-func (w *workload) initMetrics(b *bench.Bench) map[string]*queryMetrics {
+func (w *workload) initMetrics(b *bench.MetricDeclarations) map[string]*queryMetrics {
 	m := make(map[string]*queryMetrics, len(queryNames))
 	for _, name := range queryNames {
 		m[name] = &queryMetrics{
-			duration:     b.Trend("tpch_" + name + "_duration"),
+			duration:     b.Histogram("tpch_" + name + "_duration"),
 			runs:         b.Counter("tpch_" + name + "_runs"),
 			errors:       b.Counter("tpch_" + name + "_errors"),
 			elapsedTotal: b.Counter("tpch_" + name + "_elapsed_total"),
@@ -183,58 +185,52 @@ func (w *workload) buildParams() map[string]map[string]any {
 	return params
 }
 
-func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
-	return b.StepSilent("workload", func() error {
-		return w.runQueries(ctx, b)
-	})
-}
-
 // runQueries executes q1..q22 once each with pinned defaults, draining rows and
 // recording per-query timing/error metrics. Rows are discarded (throughput pass).
 func (w *workload) runQueries(ctx context.Context, b *bench.Bench) error {
-	lg := b.Logger().Sugar()
+	lg := b.Log
 
 	for _, name := range queryNames {
 		body, ok := w.sql.Query(name, "body")
 		if !ok {
-			lg.Infof("[tpch] %s: skipped (no body in SQL file)", name)
+			lg.Info("query skipped", "query", name)
 
 			continue
 		}
 
 		start := time.Now()
-		_, err := b.QueryRows(ctx, body, w.params[name])
+		_, err := b.RawRows(ctx, body, w.params[name])
 		elapsed := time.Since(start).Milliseconds()
-		w.recordAttempt(name, float64(elapsed), err != nil)
+		w.recordAttempt(ctx, name, float64(elapsed), err != nil)
 
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
 
-			b.RecordQueryError(name, err)
+			b.RecordError(name, err)
 
 			continue
 		}
 
-		lg.Infof("[tpch] %s: ok in %dms", name, elapsed)
+		lg.Info("query completed", "query", name, "milliseconds", elapsed)
 	}
 
 	return nil
 }
 
-func (w *workload) recordAttempt(name string, elapsedMs float64, failed bool) {
+func (w *workload) recordAttempt(ctx context.Context, name string, elapsedMs float64, failed bool) {
 	qm := w.m[name]
 	if qm == nil {
 		return
 	}
 
-	qm.runs.Add(1)
-	qm.duration.Add(elapsedMs)
-	qm.elapsedTotal.Add(elapsedMs)
+	qm.runs.Add(ctx, 1)
+	qm.duration.Record(ctx, elapsedMs)
+	qm.elapsedTotal.Add(ctx, elapsedMs)
 
 	if failed {
-		qm.errors.Add(1)
+		qm.errors.Add(ctx, 1)
 	}
 }
 

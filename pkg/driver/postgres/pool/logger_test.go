@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/v6/pkg/common/logger"
 )
 
 func TestNewLoggerTracer(t *testing.T) {
@@ -16,6 +16,12 @@ func TestNewLoggerTracer(t *testing.T) {
 	tracer, err := newLoggerTracer(log)
 	require.NoError(t, err)
 	require.NotNil(t, tracer)
+}
+
+func TestNewLoggerTracerWithDisabledLogger(t *testing.T) {
+	tracer, err := newLoggerTracer(zap.NewNop())
+	require.NoError(t, err)
+	require.Equal(t, tracelog.LogLevelNone, tracer.LogLevel)
 }
 
 func TestPgxExtLogger_Log(_ *testing.T) {

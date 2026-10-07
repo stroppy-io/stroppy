@@ -12,11 +12,10 @@ import (
 	"math/rand/v2"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
 var txNames = []string{"new_order", "payment", "order_status", "delivery", "stock_level"}
@@ -61,59 +60,167 @@ type workload struct {
 	wIDMax         int64
 	loadItems      bool
 
-	m           *metrics
-	retryPolicy bench.RetryPolicy
+	m *metrics
 
 	measureStart time.Time
 	measureEnd   time.Time
 	steady       *steady
 
-	vuStates sync.Map // uint64 -> *vuState
+	vuStates []*vuState
 }
 
 type metrics struct {
-	newOrderTotal, paymentTotal, orderStatusTotal, deliveryTotal, stockLevelTotal *bench.Metric
-	rollbackDecided, rollbackDone                                                 *bench.Metric
-	paymentRemote, paymentByname, paymentBc                                       *bench.Metric
-	orderStatusByname                                                             *bench.Metric
-	remoteLineTotal, remoteLineRemote                                             *bench.Metric
-	retryAttempts                                                                 *bench.Metric
-	newOrderDur, paymentDur, orderStatusDur, deliveryDur, stockLevelDur           *bench.Metric
+	newOrderTotal, paymentTotal, orderStatusTotal, deliveryTotal, stockLevelTotal *bench.CounterHandle
+	rollbackDecided, rollbackDone                                                 *bench.CounterHandle
+	paymentRemote, paymentByname, paymentBc                                       *bench.CounterHandle
+	orderStatusByname                                                             *bench.CounterHandle
+	remoteLineTotal, remoteLineRemote                                             *bench.CounterHandle
+	retryAttempts, populationRetryAttempts                                        *bench.CounterHandle
+	newOrderDur, paymentDur, orderStatusDur, deliveryDur, stockLevelDur           *bench.HistogramHandle
 }
 
-func init() {
-	bench.Register(func() bench.Workload { return &workload{variant: "tx"} })
-	bench.Register(func() bench.Workload { return &workload{variant: "procs"} })
-}
+var (
+	Tx    = bench.Test{Name: "tpcc/tx", Define: defineTx, Source: publication("Tx")}
+	Procs = bench.Test{Name: "tpcc/procs", Define: defineProcs, Source: publication("Procs")}
+)
 
-func (w *workload) Name() string { return "tpcc/" + w.variant }
+func init()                          { bench.Register(Tx); bench.Register(Procs) }
+func defineTx(d *bench.Def) error    { return define(d, "tx") }
+func defineProcs(d *bench.Def) error { return define(d, "procs") }
 
-func (w *workload) Define(d *bench.Def) error {
-	d.Report("tpcc.compliance", 1, w.complianceContribution)
-
-	warehouses := d.Param.Int(
-		"scale-factor", 1, "Number of warehouses.", bench.LegacyEnvAliases("WAREHOUSES"),
-	).Value()
+//nolint:funlen // workload options and ordered phases stay visible.
+func define(d *bench.Def, variant string) error {
+	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
+	w := &workload{variant: variant, vuStates: make([]*vuState, settings.Workers)}
+	d.Report.Contribute("tpcc.compliance", 1, w.complianceContribution)
+	d.Report.Render("tpcc.compliance", renderCompliance)
+	warehouses, _ := d.Param.Int(
+		"scale-factor",
+		1,
+		"Number of warehouses.",
+		bench.Aliases("warehouses"),
+	)
 	w.warehouses = int64(max(warehouses, 1))
-	w.warehouseStart = int64(d.Param.Int("warehouse-start", 1, "First warehouse ID.").Value())
+	start, _ := d.Param.Int("warehouse-start", 1, "First warehouse ID.")
+	w.warehouseStart = int64(start)
 	w.wIDMax = w.warehouseStart + w.warehouses - 1
-	w.loadItems = d.Param.Bool(
+	w.loadItems, _ = d.Param.Bool(
 		"load-items",
 		w.warehouseStart == 1,
-		"Load the shared item table.",
-		bench.DerivedDefault("true when warehouse-start is 1; false otherwise"),
-	).Value()
-	w.pacing = d.Param.Bool("pacing", false, "Apply TPC-C keying and think times.").Value()
-	w.retryAttempts = d.Param.Int(
-		"retry-attempts", 3, "Maximum attempts per transaction or population validation query.",
-	).Value()
-	w.pgUnlogged = d.Param.Bool("pg-unlogged", false, "Use unlogged PostgreSQL tables while loading.").Value()
-	w.iso = bench.TxIsolationName(d.Param.String("tx-isolation", "", "Transaction isolation override.").Value())
-	w.sqlFile = d.Param.String("sql-file", "", "SQL dialect file override.").Value()
-	w.loadWorkers = d.Param.Int("load-workers", 1, "Workers used to load each table.").Value()
+		"Load shared item table.",
+		bench.DerivedDefault("true when warehouse-start is 1"),
+	)
+	w.pacing, _ = d.Param.Bool("pacing", false, "Apply keying and think times.")
+	w.retryAttempts, _ = d.Param.Int("retry-attempts", 3, "Maximum transaction attempts.")
+	w.pgUnlogged, _ = d.Param.Bool("pg-unlogged", false, "Use unlogged tables while loading.")
+	iso, _ := d.Param.String("tx-isolation", "", "Transaction isolation override.")
+	w.sqlFile, _ = d.Param.String("sql-file", "", "SQL dialect file override.")
+	w.loadWorkers, _ = d.Param.Int("load-workers", 1, "Workers used to load each table.")
 	w.loadWorkers = max(w.loadWorkers, 1)
+	db := d.Drivers.Declare("default", bench.DriverConfig{})
+	w.driverType = db.Kind()
+
+	w.iso = resolveIsolation(w.driverType, bench.TxIsolationName(iso))
+	if variant == "procs" && (w.driverType == bench.DriverPicodata || w.driverType == bench.DriverYDB) {
+		return errProcsDriverUnsupported
+	}
+
+	var err error
+	if w.sqlFile != "" {
+		w.sql, err = d.Queries.Override(w.sqlFile)
+	} else {
+		w.sql, err = d.Queries.Load(files, sqlFile(w.driverType, ""))
+	}
+
+	if err != nil {
+		return err
+	}
+
+	w.isPicodata = w.driverType == bench.DriverPicodata
+	w.isYdb = w.driverType == bench.DriverYDB
+	w.hasReturning = w.driverType == bench.DriverPostgres || w.driverType == bench.DriverYDB
+
+	w.m = w.initMetrics(&d.Metrics)
+	for _, name := range []string{"drop_schema", "create_schema"} {
+		section := sqlSection{workload: w, name: name}
+		d.Execution.Step(name, section.Run)
+	}
+
+	if variant == "procs" {
+		section := sqlSection{workload: w, name: "create_procedures"}
+		d.Execution.Step(section.name, section.Run)
+	}
+
+	unlogged := w.pgUnlogged && w.driverType == bench.DriverPostgres
+	if unlogged {
+		section := sqlSection{workload: w, name: "set_unlogged"}
+		d.Execution.Step(section.name, section.Run)
+	}
+
+	d.Execution.Step("load_data", w.load)
+	section := sqlSection{workload: w, name: "create_indexes"}
+	d.Execution.Step(section.name, section.Run)
+
+	if unlogged {
+		loggedSection := sqlSection{workload: w, name: "set_logged"}
+		d.Execution.Step(loggedSection.name, loggedSection.Run)
+	}
+
+	for _, name := range []string{"create_foreign_keys", "analyze"} {
+		nextSection := sqlSection{workload: w, name: name}
+		d.Execution.Step(name, nextSection.Run)
+	}
+
+	d.Execution.Step("validate_population", w.validate)
+	w.measureStart = time.Now()
+	w.steady = w.initSteady()
+	d.Execution.Step("workload", w.Iterate, settings.Policy())
+	w.measureEnd = time.Now()
+
+	return d.Execution.Err()
+}
+func (w *workload) Name() string { return "tpcc/" + w.variant }
+
+type sqlSection struct {
+	workload *workload
+	name     string
+}
+
+func (s sqlSection) Run(ctx context.Context, b *bench.Bench) error {
+	for _, q := range s.workload.sql.Section(s.name) {
+		if s.name == "create_schema" {
+			q = s.workload.renderDDL(q)
+		}
+
+		if err := b.Exec(ctx, q, nil); err != nil {
+			return fmt.Errorf("%s: %w", s.name, err)
+		}
+	}
 
 	return nil
+}
+
+func (w *workload) load(ctx context.Context, b *bench.Bench) error {
+	return w.loadData(ctx, b, time.Now().UTC().Unix()/86400)
+}
+
+func (w *workload) validate(ctx context.Context, b *bench.Bench) error {
+	return validatePopulation(
+		ctx,
+		b,
+		w.warehouses,
+		w.warehouseStart,
+		w.wIDMax,
+		w.retryAttempts,
+		w.m.populationRetryAttempts,
+	)
+}
+
+func (w *workload) retryOptions(ctx context.Context) bench.RetryOptions {
+	return bench.RetryOptions{
+		MaxAttempts: w.retryAttempts,
+		OnRetry:     func(int, error, bench.RetryDecision) { w.m.retryAttempts.Add(ctx, 1) },
+	}
 }
 
 // renderDDL expands the ydb.sql {partition_keys}/{partition_count} tablet-split
@@ -142,88 +249,6 @@ func (w *workload) renderDDL(s string) string {
 	return strings.ReplaceAll(s, "{partition_count}", count)
 }
 
-func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
-	w.driverType = b.DriverTypeName()
-	if w.variant == "procs" && (w.driverType == bench.DriverPicodata || w.driverType == bench.DriverYDB) {
-		return errProcsDriverUnsupported
-	}
-
-	w.initConfig()
-	useUnlogged := w.pgUnlogged && w.driverType == bench.DriverPostgres
-	w.m = w.initMetrics(b)
-	w.retryPolicy = b.TxRetryPolicy(bench.TxRetryPolicyOptions{
-		MaxAttempts: w.retryAttempts,
-		OnRetry:     func(int, error, bench.RetryDecision) { w.m.retryAttempts.Add(1) },
-	})
-
-	loadDays := time.Now().UTC().Unix() / 86400
-
-	runSection := func(name string) error {
-		for _, q := range w.sql.Section(name) {
-			if err := b.Exec(ctx, q, nil); err != nil {
-				return fmt.Errorf("%s: %w", name, err)
-			}
-		}
-
-		return nil
-	}
-
-	type step struct {
-		name string
-		fn   func() error
-	}
-
-	var steps []step
-
-	addStep := func(name string, fn func() error) { steps = append(steps, step{name, fn}) }
-
-	addStep("drop_schema", func() error { return runSection("drop_schema") })
-	addStep("create_schema", func() error {
-		// ydb.sql DDL carries {partition_keys}/{partition_count} tablet-split
-		// placeholders rendered here from the warehouse range. Other dialects
-		// do not carry these tokens.
-		for _, q := range w.sql.Section("create_schema") {
-			if err := b.Exec(ctx, w.renderDDL(q), nil); err != nil {
-				return fmt.Errorf("create_schema: %w", err)
-			}
-		}
-
-		return nil
-	})
-
-	if w.variant == "procs" {
-		addStep("create_procedures", func() error { return runSection("create_procedures") })
-	}
-
-	if useUnlogged {
-		addStep("set_unlogged", func() error { return runSection("set_unlogged") })
-	}
-
-	addStep("load_data", func() error { return w.loadData(ctx, b, loadDays) })
-	addStep("create_indexes", func() error { return runSection("create_indexes") })
-
-	if useUnlogged {
-		addStep("set_logged", func() error { return runSection("set_logged") })
-	}
-
-	addStep("create_foreign_keys", func() error { return runSection("create_foreign_keys") })
-	addStep("analyze", func() error { return runSection("analyze") })
-	addStep("validate_population", func() error {
-		return validatePopulation(ctx, b, w.warehouses, w.warehouseStart, w.wIDMax, w.retryAttempts)
-	})
-
-	for _, s := range steps {
-		if err := b.Step(s.name, s.fn); err != nil {
-			return err
-		}
-	}
-
-	w.measureStart = time.Now()
-	w.steady = w.initSteady()
-
-	return nil
-}
-
 // initSteady allocates the paced steady-state tracker, or nil for unpaced runs.
 func (w *workload) initSteady() *steady {
 	if !w.pacing {
@@ -233,74 +258,94 @@ func (w *workload) initSteady() *steady {
 	return newSteady(w.measureStart, steadySlotWidth, steadySlotCount)
 }
 
-// initConfig resolves driver-specific workload configuration.
-func (w *workload) initConfig() {
-	w.iso = resolveIsolation(w.driverType, w.iso)
-	w.sql = mustLoadSQL(w.driverType, w.sqlFile)
-	w.isPicodata = w.driverType == bench.DriverPicodata
-	w.isYdb = w.driverType == bench.DriverYDB
-	w.hasReturning = w.driverType == bench.DriverPostgres || w.driverType == bench.DriverYDB
-}
-
 // initMetrics wires the per-transaction counters and duration trends.
-func (w *workload) initMetrics(b *bench.Bench) *metrics {
+func (w *workload) initMetrics(b *bench.MetricDeclarations) *metrics {
 	return &metrics{
-		newOrderTotal:     b.Counter("tpcc_new_order_total"),
-		paymentTotal:      b.Counter("tpcc_payment_total"),
-		orderStatusTotal:  b.Counter("tpcc_order_status_total"),
-		deliveryTotal:     b.Counter("tpcc_delivery_total"),
-		stockLevelTotal:   b.Counter("tpcc_stock_level_total"),
-		rollbackDecided:   b.Counter("tpcc_rollback_decided"),
-		rollbackDone:      b.Counter("tpcc_rollback_done"),
-		paymentRemote:     b.Counter("tpcc_payment_remote"),
-		paymentByname:     b.Counter("tpcc_payment_byname"),
-		paymentBc:         b.Counter("tpcc_payment_bc"),
-		orderStatusByname: b.Counter("tpcc_order_status_byname"),
-		remoteLineTotal:   b.Counter("tpcc_remote_line_total"),
-		remoteLineRemote:  b.Counter("tpcc_remote_line_remote"),
-		retryAttempts:     b.Counter("tpcc_retry_attempts"),
-		newOrderDur:       b.Trend("tpcc_new_order_duration"),
-		paymentDur:        b.Trend("tpcc_payment_duration"),
-		orderStatusDur:    b.Trend("tpcc_order_status_duration"),
-		deliveryDur:       b.Trend("tpcc_delivery_duration"),
-		stockLevelDur:     b.Trend("tpcc_stock_level_duration"),
+		newOrderTotal:           b.Counter("tpcc_new_order_total"),
+		paymentTotal:            b.Counter("tpcc_payment_total"),
+		orderStatusTotal:        b.Counter("tpcc_order_status_total"),
+		deliveryTotal:           b.Counter("tpcc_delivery_total"),
+		stockLevelTotal:         b.Counter("tpcc_stock_level_total"),
+		rollbackDecided:         b.Counter("tpcc_rollback_decided"),
+		rollbackDone:            b.Counter("tpcc_rollback_done"),
+		paymentRemote:           b.Counter("tpcc_payment_remote"),
+		paymentByname:           b.Counter("tpcc_payment_byname"),
+		paymentBc:               b.Counter("tpcc_payment_bc"),
+		orderStatusByname:       b.Counter("tpcc_order_status_byname"),
+		remoteLineTotal:         b.Counter("tpcc_remote_line_total"),
+		remoteLineRemote:        b.Counter("tpcc_remote_line_remote"),
+		retryAttempts:           b.Counter("tpcc_retry_attempts"),
+		populationRetryAttempts: b.Counter("tpcc_population_retry_attempts"),
+		newOrderDur:             b.Histogram("tpcc_new_order_duration"),
+		paymentDur:              b.Histogram("tpcc_payment_duration"),
+		orderStatusDur:          b.Histogram("tpcc_order_status_duration"),
+		deliveryDur:             b.Histogram("tpcc_delivery_duration"),
+		stockLevelDur:           b.Histogram("tpcc_stock_level_duration"),
 	}
 }
 
 // loadData loads warehouse, district, customer, item, stock, orders,
 // order_line, and new_order through typed insert requests.
 func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64) error {
-	if _, err := b.Insert(ctx, warehouseRequest(w.warehouses, w.warehouseStart, w.loadWorkers)); err != nil {
+	if _, err := insertRows(
+		ctx,
+		b,
+		warehouseRequest(w.warehouses, w.warehouseStart, w.loadWorkers),
+	); err != nil {
 		return err
 	}
 
-	if _, err := b.Insert(ctx, districtRequest(w.warehouses, w.warehouseStart, w.loadWorkers)); err != nil {
+	if _, err := insertRows(
+		ctx,
+		b,
+		districtRequest(w.warehouses, w.warehouseStart, w.loadWorkers),
+	); err != nil {
 		return err
 	}
 
-	if _, err := b.Insert(ctx, customerRequest(w.warehouses, w.warehouseStart, loadDays, w.loadWorkers)); err != nil {
+	if _, err := insertRows(
+		ctx,
+		b,
+		customerRequest(w.warehouses, w.warehouseStart, loadDays, w.loadWorkers),
+	); err != nil {
 		return err
 	}
 
 	if w.loadItems {
-		if _, err := b.Insert(ctx, itemRequest(w.loadWorkers)); err != nil {
+		if _, err := insertRows(ctx, b, itemRequest(w.loadWorkers)); err != nil {
 			return err
 		}
 	}
 
-	if _, err := b.Insert(ctx, stockRequest(w.warehouses, w.warehouseStart, w.loadWorkers)); err != nil {
+	if _, err := insertRows(
+		ctx,
+		b,
+		stockRequest(w.warehouses, w.warehouseStart, w.loadWorkers),
+	); err != nil {
 		return err
 	}
 
-	if _, err := b.Insert(ctx, ordersRequest(w.warehouses, w.warehouseStart, loadDays, w.loadWorkers)); err != nil {
+	if _, err := insertRows(
+		ctx,
+		b,
+		ordersRequest(w.warehouses, w.warehouseStart, loadDays, w.loadWorkers),
+	); err != nil {
 		return err
 	}
 
-	if _, err := b.Insert(ctx, orderLineRequest(w.warehouses, w.warehouseStart, loadDays, w.loadWorkers)); err != nil {
+	if _, err := insertRows(
+		ctx,
+		b,
+		orderLineRequest(w.warehouses, w.warehouseStart, loadDays, w.loadWorkers),
+	); err != nil {
 		return err
 	}
 
-	if _, err := b.Insert(ctx, newOrderRequest(w.warehouses, w.warehouseStart, w.loadWorkers)); err != nil {
+	if _, err := insertRows(
+		ctx,
+		b,
+		newOrderRequest(w.warehouses, w.warehouseStart, w.loadWorkers),
+	); err != nil {
 		return err
 	}
 
@@ -308,12 +353,13 @@ func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64)
 }
 
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
-	vs := w.vuState(b.VUID(), w.warehouseStart, w.warehouses)
+	//nolint:gosec // worker is nonnegative and bounded by allocated worker state.
+	vs := w.vuState(uint64(b.Worker()+1), w.warehouseStart, w.warehouses)
 	if w.variant == "procs" {
 		return w.iterateProcs(ctx, b, vs)
 	}
 
-	return b.Transaction(func() error {
+	return b.LogicalOperation(func() error {
 		idx := weightedPick(vs.picker, txWeights)
 		name := txNames[idx]
 
@@ -375,10 +421,10 @@ func (w *workload) q(section, name string) string {
 // --- new_order ---
 
 func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) error {
-	w.m.newOrderTotal.Add(1)
+	w.m.newOrderTotal.Add(ctx, 1)
 
 	start := time.Now()
-	defer func() { w.m.newOrderDur.Add(float64(time.Since(start).Milliseconds())) }()
+	defer func() { w.m.newOrderDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
 
 	wID := vs.homeWID
 	dID := vs.ri(vs.noDID, 1, districtsPerWarehouse)
@@ -394,10 +440,10 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) er
 		lineIID[i] = vs.nurand(vs.noItem, 8191, 1, items, vs.noItemSalt)
 		lineQty[i] = vs.ri(vs.noQty, 1, 10)
 
-		w.m.remoteLineTotal.Add(1)
+		w.m.remoteLineTotal.Add(ctx, 1)
 
 		if w.warehouses > 1 && vs.ri(vs.noRemoteLine, 1, 100) <= 1 {
-			w.m.remoteLineRemote.Add(1)
+			w.m.remoteLineRemote.Add(ctx, 1)
 
 			lineSupply[i] = vs.pickRemoteWh()
 			allLocal = 0
@@ -408,12 +454,12 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) er
 
 	forceRollback := vs.ri(vs.noRollback, 1, 100) <= 1 && w.iso != bench.IsoNone
 	if forceRollback {
-		w.m.rollbackDecided.Add(1)
+		w.m.rollbackDecided.Add(ctx, 1)
 
 		lineIID[olCnt-1] = items + 1 // nonexistent item → sentinel rollback
 	}
 
-	if err := bench.Retry0(ctx, w.retryPolicy, func() error {
+	if err := bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
 		tx, err := b.Begin(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"})
 		if err != nil {
 			return err
@@ -454,14 +500,14 @@ func finishNewOrder(bodyErr, rollbackErr error) error {
 	return bodyErr
 }
 
-//nolint:gocognit,gocyclo,cyclop,funlen // TPC-C spec transaction; complexity is inherent to the spec.
+//nolint:gocognit,gocyclo,cyclop,funlen,maintidx // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) newOrderBody(
-	ctx context.Context, tx *bench.TxX,
+	ctx context.Context, tx *bench.Tx,
 	wID, dID, cID, olCnt, allLocal int64,
 	lineIID, lineQty, lineSupply []int64,
 	forceRollback bool,
 ) error {
-	custRow, err := tx.QueryRow(ctx, w.q("workload_tx_new_order", "get_customer"), map[string]any{
+	custRow, err := tx.RawRow(ctx, w.q("workload_tx_new_order", "get_customer"), map[string]any{
 		"c_id": cID, "d_id": dID, "w_id": wID,
 	})
 	if err != nil {
@@ -472,7 +518,11 @@ func (w *workload) newOrderBody(
 		return fmt.Errorf("%w: (%d,%d,%d)", errNewOrderCustomerMissing, wID, dID, cID)
 	}
 
-	whRow, err := tx.QueryRow(ctx, w.q("workload_tx_new_order", "get_warehouse"), map[string]any{"w_id": wID})
+	whRow, err := tx.RawRow(
+		ctx,
+		w.q("workload_tx_new_order", "get_warehouse"),
+		map[string]any{"w_id": wID},
+	)
 	if err != nil {
 		return err
 	}
@@ -481,7 +531,7 @@ func (w *workload) newOrderBody(
 		return fmt.Errorf("%w: %d", errNewOrderWarehouseMissing, wID)
 	}
 
-	distRow, err := tx.QueryRow(ctx, w.q("workload_tx_new_order", "get_district"), map[string]any{
+	distRow, err := tx.RawRow(ctx, w.q("workload_tx_new_order", "get_district"), map[string]any{
 		"d_id": dID, "w_id": wID,
 	})
 	if err != nil {
@@ -516,7 +566,16 @@ func (w *workload) newOrderBody(
 	// Batch item read (IN list).
 	uniqueIDs := uniqueInt64s(lineIID)
 
-	itemRows, err := w.batchRead(ctx, tx, "workload_tx_new_order", "get_items_batch", "{item_ids}", wID, uniqueIDs, true)
+	itemRows, err := w.batchRead(
+		ctx,
+		tx,
+		"workload_tx_new_order",
+		"get_items_batch",
+		"{item_ids}",
+		wID,
+		uniqueIDs,
+		true,
+	)
 	if err != nil {
 		return err
 	}
@@ -533,7 +592,7 @@ func (w *workload) newOrderBody(
 			}
 		}
 
-		w.m.rollbackDone.Add(1)
+		w.m.rollbackDone.Add(ctx, 1)
 
 		return errRollbackSentinel
 	}
@@ -563,7 +622,16 @@ func (w *workload) newOrderBody(
 			ids = append(ids, iid)
 		}
 
-		rows, err := w.batchRead(ctx, tx, "workload_tx_new_order", "get_stocks_batch", "{item_ids}", sw, ids, false)
+		rows, err := w.batchRead(
+			ctx,
+			tx,
+			"workload_tx_new_order",
+			"get_stocks_batch",
+			"{item_ids}",
+			sw,
+			ids,
+			false,
+		)
 		if err != nil {
 			return err
 		}
@@ -633,7 +701,7 @@ func (w *workload) newOrderBody(
 // batchRead issues a get_items_batch / get_stocks_batch query whose {item_ids}
 // placeholder is either client-interpolated (pg/mysql/pico) or bound as a list (ydb).
 func (w *workload) batchRead(
-	ctx context.Context, tx *bench.TxX,
+	ctx context.Context, tx *bench.Tx,
 	section, query, placeholder string,
 	wID int64, ids []int64, isItem bool,
 ) ([][]any, error) {
@@ -644,25 +712,25 @@ func (w *workload) batchRead(
 			args["w_id"] = wID // stock query scopes by s_w_id; item query is global
 		}
 
-		return tx.QueryRows(ctx, tmpl, args)
+		return tx.RawRows(ctx, tmpl, args)
 	}
 
 	rendered := strings.ReplaceAll(tmpl, placeholder, joinInt64s(ids))
 	if isItem {
-		return tx.QueryRows(ctx, rendered, nil) // get_items_batch has no :w_id
+		return tx.RawRows(ctx, rendered, nil) // get_items_batch has no :w_id
 	}
 
-	return tx.QueryRows(ctx, rendered, map[string]any{"w_id": wID})
+	return tx.RawRows(ctx, rendered, map[string]any{"w_id": wID})
 }
 
 // --- payment ---
 
 //nolint:gocognit,cyclop // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) error {
-	w.m.paymentTotal.Add(1)
+	w.m.paymentTotal.Add(ctx, 1)
 
 	start := time.Now()
-	defer func() { w.m.paymentDur.Add(float64(time.Since(start).Milliseconds())) }()
+	defer func() { w.m.paymentDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
 
 	wID := vs.homeWID
 	dID := vs.ri(vs.payDID, 1, districtsPerWarehouse)
@@ -672,7 +740,7 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) err
 
 	isRemote := w.warehouses > 1 && vs.ri(vs.payRemote, 1, 100) <= 15
 	if isRemote {
-		w.m.paymentRemote.Add(1)
+		w.m.paymentRemote.Add(ctx, 1)
 	}
 
 	cWID := wID
@@ -696,10 +764,10 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) err
 
 	var wasBC bool
 
-	err := bench.Retry0(ctx, w.retryPolicy, func() error {
+	err := bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
 		wasBC = false
 
-		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "payment"}, func(tx *bench.TxX) error {
+		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "payment"}, func(tx *bench.Tx) error {
 			wName, err := w.paymentUpdateWarehouse(ctx, tx, wID, amount)
 			if err != nil {
 				return err
@@ -716,7 +784,7 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) err
 			)
 
 			if isByName { //nolint:nestif // TPC-C by-name customer lookup branch
-				cnt, err := tx.QueryValue(ctx, w.q("workload_tx_payment", "count_customers_by_name"), map[string]any{
+				cnt, err := tx.QueryValue[any](ctx, w.q("workload_tx_payment", "count_customers_by_name"), map[string]any{
 					"w_id": cWID, "d_id": cDID, "c_last": cLastPick,
 				})
 				if err != nil {
@@ -725,12 +793,26 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) err
 
 				nameCount := toInt64(cnt)
 				if nameCount == 0 {
-					return fmt.Errorf("%w=%q in (%d,%d)", errPaymentNoCustomers, cLastPick, cWID, cDID)
+					return fmt.Errorf(
+						"%w=%q in (%d,%d)",
+						errPaymentNoCustomers,
+						cLastPick,
+						cWID,
+						cDID,
+					)
 				}
 
 				offset := (nameCount - 1) / 2
 
-				nameRow, err := w.customerByName(ctx, tx, "workload_tx_payment", cWID, cDID, cLastPick, offset)
+				nameRow, err := w.customerByName(
+					ctx,
+					tx,
+					"workload_tx_payment",
+					cWID,
+					cDID,
+					cLastPick,
+					offset,
+				)
 				if err != nil {
 					return err
 				}
@@ -745,7 +827,7 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) err
 			} else {
 				cID = cIDPick
 
-				custRow, err := tx.QueryRow(ctx, w.q("workload_tx_payment", "get_customer_by_id"), map[string]any{
+				custRow, err := tx.RawRow(ctx, w.q("workload_tx_payment", "get_customer_by_id"), map[string]any{
 					"w_id": cWID, "d_id": cDID, "c_id": cID,
 				})
 				if err != nil {
@@ -761,7 +843,16 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) err
 			}
 
 			if cCredit == "BC" {
-				cDataNew := fmt.Sprintf("%d %d %d %d %d %s|%s", cID, cDID, cWID, dID, wID, fmtAmount(amount), cDataOld)
+				cDataNew := fmt.Sprintf(
+					"%d %d %d %d %d %s|%s",
+					cID,
+					cDID,
+					cWID,
+					dID,
+					wID,
+					fmtAmount(amount),
+					cDataOld,
+				)
 				if len(cDataNew) > 500 {
 					cDataNew = cDataNew[:500]
 				}
@@ -799,21 +890,21 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) err
 	})
 
 	if isByName {
-		w.m.paymentByname.Add(1)
+		w.m.paymentByname.Add(ctx, 1)
 	}
 
 	if wasBC {
-		w.m.paymentBc.Add(1)
+		w.m.paymentBc.Add(ctx, 1)
 	}
 
 	return err
 }
 
 func (w *workload) paymentUpdateWarehouse(
-	ctx context.Context, tx *bench.TxX, wID int64, amount float64,
+	ctx context.Context, tx *bench.Tx, wID int64, amount float64,
 ) (string, error) {
 	if w.hasReturning {
-		row, err := tx.QueryRow(ctx, w.q("workload_tx_payment", "update_get_warehouse"), map[string]any{
+		row, err := tx.RawRow(ctx, w.q("workload_tx_payment", "update_get_warehouse"), map[string]any{
 			"w_id": wID, "amount": amount,
 		})
 		if err != nil {
@@ -833,7 +924,11 @@ func (w *workload) paymentUpdateWarehouse(
 		return "", err
 	}
 
-	row, err := tx.QueryRow(ctx, w.q("workload_tx_payment", "get_warehouse"), map[string]any{"w_id": wID})
+	row, err := tx.RawRow(
+		ctx,
+		w.q("workload_tx_payment", "get_warehouse"),
+		map[string]any{"w_id": wID},
+	)
 	if err != nil {
 		return "", err
 	}
@@ -846,10 +941,10 @@ func (w *workload) paymentUpdateWarehouse(
 }
 
 func (w *workload) paymentUpdateDistrict(
-	ctx context.Context, tx *bench.TxX, wID, dID int64, amount float64,
+	ctx context.Context, tx *bench.Tx, wID, dID int64, amount float64,
 ) (string, error) {
 	if w.hasReturning {
-		row, err := tx.QueryRow(ctx, w.q("workload_tx_payment", "update_get_district"), map[string]any{
+		row, err := tx.RawRow(ctx, w.q("workload_tx_payment", "update_get_district"), map[string]any{
 			"w_id": wID, "d_id": dID, "amount": amount,
 		})
 		if err != nil {
@@ -869,7 +964,11 @@ func (w *workload) paymentUpdateDistrict(
 		return "", err
 	}
 
-	row, err := tx.QueryRow(ctx, w.q("workload_tx_payment", "get_district"), map[string]any{"w_id": wID, "d_id": dID})
+	row, err := tx.RawRow(
+		ctx,
+		w.q("workload_tx_payment", "get_district"),
+		map[string]any{"w_id": wID, "d_id": dID},
+	)
 	if err != nil {
 		return "", err
 	}
@@ -884,11 +983,11 @@ func (w *workload) paymentUpdateDistrict(
 // customerByName resolves the median customer by c_last. Picodata has no OFFSET, so
 // it fetches all rows and picks the median client-side; other drivers use :offset.
 func (w *workload) customerByName(
-	ctx context.Context, tx *bench.TxX, section string,
+	ctx context.Context, tx *bench.Tx, section string,
 	wID, dID int64, cLast string, offset int64,
 ) ([]any, error) {
 	if w.isPicodata {
-		rows, err := tx.QueryRows(ctx, w.q(section, "get_customer_by_name"), map[string]any{
+		rows, err := tx.RawRows(ctx, w.q(section, "get_customer_by_name"), map[string]any{
 			"w_id": wID, "d_id": dID, "c_last": cLast,
 		})
 		if err != nil {
@@ -902,7 +1001,7 @@ func (w *workload) customerByName(
 		return rows[offset], nil
 	}
 
-	return tx.QueryRow(ctx, w.q(section, "get_customer_by_name"), map[string]any{
+	return tx.RawRow(ctx, w.q(section, "get_customer_by_name"), map[string]any{
 		"w_id": wID, "d_id": dID, "c_last": cLast, "offset": offset,
 	})
 }
@@ -911,10 +1010,10 @@ func (w *workload) customerByName(
 
 //nolint:gocognit // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState) error {
-	w.m.orderStatusTotal.Add(1)
+	w.m.orderStatusTotal.Add(ctx, 1)
 
 	start := time.Now()
-	defer func() { w.m.orderStatusDur.Add(float64(time.Since(start).Milliseconds())) }()
+	defer func() { w.m.orderStatusDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
 
 	wID := vs.homeWID
 	dID := vs.ri(vs.osDID, 1, districtsPerWarehouse)
@@ -927,14 +1026,14 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 	}
 
 	bynameObserved := false
-	err := bench.Retry0(ctx, w.retryPolicy, func() error {
+	err := bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
 		bynameObserved = false
 
-		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "order_status"}, func(tx *bench.TxX) error {
+		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "order_status"}, func(tx *bench.Tx) error {
 			var cID int64
 
 			if isByName { //nolint:nestif // TPC-C by-name customer lookup branch
-				cnt, err := tx.QueryValue(ctx, w.q("workload_tx_order_status", "count_customers_by_name"), map[string]any{
+				cnt, err := tx.QueryValue[any](ctx, w.q("workload_tx_order_status", "count_customers_by_name"), map[string]any{
 					"w_id": wID, "d_id": dID, "c_last": cLastPick,
 				})
 				if err != nil {
@@ -947,7 +1046,15 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 
 				offset := (toInt64(cnt) - 1) / 2
 
-				nameRow, err := w.customerByName(ctx, tx, "workload_tx_order_status", wID, dID, cLastPick, offset)
+				nameRow, err := w.customerByName(
+					ctx,
+					tx,
+					"workload_tx_order_status",
+					wID,
+					dID,
+					cLastPick,
+					offset,
+				)
 				if err != nil {
 					return err
 				}
@@ -961,7 +1068,7 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 			} else {
 				cID = cIDPick
 
-				custRow, err := tx.QueryRow(ctx, w.q("workload_tx_order_status", "get_customer_by_id"), map[string]any{
+				custRow, err := tx.RawRow(ctx, w.q("workload_tx_order_status", "get_customer_by_id"), map[string]any{
 					"c_id": cID, "d_id": dID, "w_id": wID,
 				})
 				if err != nil {
@@ -973,7 +1080,7 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 				}
 			}
 
-			lastRow, err := tx.QueryRow(ctx, w.q("workload_tx_order_status", "get_last_order"), map[string]any{
+			lastRow, err := tx.RawRow(ctx, w.q("workload_tx_order_status", "get_last_order"), map[string]any{
 				"d_id": dID, "w_id": wID, "c_id": cID,
 			})
 			if err != nil {
@@ -985,7 +1092,7 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 			}
 
 			oID := toInt64(lastRow[0])
-			_, err = tx.QueryRows(ctx, w.q("workload_tx_order_status", "get_order_lines"), map[string]any{
+			_, err = tx.RawRows(ctx, w.q("workload_tx_order_status", "get_order_lines"), map[string]any{
 				"o_id": oID, "d_id": dID, "w_id": wID,
 			})
 
@@ -994,7 +1101,7 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 	})
 
 	if bynameObserved {
-		w.m.orderStatusByname.Add(1)
+		w.m.orderStatusByname.Add(ctx, 1)
 	}
 
 	return err
@@ -1004,18 +1111,18 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 
 //nolint:gocognit // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) error {
-	w.m.deliveryTotal.Add(1)
+	w.m.deliveryTotal.Add(ctx, 1)
 
 	start := time.Now()
-	defer func() { w.m.deliveryDur.Add(float64(time.Since(start).Milliseconds())) }()
+	defer func() { w.m.deliveryDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
 
 	wID := vs.homeWID
 	carrierID := vs.ri(vs.dCarrier, 1, 10)
 
-	return bench.Retry0(ctx, w.retryPolicy, func() error {
-		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, func(tx *bench.TxX) error {
+	return bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, func(tx *bench.Tx) error {
 			for dID := int64(1); dID <= districtsPerWarehouse; dID++ {
-				minRow, err := tx.QueryRow(ctx, w.q("workload_tx_delivery", "get_min_new_order"), map[string]any{
+				minRow, err := tx.RawRow(ctx, w.q("workload_tx_delivery", "get_min_new_order"), map[string]any{
 					"d_id": dID, "w_id": wID,
 				})
 				if err != nil {
@@ -1033,7 +1140,7 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) er
 					return err
 				}
 
-				orderRow, err := tx.QueryRow(ctx, w.q("workload_tx_delivery", "get_order"), map[string]any{
+				orderRow, err := tx.RawRow(ctx, w.q("workload_tx_delivery", "get_order"), map[string]any{
 					"o_id": oID, "d_id": dID, "w_id": wID,
 				})
 				if err != nil {
@@ -1058,7 +1165,7 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) er
 					return err
 				}
 
-				sumRow, err := tx.QueryRow(ctx, w.q("workload_tx_delivery", "get_order_line_amount"), map[string]any{
+				sumRow, err := tx.RawRow(ctx, w.q("workload_tx_delivery", "get_order_line_amount"), map[string]any{
 					"o_id": oID, "d_id": dID, "w_id": wID,
 				})
 				if err != nil {
@@ -1086,18 +1193,18 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) er
 
 //nolint:gocognit // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) error {
-	w.m.stockLevelTotal.Add(1)
+	w.m.stockLevelTotal.Add(ctx, 1)
 
 	start := time.Now()
-	defer func() { w.m.stockLevelDur.Add(float64(time.Since(start).Milliseconds())) }()
+	defer func() { w.m.stockLevelDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
 
 	wID := vs.homeWID
 	dID := vs.ri(vs.slDID, 1, districtsPerWarehouse)
 	threshold := vs.ri(vs.slThreshold, 10, 20)
 
-	return bench.Retry0(ctx, w.retryPolicy, func() error {
-		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "stock_level"}, func(tx *bench.TxX) error {
-			nextOIDv, err := tx.QueryValue(ctx, w.q("workload_tx_stock_level", "get_district"), map[string]any{
+	return bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "stock_level"}, func(tx *bench.Tx) error {
+			nextOIDv, err := tx.QueryValue[any](ctx, w.q("workload_tx_stock_level", "get_district"), map[string]any{
 				"w_id": wID, "d_id": dID,
 			})
 			if err != nil {
@@ -1110,7 +1217,7 @@ func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) 
 
 			nextOID := toInt64(nextOIDv)
 
-			olRows, err := tx.QueryRows(ctx, w.q("workload_tx_stock_level", "get_window_items"), map[string]any{
+			olRows, err := tx.RawRows(ctx, w.q("workload_tx_stock_level", "get_window_items"), map[string]any{
 				"w_id": wID, "d_id": dID,
 				"min_o_id": nextOID - 20, "next_o_id": nextOID,
 			})
@@ -1135,7 +1242,7 @@ func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) 
 
 			tmpl := w.q("workload_tx_stock_level", "stock_count_in")
 			if w.isYdb {
-				_, err = tx.QueryValue(ctx, tmpl, map[string]any{
+				_, err = tx.QueryValue[any](ctx, tmpl, map[string]any{
 					"w_id": wID, "threshold": threshold, "ids": idsToIntAny(ids),
 				})
 
@@ -1143,7 +1250,11 @@ func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) 
 			}
 
 			rendered := strings.ReplaceAll(tmpl, "{ids}", joinInt64s(ids))
-			_, err = tx.QueryValue(ctx, rendered, map[string]any{"w_id": wID, "threshold": threshold})
+			_, err = tx.QueryValue[any](
+				ctx,
+				rendered,
+				map[string]any{"w_id": wID, "threshold": threshold},
+			)
 
 			return err
 		})
@@ -1183,10 +1294,8 @@ type vuState struct {
 }
 
 func (w *workload) vuState(vuid uint64, warehouseStart, warehouses int64) *vuState {
-	if v, ok := w.vuStates.Load(vuid); ok {
-		vs, _ := v.(*vuState)
-
-		return vs
+	if w.vuStates[vuid-1] != nil {
+		return w.vuStates[vuid-1]
 	}
 
 	newRand := func(slot string) *rand.Rand {
@@ -1228,10 +1337,9 @@ func (w *workload) vuState(vuid uint64, warehouseStart, warehouses int64) *vuSta
 		nurand255Salt:  seedOf("nurand255", vuid),
 	}
 	vs.hid.Store(int64(vuid) * 10_000_000) //nolint:gosec // G115: value bounded by scale factor, no overflow path
-	actual, _ := w.vuStates.LoadOrStore(vuid, vs)
-	stored, _ := actual.(*vuState)
+	w.vuStates[vuid-1] = vs
 
-	return stored
+	return vs
 }
 
 func (v *vuState) nextHid() int64 { return v.hid.Add(1) }

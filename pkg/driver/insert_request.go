@@ -3,7 +3,7 @@ package driver
 import (
 	"errors"
 
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // InsertRequest carries a driver-owned [InsertMethod], a worker count, and a

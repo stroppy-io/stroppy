@@ -92,7 +92,11 @@ func TestCheckConsistencyAggregatesStillComparedWhenNoError(t *testing.T) {
 	t.Run("equal sums pass", func(t *testing.T) {
 		passed, failed := runConsistency(t, 100, 100, nil, nil, 42, 42, nil, nil)
 		if !has(passed, cc1Name) || !has(passed, cc4Name) {
-			t.Fatalf("equal sums should pass CC1/CC4; passed=%v failed=%v", passed, failed)
+			t.Fatalf(
+				"equal sums should pass CC1/CC4; passed=%v failed=%v",
+				passed,
+				failed,
+			)
 		}
 	})
 

@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/stroppy-io/stroppy/internal/runner"
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/internal/runner"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 func TestNewDriverCLIConfigFromJSONStrictCompatibility(t *testing.T) {
@@ -201,8 +201,8 @@ func TestDefaultInsertMethodInputValidation(t *testing.T) {
 	require.EqualError(t, secondErr, firstErr.Error())
 
 	invalid := "bogus"
-	_, err = runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
-		0: {DefaultInsertMethod: &invalid},
+	_, err = runner.DriverCLIConfigsFromFile(map[string]*config.DriverRunConfig{
+		"": {DefaultInsertMethod: &invalid},
 	})
 	require.ErrorIs(t, err, driver.ErrUnknownInsertMethod)
 

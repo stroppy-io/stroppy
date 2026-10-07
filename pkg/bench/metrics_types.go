@@ -2,7 +2,6 @@ package bench
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -18,8 +17,8 @@ const (
 )
 
 var (
-	errMetricAlreadyRegistered = errors.New("metric already registered")
-	errUnknownMetricType       = errors.New("unknown metric type")
+	errMetricAlreadyRegistered = inputError("metric already registered")
+	errUnknownMetricType       = inputError("unknown metric type")
 )
 
 type metricType int
@@ -40,7 +39,7 @@ var (
 )
 
 type metricAttributes struct {
-	set    attribute.Set
+	set    *attribute.Set
 	add    []otelmetric.AddOption
 	record []otelmetric.RecordOption
 }
@@ -62,9 +61,35 @@ type metric struct {
 	overflow   metricAttributes
 	tagAttrs   sync.Map
 	tagCount   atomic.Int64
+	seriesMu   sync.Mutex
+	series     map[attribute.Distinct]struct{}
+	writers    [metricWriterLimit + 1]atomic.Pointer[metricWriterBinding]
+	bindings   sync.Map
 }
 
 func (m *metric) add(ctx context.Context, value float64, attrs metricAttributes) {
+	writer, _ := ctx.Value(metricWriterContextKey{}).(*metricWriter)
+	m.addWriter(ctx, value, attrs, writer)
+}
+
+func (m *metric) addWriter(ctx context.Context, value float64, attrs metricAttributes, writer *metricWriter) {
+	if m.Type != Gauge {
+		if attrs.set == nil {
+			attrs = m.emptyAttrs
+		}
+
+		id := metricWriterLimit
+		if writer != nil {
+			id = writer.id
+		}
+
+		if cached := m.writers[id].Load(); cached != nil && cached.original == attrs.set {
+			attrs = cached.bound
+		} else {
+			attrs = m.bindSeries(id, attrs)
+		}
+	}
+
 	switch m.Type {
 	case Counter:
 		m.counter.Add(ctx, value, attrs.add...)
@@ -81,18 +106,27 @@ func (m *metric) add(ctx context.Context, value float64, attrs metricAttributes)
 	}
 }
 
-type Registry struct {
+type metricRegistry struct {
 	mu      sync.Mutex
 	meter   otelmetric.Meter
 	prefix  string
 	metrics map[string]*metric
 }
 
-func NewRegistry(meter otelmetric.Meter, prefix string) *Registry {
-	return &Registry{meter: meter, prefix: prefix, metrics: map[string]*metric{}}
+func newmetricRegistry(meter otelmetric.Meter, prefix string) *metricRegistry {
+	return &metricRegistry{meter: meter, prefix: prefix, metrics: map[string]*metric{}}
 }
 
-func (r *Registry) NewMetric(name string, typ metricType) (*metric, error) {
+func (r *metricRegistry) NewMetric(name string, typ metricType) (*metric, error) {
+	return r.newInstrument(name, typ, "", "", nil)
+}
+
+func (r *metricRegistry) newInstrument(
+	name string,
+	typ metricType,
+	unit, description string,
+	bounds []float64,
+) (*metric, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -112,12 +146,23 @@ func (r *Registry) NewMetric(name string, typ metricType) (*metric, error) {
 
 	switch typ {
 	case Counter:
-		m.counter, err = r.meter.Float64Counter(exportedName)
+		m.counter, err = r.meter.Float64Counter(
+			exportedName,
+			otelmetric.WithUnit(unit),
+			otelmetric.WithDescription(description),
+		)
 	case Trend:
-		options := []otelmetric.Float64HistogramOption{
-			otelmetric.WithExplicitBucketBoundaries(histogramBounds(name)...),
+		if bounds == nil {
+			bounds = histogramBounds(name)
 		}
-		if strings.HasSuffix(name, "_duration") {
+
+		options := []otelmetric.Float64HistogramOption{
+			otelmetric.WithExplicitBucketBoundaries(bounds...),
+			otelmetric.WithDescription(description),
+		}
+		if unit != "" {
+			options = append(options, otelmetric.WithUnit(unit))
+		} else if strings.HasSuffix(name, "_duration") {
 			options = append(options, otelmetric.WithUnit("ms"))
 		}
 
@@ -128,7 +173,11 @@ func (r *Registry) NewMetric(name string, typ metricType) (*metric, error) {
 			m.rateTrue, err = r.meter.Float64Counter(exportedName + "_true_total")
 		}
 	case Gauge:
-		m.gauge, err = r.meter.Float64Gauge(exportedName)
+		m.gauge, err = r.meter.Float64Gauge(
+			exportedName,
+			otelmetric.WithUnit(unit),
+			otelmetric.WithDescription(description),
+		)
 	default:
 		err = fmt.Errorf("%w: %d", errUnknownMetricType, typ)
 	}
@@ -212,8 +261,12 @@ func attributes(tags ...string) metricAttributes {
 		set = attribute.NewSet()
 	}
 
+	return metricAttributesFromSet(set)
+}
+
+func metricAttributesFromSet(set attribute.Set) metricAttributes {
 	return metricAttributes{
-		set:    set,
+		set:    &set,
 		add:    []otelmetric.AddOption{otelmetric.WithAttributeSet(set)},
 		record: []otelmetric.RecordOption{otelmetric.WithAttributeSet(set)},
 	}

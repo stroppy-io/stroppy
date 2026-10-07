@@ -7,14 +7,13 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/pkg/driver/common"
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/common"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // drainAll prepares a full-range cursor over req.Source and materializes
 // every row into a [][]any in entity order.
-func drainAll(t *testing.T, req *driver.InsertRequest) [][]any {
+func drainAll(t *testing.T, req *insertRequest) [][]any {
 	t.Helper()
 
 	src := req.Source
@@ -169,7 +168,12 @@ func TestDemoSourceWorkerInvariance(t *testing.T) {
 		}
 
 		if len(got) != demoRows {
-			t.Fatalf("workers=%d: distinct ids %d, want %d", workers, len(got), demoRows)
+			t.Fatalf(
+				"workers=%d: distinct ids %d, want %d",
+				workers,
+				len(got),
+				demoRows,
+			)
 		}
 
 		for id := int64(1); id <= demoRows; id++ {

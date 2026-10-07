@@ -7,8 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/third_party/gotpcds/dsqgen"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/workloads/tpcds/dsqgen"
+	"github.com/stroppy-io/stroppy/v6/workloads/tpcds/tpcdsgen"
 )
 
 var (
@@ -47,177 +48,190 @@ type namedQuery struct {
 	sql  string
 }
 
-func init() { bench.Register(func() bench.Workload { return &workload{} }) }
+var Test = bench.Test{Name: "tpcds", Define: define, Source: publication("Test")}
 
-func (*workload) Name() string { return "tpcds" }
+func init() { bench.Register(Test) }
 
-func (w *workload) Define(d *bench.Def) error {
-	d.Report("tpcds.validation", 1, w.validationContribution)
+//nolint:gocognit,cyclop,funlen // query choices precede schema-changing actions.
+func define(d *bench.Def) error {
+	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
+	w := &workload{}
+	d.Report.Contribute("tpcds.validation", 1, w.validationContribution)
+	w.scaleFactor, _ = d.Param.Float64("scale-factor", 1, "TPC-DS scale factor.")
+	w.loadWorkers, _ = d.Param.Int("load-workers", 0, "Workers used to load each table.")
+	w.useUnlogged, _ = d.Param.Bool("pg-unlogged", false, "Use unlogged tables while loading.")
+	w.ydbStoreMode, _ = d.Param.String("ydb-store-mode", "column", "YDB table store mode.")
+	w.streams, _ = d.Param.Int("streams", 1, "Number of query streams.")
+	w.seed, _ = d.Param.Int64("query-seed", 19620718, "Query generator seed.")
+	stream, streamInfo := d.Param.Int("query-stream", 0, "Query stream to generate.")
 
-	w.scaleFactor = d.Param.Float64("scale-factor", 1, "TPC-DS scale factor.").Value()
-	w.loadWorkers = d.Param.Int("load-workers", 0, "Workers used to load each table.").Value()
-	w.useUnlogged = d.Param.Bool("pg-unlogged", false, "Use unlogged PostgreSQL tables while loading.").Value()
-	w.ydbStoreMode = d.Param.String("ydb-store-mode", "column", "YDB table store mode.").Value()
-	w.streams = d.Param.Int("streams", 1, "Number of query streams.").Value()
-	w.seed = int64(d.Param.Int("query-seed", 19620718, "Query generator seed.").Value())
-
-	queryStream := d.Param.Int("query-stream", 0, "Query stream to generate.")
-	if queryStream.Explicit() {
-		w.genStream = queryStream.Value()
-	} else {
-		w.genStream = -1
+	w.genStream = -1
+	if streamInfo.Explicit() {
+		w.genStream = stream
 	}
 
-	w.schemaFile = d.Param.String("schema-file", "", "Schema SQL file override.").Value()
-	w.sqlFile = d.Param.String("sql-file", "", "Query SQL file override.").Value()
-	validateForce := d.Param.Bool("validate-force", false, "Validate answers outside scale factor 1.")
+	w.schemaFile, _ = d.Param.String("schema-file", "", "Schema SQL file override.")
+	w.sqlFile, _ = d.Param.String("sql-file", "", "Query SQL file override.")
 
-	w.validateForce = validateForce.Value()
-
-	legacyForce := validateForce.Source() == bench.ParamSourceProcessEnv ||
-		validateForce.Source() == bench.ParamSourceLegacyEnv ||
-		validateForce.Source() == bench.ParamSourceLegacyConfigEnv
-	if validateForce.Explicit() && legacyForce {
-		w.validateForce = true
-	}
-
+	w.validateForce, _ = d.Param.Bool("validate-force", false, "Validate outside scale factor 1.")
 	if w.scaleFactor <= 0 {
 		return fmt.Errorf("%w, got %v", errScaleFactorMustBePositive, w.scaleFactor)
 	}
 
-	return nil
-}
-
-func (w *workload) Setup(ctx context.Context, b *bench.Bench) error {
-	w.driver = b.DriverTypeName()
+	db := d.Drivers.Declare("default", bench.DriverConfig{})
+	w.driver = db.Kind()
 	w.isPgOrMs = w.driver == bench.DriverPostgres || w.driver == bench.DriverMySQL
 	w.ydbColumn = w.driver == bench.DriverYDB && w.ydbStoreMode == "column"
 	w.useUnlogged = w.useUnlogged && w.driver == bench.DriverPostgres
 
-	// Query source. Throughput (STREAMS>1) or an explicit QUERY_STREAM selects the
-	// in-process generator; otherwise the baked canonical set. ydb runs the baked set
-	// only — the generator targets ANSI/pg/MySQL, not YQL.
 	w.throughput = w.streams > 1
-
 	if w.driver == bench.DriverYDB && (w.throughput || w.genStream >= 0) {
 		return errYdbBakedOnly
 	}
 
-	// Reject incomplete generated sets before any schema changes or loading.
-	// Respect load-only runs that explicitly exclude the workload step.
-	if (w.throughput || w.genStream >= 0) && b.StepEnabled("workload") {
-		if _, err := generateStream(string(w.driver), w.scaleFactor, w.seed, max(w.genStream, 0)); err != nil {
+	if (w.throughput || w.genStream >= 0) && d.Execution.Enabled("workload") {
+		if _, err := generateStream(
+			string(w.driver),
+			w.scaleFactor,
+			w.seed,
+			max(w.genStream, 0),
+		); err != nil {
 			return err
 		}
 	}
 
 	schemaFile, queryFile := dialectFiles(w.driver, w.schemaFile, w.sqlFile)
-	w.schemaSQL = mustLoad(preset, schemaFile)
-	w.querySQL = mustLoad(preset, queryFile)
 
-	if err := w.runSteps(ctx, b); err != nil {
+	var err error
+	if w.schemaFile != "" {
+		w.schemaSQL, err = d.Queries.Override(schemaFile)
+	} else {
+		w.schemaSQL, err = d.Queries.Load(files, schemaFile)
+	}
+
+	if err != nil {
 		return err
 	}
 
-	return nil
-}
+	if w.sqlFile != "" {
+		w.querySQL, err = d.Queries.Override(queryFile)
+	} else {
+		w.querySQL, err = d.Queries.Load(files, queryFile)
+	}
 
-// runSteps executes the ordered setup pipeline (drop → create → load → index →
-// analyze → optional validate). Returns the first step error.
-func (w *workload) runSteps(ctx context.Context, b *bench.Bench) error {
-	addStep := func(name string, fn func() error) error { return b.Step(name, fn) }
-
-	if err := addStep("drop_schema", w.dropSchema(ctx, b)); err != nil {
+	if err != nil {
 		return err
 	}
 
-	if err := addStep("create_schema", w.createSchema(ctx, b)); err != nil {
-		return err
-	}
+	d.Execution.Step("drop_schema", w.drop)
+	d.Execution.Step("create_schema", w.create)
 
 	if w.useUnlogged {
-		if err := addStep("set_unlogged", w.setUnlogged(ctx, b, "UNLOGGED")); err != nil {
-			return err
-		}
+		d.Execution.Step("set_unlogged", w.unlogged)
 	}
 
-	if err := addStep("load_data", func() error {
-		for _, table := range tpcdsTables {
-			if _, err := b.InsertTpcds(ctx, table, w.scaleFactor, w.loadWorkers); err != nil {
-				return fmt.Errorf("load %s: %w", table, err)
-			}
-		}
-
-		return nil
-	}); err != nil {
-		return err
-	}
-
-	if err := addStep("create_indexes", w.runSchemaSection(ctx, b, "create_indexes")); err != nil {
-		return err
-	}
+	d.Execution.Step("load_data", w.load)
+	section := schemaSection{w, "create_indexes"}
+	d.Execution.Step(section.name, section.Run)
 
 	if w.useUnlogged {
-		if err := addStep("set_logged", w.setUnlogged(ctx, b, "LOGGED")); err != nil {
-			return err
-		}
+		d.Execution.Step("set_logged", w.logged)
 	}
 
-	if err := addStep("analyze", w.analyze(ctx, b)); err != nil {
-		return err
-	}
+	d.Execution.Step("analyze", w.analyzeAction)
 
-	// SF=1 baked answer validation (PostgreSQL/MySQL) runs once in setup. The
-	// measured pass still runs in Iterate, so queries execute twice at SF=1.
 	if !w.throughput && w.genStream < 0 && w.isPgOrMs {
-		if err := addStep("validate_answers", func() error {
-			w.validation = validateAnswers(
-				ctx, b, w.schemaSQL, w.querySQL, w.querySQL.Names(""),
-				w.scaleFactor, w.driver, w.validateForce,
-			)
-
-			return nil
-		}); err != nil {
-			return err
-		}
+		d.Execution.Step("validate_answers", w.validate)
 	}
 
-	return nil
+	d.Execution.Step("workload", w.work, settings.Policy())
+
+	return d.Execution.Err()
 }
 
-func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
-	return b.StepSilent("workload", func() error {
-		queries, err := w.resolveQueries(b)
+func (w *workload) drop(ctx context.Context, b *bench.Bench) error { return w.dropSchema(ctx, b)() }
+
+func (w *workload) create(ctx context.Context, b *bench.Bench) error { return w.createSchema(ctx, b)() }
+
+func (w *workload) unlogged(ctx context.Context, b *bench.Bench) error {
+	return w.setUnlogged(ctx, b, "UNLOGGED")()
+}
+
+func (w *workload) logged(ctx context.Context, b *bench.Bench) error {
+	return w.setUnlogged(ctx, b, "LOGGED")()
+}
+
+func (w *workload) analyzeAction(ctx context.Context, b *bench.Bench) error {
+	return w.analyze(ctx, b)()
+}
+
+type schemaSection struct {
+	workload *workload
+	name     string
+}
+
+func (s schemaSection) Run(ctx context.Context, b *bench.Bench) error {
+	return s.workload.runSection(ctx, b, s.workload.schemaSQL, s.name)
+}
+
+func (w *workload) load(ctx context.Context, b *bench.Bench) error {
+	for _, table := range tpcdsTables {
+		source, err := tpcdsgen.NewBatchSource(table, w.scaleFactor)
 		if err != nil {
 			return err
 		}
-		// The measured pass runs without validation-only planner settings.
-		lg := b.Logger().Sugar()
 
-		for _, q := range queries {
-			start := time.Now()
-			err := b.Exec(ctx, q.sql, nil)
-
-			ms := time.Since(start).Milliseconds()
-
-			if err != nil {
-				if ctx.Err() != nil {
-					return ctx.Err()
-				}
-
-				b.RecordQueryError(q.name, err)
-
-				continue
-			}
-
-			lg.Infof("[tpcds] %s: ok in %dms", q.name, ms)
+		if _, err = b.Insert(ctx, table, source, bench.LoadWorkers(max(w.loadWorkers, 1))); err != nil {
+			return fmt.Errorf("load %s: %w", table, err)
 		}
+	}
 
-		return nil
-	})
+	return nil
 }
 
-func (*workload) Teardown(_ context.Context, b *bench.Bench) error {
+func (w *workload) validate(ctx context.Context, b *bench.Bench) error {
+	w.validation = validateAnswers(
+		ctx,
+		b,
+		w.schemaSQL,
+		w.querySQL,
+		w.querySQL.Names(""),
+		w.scaleFactor,
+		w.driver,
+		w.validateForce,
+	)
+
+	return nil
+}
+
+func (w *workload) work(ctx context.Context, b *bench.Bench) error {
+	queries, err := w.resolveQueries(b)
+	if err != nil {
+		return err
+	}
+
+	for _, q := range queries {
+		start := time.Now()
+
+		if err := b.Exec(ctx, q.sql, nil); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+
+			b.RecordError(q.name, err)
+
+			continue
+		}
+
+		b.Log.Info(
+			"query completed",
+			"query",
+			q.name,
+			"elapsed",
+			time.Since(start),
+		)
+	}
+
 	return nil
 }
 
@@ -239,7 +253,7 @@ func (w *workload) resolveQueries(b *bench.Bench) ([]namedQuery, error) {
 
 	var streamIdx int
 	if w.throughput {
-		streamIdx = int(b.VUID()) - 1 //nolint:gosec // G115: value bounded by scale factor, no overflow path
+		streamIdx = b.Worker()
 	} else {
 		streamIdx = w.genStream
 	}
@@ -260,11 +274,19 @@ func generateStream(dialect string, scale float64, seed int64, stream int) ([]na
 	}
 
 	if len(res.Skipped) > 0 {
-		return nil, fmt.Errorf("%w: %s", errIncompleteQuerySet, strings.Join(res.Skipped, "; "))
+		return nil, fmt.Errorf(
+			"%w: %s",
+			errIncompleteQuerySet,
+			strings.Join(res.Skipped, "; "),
+		)
 	}
 
 	if len(res.Queries) != 99 {
-		return nil, fmt.Errorf("%w: expected 99 queries, got %d", errIncompleteQuerySet, len(res.Queries))
+		return nil, fmt.Errorf(
+			"%w: expected 99 queries, got %d",
+			errIncompleteQuerySet,
+			len(res.Queries),
+		)
 	}
 
 	suffix := []string{"_a", "_b", "_c"}
@@ -306,10 +328,6 @@ func (w *workload) runSection(ctx context.Context, b *bench.Bench, sql *bench.SQ
 	return nil
 }
 
-func (w *workload) runSchemaSection(ctx context.Context, b *bench.Bench, section string) func() error {
-	return func() error { return w.runSection(ctx, b, w.schemaSQL, section) }
-}
-
 func (w *workload) dropSchema(ctx context.Context, b *bench.Bench) func() error {
 	return func() error {
 		// ydb/picodata have no CASCADE; drop from the schema file's drop_schema section.
@@ -318,7 +336,11 @@ func (w *workload) dropSchema(ctx context.Context, b *bench.Bench) func() error 
 		}
 		// pg/mysql: reverse load order, CASCADE (mysql accepts/ignores the keyword).
 		for i := len(tpcdsTables) - 1; i >= 0; i-- {
-			if err := b.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s CASCADE", tpcdsTables[i]), nil); err != nil {
+			if err := b.Exec(
+				ctx,
+				fmt.Sprintf("DROP TABLE IF EXISTS %s CASCADE", tpcdsTables[i]),
+				nil,
+			); err != nil {
 				return fmt.Errorf("drop_schema: %w", err)
 			}
 		}
@@ -361,7 +383,7 @@ func (w *workload) analyze(ctx context.Context, b *bench.Bench) func() error {
 					return fmt.Errorf("analyze %s: %w", table, err)
 				}
 			}
-		case bench.DriverPicodata, bench.DriverYDB, bench.DriverNoop, bench.DriverCSV:
+		case bench.DriverPicodata, bench.DriverYDB, bench.DriverNoop, bench.DriverCSV, bench.DriverRecording:
 			// no ANALYZE; planner runs on index stats from create_indexes.
 		}
 		// ydb/picodata: no ANALYZE; planner runs on index stats from create_indexes.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // drainRangePrepared drains a prepared cursor over [0, count), returning rows
@@ -54,7 +54,11 @@ func TestStockSource(t *testing.T) {
 
 	const start int64 = 1
 
-	rows := drainRangePrepared(t, stockSource(gen.New(seedStock), 1, start), itemsPerWh)
+	rows := drainRangePrepared(
+		t,
+		stockSource(gen.New(seedStock), 1, start),
+		itemsPerWh,
+	)
 
 	if len(rows) != itemsPerWh {
 		t.Fatalf("rows = %d, want %d", len(rows), itemsPerWh)
@@ -97,7 +101,11 @@ func TestStockSource(t *testing.T) {
 
 	hi := itemsPerWh / 5 // 20%
 	if originalCount < lo || originalCount > hi {
-		t.Fatalf("ORIGINAL count = %d (~%.1f%%), want ~10%%", originalCount, 100*float64(originalCount)/float64(itemsPerWh))
+		t.Fatalf(
+			"ORIGINAL count = %d (~%.1f%%), want ~10%%",
+			originalCount,
+			100*float64(originalCount)/float64(itemsPerWh),
+		)
 	}
 }
 
@@ -109,7 +117,11 @@ func TestOrdersSource(t *testing.T) {
 
 	const start int64 = 1
 
-	rows := drainRangePrepared(t, ordersSource(gen.New(seedOrders), 1, start, 0), customersPerWh)
+	rows := drainRangePrepared(
+		t,
+		ordersSource(gen.New(seedOrders), 1, start, 0),
+		customersPerWh,
+	)
 
 	if len(rows) != customersPerWh {
 		t.Fatalf("rows = %d, want %d", len(rows), customersPerWh)
@@ -127,7 +139,12 @@ func TestOrdersSource(t *testing.T) {
 		cID := mustInt64(t, row[3], "o_c_id")
 
 		if oID != int64(i%customersPerDistrict)+1 {
-			t.Fatalf("row %d o_id = %d, want %d", i, oID, int64(i%customersPerDistrict)+1)
+			t.Fatalf(
+				"row %d o_id = %d, want %d",
+				i,
+				oID,
+				int64(i%customersPerDistrict)+1,
+			)
 		}
 
 		if wID != start {
@@ -181,7 +198,13 @@ func TestOrdersSource(t *testing.T) {
 
 	wantUndelivered := int64(ordersUndelivered) * districtsPerWarehouse
 	if int64(nonNullCarrier) != wantDelivered || int64(nullCarrier) != wantUndelivered {
-		t.Fatalf("carrier null/non-null = %d/%d, want %d/%d", nullCarrier, nonNullCarrier, wantUndelivered, wantDelivered)
+		t.Fatalf(
+			"carrier null/non-null = %d/%d, want %d/%d",
+			nullCarrier,
+			nonNullCarrier,
+			wantUndelivered,
+			wantDelivered,
+		)
 	}
 }
 
@@ -193,7 +216,11 @@ func TestOrderLineSource(t *testing.T) {
 
 	const start int64 = 1
 	// One warehouse's order_lines: customersPerWh * olCntFixed.
-	rows := drainRangePrepared(t, orderLineSource(gen.New(seedOrderLine), 1, start, 0), customersPerWh*olCntFixed)
+	rows := drainRangePrepared(
+		t,
+		orderLineSource(gen.New(seedOrderLine), 1, start, 0),
+		customersPerWh*olCntFixed,
+	)
 
 	want := int64(customersPerWh) * olCntFixed
 	if int64(len(rows)) != want {
@@ -209,11 +236,21 @@ func TestOrderLineSource(t *testing.T) {
 		olQty := mustInt64(t, row[7], "ol_quantity")
 
 		if olOID != int64(i/olCntFixed%customersPerDistrict)+1 {
-			t.Fatalf("row %d ol_o_id = %d, want %d", i, olOID, int64(i/olCntFixed%customersPerDistrict)+1)
+			t.Fatalf(
+				"row %d ol_o_id = %d, want %d",
+				i,
+				olOID,
+				int64(i/olCntFixed%customersPerDistrict)+1,
+			)
 		}
 
 		if olNumber != int64(i%olCntFixed)+1 {
-			t.Fatalf("row %d ol_number = %d, want %d", i, olNumber, int64(i%olCntFixed)+1)
+			t.Fatalf(
+				"row %d ol_number = %d, want %d",
+				i,
+				olNumber,
+				int64(i%olCntFixed)+1,
+			)
 		}
 
 		if olIID < 1 || olIID > items {
@@ -245,7 +282,13 @@ func TestOrderLineSource(t *testing.T) {
 
 	wantZero := int64(customersPerDistrict)*olCntFixed*districtsPerWarehouse - wantNull
 	if int64(nullDelivery) != wantNull || int64(zeroAmount) != wantZero {
-		t.Fatalf("null/zero = %d/%d, want %d/%d", nullDelivery, zeroAmount, wantNull, wantZero)
+		t.Fatalf(
+			"null/zero = %d/%d, want %d/%d",
+			nullDelivery,
+			zeroAmount,
+			wantNull,
+			wantZero,
+		)
 	}
 }
 
@@ -286,7 +329,11 @@ func TestCustomerSource(t *testing.T) {
 
 	const start int64 = 1
 
-	rows := drainRangePrepared(t, customerSource(gen.New(seedCustomer), 1, start, 0), customersPerWh)
+	rows := drainRangePrepared(
+		t,
+		customerSource(gen.New(seedCustomer), 1, start, 0),
+		customersPerWh,
+	)
 
 	if len(rows) != customersPerWh {
 		t.Fatalf("rows = %d, want %d", len(rows), customersPerWh)
@@ -305,11 +352,21 @@ func TestCustomerSource(t *testing.T) {
 		wID := mustInt64(t, row[2], "c_w_id")
 
 		if cID != int64(i%customersPerDistrict)+1 {
-			t.Fatalf("row %d c_id = %d, want %d", i, cID, int64(i%customersPerDistrict)+1)
+			t.Fatalf(
+				"row %d c_id = %d, want %d",
+				i,
+				cID,
+				int64(i%customersPerDistrict)+1,
+			)
 		}
 
 		if dID != int64(i/customersPerDistrict%districtsPerWarehouse)+1 {
-			t.Fatalf("row %d c_d_id = %d, want %d", i, dID, int64(i/customersPerDistrict%districtsPerWarehouse)+1)
+			t.Fatalf(
+				"row %d c_d_id = %d, want %d",
+				i,
+				dID,
+				int64(i/customersPerDistrict%districtsPerWarehouse)+1,
+			)
 		}
 
 		if wID != start {
@@ -327,7 +384,12 @@ func TestCustomerSource(t *testing.T) {
 
 		// Sequential c_id 1..1000 must map to dict[c_id-1] exactly.
 		if cID <= int64(len(cLastDict)) && last != cLastDict[cID-1] {
-			t.Fatalf("row %d sequential c_last = %q, want %q", i, last, cLastDict[cID-1])
+			t.Fatalf(
+				"row %d sequential c_last = %q, want %q",
+				i,
+				last,
+				cLastDict[cID-1],
+			)
 		}
 
 		credit := mustStr(t, row[13], "c_credit")
@@ -353,6 +415,10 @@ func TestCustomerSource(t *testing.T) {
 
 	hi := customersPerWh / 5
 	if bcCount < lo || bcCount > hi {
-		t.Fatalf("BC count = %d (~%.1f%%), want ~10%%", bcCount, 100*float64(bcCount)/float64(customersPerWh))
+		t.Fatalf(
+			"BC count = %d (~%.1f%%), want ~10%%",
+			bcCount,
+			100*float64(bcCount)/float64(customersPerWh),
+		)
 	}
 }

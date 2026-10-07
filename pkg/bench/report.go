@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"runtime"
 	"slices"
@@ -16,23 +17,32 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/report"
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
 // ReportOptions provides report identity owned by the calling application.
 type ReportOptions struct {
 	StroppyVersion string
+	BuildDigest    string
 	RunID          string
 	Metadata       map[string]string
 }
 
 // ReportContext contains final run data available to workload contributors.
 type ReportContext struct {
-	Metrics map[string]MetricSnapshot
+	Metrics      map[string]MetricSnapshot
+	Series       map[string]report.Metric
+	Steps        []report.Step
+	Measurements map[string]float64
+	Status       report.Status
 }
 
 // ReportContribution is one workload-owned report result.
+type (
+	FinalSnapshot = ReportContext
+	Contribution  = ReportContribution
+)
+
 type ReportContribution struct {
 	Status report.WorkloadReportStatus
 	Reason string
@@ -47,46 +57,91 @@ type reportDefinition struct {
 	kind        string
 	schema      int
 	contributor ReportContributor
+	renderer    ReportRenderer
 }
 
 var (
-	errEmptyReportKind     = errors.New("report kind must not be empty")
-	errInvalidReportSchema = errors.New("report schema must be at least 1")
-	errDuplicateReportKind = errors.New("duplicate report kind")
+	errEmptyReportKind     = inputError("report kind must not be empty")
+	errInvalidReportSchema = inputError("report schema must be at least 1")
+	errDuplicateReportKind = inputError("duplicate report kind")
 )
 
-// Report declares one workload-owned payload. Declaration is optional: every
-// workload receives the common report envelope without adding custom code.
-func (d *Def) Report(kind string, schema int, contributor ReportContributor) {
-	kind = strings.TrimSpace(kind)
-	if kind == "" {
-		d.addError(errEmptyReportKind)
+// ReportDeclarations owns optional independently versioned workload payloads.
+type ReportDeclarations struct{ def *Def }
 
-		return
-	}
+// ReportRenderer writes human output from the same finalized contribution payload.
+type ReportRenderer func(io.Writer, json.RawMessage) error
 
-	if schema < 1 {
-		d.addError(fmt.Errorf("report %q: %w", kind, errInvalidReportSchema))
-
-		return
-	}
-
-	for _, declared := range d.reports {
-		if declared.kind == kind {
-			d.addError(fmt.Errorf("%w %q", errDuplicateReportKind, kind))
+func (r *ReportDeclarations) Render(kind string, renderer ReportRenderer) {
+	for index := range r.def.reports {
+		if r.def.reports[index].kind == kind {
+			r.def.reports[index].renderer = renderer
 
 			return
 		}
 	}
 
-	d.reports = append(d.reports, reportDefinition{kind: kind, schema: schema, contributor: contributor})
+	invalid("report renderer", inputError("undeclared report %q", kind))
+}
+
+func (r *ReportDeclarations) Contribute(kind string, schema int, contributor ReportContributor) {
+	kind = strings.TrimSpace(kind)
+	if kind == "" {
+		invalid("report", errEmptyReportKind)
+	}
+
+	if schema < 1 {
+		invalid("report", errInvalidReportSchema)
+	}
+
+	for _, existing := range r.def.reports {
+		if existing.kind == kind {
+			invalid("report", fmt.Errorf("%w %q", errDuplicateReportKind, kind))
+		}
+	}
+
+	r.def.reports = append(r.def.reports, reportDefinition{kind: kind, schema: schema, contributor: contributor})
+}
+
+func (r *ReportDeclarations) Metadata(key, value string) {
+	if r.def.Execution.root == nil {
+		return
+	}
+
+	root := r.def.Execution.root
+	root.reportMu.Lock()
+	defer root.reportMu.Unlock()
+
+	if root.reportData == nil {
+		root.reportData = map[string]string{}
+	}
+
+	root.reportData[key] = value
+}
+
+// Put copies a directly computed payload at publication time.
+func (r *ReportDeclarations) Put(kind string, schema int, value any) {
+	var data json.RawMessage
+
+	if r.def.Execution.root != nil && r.def.Execution.reporting {
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			invalid("report payload", err)
+		}
+
+		data = encoded
+	}
+
+	r.Contribute(
+		kind,
+		schema,
+		func(ReportContext) (ReportContribution, error) { return ReportContribution{Data: data}, nil },
+	)
 }
 
 func newRunReport(
 	name string,
-	drivers map[int]*config.DriverConfig,
 	params []resolvedParam,
-	scenario scenarioSpec,
 	steps, noSteps []string,
 	options ReportOptions,
 ) *report.Run {
@@ -103,18 +158,22 @@ func newRunReport(
 		ID:             reportID,
 		RunID:          options.RunID,
 		StroppyVersion: options.StroppyVersion,
+		BuildDigest:    options.BuildDigest,
 		StartedAt:      started,
 		Status:         report.StatusFailed,
 		Workload:       name,
-		Drivers:        reportDrivers(drivers),
+		Drivers:        []report.Driver{},
 		Metadata:       maps.Clone(options.Metadata),
 		Host: report.Host{
 			OS: runtime.GOOS, Arch: runtime.GOARCH, GoVersion: runtime.Version(),
 			CPUs: runtime.NumCPU(), MaxProcs: runtime.GOMAXPROCS(0),
 		},
-		Scenario:        reportScenario(scenario),
-		Parameters:      reportParameters(params),
-		StepSelection:   report.StepSelection{Only: slices.Clone(steps), Exclude: slices.Clone(noSteps)},
+
+		Parameters: reportParameters(params),
+		StepSelection: report.StepSelection{
+			Only:    slices.Clone(steps),
+			Exclude: slices.Clone(noSteps),
+		},
 		Metrics:         map[string]report.Metric{},
 		Errors:          report.ErrorSummary{Groups: []report.ErrorGroup{}},
 		Steps:           []report.Step{},
@@ -126,40 +185,6 @@ func newRunReport(
 	}
 
 	return run
-}
-
-func reportDrivers(drivers map[int]*config.DriverConfig) []report.Driver {
-	indexes := make([]int, 0, len(drivers))
-	for index := range drivers {
-		indexes = append(indexes, index)
-	}
-
-	slices.Sort(indexes)
-
-	out := make([]report.Driver, 0, len(indexes))
-	for _, index := range indexes {
-		driverConfig := drivers[index]
-		if driverConfig == nil {
-			continue
-		}
-
-		out = append(out, report.Driver{Index: index, Type: driverConfig.DriverType.String()})
-	}
-
-	return out
-}
-
-func reportScenario(scenario scenarioSpec) report.Scenario {
-	out := report.Scenario{Executor: scenario.executor, VUs: scenario.vus}
-	if scenario.executor == "constant-vus" {
-		seconds := scenario.duration.Seconds()
-		out.DurationSeconds = &seconds
-	} else {
-		iterations := scenario.iterations
-		out.IterationsRequested = &iterations
-	}
-
-	return out
 }
 
 // AddReportData adds or replaces one JSON value in the common report metadata.
@@ -194,7 +219,7 @@ func reportParameters(params []resolvedParam) report.Parameters {
 
 func finalizeRunReport(
 	run *report.Run,
-	root *RootState,
+	root *rootState,
 	definitions []reportDefinition,
 	data metricdata.ResourceMetrics,
 	runErr error,
@@ -229,11 +254,18 @@ func finalizeRunReport(
 		run.Failure = &report.Failure{Phase: phase, Reason: boundReportError(runErr)}
 	}
 
-	snapshots := aggregateMetricSnapshots(data, root.metricsPrefix)
-	run.WorkloadReports = buildWorkloadReports(definitions, ReportContext{Metrics: snapshots})
+	run.WorkloadReports = buildWorkloadReports(definitions, func() ReportContext {
+		return ReportContext{
+			Metrics:      aggregateMetricSnapshots(data, root.metricsPrefix),
+			Series:       reportMetrics(data, root.metricsPrefix),
+			Steps:        slices.Clone(run.Steps),
+			Measurements: maps.Clone(run.Measurements),
+			Status:       run.Status,
+		}
+	})
 }
 
-func buildWorkloadReports(definitions []reportDefinition, reportContext ReportContext) []report.WorkloadReport {
+func buildWorkloadReports(definitions []reportDefinition, snapshot func() ReportContext) []report.WorkloadReport {
 	out := make([]report.WorkloadReport, 0, len(definitions))
 	for _, definition := range definitions {
 		item := report.WorkloadReport{
@@ -246,7 +278,7 @@ func buildWorkloadReports(definitions []reportDefinition, reportContext ReportCo
 			continue
 		}
 
-		contribution, err := definition.contributor(reportContext)
+		contribution, err := definition.contributor(snapshot())
 		if err != nil {
 			item.Status = report.WorkloadReportError
 			item.Reason = boundReportError(err)
@@ -391,7 +423,12 @@ func reportMetric(metric metricdata.Metrics) (report.Metric, bool) {
 			Type: "histogram", Unit: metric.Unit, Count: &count, Sum: &sum, Average: &average,
 			Bounds: slices.Clone(snapshot.Bounds), BucketCounts: slices.Clone(snapshot.Buckets),
 			Percentiles: map[string]float64{
-				"p50": histogramQuantile(snapshot.Bounds, snapshot.Buckets, snapshot.Count, medianP),
+				"p50": histogramQuantile(
+					snapshot.Bounds,
+					snapshot.Buckets,
+					snapshot.Count,
+					medianP,
+				),
 				"p90": histogramQuantile(snapshot.Bounds, snapshot.Buckets, snapshot.Count, p90),
 				"p95": histogramQuantile(snapshot.Bounds, snapshot.Buckets, snapshot.Count, p95),
 				"p99": histogramQuantile(snapshot.Bounds, snapshot.Buckets, snapshot.Count, p99),

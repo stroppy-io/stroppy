@@ -11,8 +11,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 // Driver preset literals reused across the postgres-family presets and
@@ -29,6 +29,9 @@ var (
 	errInsertMethodAliasConflict = errors.New("insert method aliases conflict")
 	errRawInsertMethodNotString  = errors.New("raw insert method must be a string")
 	errNilDriverConfig           = errors.New("nil driver config")
+	errInvalidDriverName         = errors.New("invalid driver name")
+	errDuplicateDefaultDriver    = errors.New("duplicate default driver")
+	driverNamePattern            = regexp.MustCompile(`^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`)
 
 	legacyRawInsertMethodKey = regexp.MustCompile(`([,{]\s*)"insertMethod"(\s*:)`)
 )
@@ -78,6 +81,9 @@ var driverPresets = map[string]DriverPreset{
 		URL:                 "grpc://localhost:2136/local",
 		DefaultInsertMethod: "native",
 		PoolKind:            "sql",
+	},
+	"recording": {
+		DriverType: "recording", URL: "recording.json", DefaultInsertMethod: "native",
 	},
 	"noop": {
 		DriverType:          "noop",
@@ -553,20 +559,32 @@ func driverCLIConfigFromFile(fileConfig *config.DriverRunConfig) (DriverCLIConfi
 	return cfg, nil
 }
 
-// DriverCLIConfigs holds parsed driver configurations indexed by driver number.
-type DriverCLIConfigs map[int]*DriverCLIConfig
+// DriverCLIConfigs holds parsed driver configurations by declaration name.
+type DriverCLIConfigs map[string]*DriverCLIConfig
 
 // DriverCLIConfigsFromFile converts config-file drivers into mutable CLI configs.
-func DriverCLIConfigsFromFile(fileDrivers map[uint32]*config.DriverRunConfig) (DriverCLIConfigs, error) {
+func DriverCLIConfigsFromFile(fileDrivers map[string]*config.DriverRunConfig) (DriverCLIConfigs, error) {
 	configs := make(DriverCLIConfigs, len(fileDrivers))
 
 	for idx, fileConfig := range fileDrivers {
-		cfg, err := driverCLIConfigFromFile(fileConfig)
-		if err != nil {
-			return nil, fmt.Errorf("convert config file driver %d: %w", idx, err)
+		if idx != "" && !driverNamePattern.MatchString(idx) {
+			return nil, fmt.Errorf("%w %q", errInvalidDriverName, idx)
 		}
 
-		configs[int(idx)] = &cfg
+		if idx == "default" {
+			idx = ""
+		}
+
+		if _, exists := configs[idx]; exists {
+			return nil, errDuplicateDefaultDriver
+		}
+
+		cfg, err := driverCLIConfigFromFile(fileConfig)
+		if err != nil {
+			return nil, fmt.Errorf("convert config file driver %s: %w", idx, err)
+		}
+
+		configs[idx] = &cfg
 	}
 
 	return configs, nil

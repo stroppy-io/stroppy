@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/driver/common"
-	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/common"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/insertprogress"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // typedIntSource returns an indexed source over one int64 column "id" =

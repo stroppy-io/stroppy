@@ -10,122 +10,44 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
-	"github.com/stroppy-io/stroppy/pkg/driver/stats"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/stats"
 )
 
 func TestSQLSourcePrecedence(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "queries.sql")
-	require.NoError(t, os.WriteFile(file, []byte("--= from_file\nSELECT 1;\n"), 0o600))
+	require.NoError(t, os.WriteFile(file, []byte("--= from_file\nSELECT 1;"), 0o600))
 
-	validBody := "--= from_body\nSELECT 1;\n"
-	invalidBody := "SELECT 1"
-
-	tests := []struct {
-		name       string
-		processEnv map[string]string
+	for _, test := range []struct {
+		body, file string
 		inputs     bench.ParamInputs
 	}{
 		{
-			name:   "masked CLI body selects CLI file",
-			inputs: bench.ParamInputs{CLI: map[string]string{"sql-body": "", "sql-file": file}},
+			body:   "SELECT 1",
+			inputs: bench.ParamInputs{CLI: map[string]string{"sql-file": file}},
 		},
 		{
-			name:   "masked CLI file selects CLI body",
-			inputs: bench.ParamInputs{CLI: map[string]string{"sql-body": validBody, "sql-file": ""}},
+			file:   "missing.sql",
+			inputs: bench.ParamInputs{CLI: map[string]string{"sql-body": "--= body\nSELECT 1;"}},
 		},
-		{
-			name:       "typed CLI file beats process body",
-			processEnv: map[string]string{"STROPPY_SQL_BODY": invalidBody},
-			inputs:     bench.ParamInputs{CLI: map[string]string{"sql-file": file}},
-		},
-		{
-			name:       "typed CLI body beats process file",
-			processEnv: map[string]string{"SQL_FILE": "missing.sql"},
-			inputs:     bench.ParamInputs{CLI: map[string]string{"sql-body": validBody}},
-		},
-		{
-			name:       "process file beats legacy body",
-			processEnv: map[string]string{"SQL_FILE": file},
-			inputs:     bench.ParamInputs{LegacyEnv: map[string]string{"STROPPY_SQL_BODY": invalidBody}},
-		},
-		{
-			name: "legacy file beats typed config body",
-			inputs: bench.ParamInputs{
-				LegacyEnv:      map[string]string{"SQL_FILE": file},
-				WorkloadConfig: map[string]json.RawMessage{"sqlBody": json.RawMessage(`"SELECT 1"`)},
-			},
-		},
-		{
-			name: "typed config file beats config env body",
-			inputs: bench.ParamInputs{
-				WorkloadConfig:  map[string]json.RawMessage{"sqlFile": json.RawMessage(`"` + file + `"`)},
-				LegacyConfigEnv: map[string]string{"STROPPY_SQL_BODY": invalidBody},
-			},
-		},
-		{
-			name:       "legacy process body alias is accepted",
-			processEnv: map[string]string{"STROPPY_SQL_BODY": validBody},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		{inputs: bench.ParamInputs{WorkloadConfig: map[string]json.RawMessage{"sqlFile": json.RawMessage(`"` + file + `"`)}}},
+	} {
+		t.Run("source", func(t *testing.T) {
 			unsetSQLSourceEnv(t)
 
-			for key, value := range test.processEnv {
-				t.Setenv(key, value)
+			if test.body != "" {
+				t.Setenv("SQL_BODY", test.body)
+			}
+
+			if test.file != "" {
+				t.Setenv("SQL_FILE", test.file)
 			}
 
 			require.NoError(t, runExecuteSQL(test.inputs))
-
-			for key, value := range test.processEnv {
-				require.Equal(t, value, os.Getenv(key))
-			}
-		})
-	}
-}
-
-func TestEmptyHigherPrioritySQLSourceMasksLowerSource(t *testing.T) {
-	tests := []struct {
-		name       string
-		processEnv map[string]string
-		inputs     bench.ParamInputs
-	}{
-		{
-			name:       "empty CLI file masks process body",
-			processEnv: map[string]string{"STROPPY_SQL_BODY": "--= process\nSELECT 1;"},
-			inputs:     bench.ParamInputs{CLI: map[string]string{"sql-file": ""}},
-		},
-		{
-			name:       "empty CLI body masks process file",
-			processEnv: map[string]string{"SQL_FILE": "process.sql"},
-			inputs:     bench.ParamInputs{CLI: map[string]string{"sql-body": ""}},
-		},
-		{
-			name: "empty typed config file masks config env body",
-			inputs: bench.ParamInputs{
-				WorkloadConfig:  map[string]json.RawMessage{"sqlFile": json.RawMessage(`""`)},
-				LegacyConfigEnv: map[string]string{"STROPPY_SQL_BODY": "--= config-env\nSELECT 1;"},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			unsetSQLSourceEnv(t)
-
-			for key, value := range test.processEnv {
-				t.Setenv(key, value)
-			}
-
-			err := runExecuteSQL(test.inputs)
-			require.ErrorIs(t, err, errNoSQLSource, err)
 		})
 	}
 }
@@ -152,7 +74,7 @@ func TestEmptySQLSourcesUseSourceNeutralError(t *testing.T) {
 
 			err := runExecuteSQL(test.inputs)
 			require.ErrorIs(t, err, errSQLSourceNoQueries)
-			require.ErrorContains(t, err, "SQL source has no `--= name` queries")
+			require.ErrorContains(t, err, "SQL source has no named queries")
 			require.NotContains(t, err.Error(), "SQL file")
 		})
 	}
@@ -171,7 +93,7 @@ func TestSQLSourceDoesNotLeakBetweenRuns(t *testing.T) {
 }
 
 func TestCancellationStopsRemainingQueries(t *testing.T) {
-	const driverType config.DriverType = 1000
+	const driverType config.DriverType = config.DriverTypeNoop
 
 	ctx, cancel := context.WithCancel(context.Background())
 	canceling := &cancelingDriver{cancel: cancel}
@@ -180,18 +102,17 @@ func TestCancellationStopsRemainingQueries(t *testing.T) {
 		return canceling, nil
 	})
 
-	err := bench.Run(
+	_, err := bench.RunCatalog(
 		ctx,
+		bench.RegisteredCatalog(),
 		"execute_sql",
-		map[int]*config.DriverConfig{0: {DriverType: driverType}},
-		bench.ParamInputs{CLI: map[string]string{
-			"sql-body": "--= first\nSELECT 1;\n--= second\nSELECT 2;\n",
-		}},
-		nil,
-		nil,
-		zap.NewNop(),
-		&bench.MetricsConfig{},
+		bench.RunOptions{
+			Drivers: map[string]bench.DriverConfig{"": {Kind: bench.DriverNoop}},
+			Params:  bench.ParamInputs{CLI: map[string]string{"sql-body": "--= first\nSELECT 1;\n--= second\nSELECT 2;"}},
+			Metrics: &bench.MetricsConfig{Quiet: true},
+		},
 	)
+
 	require.ErrorIs(t, err, context.Canceled)
 	require.Equal(t, int64(1), canceling.queries.Load())
 }
@@ -223,16 +144,18 @@ func (*cancelingDriver) ClassifyError(err error) driver.ErrorFacts {
 func (*cancelingDriver) Teardown(context.Context) error { return nil }
 
 func runExecuteSQL(inputs bench.ParamInputs) error {
-	return bench.Run(
+	_, err := bench.RunCatalog(
 		context.Background(),
+		bench.RegisteredCatalog(),
 		"execute_sql",
-		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		inputs,
-		nil,
-		nil,
-		zap.NewNop(),
-		&bench.MetricsConfig{},
+		bench.RunOptions{
+			Drivers: map[string]bench.DriverConfig{"": {Kind: bench.DriverNoop}},
+			Params:  inputs,
+			Metrics: &bench.MetricsConfig{Quiet: true},
+		},
 	)
+
+	return err
 }
 
 func unsetSQLSourceEnv(t *testing.T) {

@@ -7,9 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
-
-	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
 var errValidatePopulation = errors.New("validate_population")
@@ -18,12 +16,12 @@ var errValidatePopulation = errors.New("validate_population")
 // returns an error if any fail.
 func validatePopulation(
 	ctx context.Context, b *bench.Bench, warehouses, warehouseStart, wIDMax int64, maxAttempts int,
+	retries *bench.CounterHandle,
 ) error {
-	retries := b.Counter("tpcc_population_retry_attempts")
 	reader := &populationReader{Bench: b, policy: b.TxRetryPolicy(bench.TxRetryPolicyOptions{
 		MaxAttempts: maxAttempts,
 		Idempotent:  true,
-		OnRetry:     func(int, error, bench.RetryDecision) { retries.Add(1) },
+		OnRetry:     func(int, error, bench.RetryDecision) { retries.Add(ctx, 1) },
 	})}
 	wRange := fmt.Sprintf("BETWEEN %d AND %d", warehouseStart, wIDMax)
 	wWhere := func(col string) string { return "WHERE " + col + " " + wRange }
@@ -55,7 +53,12 @@ func validatePopulation(
 	if len(failures) > 0 {
 		detail := strings.Join(failures, "\n  ")
 
-		return fmt.Errorf("%w: %d check(s) failed:\n  %s", errValidatePopulation, len(failures), detail)
+		return fmt.Errorf(
+			"%w: %d check(s) failed:\n  %s",
+			errValidatePopulation,
+			len(failures),
+			detail,
+		)
 	}
 
 	return nil
@@ -67,7 +70,11 @@ func prefetchDistrictAggregates(
 	ctx context.Context, b *populationReader,
 	wWhere func(string) string,
 ) (distNext, ordMax map[string]int64, noStats map[string]noStat, err error) {
-	distRows, err := b.QueryRows(ctx, "SELECT d_w_id, d_id, d_next_o_id FROM district "+wWhere("d_w_id"), nil)
+	distRows, err := b.RawRows(
+		ctx,
+		"SELECT d_w_id, d_id, d_next_o_id FROM district "+wWhere("d_w_id"),
+		nil,
+	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("validate_population: prefetch failed: %w", err)
 	}
@@ -77,7 +84,7 @@ func prefetchDistrictAggregates(
 		distNext[fmt.Sprintf("%v/%v", r[0], r[1])] = toInt64(r[2])
 	}
 
-	ordRows, err := b.QueryRows(ctx,
+	ordRows, err := b.RawRows(ctx,
 		"SELECT o_w_id, o_d_id, MAX(o_id) FROM orders "+wWhere("o_w_id")+
 			" GROUP BY o_w_id, o_d_id", nil)
 	if err != nil {
@@ -89,7 +96,7 @@ func prefetchDistrictAggregates(
 		ordMax[fmt.Sprintf("%v/%v", r[0], r[1])] = toInt64(r[2])
 	}
 
-	noRows, err := b.QueryRows(ctx, "SELECT no_w_id, no_d_id, MAX(no_o_id), MIN(no_o_id), COUNT(*) FROM new_order "+
+	noRows, err := b.RawRows(ctx, "SELECT no_w_id, no_d_id, MAX(no_o_id), MIN(no_o_id), COUNT(*) FROM new_order "+
 		wWhere("no_w_id")+" GROUP BY no_w_id, no_d_id", nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("validate_population: prefetch failed: %w", err)
@@ -119,11 +126,31 @@ func checkCardinalities(
 	totalOrderLine := totalOrders * olCntFixed
 
 	check("ITEM = 100000", qintEq(ctx, b, "SELECT COUNT(*) FROM item", items))
-	check("WAREHOUSE = WAREHOUSES", qintEq(ctx, b, "SELECT COUNT(*) FROM warehouse WHERE w_id "+wRange, warehouses))
-	check("DISTRICT = TOTAL_DISTRICTS", qintEq(ctx, b, "SELECT COUNT(*) FROM district "+wWhere("d_w_id"), totalDistricts))
-	check("CUSTOMER = TOTAL_CUSTOMERS", qintEq(ctx, b, "SELECT COUNT(*) FROM customer "+wWhere("c_w_id"), totalCustomers))
+	check("WAREHOUSE = WAREHOUSES", qintEq(
+		ctx,
+		b,
+		"SELECT COUNT(*) FROM warehouse WHERE w_id "+wRange,
+		warehouses,
+	))
+	check("DISTRICT = TOTAL_DISTRICTS", qintEq(
+		ctx,
+		b,
+		"SELECT COUNT(*) FROM district "+wWhere("d_w_id"),
+		totalDistricts,
+	))
+	check("CUSTOMER = TOTAL_CUSTOMERS", qintEq(
+		ctx,
+		b,
+		"SELECT COUNT(*) FROM customer "+wWhere("c_w_id"),
+		totalCustomers,
+	))
 	check("STOCK = TOTAL_STOCK", qintEq(ctx, b, "SELECT COUNT(*) FROM stock "+wWhere("s_w_id"), totalStock))
-	check("ORDERS = TOTAL_ORDERS", qintEq(ctx, b, "SELECT COUNT(*) FROM orders "+wWhere("o_w_id"), totalOrders))
+	check("ORDERS = TOTAL_ORDERS", qintEq(
+		ctx,
+		b,
+		"SELECT COUNT(*) FROM orders "+wWhere("o_w_id"),
+		totalOrders,
+	))
 	check("NEW_ORDER = TOTAL_NEW_ORDER", qintEq(ctx, b,
 		"SELECT COUNT(*) FROM new_order "+wWhere("no_w_id"), totalNewOrder))
 	check("ORDER_LINE = TOTAL_ORDER_LINE", qintEq(ctx, b,
@@ -203,7 +230,13 @@ func qintEq(ctx context.Context, b *populationReader, sql string, want int64) bo
 func qint(ctx context.Context, b *populationReader, sql string) (int64, error) {
 	v, err := b.QueryValue(ctx, sql, nil)
 	if err != nil {
-		b.Logger().Error("population validation query failed", zap.String("query", sql), zap.Error(err))
+		b.Log.Error(
+			"population validation query failed",
+			"query",
+			sql,
+			"error",
+			err,
+		)
 	}
 
 	if err != nil || v == nil {
@@ -216,7 +249,13 @@ func qint(ctx context.Context, b *populationReader, sql string) (int64, error) {
 func qfloat(ctx context.Context, b *populationReader, sql string) (float64, error) {
 	v, err := b.QueryValue(ctx, sql, nil)
 	if err != nil {
-		b.Logger().Error("population validation query failed", zap.String("query", sql), zap.Error(err))
+		b.Log.Error(
+			"population validation query failed",
+			"query",
+			sql,
+			"error",
+			err,
+		)
 	}
 
 	if err != nil || v == nil {
@@ -364,11 +403,19 @@ type populationReader struct {
 }
 
 func (r *populationReader) QueryValue(ctx context.Context, sql string, args map[string]any) (any, error) {
-	return readPopulation(ctx, r.policy, func() (any, error) { return r.Bench.QueryValue(ctx, sql, args) })
+	return readPopulation(
+		ctx,
+		r.policy,
+		func() (any, error) { return r.Bench.QueryValue[any](ctx, sql, args) },
+	)
 }
 
-func (r *populationReader) QueryRows(ctx context.Context, sql string, args map[string]any) ([][]any, error) {
-	return readPopulation(ctx, r.policy, func() ([][]any, error) { return r.Bench.QueryRows(ctx, sql, args) })
+func (r *populationReader) RawRows(ctx context.Context, sql string, args map[string]any) ([][]any, error) {
+	return readPopulation(
+		ctx,
+		r.policy,
+		func() ([][]any, error) { return r.Bench.RawRows(ctx, sql, args) },
+	)
 }
 
 func readPopulation[T any](ctx context.Context, policy bench.RetryPolicy, query func() (T, error)) (T, error) {

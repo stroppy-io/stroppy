@@ -4,7 +4,7 @@ package help
 import (
 	"errors"
 	"fmt"
-	"os"
+	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -28,41 +28,49 @@ func Register(t Topic) {
 }
 
 // Cmd is the cobra command for `stroppy help [topic]`.
-var Cmd = &cobra.Command{
-	Use:   "help [topic]",
-	Short: "Show help about a topic",
-	Long:  `Show extended help about a topic. Run without arguments to list available topics.`,
-	// DisableFlagParsing so that topic names like "drivers" are not mistaken for flags.
-	Args: cobra.ArbitraryArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			printTopicList()
+var Cmd = NewCommand()
 
-			return nil
-		}
-
-		name := strings.ToLower(args[0])
-		for _, t := range topics {
-			if t.Name == name {
-				fmt.Fprint(os.Stdout, t.Long)
-
-				return nil
+// NewCommand creates an independent help command.
+func NewCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "help [topic]",
+		Short: "Show help about a topic",
+		Long:  `Show extended help about a topic. Run without arguments to list available topics.`,
+		Args:  cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return printTopicList(cmd.OutOrStdout())
 			}
-		}
 
-		fmt.Fprintf(os.Stderr, "stroppy help: unknown topic %q\n\n", args[0])
-		printTopicList()
+			name := strings.ToLower(args[0])
+			for _, topic := range topics {
+				if topic.Name == name {
+					_, err := fmt.Fprint(cmd.OutOrStdout(), topic.Long)
 
-		return fmt.Errorf("%w: %s", errUnknownTopic, args[0])
-	},
+					return err
+				}
+			}
+
+			fmt.Fprintf(cmd.ErrOrStderr(), "stroppy help: unknown topic %q\n\n", args[0])
+			_ = printTopicList(cmd.OutOrStdout())
+
+			return fmt.Errorf("%w: %s", errUnknownTopic, args[0])
+		},
+	}
 }
 
-func printTopicList() {
-	fmt.Fprint(os.Stdout, "Available help topics:\n\n")
-
-	for _, t := range topics {
-		fmt.Fprintf(os.Stdout, "  %-20s %s\n", t.Name, t.Short)
+func printTopicList(output io.Writer) error {
+	if _, err := fmt.Fprint(output, "Available help topics:\n\n"); err != nil {
+		return err
 	}
 
-	fmt.Fprint(os.Stdout, "\nUse 'stroppy help <topic>' for details.\n")
+	for _, topic := range topics {
+		if _, err := fmt.Fprintf(output, "  %-20s %s\n", topic.Name, topic.Short); err != nil {
+			return err
+		}
+	}
+
+	_, err := fmt.Fprint(output, "\nUse 'stroppy help <topic>' for details.\n")
+
+	return err
 }

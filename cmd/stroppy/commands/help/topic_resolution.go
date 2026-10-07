@@ -13,7 +13,7 @@ func init() {
 INPUT MODES
 
   registered name   Registered Go workload. stroppy dispatches to the
-                   matching bench.Workload implementation.
+                   matching bench.Test definition.
 
                    stroppy run tpcc/tx
                    stroppy run tpcb/tx
@@ -44,11 +44,11 @@ PARAMETER DISCOVERY AND RESOLUTION
     stroppy run tpcc/tx --help
     stroppy run tpcc/tx --scale-factor 10 --load-workers 8
 
-  Shared run parameters are --executor, --vus, --iterations, --duration, and
-  --query-timeout. Select shared-iterations or constant-vus explicitly. Typed values
-  resolve in this order: CLI flag > process env > -e > matching "run"/"params" config >
-  config "env" > declared default. Legacy DURATION can still infer constant-vus,
-  but emits a warning; prefer an explicit executor.
+  Built-in run parameters include --executor, --vus, --iterations, --duration,
+  --drain-timeout, and --query-timeout. Select shared-iterations or constant-vus
+  explicitly. Typed values resolve in this order: CLI flag > process environment >
+  matching "run"/"params" config > declared default. -e and config "env" are removed;
+  DURATION does not infer an executor.
 
 SQL RESOLUTION ORDER
 

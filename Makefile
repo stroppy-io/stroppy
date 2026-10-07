@@ -36,7 +36,7 @@ REQUIRED_BINS = git go curl unzip docker
 install-linter: # Install golangci-lint
 	$(info Installing golangci-lint...)
 	mkdir -p $(LOCAL_BIN)
-	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
 .PHONY: install-bin-deps
 install-bin-deps: install-linter # Install binary dependencies in ./bin
@@ -92,7 +92,7 @@ gen-tpcds-json: # Regenerate workloads/tpcds/distributions.json from upstream .d
 	go run ./cmd/dstparse -in $(TPCDS_TOOLS_DIR) -out workloads/tpcds/distributions.json
 
 gen-tpcds-streams: # Generate TPC-DS query streams (DIALECT, SCALE, SEED, STREAMS, OUT)
-	go run ./third_party/gotpcds/dsqgen/cmd/dsqgen \
+	go run ./workloads/tpcds/dsqgen/cmd/dsqgen \
 		-dialect $(or $(DIALECT),postgres) -scale $(or $(SCALE),1) \
 		-seed $(or $(SEED),19620718) -streams $(or $(STREAMS),1) \
 		-out $(or $(OUT),./tpcds-streams)
@@ -116,7 +116,7 @@ gen-tpch-json: # Regenerate workloads/tpch/distributions.json and answers_sf1.js
 
 STROPPY_BIN_NAME=stroppy
 STROPPY_OUT_FILE=$(CURDIR)/build/$(STROPPY_BIN_NAME)
-STROPPY_LDFLAGS=-ldflags "-s -w -X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'"
+STROPPY_LDFLAGS=-ldflags "-s -w -X 'github.com/stroppy-io/stroppy/v6/internal/version.Version=$(VERSION)'"
 
 # Extra go build tags (release builds pass -tags=pgnoop_embed to carry the
 # pg-noop baseline server inside the stroppy binary).
@@ -130,7 +130,7 @@ PGNOOP_CHECKSUMS=$(CURDIR)/internal/pgnoop/release.sha256
 build-debug: # Build binary stroppy (with symbols)
 	@mkdir -p $(CURDIR)/build
 	echo $(VERSION)
-	go build -trimpath -ldflags "-X 'github.com/stroppy-io/stroppy/internal/version.Version=$(VERSION)'" -o $(STROPPY_OUT_FILE) ./cmd/stroppy
+	go build -trimpath -ldflags "-X 'github.com/stroppy-io/stroppy/v6/internal/version.Version=$(VERSION)'" -o $(STROPPY_OUT_FILE) ./cmd/stroppy
 
 build: # Build binary stroppy
 	@mkdir -p $(CURDIR)/build
@@ -227,8 +227,8 @@ run-scenario-smoke: # Tier 0: scenario-branch smoke on noop (no DB), all workloa
 	@rc=0;                                                                          \
 	for spec in "tpcb/tx 1 -" "tpcc/tx 1 validate_population" "tpcds 0.01 -" "tpch/tx 0.01 validate_answers"; do \
 		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns="--no-steps workload"; [ "$$skip" = "-" ] || ns="--no-steps workload,$$skip"; \
-		$(call smoke_run,noop constant-vus: $$wl,./build/stroppy run $$wl -d noop -e SCALE_FACTOR=$$sf -e DURATION=2s -e VUS=2 $$ns); \
-		$(call smoke_run,noop shared-iters: $$wl,./build/stroppy run $$wl -d noop -e SCALE_FACTOR=$$sf -e VUS=2 -e ITER=1 $$ns); \
+		$(call smoke_run,noop constant-vus: $$wl,./build/stroppy run $$wl -d noop --scale-factor $$sf --executor constant-vus --duration 2s --vus 2 $$ns); \
+		$(call smoke_run,noop shared-iters: $$wl,./build/stroppy run $$wl -d noop --scale-factor $$sf --executor shared-iterations --vus 2 --iterations 1 $$ns); \
 	done;                                                                           \
 	exit $$rc
 
@@ -247,8 +247,8 @@ run-workload-branches: # Tier 1: real-Postgres smoke of both branches (tpcb/tpcc
 	@rc=0;                                                                          \
 	for spec in "tpcb/tx 1 -" "tpcc/tx 1 -" "tpch/tx 0.01 validate_answers"; do \
 		set -- $$spec; wl=$$1; sf=$$2; skip=$$3; ns=""; [ "$$skip" = "-" ] || ns="--no-steps $$skip"; \
-		$(call smoke_run,pg constant-vus: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e DURATION=2s -e VUS=1 $$ns); \
-		$(call smoke_run,pg shared-iters: $$wl,./build/stroppy run $$wl -e SCALE_FACTOR=$$sf -e VUS=2 -e ITER=1 $$ns); \
+		$(call smoke_run,pg constant-vus: $$wl,./build/stroppy run $$wl --scale-factor $$sf --executor constant-vus --duration 2s --vus 1 $$ns); \
+		$(call smoke_run,pg shared-iters: $$wl,./build/stroppy run $$wl --scale-factor $$sf --executor shared-iterations --vus 2 --iterations 1 $$ns); \
 	done;                                                                           \
 	exit $$rc
 

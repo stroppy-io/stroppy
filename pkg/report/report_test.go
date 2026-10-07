@@ -65,7 +65,7 @@ func TestOptionalFieldsStayAbsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, absent := range []string{"run_id", "metadata", "custom", "failure"} {
+	for _, absent := range []string{"run_id", "build_digest", "metadata", "custom", "failure"} {
 		if _, ok := document[absent]; ok {
 			t.Fatalf("optional field %q is present", absent)
 		}

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/stroppy-io/stroppy/internal/version"
+	"github.com/stroppy-io/stroppy/v6/internal/version"
 )
 
 // manifest is the shape of <outdir>/<workload>/MANIFEST.json. It captures
@@ -90,7 +90,7 @@ func writeManifest(
 	doc := manifest{
 		Workload:     workloadName,
 		Generated:    time.Now().UTC().Format(time.RFC3339),
-		FrameworkVer: version.Version,
+		FrameworkVer: version.Resolve(),
 		InsertMethod: "NATIVE",
 		Config: manifestConfig{
 			Dir:       cfg.dir,

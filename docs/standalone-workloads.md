@@ -1,0 +1,158 @@
+# Standalone Go workloads
+
+A standalone workload is one ordinary Go project. Workload logic lives in an
+importable package that exports and registers a test descriptor:
+
+```go
+package workload
+
+import (
+    "context"
+
+    "github.com/stroppy-io/stroppy/v6/pkg/bench"
+)
+
+var Test = bench.Test{Name: "example/query", Define: define}
+
+func init() { bench.Register(Test) }
+
+func define(d *bench.Def) error {
+    run := bench.RunParameters(&d.Param, bench.RunDefaults{Iterations: 10})
+    d.Execution.Step("query", query, run.Policy())
+    return d.Execution.Err()
+}
+
+func query(ctx context.Context, b *bench.Bench) error {
+    return b.Exec(ctx, "SELECT :value", map[string]any{"value": b.Iteration()})
+}
+```
+
+An optional project-owned `main` keeps direct development runnable:
+
+```go
+package main
+
+import (
+    stroppy "github.com/stroppy-io/stroppy/v6"
+    "example.com/project/workload"
+)
+
+func main() { stroppy.Main(workload.Test) }
+```
+
+Create the minimal project with `stroppy init my-workload` (see
+[author tooling](author-tooling.md)). `stroppy build PATH` checks the provided
+importable package first, then its conventional `workload/` directory; root
+`package main` is not imported directly:
+
+```bash
+stroppy build .
+# Explicit importable package path is also supported:
+stroppy build ./workload
+```
+
+Keeping registration in the importable package lets export link workload code
+straight into one process. Exported binaries do not launch workload subprocesses.
+
+For a project whose root package is importable, `stroppy build .` remains valid.
+
+Direct development uses the project-owned `main`:
+
+```bash
+go run . -d noop --iterations 10
+go run . --help
+go run . probe -o json
+go run . version --json
+```
+
+`go build` creates a self-contained executable with Stroppy's repository-defined
+PostgreSQL, MySQL, Picodata, YDB, noop, and CSV drivers. No driver blank imports,
+installed `stroppy` command, or imports from `cmd/` and `internal/` are required.
+
+Installed Stroppy builds and registers the importable package in its local catalog:
+
+```bash
+stroppy build ./workload
+stroppy list
+stroppy run example/query -d noop --iterations 10
+stroppy probe example/query -o json
+stroppy remove example/query
+```
+
+Export creates one binary containing every built-in plus all or selected custom
+catalog workloads:
+
+```bash
+stroppy export --all -o my-stroppy
+stroppy export example/query another/query -o my-stroppy
+./my-stroppy list
+./my-stroppy run example/query -d noop --iterations 10
+```
+
+Set `GOOS` and `GOARCH` for pure-Go cross-compilation. Windows output receives an
+`.exe` suffix when omitted. Export relinks workload packages from Stroppy-owned
+source snapshots, so original source directories are not required after a
+successful catalog build. Running also uses the published local runtime rather
+than original sources.
+
+Both `build` and `export` prefer system Go 1.27 or newer. If unavailable, Stroppy
+can download verified Go 1.27.1 into `~/.stroppy/toolchains/`. Interactive use
+prompts before download; pass `-y` for unattended use. Toolchain, module cache,
+build cache, and temporary files stay under `~/.stroppy`; Stroppy does not change
+`PATH` or persistent Go configuration. `--offline` disables network module access
+and succeeds only when compiler and dependencies are already cached.
+
+Existing Go proxy, private-module, Git, and credential environment is inherited by
+the child Go process. Stroppy does not copy credentials into catalog metadata,
+reports, or logs.
+
+Custom workload packages are trusted native Go code and run with user privileges;
+Stroppy provides no sandbox.
+
+`stroppy run` uses one local Stroppy runtime containing built-ins plus every
+catalog workload. Source edits require another `stroppy build`; an existing name
+requires `--replace`. Stroppy stores immutable compiler-input snapshots, so later
+runtime rebuilds and exports do not require original source directories. Failed
+builds leave previous runtime active. After installed Stroppy changes, refresh the
+local runtime explicitly:
+
+```bash
+stroppy build --refresh
+```
+
+`remove` deletes only Stroppy-owned catalog data and republishes remaining
+workloads; removing final custom workload returns runtime commands to installed
+Stroppy. User source is never removed.
+
+Build and export artifacts are content-addressed under `~/.stroppy/cache/builds/`.
+Inspect secret-free provenance by full or unique digest prefix, or clear reusable
+artifacts and private-toolchain Go caches:
+
+```bash
+stroppy cache inspect DIGEST
+stroppy cache inspect DIGEST -o json
+stroppy cache clean
+```
+
+Cleanup preserves active local runtime, workload snapshots, reports, catalog, and
+private compiler installation. System Go keeps its normal caches. Generated
+runtime reports include `build_digest`; direct installed built-in runs omit it.
+
+Standalone runs use the same configuration, metrics, report, cancellation, and
+`~/.stroppy` storage conventions as installed Stroppy. Constructed run reports
+are saved under `~/.stroppy/reports/`; `--no-report` disables both construction
+and history. Explicit `--report-file` write failures fail the command. Automatic
+history failures only warn on stderr.
+
+Applications with their own CLI, UI, or service can use `stroppy.New`,
+`Application.Execute`, and `Application.Run` instead of `stroppy.Main`.
+
+`Application.Run` returns report data without saving history; call `report.Save`
+explicitly if the host wants persistence. It never installs signal handlers or
+exits the process. `Application.Execute` supplies CLI behavior and report history
+but leaves cancellation and process exit to its host.
+
+See [Workload authoring API](workload-authoring-api.md) for the supported package
+boundary, compatibility guarantee, execution semantics, and migration guide.
+Runnable examples cover [queries, transactional loading, telemetry/reporting,
+and named databases](../examples/authoring/README.md).

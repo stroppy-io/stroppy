@@ -31,9 +31,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	stroppyconfig "github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/common/logger"
+	stroppyconfig "github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 // csvBufferSize bounds the bufio.Writer wrapping each shard's

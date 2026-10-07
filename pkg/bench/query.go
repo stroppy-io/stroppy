@@ -2,17 +2,16 @@ package bench
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
-	"go.uber.org/zap"
-
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/datagen/tpcdsgen"
-	"github.com/stroppy-io/stroppy/pkg/datagen/tpchgen"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
-	"github.com/stroppy-io/stroppy/pkg/driver/stats"
+	"github.com/stroppy-io/stroppy/v6/internal/rowmap"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/insertprogress"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/stats"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // BeginOpts selects isolation + names the tx for metrics.
@@ -28,40 +27,38 @@ func (b *Bench) Exec(ctx context.Context, sql string, args map[string]any) error
 	return b.finishQuery(res, err)
 }
 
-// QueryValue returns the first column of the first row (or nil if no rows).
-func (b *Bench) QueryValue(ctx context.Context, sql string, args map[string]any) (_ any, err error) {
-	res, err := b.runQuery(ctx, sql, args)
-	defer func() { err = b.finishQuery(res, err) }()
+// QueryValue reads one owned scalar or shallow struct. No row is ErrNoRows.
+func (b *Bench) QueryValue[T any](ctx context.Context, sql string, args map[string]any) (T, error) {
+	row, err := b.queryRow(ctx, sql, args)
+	if err != nil {
+		var zero T
 
+		return zero, err
+	}
+
+	return rowmap.Decode[T](row.columns, row.values)
+}
+
+// QueryValues collects owned scalar or shallow struct rows and closes the cursor.
+func (b *Bench) QueryValues[T any](ctx context.Context, sql string, args map[string]any) (values []T, err error) {
+	rows, err := b.Query(ctx, sql, args)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { err = driver.JoinErrors(err, rows.Close()) }()
 
-	return firstQueryValue(res.Rows)
-}
+	values = make([]T, 0)
 
-func firstQueryValue(rows driver.Rows) (any, error) {
-	if rows == nil {
-		//nolint:nilnil // no-row sentinel: a driver may report no result set
-		return nil, nil
-	}
-
-	if !rows.Next() {
-		if err := rows.Err(); err != nil {
-			return nil, err
+	for rows.Next() {
+		value, decodeErr := rowmap.Decode[T](rows.columns, rows.source.Values())
+		if decodeErr != nil {
+			return nil, decodeErr
 		}
 
-		//nolint:nilnil // no-row sentinel: workloads branch on `v == nil` after `err == nil`
-		return nil, nil
+		values = append(values, value)
 	}
 
-	vals := rows.Values()
-	if len(vals) == 0 {
-		//nolint:nilnil // no-row sentinel: empty row means "no value"; same caller contract as above
-		return nil, nil
-	}
-
-	return vals[0], rows.Err()
+	return values, rows.Err()
 }
 
 func firstQueryRow(rows driver.Rows) ([]any, error) {
@@ -73,7 +70,7 @@ func firstQueryRow(rows driver.Rows) ([]any, error) {
 		return nil, rows.Err()
 	}
 
-	return rows.Values(), rows.Err()
+	return copyValues(rows.Values()), rows.Err()
 }
 
 func readQueryRows(rows driver.Rows) ([][]any, error) {
@@ -81,11 +78,16 @@ func readQueryRows(rows driver.Rows) ([][]any, error) {
 		return nil, nil
 	}
 
-	return rows.ReadAll(0), rows.Err()
+	out := [][]any{}
+	for rows.Next() {
+		out = append(out, copyValues(rows.Values()))
+	}
+
+	return out, rows.Err()
 }
 
 // QueryRow returns the first row (or nil if no rows).
-func (b *Bench) QueryRow(ctx context.Context, sql string, args map[string]any) (_ []any, err error) {
+func (b *Bench) RawRow(ctx context.Context, sql string, args map[string]any) (_ []any, err error) {
 	res, err := b.runQuery(ctx, sql, args)
 	defer func() { err = b.finishQuery(res, err) }()
 
@@ -97,7 +99,7 @@ func (b *Bench) QueryRow(ctx context.Context, sql string, args map[string]any) (
 }
 
 // QueryRows returns all rows (up to a large cap).
-func (b *Bench) QueryRows(ctx context.Context, sql string, args map[string]any) (_ [][]any, err error) {
+func (b *Bench) RawRows(ctx context.Context, sql string, args map[string]any) (_ [][]any, err error) {
 	res, err := b.runQuery(ctx, sql, args)
 	defer func() { err = b.finishQuery(res, err) }()
 
@@ -109,7 +111,11 @@ func (b *Bench) QueryRows(ctx context.Context, sql string, args map[string]any) 
 }
 
 func (b *Bench) runQuery(ctx context.Context, sql string, args map[string]any) (*driver.QueryResult, error) {
-	res, err := b.drv.RunQuery(ctx, sql, args)
+	if err := b.ensureDriver(ctx); err != nil {
+		return nil, err
+	}
+
+	res, err := b.drv.RunQuery(b.operationContext(ctx), sql, args)
 	if err != nil {
 		return nil, fmt.Errorf("query: %w", err)
 	}
@@ -136,9 +142,74 @@ func (b *Bench) finishQuery(res *driver.QueryResult, queryErr error) error {
 // Insert runs a [driver.InsertRequest] through the benchmark driver. It wires
 // progress tracking and metrics while streaming workload-authored
 // [gen.BatchSource] rows.
-func (b *Bench) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Query, error) {
+// InsertResult contains neutral insertion measurements.
+type InsertResult struct {
+	Rows    int64
+	Elapsed time.Duration
+}
+type InsertStrategy int
+
+const (
+	InsertPlainQuery InsertStrategy = InsertStrategy(driver.InsertPlainQuery)
+	InsertPlainBulk  InsertStrategy = InsertStrategy(driver.InsertPlainBulk)
+	InsertColumnar   InsertStrategy = InsertStrategy(driver.InsertColumnar)
+	InsertNative     InsertStrategy = InsertStrategy(driver.InsertNative)
+)
+
+func (m InsertStrategy) String() string { return driver.InsertMethod(m).String() }
+
+type (
+	InsertOption interface {
+		applyInsert(request *driver.InsertRequest)
+	}
+	insertOption func(*driver.InsertRequest)
+)
+
+func (o insertOption) applyInsert(r *driver.InsertRequest) { o(r) }
+func InsertMethod(m InsertStrategy) InsertOption {
+	return insertOption(func(r *driver.InsertRequest) { r.Method = driver.InsertMethod(m) })
+}
+
+func LoadWorkers(n int) InsertOption {
+	if n < 1 {
+		invalid("load workers", inputError("must be positive"))
+	}
+
+	return insertOption(func(r *driver.InsertRequest) { r.Workers = n })
+}
+
+// Insert streams a partitioned source through the selected database backend.
+func (b *Bench) Insert(
+	ctx context.Context,
+	table string,
+	source gen.BatchSource,
+	options ...InsertOption,
+) (*InsertResult, error) {
+	req := &driver.InsertRequest{Table: table, Source: source, Workers: 1}
+
+	for _, option := range options {
+		if option == nil {
+			invalid("insert", inputError("nil option"))
+		}
+
+		option.applyInsert(req)
+	}
+
+	result, err := b.insert(ctx, req)
+	if result == nil {
+		return nil, err
+	}
+
+	return &InsertResult{Rows: result.Rows, Elapsed: result.Elapsed}, err
+}
+
+func (b *Bench) insert(ctx context.Context, req *driver.InsertRequest) (*stats.Query, error) {
 	if err := driver.ValidateInsert(req); err != nil {
 		return nil, fmt.Errorf("insert: %w", err)
+	}
+
+	if err := b.ensureDriver(ctx); err != nil {
+		return nil, err
 	}
 
 	effectiveReq := *req
@@ -162,9 +233,16 @@ func (b *Bench) Insert(ctx context.Context, req *driver.InsertRequest) (*stats.Q
 	if tracker.Enabled() {
 		runCtx = insertprogress.ContextWithTracker(ctx, tracker)
 		tracker.Start(runCtx)
+
+		defer func() {
+			if value := recover(); value != nil {
+				tracker.Finish(inputError("insert action panicked"))
+				panic(value)
+			}
+		}()
 	}
 
-	result, err := b.drv.Insert(runCtx, &effectiveReq)
+	result, err := b.drv.Insert(b.operationContext(runCtx), &effectiveReq)
 	if tracker.Enabled() {
 		tracker.Finish(err)
 	}
@@ -200,83 +278,53 @@ func (b *Bench) newBatchInsertTracker(req *driver.InsertRequest) *insertprogress
 	return insertprogress.NewTracker(&cfg)
 }
 
-// InsertTpch loads one TPC-H table from the canonical dbgen implementation,
-// streamed through [driver.InsertRequest] by [tpchgen.NewBatchSource]. Canonical
-// seeds, seeking, and entity fan-out are preserved.
-func (b *Bench) InsertTpch(ctx context.Context, table string, scaleFactor float64, workers int) (*stats.Query, error) {
-	if workers < 1 {
-		workers = 1
-	}
-
-	src, err := tpchgen.NewBatchSource(table, scaleFactor)
-	if err != nil {
-		return nil, fmt.Errorf("tpch %q: %w", table, err)
-	}
-
-	req := &driver.InsertRequest{
-		Table: table, Method: driver.InsertNative, Workers: workers, Source: src,
-	}
-
-	return b.Insert(ctx, req)
-}
-
-// InsertTpcds loads one TPC-DS table from the canonical dsdgen implementation,
-// streamed through [driver.InsertRequest] by [tpcdsgen.NewBatchSource]. Canonical
-// text, null semantics, ticket fan-out, and partition seeking are preserved.
-func (b *Bench) InsertTpcds(ctx context.Context, table string, scaleFactor float64, workers int) (*stats.Query, error) {
-	if workers < 1 {
-		workers = 1
-	}
-
-	src, err := tpcdsgen.NewBatchSource(table, scaleFactor)
-	if err != nil {
-		return nil, fmt.Errorf("tpcds %q: %w", table, err)
-	}
-
-	req := &driver.InsertRequest{
-		Table: table, Method: driver.InsertNative, Workers: workers, Source: src,
-	}
-
-	return b.Insert(ctx, req)
-}
-
 // Begin starts a transaction.
-func (b *Bench) Begin(ctx context.Context, opts BeginOpts) (*TxX, error) {
+func (b *Bench) Begin(ctx context.Context, opts BeginOpts) (*Tx, error) {
+	if err := b.ensureDriver(ctx); err != nil {
+		return nil, err
+	}
+
 	iso, err := ParseTxIsolation(string(opts.Isolation))
 	if err != nil {
 		return nil, err
 	}
 
 	if iso == config.TxIsolationLevelNone {
-		return &TxX{tx: nil, b: b, iso: iso, name: opts.Name, start: time.Now()}, nil
+		return &Tx{tx: nil, b: b, iso: iso, name: opts.Name, start: time.Now()}, nil
 	}
 
-	tx, err := b.drv.Begin(ctx, iso)
+	tx, err := b.drv.Begin(b.operationContext(ctx), iso)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
 
-	return &TxX{tx: tx, b: b, iso: iso, name: opts.Name, start: time.Now()}, nil
+	return &Tx{tx: tx, b: b, iso: iso, name: opts.Name, start: time.Now()}, nil
 }
 
 // BeginTx runs fn inside a transaction: commits on nil return, rolls back on error.
-func (b *Bench) BeginTx(ctx context.Context, opts BeginOpts, fn func(*TxX) error) error {
+func (b *Bench) BeginTx(ctx context.Context, opts BeginOpts, fn func(*Tx) error) (err error) {
 	tx, err := b.Begin(ctx, opts)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if !tx.done {
+			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), defaultCleanupTimeout)
+			defer cancel()
 
-	if err := fn(tx); err != nil {
-		_ = tx.Rollback(ctx)
+			err = driver.JoinErrors(err, tx.Rollback(cleanup))
+		}
+	}()
 
-		return err
+	if bodyErr := fn(tx); bodyErr != nil {
+		return bodyErr
 	}
 
 	return tx.Commit(ctx)
 }
 
-// TxX is the transaction handle (sugar over driver.Tx; NONE mode delegates to the driver).
-type TxX struct {
+// Tx is the transaction handle (sugar over driver.Tx; NONE mode delegates to the driver).
+type Tx struct {
 	tx      driver.Tx
 	b       *Bench
 	iso     config.TxIsolationLevel
@@ -286,24 +334,45 @@ type TxX struct {
 	done    bool
 }
 
-func (t *TxX) Exec(ctx context.Context, sql string, args map[string]any) error {
+func (t *Tx) Exec(ctx context.Context, sql string, args map[string]any) error {
 	res, err := t.runQuery(ctx, sql, args)
 
 	return t.b.finishQuery(res, err)
 }
 
-func (t *TxX) QueryValue(ctx context.Context, sql string, args map[string]any) (_ any, err error) {
-	res, err := t.runQuery(ctx, sql, args)
-	defer func() { err = t.b.finishQuery(res, err) }()
+func (t *Tx) QueryValue[T any](ctx context.Context, sql string, args map[string]any) (T, error) {
+	row, err := t.queryRow(ctx, sql, args)
+	if err != nil {
+		var zero T
 
+		return zero, err
+	}
+
+	return rowmap.Decode[T](row.columns, row.values)
+}
+
+func (t *Tx) QueryValues[T any](ctx context.Context, sql string, args map[string]any) (values []T, err error) {
+	rows, err := t.Query(ctx, sql, args)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { err = driver.JoinErrors(err, rows.Close()) }()
 
-	return firstQueryValue(res.Rows)
+	values = make([]T, 0)
+
+	for rows.Next() {
+		v, decodeErr := rowmap.Decode[T](rows.columns, rows.source.Values())
+		if decodeErr != nil {
+			return nil, decodeErr
+		}
+
+		values = append(values, v)
+	}
+
+	return values, rows.Err()
 }
 
-func (t *TxX) QueryRow(ctx context.Context, sql string, args map[string]any) (_ []any, err error) {
+func (t *Tx) RawRow(ctx context.Context, sql string, args map[string]any) (_ []any, err error) {
 	res, err := t.runQuery(ctx, sql, args)
 	defer func() { err = t.b.finishQuery(res, err) }()
 
@@ -314,7 +383,7 @@ func (t *TxX) QueryRow(ctx context.Context, sql string, args map[string]any) (_ 
 	return firstQueryRow(res.Rows)
 }
 
-func (t *TxX) QueryRows(ctx context.Context, sql string, args map[string]any) (_ [][]any, err error) {
+func (t *Tx) RawRows(ctx context.Context, sql string, args map[string]any) (_ [][]any, err error) {
 	res, err := t.runQuery(ctx, sql, args)
 	defer func() { err = t.b.finishQuery(res, err) }()
 
@@ -325,11 +394,15 @@ func (t *TxX) QueryRows(ctx context.Context, sql string, args map[string]any) (_
 	return readQueryRows(res.Rows)
 }
 
-func (t *TxX) runQuery(ctx context.Context, sql string, args map[string]any) (*driver.QueryResult, error) {
+func (t *Tx) runQuery(ctx context.Context, sql string, args map[string]any) (*driver.QueryResult, error) {
+	if t.done {
+		return nil, errTransactionClosed
+	}
+
 	t.queries++
 	if t.tx == nil {
 		// NONE mode: delegate to the parent driver.
-		res, err := t.b.drv.RunQuery(ctx, sql, args)
+		res, err := t.b.drv.RunQuery(t.b.operationContext(ctx), sql, args)
 		if err != nil {
 			return nil, fmt.Errorf("query: %w", err)
 		}
@@ -337,7 +410,7 @@ func (t *TxX) runQuery(ctx context.Context, sql string, args map[string]any) (*d
 		return res, nil
 	}
 
-	res, err := t.tx.RunQuery(ctx, sql, args)
+	res, err := t.tx.RunQuery(t.b.operationContext(ctx), sql, args)
 	if err != nil {
 		return nil, fmt.Errorf("tx query: %w", err)
 	}
@@ -345,11 +418,15 @@ func (t *TxX) runQuery(ctx context.Context, sql string, args map[string]any) (*d
 	return res, nil
 }
 
-func (t *TxX) Commit(ctx context.Context) error {
+func (t *Tx) Commit(ctx context.Context) error {
+	if t.done {
+		return errTransactionClosed
+	}
+
 	committed := true
 
 	if t.tx != nil {
-		if err := t.tx.Commit(ctx); err != nil {
+		if err := t.tx.Commit(t.b.operationContext(ctx)); err != nil {
 			return err
 		}
 	}
@@ -360,9 +437,15 @@ func (t *TxX) Commit(ctx context.Context) error {
 	return nil
 }
 
-func (t *TxX) Rollback(ctx context.Context) error {
+var errTransactionClosed = errors.New("transaction already finalized")
+
+func (t *Tx) Rollback(ctx context.Context) error {
+	if t.done {
+		return errTransactionClosed
+	}
+
 	if t.tx != nil {
-		if err := t.tx.Rollback(ctx); err != nil {
+		if err := t.tx.Rollback(t.b.operationContext(ctx)); err != nil {
 			return err
 		}
 	}
@@ -375,7 +458,7 @@ func (t *TxX) Rollback(ctx context.Context) error {
 
 // recordEnd emits the per-transaction summary metrics (total duration, commit
 // rate, query count) once. Idempotent — safe if a workload calls both paths.
-func (t *TxX) recordEnd(action string, committed bool) {
+func (t *Tx) recordEnd(action string, committed bool) {
 	if t.done {
 		return
 	}
@@ -385,6 +468,3 @@ func (t *TxX) recordEnd(action string, committed bool) {
 		t.b.vu, action, t.name, t.iso, time.Since(t.start), t.queries, committed,
 	)
 }
-
-// Compile-tick: ensure zap import stays used if expanded later.
-var _ = zap.NewNop

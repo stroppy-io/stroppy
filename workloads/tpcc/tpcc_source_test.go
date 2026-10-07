@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/gen"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 // drainAll prepares a full-range cursor over src and returns every row as
@@ -137,7 +137,14 @@ func TestWarehouseSource(t *testing.T) {
 			}
 
 			if len(s) < minLen || len(s) > maxLen {
-				t.Fatalf("row %d col %d len = %d, want [%d,%d]", i, ci, len(s), minLen, maxLen)
+				t.Fatalf(
+					"row %d col %d len = %d, want [%d,%d]",
+					i,
+					ci,
+					len(s),
+					minLen,
+					maxLen,
+				)
 			}
 		}
 	}
@@ -216,7 +223,11 @@ func TestItemSource(t *testing.T) {
 
 	lo, hi := items/10, items/10 // 10% nominal
 	if originalCount < lo/2 || originalCount > hi*2 {
-		t.Fatalf("ORIGINAL count = %d (~%.1f%%), want ~10%%", originalCount, 100*float64(originalCount)/float64(items))
+		t.Fatalf(
+			"ORIGINAL count = %d (~%.1f%%), want ~10%%",
+			originalCount,
+			100*float64(originalCount)/float64(items),
+		)
 	}
 }
 

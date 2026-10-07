@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+
+	runreport "github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
 const (
@@ -296,7 +298,11 @@ func tierVerdicts(tier *TierResult) []Verdict {
 		verdicts = append(verdicts, Verdict{
 			Check:  tier.Name + " errors",
 			Status: statusWarn,
-			Detail: fmt.Sprintf("%.0f failed iterations taint the %s tier numbers", failed, tier.Name),
+			Detail: fmt.Sprintf(
+				"%.0f failed iterations taint the %s tier numbers",
+				failed,
+				tier.Name,
+			),
 		})
 	} else if hasTxMeasurements {
 		verdicts = append(verdicts, Verdict{
@@ -320,7 +326,11 @@ func tierVerdicts(tier *TierResult) []Verdict {
 			verdicts = append(verdicts, Verdict{
 				Check:  tier.Name + " vu scaling",
 				Status: statusOK,
-				Detail: fmt.Sprintf("%.0f%% of linear at %d VUs", efficiency*percentScale, tier.ParallelVUs),
+				Detail: fmt.Sprintf(
+					"%.0f%% of linear at %d VUs",
+					efficiency*percentScale,
+					tier.ParallelVUs,
+				),
 			})
 		}
 	}
@@ -500,4 +510,37 @@ func reportFileTime(name string) (time.Time, bool) {
 	file, ok := parseReportFile(name)
 
 	return file.time, ok
+}
+
+func extractSnapshot(data map[string]runreport.Metric) runMetrics {
+	total := func(name string) float64 {
+		metric := data[name]
+		if metric.Total != nil {
+			return *metric.Total
+		}
+
+		return 0
+	}
+	hist := func(name string) histogram {
+		m := data[name]
+
+		h := histogram{bounds: m.Bounds, buckets: m.BucketCounts}
+		if m.Count != nil {
+			h.count = *m.Count
+		}
+
+		if m.Sum != nil {
+			h.sumMs = *m.Sum
+		}
+
+		return h
+	}
+
+	return runMetrics{
+		iterations:  total("iterations_total"),
+		failed:      total("failed_iterations_total"),
+		insertRows:  total("insert_rows_total"),
+		insertDurMs: hist("insert_duration").sumMs,
+		iter:        hist("iteration_duration"),
+	}
 }

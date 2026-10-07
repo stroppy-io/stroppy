@@ -1,6 +1,7 @@
 package run
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,19 +10,18 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/internal/runner"
-	"github.com/stroppy-io/stroppy/internal/version"
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/pkg/report"
+	"github.com/stroppy-io/stroppy/v6/internal/runner"
+	"github.com/stroppy-io/stroppy/v6/internal/version"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
 const (
@@ -67,11 +67,46 @@ var (
 	errReportDisabledOutput  = errors.New("--no-report cannot be combined with report output options")
 )
 
-var Cmd = &cobra.Command{
-	Use: "run [<workload>] [sql_file] [-f config.json] [-d driver] [-D key=value] " +
-		"[-e KEY=VALUE] [--steps step1,step2]",
-	Short: "Run a benchmark workload",
-	Long: `Run a Go-native benchmark workload. The first positional selects the mode:
+var Cmd = NewCommand(bench.RegisteredCatalog(), "")
+
+const buildDigestAnnotation = "stroppy.build_digest"
+
+// SetBuildDigest attaches generated-artifact identity to reports from command.
+func SetBuildDigest(command *cobra.Command, digest string) {
+	if command == nil || digest == "" {
+		return
+	}
+
+	if command.Annotations == nil {
+		command.Annotations = map[string]string{}
+	}
+
+	command.Annotations[buildDigestAnnotation] = digest
+}
+
+// NewCommand builds a run command over an explicit workload catalog. A non-empty
+// default workload accepts flags without a workload positional.
+func NewCommand(catalog *bench.Catalog, defaultWorkload string) *cobra.Command {
+	return NewCommandWithResolver(catalog, defaultWorkload, nil)
+}
+
+// NewCommandWithResolver builds a run command that may delegate custom names.
+// Resolver may handle a workload name outside the in-process catalog.
+type Resolver func(context.Context, *cobra.Command, string, []string) (bool, error)
+
+// Command wiring keeps parsing, precedence, and dispatch order visible.
+//
+//nolint:gocognit,cyclop,funlen,gocyclo,maintidx // command wiring stays explicit
+func NewCommandWithResolver(
+	catalog *bench.Catalog,
+	defaultWorkload string,
+	resolve Resolver,
+) *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "run [<workload>] [sql_file] [-f config.json] [-d driver] [-D key=value] " +
+			"[--steps step1,step2]",
+		Short: "Run a benchmark workload",
+		Long: `Run a Go-native benchmark workload. The first positional selects the mode:
 
   <name>       → registered workload   stroppy run tpcc/tx
   <name>.sql   → SQL file              stroppy run queries.sql
@@ -80,15 +115,11 @@ var Cmd = &cobra.Command{
 SQL files are searched in: current directory -> ~/.stroppy/ -> built-in workloads.
 The workload and optional sql_file positionals must be adjacent.
 
-Environment flags:
-  -e, --env KEY=VALUE     Set a legacy env value for the workload.
-                          Real env and typed flags take precedence.
-
 Logging:
   --log-level VALUE       Minimum level: debug, info, warn, error, or fatal.
   --log-mode VALUE        Output mode: development or production.
                           Each accepts its LOG_LEVEL_*/LOG_MODE_* name or ordinal.
-                          Sources: flags > process env > -e > global.logger > defaults.
+                          Sources: flags > process env > global.logger > defaults.
                           Defaults: debug and development.
 
 Typed parameter flags:
@@ -105,7 +136,6 @@ Driver flags:
 Config file flags:
   -f, --file PATH         Load config from file (default: ./stroppy-config.json if exists)
                           "run" holds scenario params; "params" holds workload params.
-                          Config env values are lower precedence than -e and typed values.
                           Config drivers are lower precedence than -d/-D.
                           See 'stroppy help config-file' for details.
 
@@ -122,10 +152,10 @@ Signals:
   130 (SIGINT) or 143 (SIGTERM) after a graceful cancellation, 2 after a forced
   exit, and 1 for setup, validation, teardown, fatal, or other command errors.
 `,
-	DisableFlagParsing: true,
-	SilenceErrors:      false,
-	ValidArgsFunction:  completeRunArgs,
-	Example: `
+		DisableFlagParsing: true,
+		SilenceErrors:      false,
+		ValidArgsFunction:  completeRunArgs(catalog),
+		Example: `
   stroppy run tpcc/tx                           # built-in TPC-C tx workload
   stroppy run tpcb/tx                           # TPC-B tx workload
   stroppy run tpcb/procs                        # TPC-B stored-procedure variant (pg/mysql)
@@ -138,170 +168,204 @@ Signals:
   stroppy run tpcc/tx --no-steps load_data       # run all steps except specified
   stroppy run tpcc/tx -d pg                      # use PostgreSQL driver preset
   stroppy run tpcc/tx -d pg -D url=postgres://prod:5432  # preset with URL override
-  stroppy run tpcc/tx -e load_workers=8         # set a legacy env override
-  stroppy run tpcc/tx -e FOO=bar -e BAZ=qux      # multiple env overrides
+  stroppy run tpcc/tx --load-workers 8           # typed workload parameter
   stroppy run tpcb/tx -D driverType=csv -D url='/tmp/tpcb-csv?merge=true' \
     --steps drop_schema,create_schema,load_data  # dump generated rows to CSV
 `,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		parsed, err := parseRunArgs(args)
-		if err != nil {
-			return invalidConfig(err)
-		}
-
-		if parsed.help && parsed.scriptArg != "" {
-			return printSelectedWorkloadHelp(cmd, parsed.scriptArg, parsed.sqlArg)
-		}
-
-		// Resolve -e values before loading configuration so logger input is ready
-		// before any configuration diagnostics are emitted.
-		envOverrides, err := runner.ResolveEnvOverrides(parsed.envArgs)
-		if err != nil {
-			return invalidConfig(err)
-		}
-
-		// Load configuration without emitting diagnostics. The effective logger is
-		// initialized immediately afterward so every following log shares it.
-		fileConfig, _, err := runner.LoadRunConfig(parsed.fileArg)
-		if err != nil {
-			return invalidConfig(fmt.Errorf("failed to load config file: %w", err))
-		}
-
-		if err := initializeLogger(parsed.typedParams, envOverrides, fileConfig); err != nil {
-			return invalidConfig(err)
-		}
-
-		runner.LogConfigFile(fileConfig)
-
-		// Apply effective values: CLI overrides config file.
-		scriptArg := runner.EffectiveScript(parsed.scriptArg, fileConfig)
-		sqlArg := runner.EffectiveSQL(parsed.sqlArg, fileConfig)
-		steps := normalizeStepNames(runner.EffectiveSteps(parsed.steps, fileConfig))
-		noSteps := normalizeStepNames(runner.EffectiveNoSteps(parsed.noSteps, fileConfig))
-
-		if parsed.help {
-			if scriptArg == "" {
-				return cmd.Help()
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if defaultWorkload != "" {
+				args = append([]string{defaultWorkload}, args...)
 			}
 
-			return printSelectedWorkloadHelp(cmd, scriptArg, sqlArg)
-		}
-
-		if scriptArg == "" {
-			return invalidConfig(errNoScript)
-		}
-
-		// Mutual exclusion is checked on the merged inputs (CLI over config file),
-		// not just CLI-vs-CLI, so `config steps + CLI --no-steps` (and vice versa)
-		// is rejected the same way.
-		if len(steps) > 0 && len(noSteps) > 0 {
-			return invalidConfig(errStepsMutExclusive)
-		}
-
-		if len(parsed.afterDash) > 0 {
-			return invalidConfig(errArgsAfterDash)
-		}
-
-		// Log override decisions when both CLI and file config are present.
-		if fileConfig != nil {
-			lg := logger.Global().Named("run")
-
-			if parsed.scriptArg != "" && fileConfig.RunConfig.GetScript() != "" {
-				lg.Debug("CLI script overrides config file",
-					zap.String("cli", parsed.scriptArg),
-					zap.String("file", fileConfig.RunConfig.GetScript()),
-				)
-			}
-
-			if len(parsed.steps) > 0 && len(fileConfig.RunConfig.Steps) > 0 {
-				lg.Debug("CLI --steps overrides config file steps",
-					zap.Strings("cli", parsed.steps),
-					zap.Strings("file", fileConfig.RunConfig.Steps),
-				)
-			}
-		}
-
-		paramInputs := bench.ParamInputs{
-			CLI:       withoutLoggerParams(parsed.typedParams),
-			LegacyEnv: withoutLoggerEnv(envOverrides),
-		}
-
-		driverConfigs := runner.DriverCLIConfigs{}
-
-		if fileConfig != nil {
-			paramInputs.RunConfig = fileConfig.Run
-			paramInputs.WorkloadConfig = fileConfig.Params
-			paramInputs.LegacyConfigEnv = withoutLoggerEnv(fileConfig.RunConfig.Env)
-
-			driverConfigs, err = runner.DriverCLIConfigsFromFile(fileConfig.RunConfig.Drivers)
+			parsed, err := parseRunArgs(args)
 			if err != nil {
 				return invalidConfig(err)
 			}
-		}
 
-		for idx, presetName := range parsed.driverPresets {
-			if err := applyDriverPreset(driverConfigs, idx, presetName); err != nil {
+			if parsed.help && parsed.scriptArg != "" {
+				return printSelectedWorkloadHelp(cmd, catalog, parsed.scriptArg, parsed.sqlArg)
+			}
+
+			// Load configuration without emitting diagnostics. The effective logger is
+			// initialized immediately afterward so every following log shares it.
+			fileConfig, _, err := runner.LoadRunConfig(parsed.fileArg)
+			if err != nil {
+				return invalidConfig(fmt.Errorf("failed to load config file: %w", err))
+			}
+
+			if err := initializeLogger(parsed.typedParams, fileConfig); err != nil {
 				return invalidConfig(err)
 			}
-		}
 
-		for idx, opts := range parsed.driverOpts {
-			for _, kv := range opts {
-				if err := applyDriverOpt(driverConfigs, idx, kv[0], kv[1]); err != nil {
+			runner.LogConfigFile(fileConfig)
+
+			// Apply effective values: CLI overrides config file.
+			scriptArg := runner.EffectiveScript(parsed.scriptArg, fileConfig)
+			sqlArg := runner.EffectiveSQL(parsed.sqlArg, fileConfig)
+			steps := normalizeStepNames(runner.EffectiveSteps(parsed.steps, fileConfig))
+			noSteps := normalizeStepNames(runner.EffectiveNoSteps(parsed.noSteps, fileConfig))
+
+			if parsed.help {
+				if scriptArg == "" {
+					return cmd.Help()
+				}
+
+				return printSelectedWorkloadHelp(cmd, catalog, scriptArg, sqlArg)
+			}
+
+			if scriptArg == "" {
+				return invalidConfig(errNoScript)
+			}
+
+			if resolve != nil {
+				handled, err := resolve(
+					cmd.Context(),
+					cmd,
+					scriptArg,
+					argsAfterScript(args, parsed.scriptArg),
+				)
+				if err != nil {
+					return err
+				}
+
+				if handled {
+					return nil
+				}
+			}
+
+			// Mutual exclusion is checked on the merged inputs (CLI over config file),
+			// not just CLI-vs-CLI, so `config steps + CLI --no-steps` (and vice versa)
+			// is rejected the same way.
+			if len(steps) > 0 && len(noSteps) > 0 {
+				return invalidConfig(errStepsMutExclusive)
+			}
+
+			if len(parsed.afterDash) > 0 {
+				return invalidConfig(errArgsAfterDash)
+			}
+
+			// Log override decisions when both CLI and file config are present.
+			if fileConfig != nil {
+				lg := logger.Global().Named("run")
+
+				if parsed.scriptArg != "" && fileConfig.RunConfig.GetScript() != "" {
+					lg.Debug("CLI script overrides config file",
+						zap.String("cli", parsed.scriptArg),
+						zap.String("file", fileConfig.RunConfig.GetScript()),
+					)
+				}
+
+				if len(parsed.steps) > 0 && len(fileConfig.RunConfig.Steps) > 0 {
+					lg.Debug("CLI --steps overrides config file steps",
+						zap.Strings("cli", parsed.steps),
+						zap.Strings("file", fileConfig.RunConfig.Steps),
+					)
+				}
+			}
+
+			paramInputs := bench.ParamInputs{
+				CLI: withoutLoggerParams(parsed.typedParams),
+			}
+
+			driverConfigs := runner.DriverCLIConfigs{}
+
+			if fileConfig != nil {
+				paramInputs.RunConfig = fileConfig.Run
+				paramInputs.WorkloadConfig = fileConfig.Params
+
+				driverConfigs, err = runner.DriverCLIConfigsFromFile(fileConfig.RunConfig.Drivers)
+				if err != nil {
 					return invalidConfig(err)
 				}
 			}
-		}
 
-		// Go-native execute_sql: a .sql file, inline SQL (contains spaces), or the
-		// execute_sql preset routes to the Go runner with its SQL source bound as an
-		// explicit typed workload parameter. Checked before the registered-name
-		// lookup so the preset's sql arg is honored.
-		if name, body, file, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
-			return runGoWorkload(
-				cmd,
-				name,
-				steps,
-				noSteps,
-				withExecuteSQLSource(paramInputs, body, file),
-				driverConfigs,
-				metricsConfig(loadedRunConfig(fileConfig)),
-				reportOptions(loadedRunConfig(fileConfig)),
-				parsed.report,
-			)
-		}
-
-		// Go-native workload: if a Go workload is registered under the bare
-		// script name, dispatch to bench.Run.
-		if _, ok := bench.Lookup(scriptArg); ok {
-			workloadParamInputs, err := withEffectiveSQLFile(scriptArg, paramInputs, sqlArg)
-			if err != nil {
-				return invalidConfig(err)
+			for idx, presetName := range parsed.driverPresets {
+				if err := applyDriverPreset(driverConfigs, idx, presetName); err != nil {
+					return invalidConfig(err)
+				}
 			}
 
-			return runGoWorkload(
-				cmd,
-				scriptArg,
-				steps,
-				noSteps,
-				workloadParamInputs,
-				driverConfigs,
-				metricsConfig(loadedRunConfig(fileConfig)),
-				reportOptions(loadedRunConfig(fileConfig)),
-				parsed.report,
-			)
-		}
+			for idx, opts := range parsed.driverOpts {
+				for _, kv := range opts {
+					if err := applyDriverOpt(driverConfigs, idx, kv[0], kv[1]); err != nil {
+						return invalidConfig(err)
+					}
+				}
+			}
 
-		return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
-	},
+			// Go-native execute_sql: a .sql file, inline SQL (contains spaces), or the
+			// execute_sql preset routes to the Go runner with its SQL source bound as an
+			// explicit typed workload parameter. Checked before the registered-name
+			// lookup so the preset's sql arg is honored.
+			if name, body, file, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
+				return runGoWorkload(
+					cmd,
+					catalog,
+					name,
+					steps,
+					noSteps,
+					withExecuteSQLSource(paramInputs, body, file),
+					driverConfigs,
+					metricsConfig(loadedRunConfig(fileConfig)),
+					reportOptions(cmd, loadedRunConfig(fileConfig)),
+					parsed.report,
+				)
+			}
+
+			// Go-native workload: if a Go workload is registered under the bare
+			// script name, dispatch to bench.Run.
+			if _, ok := catalog.Test(scriptArg); ok {
+				workloadParamInputs, err := withEffectiveSQLFile(catalog, scriptArg, paramInputs, sqlArg)
+				if err != nil {
+					return invalidConfig(err)
+				}
+
+				return runGoWorkload(
+					cmd,
+					catalog,
+					scriptArg,
+					steps,
+					noSteps,
+					workloadParamInputs,
+					driverConfigs,
+					metricsConfig(loadedRunConfig(fileConfig)),
+					reportOptions(cmd, loadedRunConfig(fileConfig)),
+					parsed.report,
+				)
+			}
+
+			return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
+		},
+	}
+
+	return cmd
 }
 
-func withEffectiveSQLFile(name string, inputs bench.ParamInputs, sqlFile string) (bench.ParamInputs, error) {
+func argsAfterScript(args []string, script string) []string {
+	if script == "" {
+		return args
+	}
+
+	for index, argument := range args {
+		if argument == script {
+			return append([]string(nil), args[index+1:]...)
+		}
+	}
+
+	return nil
+}
+
+func withEffectiveSQLFile(
+	catalog *bench.Catalog,
+	name string,
+	inputs bench.ParamInputs,
+	sqlFile string,
+) (bench.ParamInputs, error) {
 	if sqlFile == "" {
 		return inputs, nil
 	}
 
-	description, err := bench.Describe(name)
+	description, err := catalog.Describe(name)
 	if err != nil {
 		return inputs, err
 	}
@@ -363,7 +427,7 @@ func loadedRunConfig(loaded *runner.LoadedConfig) *config.RunConfig {
 }
 
 func initializeLogger(
-	cli, legacyEnv map[string]string,
+	cli map[string]string,
 	loaded *runner.LoadedConfig,
 ) error {
 	var fileLogger *config.LoggerConfig
@@ -371,12 +435,12 @@ func initializeLogger(
 		fileLogger = loaded.RunConfig.Global.Logger
 	}
 
-	level, err := resolveLogLevel(cli, legacyEnv, fileLogger)
+	level, err := resolveLogLevel(cli, fileLogger)
 	if err != nil {
 		return err
 	}
 
-	mode, err := resolveLogMode(cli, legacyEnv, fileLogger)
+	mode, err := resolveLogMode(cli, fileLogger)
 	if err != nil {
 		return err
 	}
@@ -384,16 +448,12 @@ func initializeLogger(
 	return logger.Init(level, mode)
 }
 
-func resolveLogLevel(cli, legacyEnv map[string]string, fileLogger *config.LoggerConfig) (string, error) {
+func resolveLogLevel(cli map[string]string, fileLogger *config.LoggerConfig) (string, error) {
 	if value, ok := cli[loggerLevelParam]; ok {
 		return parseLogLevel(value)
 	}
 
 	if value, ok := os.LookupEnv(envLogLevel); ok {
-		return parseLogLevel(value)
-	}
-
-	if value, ok := legacyEnv[envLogLevel]; ok {
 		return parseLogLevel(value)
 	}
 
@@ -404,16 +464,12 @@ func resolveLogLevel(cli, legacyEnv map[string]string, fileLogger *config.Logger
 	return defaultLogLevel, nil
 }
 
-func resolveLogMode(cli, legacyEnv map[string]string, fileLogger *config.LoggerConfig) (string, error) {
+func resolveLogMode(cli map[string]string, fileLogger *config.LoggerConfig) (string, error) {
 	if value, ok := cli[loggerModeParam]; ok {
 		return parseLogMode(value)
 	}
 
 	if value, ok := os.LookupEnv(envLogMode); ok {
-		return parseLogMode(value)
-	}
-
-	if value, ok := legacyEnv[envLogMode]; ok {
 		return parseLogMode(value)
 	}
 
@@ -472,22 +528,8 @@ func withoutLoggerParams(values map[string]string) map[string]string {
 	return without
 }
 
-func withoutLoggerEnv(values map[string]string) map[string]string {
-	if _, hasLevel := values[envLogLevel]; !hasLevel {
-		if _, hasMode := values[envLogMode]; !hasMode {
-			return values
-		}
-	}
-
-	without := maps.Clone(values)
-	delete(without, envLogLevel)
-	delete(without, envLogMode)
-
-	return without
-}
-
 func metricsConfig(cfg *config.RunConfig) *bench.MetricsConfig {
-	metrics := &bench.MetricsConfig{ServiceVersion: version.Version}
+	metrics := &bench.MetricsConfig{ServiceVersion: version.Resolve()}
 	if cfg == nil || cfg.Global == nil {
 		return metrics
 	}
@@ -511,72 +553,83 @@ func metricsConfig(cfg *config.RunConfig) *bench.MetricsConfig {
 	return metrics
 }
 
-func completeRunArgs(
-	_ *cobra.Command,
-	args []string,
-	toComplete string,
-) ([]string, cobra.ShellCompDirective) {
-	if !strings.HasPrefix(toComplete, "--") {
-		return nil, cobra.ShellCompDirectiveDefault
-	}
-
-	parsed, err := parseRunArgs(args)
-	if err != nil || parsed.scriptArg == "" {
-		return nil, cobra.ShellCompDirectiveDefault
-	}
-
-	describeName := parsed.scriptArg
-	if name, _, _, ok := executeSQLGoRoute(parsed.scriptArg, parsed.sqlArg); ok {
-		describeName = name
-	}
-
-	description, err := bench.Describe(describeName)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveDefault
-	}
-
-	completions := make([]string, 0, len(description.Params))
-	for idx := range description.Params {
-		param := &description.Params[idx]
-
-		candidates := []string{param.Flag}
-		if param.Type == bench.ParamTypeBool {
-			candidates = []string{param.Flag + "=true", param.Flag + "=false"}
+//nolint:gocognit // Completion mirrors run parsing and parameter projection.
+func completeRunArgs(catalog *bench.Catalog) cobra.CompletionFunc {
+	return func(
+		_ *cobra.Command,
+		args []string,
+		toComplete string,
+	) ([]string, cobra.ShellCompDirective) {
+		if !strings.HasPrefix(toComplete, "--") {
+			return nil, cobra.ShellCompDirectiveDefault
 		}
 
-		for _, candidate := range candidates {
-			if strings.HasPrefix(candidate, toComplete) {
-				completions = append(completions, candidate+"\t"+param.Description)
+		parsed, err := parseRunArgs(args)
+		if err != nil || parsed.scriptArg == "" {
+			return nil, cobra.ShellCompDirectiveDefault
+		}
+
+		describeName := parsed.scriptArg
+		if name, _, _, ok := executeSQLGoRoute(parsed.scriptArg, parsed.sqlArg); ok {
+			describeName = name
+		}
+
+		description, err := catalog.Describe(describeName)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveDefault
+		}
+
+		completions := make([]string, 0, len(description.Params))
+		for idx := range description.Params {
+			param := &description.Params[idx]
+
+			candidates := []string{param.Flag}
+			if param.Type == bench.ParamTypeBool {
+				candidates = []string{param.Flag + "=true", param.Flag + "=false"}
+			}
+
+			for _, candidate := range candidates {
+				if strings.HasPrefix(candidate, toComplete) {
+					completions = append(completions, candidate+"\t"+param.Description)
+				}
 			}
 		}
-	}
 
-	return completions, cobra.ShellCompDirectiveNoFileComp
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	}
 }
 
-func printSelectedWorkloadHelp(cmd *cobra.Command, scriptArg, sqlArg string) error {
+func printSelectedWorkloadHelp(
+	cmd *cobra.Command,
+	catalog *bench.Catalog,
+	scriptArg, sqlArg string,
+) error {
 	describeName := scriptArg
 	if name, _, _, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
 		describeName = name
 	}
 
-	description, err := bench.Describe(describeName)
+	description, err := catalog.Describe(describeName)
 	if err != nil {
 		return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
 	}
 
-	return printWorkloadHelp(cmd, description)
+	return printWorkloadHelp(cmd, &description)
 }
 
-func printWorkloadHelp(cmd *cobra.Command, description bench.Description) error {
+func printWorkloadHelp(cmd *cobra.Command, description *bench.Description) error {
 	var output strings.Builder
 
-	fmt.Fprintf(&output, "Usage:\n  stroppy run %s [sql_file] [flags]\n\n", description.Name)
+	fmt.Fprintf(
+		&output,
+		"Usage:\n  stroppy run %s [sql_file] [flags]\n\n",
+		description.Name,
+	)
 	output.WriteString("Static flags:\n")
 	output.WriteString("  -f, --file PATH          Load a config file\n")
 	output.WriteString("  -d, --driver NAME        Use a driver preset\n")
 	output.WriteString("  -D, --driver-opt K=V     Override a driver field\n")
-	output.WriteString("  -e, --env KEY=VALUE      Set a legacy workload environment value\n")
+	output.WriteString("  -dNAME / -DNAME          Configure an explicitly named driver\n")
 	output.WriteString("      --log-level VALUE     Set global log level\n")
 	output.WriteString("      --log-mode VALUE      Set global log output mode\n")
 	output.WriteString("      --steps NAMES        Run only named steps\n")
@@ -587,8 +640,18 @@ func printWorkloadHelp(cmd *cobra.Command, description bench.Description) error 
 	output.WriteString("  -h, --help               Show this help\n")
 	output.WriteString("\nBoolean parameters require an explicit value: --flag=true or --flag=false.\n")
 
-	writeParamHelpSection(&output, "Run parameters", description.Params, bench.ParamScopeRun)
-	writeParamHelpSection(&output, "Workload parameters", description.Params, bench.ParamScopeWorkload)
+	writeParamHelpSection(
+		&output,
+		"Run parameters",
+		description.Params,
+		bench.ParamScopeRun,
+	)
+	writeParamHelpSection(
+		&output,
+		"Workload parameters",
+		description.Params,
+		bench.ParamScopeWorkload,
+	)
 
 	_, err := fmt.Fprint(cmd.OutOrStdout(), output.String())
 
@@ -631,6 +694,15 @@ func writeParamHelpSection(
 			param.Env,
 			param.Config,
 		)
+
+		if len(param.Aliases) > 0 {
+			fmt.Fprintf(output, "      aliases: --%s (same environment/config projections)\n",
+				strings.Join(param.Aliases, ", --"))
+		}
+
+		for _, constraint := range param.Constraints {
+			fmt.Fprintf(output, "      %s: %v\n", constraint.Kind, constraint.Value)
+		}
 	}
 }
 
@@ -661,10 +733,10 @@ func executeSQLGoRoute(scriptArg, sqlArg string) (name, body, file string, ok bo
 	return "", "", "", false
 }
 
-// runGoWorkload dispatches to the Go-native bench engine. Driver, parameter,
-// and step inputs are passed explicitly to their runtime owners.
+// runGoWorkload adapts command inputs to the public execution boundary.
 func runGoWorkload(
 	cmd *cobra.Command,
+	catalog *bench.Catalog,
 	name string,
 	steps, noSteps []string,
 	paramInputs bench.ParamInputs,
@@ -673,45 +745,49 @@ func runGoWorkload(
 	reportConfig bench.ReportOptions,
 	output reportOutput,
 ) error {
-	drivers := map[int]*config.DriverConfig{}
+	drivers := map[string]bench.DriverConfig{}
 
-	for idx, cfg := range driverConfigs {
-		dc, err := buildDriverConfig(idx, cfg)
+	for driverName, cfg := range driverConfigs {
+		dc, err := buildDriverConfig(driverName, cfg)
 		if err != nil {
 			return err
 		}
 
-		drivers[idx] = dc
+		drivers[driverName] = bench.DriverConfiguration(dc)
 	}
 
-	if _, ok := drivers[0]; !ok {
-		// No -d given: default to the local postgres preset (mirrors TS
-		// declareDriverSetup defaults).
-		drivers[0] = &config.DriverConfig{ //nolint:gosec // G101: URL field name, not an embedded credential
-			DriverType:          config.DriverTypePostgres,
-			URL:                 "postgres://postgres:postgres@localhost:5432",
-			DefaultInsertMethod: "native",
-		}
+	metrics.SummaryWriter = cmd.ErrOrStderr()
+
+	var options *bench.ReportOptions
+	if !output.disabled {
+		options = &reportConfig
 	}
 
-	if output.disabled {
-		if err := bench.Run(
-			cmd.Context(), name, drivers, paramInputs, steps, noSteps, logger.Global(), metrics,
-		); err != nil {
-			return fmt.Errorf("failed to run go workload: %w", err)
-		}
-
-		return nil
-	}
-
-	runReport, runErr := bench.RunWithReport(
-		cmd.Context(), name, drivers, paramInputs, steps, noSteps,
-		logger.Global(), metrics, reportConfig,
+	runReport, runErr := bench.RunCatalog(
+		cmd.Context(),
+		catalog,
+		name,
+		bench.RunOptions{
+			Drivers: drivers,
+			Params:  paramInputs,
+			Steps:   steps,
+			NoSteps: noSteps,
+			Logger:  bench.LoggerFromBackend(logger.Global()),
+			Metrics: metrics,
+			Report:  options,
+		},
 	)
 
 	var outputErr error
-	if output.requested() && runReport != nil {
-		outputErr = writeRunReport(cmd.OutOrStdout(), output, runReport)
+
+	if runReport != nil {
+		if _, err := report.Save(runReport); err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: save report history: %v\n", err)
+		}
+
+		if output.requested() {
+			outputErr = writeRunReport(cmd.OutOrStdout(), output, runReport)
+		}
 	}
 
 	if runErr != nil {
@@ -721,8 +797,12 @@ func runGoWorkload(
 	return errors.Join(runErr, outputErr)
 }
 
-func reportOptions(cfg *config.RunConfig) bench.ReportOptions {
-	options := bench.ReportOptions{StroppyVersion: version.Version}
+func reportOptions(cmd *cobra.Command, cfg *config.RunConfig) bench.ReportOptions {
+	options := bench.ReportOptions{StroppyVersion: version.Resolve()}
+	if cmd != nil {
+		options.BuildDigest = cmd.Annotations[buildDigestAnnotation]
+	}
+
 	if cfg != nil && cfg.Global != nil {
 		options.RunID = cfg.Global.RunID
 		options.Metadata = cfg.Global.Metadata
@@ -793,10 +873,10 @@ func writeReportFile(path string, data []byte) (retErr error) {
 // DriverConfig the bench layer expects. driverType arrives as a preset short
 // name ("noop"). Retained -D entries undergo strict decoding before their
 // nested driver fields merge with config-file values.
-func buildDriverConfig(idx int, cfg *runner.DriverCLIConfig) (*config.DriverConfig, error) {
+func buildDriverConfig(idx string, cfg *runner.DriverCLIConfig) (*config.DriverConfig, error) {
 	overrides, err := cfg.DecodeOverrides()
 	if err != nil {
-		return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
+		return nil, invalidConfig(fmt.Errorf("driver %s: %w", idx, err))
 	}
 
 	driverType := cfg.DriverType
@@ -824,7 +904,7 @@ func buildDriverConfig(idx int, cfg *runner.DriverCLIConfig) (*config.DriverConf
 	if driverType != "" {
 		t, err := bench.ParseDriverType(driverType)
 		if err != nil {
-			return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
+			return nil, invalidConfig(fmt.Errorf("driver %s: %w", idx, err))
 		}
 
 		dc.DriverType = t
@@ -833,7 +913,7 @@ func buildDriverConfig(idx int, cfg *runner.DriverCLIConfig) (*config.DriverConf
 	if hasDefaultInsertMethod {
 		method, err := driver.ResolveInsertMethod(dc.DriverType, defaultInsertMethod)
 		if err != nil {
-			return nil, invalidConfig(fmt.Errorf("driver %d: %w", idx, err))
+			return nil, invalidConfig(fmt.Errorf("driver %s: %w", idx, err))
 		}
 
 		dc.DefaultInsertMethod = method.String()
@@ -852,26 +932,26 @@ func buildDriverConfig(idx int, cfg *runner.DriverCLIConfig) (*config.DriverConf
 	return dc, nil
 }
 
-func applyDriverExtras(idx int, driverConfig *config.DriverConfig, extras map[string]any) error {
+func applyDriverExtras(idx string, driverConfig *config.DriverConfig, extras map[string]any) error {
 	if len(extras) == 0 {
 		return nil
 	}
 
 	data, err := json.Marshal(extras)
 	if err != nil {
-		return fmt.Errorf("driver %d extra config: %w", idx, err)
+		return fmt.Errorf("driver %s extra config: %w", idx, err)
 	}
 
 	fileConfig := &config.DriverRunConfig{}
 	if err := runner.UnmarshalStrict(data, fileConfig); err != nil {
-		return fmt.Errorf("driver %d extra config: %w", idx, err)
+		return fmt.Errorf("driver %s extra config: %w", idx, err)
 	}
 
 	return applyDriverRunConfigExtras(idx, driverConfig, fileConfig)
 }
 
 func applyDriverRunConfigExtras(
-	idx int,
+	idx string,
 	driverConfig *config.DriverConfig,
 	fileConfig *config.DriverRunConfig,
 ) error {
@@ -928,34 +1008,46 @@ func applyDriverRunConfigExtras(
 	return nil
 }
 
-func warnIgnoredDriverExtra(idx int, field, reason string) {
+func warnIgnoredDriverExtra(idx, field, reason string) {
 	logger.Global().Named("run").Warn(
 		"ignoring driver option",
-		zap.Int("driver", idx),
+		zap.String("driver", idx),
 		zap.String("field", field),
 		zap.String("reason", reason),
 	)
 }
 
 func applicableDriverPool(
-	idx int,
+	idx string,
 	driverType config.DriverType,
 	fileConfig *config.DriverRunConfig,
 ) *config.PoolConfig {
 	if driverType == config.DriverTypePostgres || driverType == config.DriverTypePicodata {
 		if fileConfig.SQL != nil {
-			warnIgnoredDriverExtra(idx, "sql", "PostgreSQL and Picodata use pgx pool settings")
+			warnIgnoredDriverExtra(
+				idx,
+				"sql",
+				"PostgreSQL and Picodata use pgx pool settings",
+			)
 
 			fileConfig.SQL = nil
 		}
 	} else if fileConfig.Postgres != nil {
-		warnIgnoredDriverExtra(idx, "postgres", "only PostgreSQL and Picodata use pgx pool settings")
+		warnIgnoredDriverExtra(
+			idx,
+			"postgres",
+			"only PostgreSQL and Picodata use pgx pool settings",
+		)
 
 		fileConfig.Postgres = nil
 	}
 
 	if fileConfig.Pool != nil && !driverSupportsPool(driverType) {
-		warnIgnoredDriverExtra(idx, "pool", "selected driver has no connection pool")
+		warnIgnoredDriverExtra(
+			idx,
+			"pool",
+			"selected driver has no connection pool",
+		)
 
 		return nil
 	}
@@ -1038,12 +1130,11 @@ type runArgs struct {
 	steps         []string
 	noSteps       []string
 	afterDash     []string
-	envArgs       []string          // -e KEY=VALUE raw pairs
 	typedParams   map[string]string // provisional --name=value workload/run params
 	help          bool
 	report        reportOutput
-	driverPresets map[int]string      // driver index → preset name
-	driverOpts    map[int][][2]string // driver index → list of [key, value] pairs
+	driverPresets map[string]string      // driver index → preset name
+	driverOpts    map[string][][2]string // driver index → list of [key, value] pairs
 }
 
 // flagParser is a function that attempts to parse a flag at position i.
@@ -1077,7 +1168,6 @@ func parseRunArgs(args []string) (runArgs, error) {
 		parseReportFlags,
 		parseStepsFlag,
 		parseFileFlag,
-		parseEnvFlag,
 		parseDriverFlags,
 		parseTypedParamFlag,
 	}
@@ -1366,292 +1456,88 @@ func parseFileFlag(args []string, i int, parsed *runArgs) (int, error) {
 	return 0, nil
 }
 
-// parseEnvFlag handles -e and --env flags in both space and equals forms.
-// Returns the number of tokens consumed (0 if the arg is not an env flag).
-func parseEnvFlag(args []string, i int, parsed *runArgs) (int, error) {
+// Named short forms use -d<name> and -D<name>; default is -d/-D.
+func parseDriverFlags(args []string, i int, parsed *runArgs) (int, error) {
 	arg := args[i]
+	flag, value, equals := strings.Cut(arg, "=")
+	name := ""
+	option := false
+	matched := false
 
 	switch {
-	case arg == "-e" || arg == "--env":
-		value, err := nextFlagValue(args, i)
+	case flag == "--driver":
+		matched = true
+	case flag == "--driver-opt":
+		matched = true
+		option = true
+	case strings.HasPrefix(flag, "-D") && !strings.HasPrefix(flag, "--"):
+		name = strings.TrimPrefix(flag, "-D")
+		option = true
+		matched = true
+	case strings.HasPrefix(flag, "-d") && !strings.HasPrefix(flag, "--"):
+		name = strings.TrimPrefix(flag, "-d")
+		matched = true
+	}
+
+	if !matched {
+		return 0, nil
+	}
+
+	if name != "" && (!validDriverName(name)) {
+		return 0, fmt.Errorf("%w: driver name %q", errUnknownRunFlag, name)
+	}
+
+	consumed := 1
+
+	if !equals {
+		var err error
+
+		value, err = nextFlagValue(args, i)
 		if err != nil {
 			return 0, err
 		}
 
-		parsed.envArgs = append(parsed.envArgs, value)
-
-		return consumedPairFlag, nil
-
-	case strings.HasPrefix(arg, "-e="):
-		parsed.envArgs = append(parsed.envArgs, strings.TrimPrefix(arg, "-e="))
-
-		return 1, nil
-
-	case strings.HasPrefix(arg, "--env="):
-		parsed.envArgs = append(parsed.envArgs, strings.TrimPrefix(arg, "--env="))
-
-		return 1, nil
+		consumed = 2
 	}
 
-	return 0, nil
-}
-
-// parseDriverFlags handles -d/-D/--driver/--driver-opt flags at position i.
-// Returns the number of tokens consumed (0 if the arg is not a driver flag).
-func parseDriverFlags(args []string, i int, parsed *runArgs) (int, error) {
-	if idx, value, consumed, err := parseDriverFlag(args, i); err != nil {
-		return 0, err
-	} else if consumed > 0 {
-		if parsed.driverPresets == nil {
-			parsed.driverPresets = make(map[int]string)
+	if option {
+		key, val, err := splitKeyValue(value)
+		if err != nil {
+			return 0, err
 		}
 
-		parsed.driverPresets[idx] = value
-
-		return consumed, nil
-	}
-
-	if idx, key, value, consumed, err := parseDriverOptFlag(args, i); err != nil {
-		return 0, err
-	} else if consumed > 0 {
 		if parsed.driverOpts == nil {
-			parsed.driverOpts = make(map[int][][2]string)
+			parsed.driverOpts = map[string][][2]string{}
 		}
 
-		parsed.driverOpts[idx] = append(parsed.driverOpts[idx], [2]string{key, value})
+		parsed.driverOpts[name] = append(parsed.driverOpts[name], [2]string{key, val})
+	} else {
+		if parsed.driverPresets == nil {
+			parsed.driverPresets = map[string]string{}
+		}
 
-		return consumed, nil
+		parsed.driverPresets[name] = value
 	}
 
-	return 0, nil
+	return consumed, nil
 }
 
-// parseFlagNextArg is a shared helper for two-token flags: it checks the current
-// arg against a set of prefixes (short and long), and if matched returns the
-// driver index and the next token as the value.
-//
-// Returns (driverIndex, nextValue, consumed, error).
-// consumed == 0 means no match.
-func parseFlagNextArg(
-	args []string, i int, shortPrefix, longPrefix string,
-) (driverIndex int, value string, consumed int, err error) {
-	arg := args[i]
+func validDriverName(name string) bool {
+	if name == "" {
+		return true
+	}
 
-	for _, prefix := range []string{shortPrefix, longPrefix} {
-		if idx, ok := parseShortFlag(arg, prefix); ok {
-			next, err := nextFlagValue(args, i)
-			if err != nil {
-				return 0, "", 0, err
-			}
+	for i, r := range name {
+		if i == 0 && (r < 'a' || r > 'z') {
+			return false
+		}
 
-			return idx, next, consumedPairFlag, nil
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
+			return false
 		}
 	}
 
-	return 0, "", 0, nil
-}
-
-// parseIndexedInfixFlag matches flags of the form "--prefix<N>suffix" (e.g., "--driver1-opt").
-// The number N is optional; its absence implies index 0.
-// Returns (driverIndex, matched).
-func parseIndexedInfixFlag(arg, prefix, suffix string) (int, bool) {
-	if !strings.HasPrefix(arg, prefix) {
-		return 0, false
-	}
-
-	middle := arg[len(prefix):]
-
-	// "--prefix-suffix" (no number)
-	if strings.HasPrefix(middle, suffix) && middle == suffix {
-		return 0, true
-	}
-
-	// "--prefix<N>-suffix"
-	eqIdx := strings.Index(middle, suffix)
-	if eqIdx <= 0 {
-		return 0, false
-	}
-
-	idx, err := strconv.Atoi(middle[:eqIdx])
-	if err != nil {
-		return 0, false
-	}
-
-	if middle[eqIdx:] != suffix {
-		return 0, false
-	}
-
-	return idx, true
-}
-
-// parseDriverFlag tries to parse -d, -d1, --driver, --driver1 at position i.
-// Returns (driverIndex, presetName, tokensConsumed, error).
-// tokensConsumed == 0 means this arg is not a driver flag.
-func parseDriverFlag(args []string, i int) (driverIndex int, presetName string, consumed int, err error) {
-	driverIndex, presetName, consumed, err = parseFlagNextArg(args, i, "-d", "--driver")
-	if err != nil {
-		return 0, "", 0, err
-	}
-
-	if consumed > 0 {
-		return driverIndex, presetName, consumed, nil
-	}
-
-	// --driver=value / --driver1=value
-	var ok bool
-
-	driverIndex, presetName, ok = parseLongFlagWithEquals(args[i], "--driver")
-	if ok {
-		return driverIndex, presetName, 1, nil
-	}
-
-	return 0, "", 0, nil
-}
-
-// parseDriverOptFlag tries to parse -D, -D1, --driver-opt, --driver1-opt at position i.
-// Returns (driverIndex, key, value, tokensConsumed, error).
-func parseDriverOptFlag(args []string, i int) (driverIndex int, key, value string, consumed int, err error) {
-	arg := args[i]
-
-	// -D / -D0 / -D1 (short form, two tokens)
-	if idx, ok := parseShortFlag(arg, "-D"); ok {
-		raw, err := nextFlagValue(args, i)
-		if err != nil {
-			return 0, "", "", 0, err
-		}
-
-		key, value, err = splitKeyValue(raw)
-		if err != nil {
-			return 0, "", "", 0, fmt.Errorf("%s %s: %w", arg, raw, err)
-		}
-
-		return idx, key, value, consumedPairFlag, nil
-	}
-
-	// --driver-opt / --driver1-opt / --driver0-opt (long form, two tokens)
-	if idx, ok := parseIndexedInfixFlag(arg, "--driver", "-opt"); ok {
-		raw, err := nextFlagValue(args, i)
-		if err != nil {
-			return 0, "", "", 0, err
-		}
-
-		key, value, err = splitKeyValue(raw)
-		if err != nil {
-			return 0, "", "", 0, fmt.Errorf("%s %s: %w", arg, raw, err)
-		}
-
-		return idx, key, value, consumedPairFlag, nil
-	}
-
-	// -D=key=value / -D1=key=value / --driver-opt=key=value / --driver1-opt=key=value
-	for _, prefix := range []string{"-D", flagDriverOpt} {
-		if idx, rest, ok := parseLongFlagWithEquals(arg, prefix); ok {
-			key, value, err = splitKeyValue(rest)
-			if err != nil {
-				return 0, "", "", 0, fmt.Errorf("%s: %w", arg, err)
-			}
-
-			return idx, key, value, 1, nil
-		}
-	}
-
-	// --driver1-opt=key=value / --driver2-opt=key=value (equals form with infix number)
-	if idx, ok := parseIndexedInfixFlagWithEquals(arg, "--driver", "-opt"); ok {
-		eqStart := strings.Index(arg[len("--driver"):], "-opt=")
-		rest := arg[len("--driver")+eqStart+len("-opt="):]
-
-		key, value, err = splitKeyValue(rest)
-		if err != nil {
-			return 0, "", "", 0, fmt.Errorf("%s: %w", arg, err)
-		}
-
-		return idx, key, value, 1, nil
-	}
-
-	return 0, "", "", 0, nil
-}
-
-// parseIndexedInfixFlagWithEquals matches "--prefix<N>suffix=value".
-func parseIndexedInfixFlagWithEquals(arg, prefix, suffix string) (int, bool) {
-	if !strings.HasPrefix(arg, prefix) {
-		return 0, false
-	}
-
-	middle := arg[len(prefix):]
-	suffixEq := suffix + "="
-
-	// "--prefix-suffix=value" (no number)
-	if strings.HasPrefix(middle, suffixEq) {
-		return 0, true
-	}
-
-	// "--prefix<N>-suffix=value"
-	eqIdx := strings.Index(middle, suffixEq)
-	if eqIdx <= 0 {
-		return 0, false
-	}
-
-	idx, err := strconv.Atoi(middle[:eqIdx])
-	if err != nil {
-		return 0, false
-	}
-
-	return idx, true
-}
-
-// parseShortFlag checks if arg matches "prefix" or "prefix<N>" (e.g., "-d" or "-d1").
-// Returns the driver index (0 for bare prefix) and whether it matched.
-func parseShortFlag(arg, prefix string) (int, bool) {
-	if arg == prefix {
-		return 0, true
-	}
-
-	if !strings.HasPrefix(arg, prefix) {
-		return 0, false
-	}
-
-	suffix := arg[len(prefix):]
-
-	// For --driver-opt style: the prefix is "--driver" but we don't want to match "--driver-opt" here.
-	// Suffix must be a number or empty.
-	if suffix == "" {
-		return 0, true
-	}
-
-	idx, err := strconv.Atoi(suffix)
-	if err != nil {
-		return 0, false
-	}
-
-	return idx, true
-}
-
-// parseLongFlagWithEquals checks if arg matches "prefix=value" or "prefix<N>=value".
-// Returns (driverIndex, value, matched).
-func parseLongFlagWithEquals(arg, prefix string) (driverIndex int, value string, matched bool) {
-	if !strings.HasPrefix(arg, prefix) {
-		return 0, "", false
-	}
-
-	rest := arg[len(prefix):]
-
-	// prefix=value (no number)
-	if strings.HasPrefix(rest, "=") {
-		return 0, rest[1:], true
-	}
-
-	// prefix<N>=value
-	eqIdx := strings.Index(rest, "=")
-	if eqIdx <= 0 {
-		return 0, "", false
-	}
-
-	idx, err := strconv.Atoi(rest[:eqIdx])
-	if err != nil {
-		return 0, "", false
-	}
-
-	return idx, rest[eqIdx+1:], true
+	return true
 }
 
 // splitKeyValue splits "key=value" into (key, value).
@@ -1667,7 +1553,7 @@ func splitKeyValue(s string) (key, val string, err error) {
 func positionalAfterOptionsError(arg string) error {
 	message := "script and sql_file must be adjacent before --"
 	if strings.Contains(arg, "=") {
-		message += "; quote driver/env values that contain spaces"
+		message += "; quote driver values that contain spaces"
 	}
 
 	return fmt.Errorf("%w: %q; %s", errPositionalAfterOpt, arg, message)
@@ -1675,7 +1561,7 @@ func positionalAfterOptionsError(arg string) error {
 
 func keyValuePositionalError(arg string) error {
 	return fmt.Errorf(
-		"%w: %q; key=value arguments must follow -D/--driver-opt or -e/--env; quote values that contain spaces",
+		"%w: %q; key=value arguments must follow -D/--driver-opt ; quote values that contain spaces",
 		errKeyValuePositional,
 		arg,
 	)
@@ -1715,7 +1601,7 @@ func nextFlagValue(args []string, i int) (string, error) {
 
 // applyDriverPreset loads a preset or parses raw JSON and sets it on the config map.
 // If the value starts with '{', it's treated as a JSON driver config; otherwise as a preset name.
-func applyDriverPreset(configs runner.DriverCLIConfigs, idx int, value string) error {
+func applyDriverPreset(configs runner.DriverCLIConfigs, idx, value string) error {
 	value = strings.TrimSpace(value)
 	if strings.HasPrefix(value, "{") {
 		cfg, err := runner.NewDriverCLIConfigFromJSON(value)
@@ -1740,7 +1626,7 @@ func applyDriverPreset(configs runner.DriverCLIConfigs, idx int, value string) e
 }
 
 // applyDriverOpt applies a -D key=value override to the driver at the given index.
-func applyDriverOpt(configs runner.DriverCLIConfigs, idx int, key, value string) error {
+func applyDriverOpt(configs runner.DriverCLIConfigs, idx, key, value string) error {
 	cfg, ok := configs[idx]
 	if !ok {
 		cfg = &runner.DriverCLIConfig{}

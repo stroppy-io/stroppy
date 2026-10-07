@@ -2,21 +2,16 @@ package bench
 
 import (
 	"context"
-	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
-	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
+	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
 )
 
 // testBenchFixture wires a Bench to an observer logger and a fresh meter provider
@@ -25,7 +20,7 @@ import (
 type testBenchFixture struct {
 	b         *Bench
 	logs      *observer.ObservedLogs
-	rootState *RootState
+	rootState *rootState
 	reader    *sdkmetric.ManualReader
 	prefix    string
 }
@@ -40,9 +35,9 @@ func newTestBenchFixture(t *testing.T) *testBenchFixture {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
 
-	rootState := &RootState{
+	rootState := &rootState{
 		lg:         lg,
-		registry:   NewRegistry(provider.Meter("test"), prefix),
+		registry:   newmetricRegistry(provider.Meter("test"), prefix),
 		txMetrics:  &txMetrics{},
 		stepFilter: newStepFilter(nil, nil),
 	}
@@ -60,224 +55,29 @@ func newTestBenchFixture(t *testing.T) *testBenchFixture {
 	}
 }
 
-func TestStepLogsStartAndEnd(t *testing.T) {
-	fx := newTestBenchFixture(t)
+func TestImmediateStepFiltering(t *testing.T) {
+	test := Test{Name: "filters", Define: func(d *Def) error {
+		d.Execution.Step("ordinary", func(context.Context, *Bench) error {
+			t.Fatal("filtered step ran")
 
-	require.NoError(t, fx.b.Step("load_data", func() error { return nil }))
-
-	require.Equal(t, 2, fx.logs.Len())
-	require.Equal(t, "Start of 'load_data' step", fx.logs.All()[0].Message)
-	require.Contains(t, fx.logs.All()[1].Message, "End of 'load_data' step")
-	require.Empty(t, fx.b.vu.stepTag) // tag cleared after the step
-}
-
-func TestStepEnabledDoesNotRecordPreflightAsExecution(t *testing.T) {
-	for _, tc := range []struct {
-		name    string
-		only    []string
-		except  []string
-		enabled bool
-	}{
-		{name: "default", enabled: true},
-		{name: "load-only", only: []string{"load_data"}},
-		{name: "excluded", except: []string{"workload"}},
-		{name: "included", only: []string{"workload"}, enabled: true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			fx := newTestBenchFixture(t)
-			fx.rootState.stepFilter = newStepFilter(tc.only, tc.except)
-			require.Equal(t, tc.enabled, fx.b.StepEnabled("workload"))
-			require.Empty(t, fx.rootState.stepFilter.snapshot())
-			require.Zero(t, fx.logs.Len())
-			require.Empty(t, fx.b.vu.stepTag)
+			return nil
 		})
-	}
-}
+		d.Execution.Step("cleanup", func(context.Context, *Bench) error {
+			t.Fatal("filtered cleanup ran")
 
-func TestStepSilentKeepsMetricTagWithoutLogging(t *testing.T) {
-	fx := newTestBenchFixture(t)
+			return nil
+		}, Always(time.Second))
 
-	var tagDuring string
-
-	err := fx.b.StepSilent("workload", func() error {
-		tagDuring = fx.b.vu.stepTag
-		fx.rootState.txMetrics.recordQueryResult(fx.b.vu, time.Millisecond, nil)
-
-		return nil
-	})
+		return d.Execution.Err()
+	}}
+	options := noopRunOptions()
+	options.Steps = []string{"other"}
+	result, err := RunTest(t.Context(), test, options)
 	require.NoError(t, err)
+	require.Len(t, result.Steps, 2)
 
-	require.Equal(t, "workload", tagDuring, "step tag must be set for the iteration metrics")
-	require.Empty(t, fx.b.vu.stepTag, "step tag must be cleared after the step")
-	require.Zero(t, fx.logs.Len(), "a silent step must not emit start/end records")
-
-	var data metricdata.ResourceMetrics
-	require.NoError(t, fx.reader.Collect(context.Background(), &data))
-
-	hist := findHistogram(t, data, fx.prefix+"run_query_duration")
-	require.Len(t, hist.DataPoints, 1)
-	require.Equal(t, "workload", attributeValue(hist.DataPoints[0].Attributes, "step"))
-}
-
-func TestStepAndStepSilentRespectFilter(t *testing.T) {
-	t.Run("loud skip is logged", func(t *testing.T) {
-		fx := newTestBenchFixture(t)
-		fx.rootState.stepFilter.only = map[string]struct{}{"load_data": {}}
-
-		var ran atomic.Bool
-
-		require.NoError(t, fx.b.Step("workload", func() error {
-			ran.Store(true)
-
-			return nil
-		}))
-
-		require.False(t, ran.Load(), "filtered step must not run")
-		require.Equal(t, 1, fx.logs.Len())
-		require.Equal(t, "Skipping step 'workload'", fx.logs.All()[0].Message)
-	})
-
-	t.Run("silent skip is quiet", func(t *testing.T) {
-		fx := newTestBenchFixture(t)
-		fx.rootState.stepFilter.only = map[string]struct{}{"load_data": {}}
-
-		var ran atomic.Bool
-
-		require.NoError(t, fx.b.StepSilent("workload", func() error {
-			ran.Store(true)
-
-			return nil
-		}))
-
-		require.False(t, ran.Load(), "filtered step must not run")
-		require.Zero(t, fx.logs.Len(), "silent skip must not emit records")
-	})
-}
-
-func TestStepFilterUsesExplicitNonEmptyNames(t *testing.T) {
-	filter := newStepFilter(
-		[]string{" load_data ", "", "   "},
-		[]string{" workload ", "", "   "},
-	)
-
-	require.True(t, filter.enabled("load_data"))
-	require.False(t, filter.enabled("workload"))
-	require.False(t, filter.enabled("create_schema"))
-}
-
-// stepLifecycleWorkload exhibits the uniform workload-step contract: one loud
-// setup step (load_data) and one silent per-iteration step (workload). Its
-// iteration runs one query so per-iteration query metrics carry the step tag.
-type stepLifecycleWorkload struct{}
-
-func (stepLifecycleWorkload) Name() string { return "test/step-lifecycle" }
-
-func (stepLifecycleWorkload) Define(*Def) error { return nil }
-
-func (stepLifecycleWorkload) Setup(_ context.Context, b *Bench) error {
-	return b.Step("load_data", func() error { return nil })
-}
-
-func (stepLifecycleWorkload) Iterate(ctx context.Context, b *Bench) error {
-	return b.StepSilent("workload", func() error {
-		stepLifecycleWorkloadRuns.Add(1)
-
-		_, err := b.QueryValue(ctx, "SELECT 1", nil)
-
-		return err
-	})
-}
-
-func (stepLifecycleWorkload) Teardown(context.Context, *Bench) error { return nil }
-
-var stepLifecycleWorkloadRuns atomic.Int64
-
-var registerStepLifecycleWorkloadOnce sync.Once
-
-func registerStepLifecycleWorkload() {
-	registerStepLifecycleWorkloadOnce.Do(func() {
-		Register(func() Workload { return stepLifecycleWorkload{} })
-	})
-}
-
-func TestWorkloadRunLogVolumeIsBounded(t *testing.T) {
-	registerStepLifecycleWorkload()
-
-	runAndCount := func(iterations string) (*observer.ObservedLogs, int, int64) {
-		stepLifecycleWorkloadRuns.Store(0)
-
-		core, logs := observer.New(zapcore.InfoLevel)
-		lg := zap.New(core)
-
-		err := Run(
-			context.Background(),
-			"test/step-lifecycle",
-			map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-			ParamInputs{CLI: map[string]string{"iterations": iterations, "vus": "1"}},
-			nil,
-			nil,
-			lg,
-			&MetricsConfig{},
-		)
-		require.NoError(t, err)
-
-		return logs, logs.Len(), stepLifecycleWorkloadRuns.Load()
+	for _, step := range result.Steps {
+		require.Equal(t, "skipped", step.Status)
+		require.Zero(t, step.Executions)
 	}
-
-	base, baseCount, baseIterations := runAndCount("100")
-	_, highCount, highIterations := runAndCount("10000")
-
-	require.Equal(t, int64(100), baseIterations)
-	require.Equal(t, int64(10000), highIterations)
-
-	// The per-iteration workload step is silent, so a 100x increase in iteration
-	// count must not change the log volume: only the one setup step records.
-	require.Equal(t, baseCount, highCount, "log volume must be independent of iteration count")
-
-	workloadRecords, setupStarts, setupEnds := 0, 0, 0
-
-	for _, entry := range base.All() {
-		if strings.Contains(entry.Message, "workload' step") {
-			workloadRecords++
-		}
-
-		if entry.Message == "Start of 'load_data' step" {
-			setupStarts++
-		}
-
-		if strings.HasPrefix(entry.Message, "End of 'load_data' step") {
-			setupEnds++
-		}
-	}
-
-	require.Zero(t, workloadRecords, "no per-iteration start/end workload records")
-	require.Equal(t, 1, setupStarts, "setup step emits exactly one start record")
-	require.Equal(t, 1, setupEnds, "setup step emits exactly one end record")
-}
-
-func TestRunStepFiltersDoNotLeakBetweenRuns(t *testing.T) {
-	registerStepLifecycleWorkload()
-
-	run := func(steps, noSteps []string) int64 {
-		stepLifecycleWorkloadRuns.Store(0)
-
-		err := Run(
-			context.Background(),
-			"test/step-lifecycle",
-			map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-			ParamInputs{CLI: map[string]string{"iterations": "1", "vus": "1"}},
-			steps,
-			noSteps,
-			zap.NewNop(),
-			&MetricsConfig{},
-		)
-		require.NoError(t, err)
-
-		return stepLifecycleWorkloadRuns.Load()
-	}
-
-	require.Zero(t, run([]string{"load_data"}, nil))
-	require.Equal(t, int64(1), run(nil, nil))
-	require.Zero(t, run(nil, []string{"workload"}))
-	require.Equal(t, int64(1), run(nil, nil))
 }

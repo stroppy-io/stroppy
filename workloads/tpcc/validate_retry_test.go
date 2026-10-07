@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 func TestPopulationReadRetry(t *testing.T) {

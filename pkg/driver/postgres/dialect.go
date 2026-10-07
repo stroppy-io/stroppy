@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 
-	sqlqueries "github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
+	sqlqueries "github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver/queries"
 )
 
 var _ sqlqueries.Dialect = PgxDialect{}

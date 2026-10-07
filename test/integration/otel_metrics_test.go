@@ -110,7 +110,7 @@ func TestOtelStroppyMetrics(t *testing.T) {
 			"step":         "workload",
 		}
 		expected := []metricExpectation{
-			{name: "stroppy_successful_transactions_total", labels: labels{"job": "stroppy"}, value: 1, exact: true},
+			{name: "stroppy_successful_transactions_total", labels: labels{"job": "stroppy", "step": "workload"}, value: 1, exact: true},
 			{name: "stroppy_failed_iterations_total", labels: labels{"job": "stroppy"}, value: 0, exact: true},
 			{name: "stroppy_run_query_operations_total", labels: labels{"job": "stroppy", "step": "workload"}, value: 5, exact: true},
 			{name: "stroppy_run_query_duration_milliseconds_count", labels: labels{"job": "stroppy", "step": "workload"}, value: 5, exact: true},
@@ -118,8 +118,8 @@ func TestOtelStroppyMetrics(t *testing.T) {
 			{name: "stroppy_tx_commits_total", labels: txLabels, value: 1, exact: true},
 			{name: "stroppy_tx_total_duration_milliseconds_count", labels: txLabels, value: 1, exact: true},
 			{name: "stroppy_tx_queries_per_tx_count", labels: txLabels, value: 1, exact: true},
-			{name: "stroppy_iterations_total", labels: labels{"job": "stroppy"}, value: 1, exact: true},
-			{name: "stroppy_iteration_duration_milliseconds_count", labels: labels{"job": "stroppy"}, value: 1, exact: true},
+			{name: "stroppy_iterations_total", labels: labels{"job": "stroppy", "step": "workload"}, value: 1, exact: true},
+			{name: "stroppy_iteration_duration_milliseconds_count", labels: labels{"job": "stroppy", "step": "workload"}, value: 1, exact: true},
 		}
 		for _, expectation := range expected {
 			expectation.labels["instance"] = instance

@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 func unmarshalStrict(data string, value any) error {
@@ -30,7 +30,7 @@ func TestRunConfigJSONAccepted(t *testing.T) {
 			"exporter": {"name": "otlp", "otlpExport": {"otlpGrpcEndpoint": "collector:4317", "otlpEndpointInsecure": true}}
 		},
 		"drivers": {
-			"0": {
+			"": {
 				"driverType": "postgres",
 				"url": "postgres://user:pass@localhost:5432/bench",
 				"defaultInsertMethod": "native",
@@ -40,7 +40,6 @@ func TestRunConfigJSONAccepted(t *testing.T) {
 				"insertProgress": {"interval": "30s", "mode": "both"}
 			}
 		},
-		"env": {"WAREHOUSES": "10"},
 		"steps": ["create_schema", "load_data"]
 	}`
 
@@ -59,7 +58,7 @@ func TestRunConfigJSONAccepted(t *testing.T) {
 	require.Equal(t, "collector:4317", cfg.Global.Exporter.OtlpExport.GetOtlpGrpcEndpoint())
 	require.True(t, cfg.Global.Exporter.OtlpExport.GetOtlpEndpointInsecure())
 
-	driver := cfg.Drivers[0]
+	driver := cfg.Drivers[""]
 	require.NotNil(t, driver)
 	require.Equal(t, "postgres", driver.GetDriverType())
 	require.Equal(t, "postgres://user:pass@localhost:5432/bench", driver.GetURL())
@@ -69,7 +68,6 @@ func TestRunConfigJSONAccepted(t *testing.T) {
 	require.Equal(t, int32(10), driver.Pool.GetMinConns())
 	require.Equal(t, int32(128), driver.Postgres.GetStatementCacheCapacity())
 	require.Equal(t, "both", driver.InsertProgress.GetMode())
-	require.Equal(t, map[string]string{"WAREHOUSES": "10"}, cfg.Env)
 }
 
 func TestRunConfigJSONRejects(t *testing.T) {
@@ -77,15 +75,15 @@ func TestRunConfigJSONRejects(t *testing.T) {
 		"unknown top-level field": `{"unknownField": 1}`,
 		"removed k6Args":          `{"k6Args": ["--vus", "10"]}`,
 		"removed k6Config":        `{"k6Config": "k6.json"}`,
-		"removed driver errorMode": `{"drivers":{"0":{
+		"removed driver errorMode": `{"drivers":{"":{
 			"driverType":"postgres","errorMode":"throw"}}}`,
-		"removed driver defaultTxIsolation": `{"drivers":{"0":{
+		"removed driver defaultTxIsolation": `{"drivers":{"":{
 			"driverType":"postgres","defaultTxIsolation":"repeatable_read"}}}`,
-		"unknown driver field": `{"drivers":{"0":{"driverType":"postgres","unknown":true}}}`,
+		"unknown driver field": `{"drivers":{"":{"driverType":"postgres","unknown":true}}}`,
 		"unknown global field": `{"global":{"unknown":true}}`,
-		"wrong scalar type":    `{"drivers":{"0":{"bulkSize":"twenty"}}}`,
+		"wrong scalar type":    `{"drivers":{"":{"bulkSize":"twenty"}}}`,
 		"wrong nested type":    `{"global":{"seed":"not-a-number"}}`,
-		"wrong bool type":      `{"drivers":{"0":{"tlsInsecureSkipVerify":"yes"}}}`,
+		"wrong bool type":      `{"drivers":{"":{"tlsInsecureSkipVerify":"yes"}}}`,
 		"unknown logLevel":     `{"global":{"logger":{"logLevel":"NOT_A_LEVEL"}}}`,
 		"unknown logMode":      `{"global":{"logger":{"logMode":"NOT_A_MODE"}}}`,
 	}
@@ -111,26 +109,26 @@ func TestRemovedFieldsUseOrdinaryUnknownFieldErrors(t *testing.T) {
 		{name: "k6 config alias", doc: `{"k6_config":"k6.json"}`, path: `$["k6_config"]`, field: "k6_config"},
 		{
 			name:  "driver error mode",
-			doc:   `{"drivers":{"0":{"errorMode":"throw"}}}`,
-			path:  `$.drivers["0"].errorMode`,
+			doc:   `{"drivers":{"":{"errorMode":"throw"}}}`,
+			path:  `$.drivers[""].errorMode`,
 			field: "errorMode",
 		},
 		{
 			name:  "driver error mode alias",
-			doc:   `{"drivers":{"0":{"error_mode":"throw"}}}`,
-			path:  `$.drivers["0"]["error_mode"]`,
+			doc:   `{"drivers":{"":{"error_mode":"throw"}}}`,
+			path:  `$.drivers[""]["error_mode"]`,
 			field: "error_mode",
 		},
 		{
 			name:  "driver isolation",
-			doc:   `{"drivers":{"0":{"defaultTxIsolation":"serializable"}}}`,
-			path:  `$.drivers["0"].defaultTxIsolation`,
+			doc:   `{"drivers":{"":{"defaultTxIsolation":"serializable"}}}`,
+			path:  `$.drivers[""].defaultTxIsolation`,
 			field: "defaultTxIsolation",
 		},
 		{
 			name:  "driver isolation alias",
-			doc:   `{"drivers":{"0":{"default_tx_isolation":"serializable"}}}`,
-			path:  `$.drivers["0"]["default_tx_isolation"]`,
+			doc:   `{"drivers":{"":{"default_tx_isolation":"serializable"}}}`,
+			path:  `$.drivers[""]["default_tx_isolation"]`,
 			field: "default_tx_isolation",
 		},
 	}
@@ -198,7 +196,7 @@ func TestProtoJSONAliasesAndCanonicalization(t *testing.T) {
 			"logger":{"log_level":"LOG_LEVEL_WARN","log_mode":1},
 			"exporter":{"otlp_export":{"otlp_http_endpoint":"http://collector"}}
 		},
-		"drivers":{"01":{
+		"drivers":{"secondary":{
 			"driver_type":"postgres",
 			"bulk_size":"2e2",
 			"tls_insecure_skip_verify":true,
@@ -215,10 +213,10 @@ func TestProtoJSONAliasesAndCanonicalization(t *testing.T) {
 	require.Equal(t, config.LogLevelWarn, cfg.Global.Logger.LogLevel)
 	require.Equal(t, config.LogModeProduction, cfg.Global.Logger.LogMode)
 	require.Equal(t, "http://collector", cfg.Global.Exporter.OtlpExport.GetOtlpHTTPEndpoint())
-	require.Equal(t, "postgres", cfg.Drivers[1].GetDriverType())
-	require.Equal(t, int32(200), cfg.Drivers[1].GetBulkSize())
-	require.Equal(t, int32(1), cfg.Drivers[1].Pool.GetMaxConns())
-	require.True(t, *cfg.Drivers[1].TLSInsecureSkipVerify)
+	require.Equal(t, "postgres", cfg.Drivers["secondary"].GetDriverType())
+	require.Equal(t, int32(200), cfg.Drivers["secondary"].GetBulkSize())
+	require.Equal(t, int32(1), cfg.Drivers["secondary"].Pool.GetMaxConns())
+	require.True(t, *cfg.Drivers["secondary"].TLSInsecureSkipVerify)
 	require.JSONEq(t, `"5s"`, string(cfg.Run["queryTimeout"]))
 	require.JSONEq(t, `1`, string(cfg.Params["scaleFactor"]))
 }
@@ -244,11 +242,11 @@ func TestProtoJSONInt32Forms(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.value, func(t *testing.T) {
-			doc := `{"drivers":{"0":{"bulkSize":` + test.value + `}}}`
+			doc := `{"drivers":{"":{"bulkSize":` + test.value + `}}}`
 
 			var cfg config.RunConfig
 			require.NoError(t, config.Unmarshal([]byte(doc), &cfg))
-			require.Equal(t, test.want, cfg.Drivers[0].GetBulkSize())
+			require.Equal(t, test.want, cfg.Drivers[""].GetBulkSize())
 		})
 	}
 }
@@ -261,11 +259,11 @@ func TestProtoJSONInt32LargeExactScale(t *testing.T) {
 
 	for name, value := range tests {
 		t.Run(name, func(t *testing.T) {
-			doc := `{"drivers":{"0":{"bulkSize":` + value + `}}}`
+			doc := `{"drivers":{"":{"bulkSize":` + value + `}}}`
 
 			var cfg config.RunConfig
 			require.NoError(t, config.Unmarshal([]byte(doc), &cfg))
-			require.Equal(t, int32(1), cfg.Drivers[0].GetBulkSize())
+			require.Equal(t, int32(1), cfg.Drivers[""].GetBulkSize())
 		})
 	}
 }
@@ -276,7 +274,6 @@ func TestProtoJSONNullCompatibility(t *testing.T) {
 		"script":null,
 		"global":{"seed":null,"metadata":null,"logger":{"logLevel":null,"logMode":null}},
 		"drivers":null,
-		"env":null,
 		"steps":null,
 		"noSteps":null
 	}`
@@ -293,7 +290,6 @@ func TestProtoJSONNullCompatibility(t *testing.T) {
 	require.Equal(t, config.LogLevelDebug, cfg.Global.Logger.LogLevel)
 	require.Equal(t, config.LogModeDevelopment, cfg.Global.Logger.LogMode)
 	require.Nil(t, cfg.Drivers)
-	require.Nil(t, cfg.Env)
 	require.Nil(t, cfg.Steps)
 	require.Nil(t, cfg.NoSteps)
 }
@@ -301,7 +297,7 @@ func TestProtoJSONNullCompatibility(t *testing.T) {
 func TestProtoJSONNestedNullFields(t *testing.T) {
 	const doc = `{
 		"global":{"exporter":null},
-		"drivers":{"0":{
+		"drivers":{"":{
 			"url":null,
 			"bulkSize":null,
 			"pool":null,
@@ -314,12 +310,12 @@ func TestProtoJSONNestedNullFields(t *testing.T) {
 	var cfg config.RunConfig
 	require.NoError(t, config.Unmarshal([]byte(doc), &cfg))
 	require.Nil(t, cfg.Global.Exporter)
-	require.Nil(t, cfg.Drivers[0].URL)
-	require.Nil(t, cfg.Drivers[0].BulkSize)
-	require.Nil(t, cfg.Drivers[0].Pool)
-	require.Nil(t, cfg.Drivers[0].Postgres)
-	require.Nil(t, cfg.Drivers[0].SQL)
-	require.Nil(t, cfg.Drivers[0].InsertProgress)
+	require.Nil(t, cfg.Drivers[""].URL)
+	require.Nil(t, cfg.Drivers[""].BulkSize)
+	require.Nil(t, cfg.Drivers[""].Pool)
+	require.Nil(t, cfg.Drivers[""].Postgres)
+	require.Nil(t, cfg.Drivers[""].SQL)
+	require.Nil(t, cfg.Drivers[""].InsertProgress)
 }
 
 func TestSeedBareIntegerForms(t *testing.T) {
@@ -405,21 +401,19 @@ func TestStrictConfigRejectsInvalidJSON(t *testing.T) {
 		{name: "nested exact duplicate", doc: `{"global":{"runId":"a","runId":"b"}}`, path: `$.global.runId`},
 		{name: "wrong top-level case", doc: `{"Global":{}}`, path: `$["Global"]`},
 		{name: "wrong nested case", doc: `{"global":{"RunId":"x"}}`, path: `$.global["RunId"]`},
-		{name: "unknown nested field", doc: `{"drivers":{"0":{"pool":{"missing":1}}}}`, path: `$.drivers["0"].pool.missing`},
-		{name: "null driver map value", doc: `{"drivers":{"0":null}}`, path: `$.drivers["0"]`},
-		{name: "null string map value", doc: `{"env":{"A":null}}`, path: `$.env["A"]`},
+		{name: "unknown nested field", doc: `{"drivers":{"":{"pool":{"missing":1}}}}`, path: `$.drivers[""].pool.missing`},
+		{name: "null driver map value", doc: `{"drivers":{"":null}}`, path: `$.drivers[""]`},
+		{name: "null string map value", doc: `{"env":{"A":null}}`, path: `$.env`},
 		{name: "null array value", doc: `{"steps":[null]}`, path: `$.steps[0]`},
 		{name: "wrong object container", doc: `{"global":[]}`, path: `$.global`},
 		{name: "wrong array container", doc: `{"steps":{}}`, path: `$.steps`},
-		{name: "fractional int32", doc: `{"drivers":{"0":{"bulkSize":1.5}}}`, path: `$.drivers["0"].bulkSize`},
-		{name: "fractional quoted int32", doc: `{"drivers":{"0":{"bulkSize":"1e-1"}}}`, path: `$.drivers["0"].bulkSize`},
-		{name: "overflowing int32", doc: `{"drivers":{"0":{"bulkSize":2147483648}}}`, path: `$.drivers["0"].bulkSize`},
-		{name: "malformed quoted int32", doc: `{"drivers":{"0":{"bulkSize":"01"}}}`, path: `$.drivers["0"].bulkSize`},
-		{name: "signed quoted int32", doc: `{"drivers":{"0":{"bulkSize":"+1"}}}`, path: `$.drivers["0"].bulkSize`},
-		{name: "incomplete decimal int32", doc: `{"drivers":{"0":{"bulkSize":"1."}}}`, path: `$.drivers["0"].bulkSize`},
-		{name: "incomplete exponent int32", doc: `{"drivers":{"0":{"bulkSize":"1e"}}}`, path: `$.drivers["0"].bulkSize`},
-		{name: "invalid driver map key", doc: `{"drivers":{"+1":{}}}`, path: `$.drivers["+1"]`},
-		{name: "overflowing driver map key", doc: `{"drivers":{"4294967296":{}}}`, path: `$.drivers["4294967296"]`},
+		{name: "fractional int32", doc: `{"drivers":{"":{"bulkSize":1.5}}}`, path: `$.drivers[""].bulkSize`},
+		{name: "fractional quoted int32", doc: `{"drivers":{"":{"bulkSize":"1e-1"}}}`, path: `$.drivers[""].bulkSize`},
+		{name: "overflowing int32", doc: `{"drivers":{"":{"bulkSize":2147483648}}}`, path: `$.drivers[""].bulkSize`},
+		{name: "malformed quoted int32", doc: `{"drivers":{"":{"bulkSize":"01"}}}`, path: `$.drivers[""].bulkSize`},
+		{name: "signed quoted int32", doc: `{"drivers":{"":{"bulkSize":"+1"}}}`, path: `$.drivers[""].bulkSize`},
+		{name: "incomplete decimal int32", doc: `{"drivers":{"":{"bulkSize":"1."}}}`, path: `$.drivers[""].bulkSize`},
+		{name: "incomplete exponent int32", doc: `{"drivers":{"":{"bulkSize":"1e"}}}`, path: `$.drivers[""].bulkSize`},
 		{name: "null run scope", doc: `{"run":null}`, path: `$.run`},
 		{name: "null run value", doc: `{"run":{"queryTimeout":null}}`, path: `$.run.queryTimeout`},
 		{name: "wrong run scalar", doc: `{"run":{"queryTimeout":5}}`, path: `$.run.queryTimeout`},
@@ -467,8 +461,8 @@ func TestAliasCollisionsAreOrderIndependent(t *testing.T) {
 			`{"global":{"run_id":"b","runId":"a"}}`,
 		},
 		{
-			`{"drivers":{"0":{"bulkSize":1,"bulk_size":2}}}`,
-			`{"drivers":{"0":{"bulk_size":2,"bulkSize":1}}}`,
+			`{"drivers":{"":{"bulkSize":1,"bulk_size":2}}}`,
+			`{"drivers":{"":{"bulk_size":2,"bulkSize":1}}}`,
 		},
 		{
 			`{"run":{"queryTimeout":"1s","query_timeout":"2s"}}`,
@@ -477,10 +471,6 @@ func TestAliasCollisionsAreOrderIndependent(t *testing.T) {
 		{
 			`{"params":{"scaleFactor":1,"scale_factor":2}}`,
 			`{"params":{"scale_factor":2,"scaleFactor":1}}`,
-		},
-		{
-			`{"drivers":{"1":{},"01":{}}}`,
-			`{"drivers":{"01":{},"1":{}}}`,
 		},
 	}
 

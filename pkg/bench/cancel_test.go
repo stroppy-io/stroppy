@@ -9,7 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 // cancelDuringSetupWorkload blocks Setup until ctx is canceled and surfaces the
@@ -32,7 +32,7 @@ func (*cancelDuringSetupWorkload) Setup(ctx context.Context, _ *Bench) error {
 // TestRunCancelsSetup verifies a canceled Run context reaches workload Setup
 // (schema/load) and the cancellation is reported back out of Run.
 func TestRunCancelsSetup(t *testing.T) {
-	Register(func() Workload { return &cancelDuringSetupWorkload{} })
+	fixtureRegister(func() Workload { return &cancelDuringSetupWorkload{} })
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -58,27 +58,22 @@ func TestRunCancelsSetup(t *testing.T) {
 // once its per-VU context is canceled, so a leak would hang runScenario and trip
 // the timeout guard.
 func TestRunScenarioConstantVUsCancellation(t *testing.T) {
-	rootState := newRuntimeTestRoot(t)
+	ctx, cancel := context.WithCancel(t.Context())
 
-	ctx, cancel := context.WithCancel(context.Background())
+	go func() { time.Sleep(20 * time.Millisecond); cancel() }()
 
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		cancel()
-	}()
+	test := Test{Name: "duration-cancel", Define: func(d *Def) error {
+		d.Execution.Step("work", func(ctx context.Context, b *Bench) error {
+			<-ctx.Done()
 
+			return ctx.Err()
+		}, ConstantWorkers(4, 10*time.Second, DrainNoTimeout))
+
+		return d.Execution.Err()
+	}}
 	done := make(chan error, 1)
-	go func() {
-		done <- runScenario(ctx, rootState, scenarioSpec{
-			executor: "constant-vus",
-			vus:      4,
-			duration: 10 * time.Second,
-		}, func(vu *VU) error {
-			<-vu.Context().Done()
 
-			return vu.Context().Err()
-		}, nil)
-	}()
+	go func() { _, err := RunTest(ctx, test, noopRunOptions()); done <- err }()
 
 	select {
 	case err := <-done:
@@ -128,7 +123,7 @@ func (w *teardownTrackingWorkload) Teardown(ctx context.Context, _ *Bench) error
 func TestRunTeardownRunsOnCancellation(t *testing.T) {
 	var wl *teardownTrackingWorkload
 
-	Register(func() Workload {
+	fixtureRegister(func() Workload {
 		wl = &teardownTrackingWorkload{}
 
 		return wl

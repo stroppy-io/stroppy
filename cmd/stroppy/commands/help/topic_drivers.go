@@ -48,10 +48,11 @@ DRIVER PRESETS (-d / --driver)
   setup steps, rejects runtime query execution, and requires the native insert
   method.
 
-  Use -d (driver 0) or -d1, -d2, ... for additional drivers:
+  Use -d for the default database. Workloads that declare named databases accept
+  -dNAME and -DNAME, for example -dprimary pg -dsecondary mysql. Numeric suffixes
+  are not supported. Built-in TPC-C uses one default database:
 
-    stroppy run tpcc/tx -d pg              # driver 0 = pg preset
-    stroppy run tpcc/tx -d pg -d1 mysql    # driver 0 = pg, driver 1 = mysql
+    stroppy run tpcc/tx -d pg
 
   Instead of a preset name, -d also accepts a raw JSON driver config:
 
@@ -67,7 +68,7 @@ DRIVER OPTIONS (-D / --driver-opt)
   any), so fields not mentioned keep their preset values.
 
   Format:  -D key=value
-  Numbered: -D1 key=value  (driver 1), -D2 key=value  (driver 2), etc.
+  Named:   -Dprimary key=value, -Dsecondary key=value
 
   Available option keys:
 
@@ -157,9 +158,6 @@ EXAMPLES
 
   # Preset with URL override
   stroppy run tpcc/tx -d pg -D url=postgres://prod-host:5432/mydb
-
-  # Two drivers: PostgreSQL and MySQL
-  stroppy run tpcc/tx -d pg -d1 mysql
 
   # Dump generated TPC-B data to CSV and stop before the workload phase
   stroppy run tpcb/tx -D driverType=csv \

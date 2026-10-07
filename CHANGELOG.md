@@ -10,6 +10,35 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- `stroppy init` creates a minimal standalone Go workload, and `stroppy eject` restores explicitly published workload source into a new or empty directory, including built-in sources and exported collections. ([#188](https://github.com/stroppy-io/stroppy/pull/188))
+- Workload tests can use public noop/recording helpers and a recording driver that captures typed query arguments, transactions, and inserts without a database. ([#188](https://github.com/stroppy-io/stroppy/pull/188))
+- Selected-workload probe can show resolved values, sources, aliases, constraints, steps, and metric schemas without running actions or connecting to databases. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
+- Runnable Go authoring examples cover queries, transactional loading, reports, and named databases; the supported API is documented with a v6 minor-release compatibility guarantee. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
+- Custom workload builds and exports reuse content-addressed artifacts, preserve owned source snapshots, expose secret-free provenance through `stroppy cache inspect`, and identify generated runtime reports by build digest. ([#186](https://github.com/stroppy-io/stroppy/pull/186))
+- `stroppy export` creates one portable binary containing every built-in and all or selected custom workload packages, with standard cross-compilation support and a verified private Go 1.26.8 fallback under `~/.stroppy`. ([#185](https://github.com/stroppy-io/stroppy/pull/185))
+- `stroppy build`, `list`, and `remove` manage compiled custom workloads under `~/.stroppy/workloads/`, and registered workloads run or probe by name without their source tree. ([#184](https://github.com/stroppy-io/stroppy/pull/184))
+- Custom Go workloads can run as standalone Stroppy applications with the standard drivers, CLI, probe, version, reports, and programmatic runtime API. ([#183](https://github.com/stroppy-io/stroppy/pull/183))
+- Every constructed workload run report is saved under `~/.stroppy/reports/`; history write failures warn without failing the run. ([#183](https://github.com/stroppy-io/stroppy/pull/183))
+
+### Changed
+
+- Parallel workloads spend less time contending on metric updates while retaining the same public counters, histogram buckets, gauges, and sampled trace exemplars. ([#189](https://github.com/stroppy-io/stroppy/pull/189))
+- Repeated SQL queries avoid allocating cache keys after warmup, and combining absent errors no longer allocates. ([#189](https://github.com/stroppy-io/stroppy/pull/189))
+- `stroppy build PATH` accepts a standalone project root by checking its conventional `workload/` package when the root is not importable. ([#188](https://github.com/stroppy-io/stroppy/pull/188))
+- Workload authors use ordinary test definitions and immediate named steps, with typed parameters, generic query reads, named databases, neutral metrics and reporting, and the same supported API as built-ins. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
+- Stroppy requires Go 1.27 and can install verified private Go 1.27.1 under `~/.stroppy`; repeated runs expose explicit drain settings and schema-3 reports record named drivers and measured step windows. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
+- Workload inputs use typed flags, process environment, and typed config; legacy `-e` and config `env` are rejected, and additional drivers are configured by name rather than numeric index. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
+
+- Go applications can depend on Stroppy v6 through the standard `github.com/stroppy-io/stroppy/v6` module path. ([#181](https://github.com/stroppy-io/stroppy/pull/181))
+
+### Fixed
+
+- Source ejection rejects trailing-slash symlink targets, preserves concurrently replaced directories, and relocates published self-imports without changing query data; starters reject reserved names before writing, and testkit runs honor supplied inputs while keeping every database declaration offline. ([#188](https://github.com/stroppy-io/stroppy/pull/188))
+- Programmatic PostgreSQL workloads work with logging disabled, and successful runs still export explicit zero error and retry counters. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
+- Named databases default to native insertion, nested database facades count one logical operation, framework metric-name collisions fail before actions, concurrent logs are serialized, and row-generator panics propagate after workers and resources are cleaned up. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
+
 ## [6.1.1] - 2026-09-28
 
 ### Added

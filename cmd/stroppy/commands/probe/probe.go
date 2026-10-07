@@ -6,13 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	"github.com/stroppy-io/stroppy/workloads"
+	runcommand "github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/run"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/workloads"
 )
 
 const (
@@ -26,40 +30,113 @@ var (
 	formats             = []string{humanFormat, jsonFormat}
 	formatsWithCommas   = strings.Join(formats, ", ")
 	ErrUnsoportedFormat = errors.New("unsupported format")
-	Cmd                 = func() *cobra.Command {
-		cmd := &cobra.Command{
-			Use:   "probe",
-			Short: "List embedded workload presets and supported drivers",
-			Long: `Probe lists the embedded workload presets (their SQL dialects and docs)
+	Cmd                 = NewCommand(bench.RegisteredCatalog())
+)
+
+// NewCommand builds a probe command over an explicit workload catalog.
+//
+//nolint:gocognit // catalog and selected/resolved views share one command boundary.
+func NewCommand(workloadCatalog *bench.Catalog) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "probe [workload] [--resolved] [run inputs]",
+		Short: "Describe workloads, embedded presets, and supported drivers",
+		Long: `Probe lists the embedded workload presets (their SQL dialects and docs)
 and the insert methods each driver supports. Registered workload parameter schemas
 are read without setting up a workload or connecting to a database.
 
   -o json   machine-readable output
 `,
-			Args: cobra.NoArgs,
-			RunE: func(cmd *cobra.Command, _ []string) error {
-				formatFlagValue := cmd.Flag(formatFlag).Value.String()
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if slices.Contains(args, "--help") || slices.Contains(args, "-h") {
+				return cmd.Help()
+			}
 
-				if !contains(formats, formatFlagValue) {
-					return fmt.Errorf(
-						"%q, available (%s): %w",
-						formatFlagValue,
-						formatsWithCommas,
-						ErrUnsoportedFormat,
-					)
+			name, formatFlagValue, resolved, inputs, err := parseProbeArgs(args)
+			if err != nil {
+				return err
+			}
+
+			if !contains(formats, formatFlagValue) {
+				return fmt.Errorf(
+					"%q, available (%s): %w",
+					formatFlagValue,
+					formatsWithCommas,
+					ErrUnsoportedFormat,
+				)
+			}
+
+			if name == "" {
+				if resolved || len(inputs) != 0 {
+					return errProbeSelection
 				}
 
-				return printCatalog(cmd.OutOrStdout(), formatFlagValue)
-			},
-		}
+				return printCatalog(cmd.OutOrStdout(), workloadCatalog, formatFlagValue)
+			}
 
-		cmd.Flags().
-			StringP(formatFlag, string(formatFlag[0]), humanFormat,
-				fmt.Sprintf("(%s)", formatsWithCommas))
+			if !resolved && len(inputs) != 0 {
+				return errProbeResolution
+			}
 
-		return cmd
-	}()
+			var description bench.Description
+			if resolved {
+				description, err = runcommand.ResolveDescription(workloadCatalog, name, inputs)
+			} else {
+				description, err = workloadCatalog.Describe(name)
+			}
+
+			if err != nil {
+				return err
+			}
+
+			return printDescriptions(cmd.OutOrStdout(), formatFlagValue, []bench.Description{description}, nil)
+		},
+	}
+
+	cmd.Flags().StringP(
+		formatFlag,
+		string(formatFlag[0]),
+		humanFormat,
+		fmt.Sprintf("(%s)", formatsWithCommas),
+	)
+
+	cmd.Flags().Bool("resolved", false, "Resolve inputs and show effective values without executing actions")
+
+	return cmd
+}
+
+var (
+	errProbeSelection  = errors.New("resolved probe requires a workload name")
+	errProbeResolution = errors.New("probe run inputs require --resolved")
+	errProbeOutput     = errors.New("probe output requires a value")
 )
+
+func parseProbeArgs(args []string) (name, format string, resolved bool, inputs []string, err error) {
+	format = humanFormat
+
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		switch {
+		case arg == "--resolved":
+			resolved = true
+		case arg == "-o" || arg == "--output":
+			index++
+			if index == len(args) {
+				return "", "", false, nil, errProbeOutput
+			}
+
+			format = args[index]
+		case strings.HasPrefix(arg, "--output="):
+			format = strings.TrimPrefix(arg, "--output=")
+		case name == "" && !strings.HasPrefix(arg, "-"):
+			name = arg
+		default:
+			inputs = append(inputs, arg)
+		}
+	}
+
+	return name, format, resolved, inputs, err
+}
 
 func contains(haystack []string, needle string) bool {
 	for _, s := range haystack {
@@ -73,17 +150,26 @@ func contains(haystack []string, needle string) bool {
 
 // printCatalog renders the embedded preset catalog, workload schemas, and driver
 // insert-method matrix in the requested format.
-func printCatalog(output io.Writer, format string) error {
+func printCatalog(output io.Writer, workloadCatalog *bench.Catalog, format string) error {
 	catalog, err := workloads.Catalog()
 	if err != nil {
 		return fmt.Errorf("failed to build workloads catalog: %w", err)
 	}
 
-	descriptions, err := bench.DescribeAll()
+	descriptions, err := workloadCatalog.DescribeAll()
 	if err != nil {
 		return fmt.Errorf("failed to describe workloads: %w", err)
 	}
 
+	return printDescriptions(output, format, descriptions, catalog)
+}
+
+func printDescriptions(
+	output io.Writer,
+	format string,
+	descriptions []bench.Description,
+	catalog []workloads.PresetInfo,
+) error {
 	drivers := driverCatalog()
 	workloadSchemas := describeWorkloads(descriptions)
 
@@ -113,21 +199,32 @@ type catalogOutput struct {
 }
 
 type workloadEntry struct {
-	Name   string       `json:"name"`
-	Params []paramEntry `json:"params"`
+	Name       string                    `json:"name"`
+	Params     []paramEntry              `json:"params"`
+	Steps      []bench.StepDescription   `json:"steps"`
+	DriverRefs []bench.DriverDescription `json:"driver_refs"`
+	Metrics    []bench.MetricSchema      `json:"metrics"`
+	Values     map[string]valueEntry     `json:"values,omitempty"`
+}
+
+type valueEntry struct {
+	Value    any               `json:"value"`
+	Source   bench.ParamSource `json:"source"`
+	Spelling string            `json:"spelling"`
 }
 
 type paramEntry struct {
-	Name               string           `json:"name"`
-	Flag               string           `json:"flag"`
-	Scope              bench.ParamScope `json:"scope"`
-	Type               bench.ParamType  `json:"type"`
-	Description        string           `json:"description"`
-	Default            any              `json:"default"`
-	DefaultDescription string           `json:"default_description,omitempty"`
-	Env                string           `json:"env"`
-	LegacyAliases      []string         `json:"legacy_aliases"`
-	Config             string           `json:"config"`
+	Name               string             `json:"name"`
+	Flag               string             `json:"flag"`
+	Scope              bench.ParamScope   `json:"scope"`
+	Type               bench.ParamType    `json:"type"`
+	Description        string             `json:"description"`
+	Default            any                `json:"default"`
+	DefaultDescription string             `json:"default_description,omitempty"`
+	Env                string             `json:"env"`
+	Aliases            []string           `json:"aliases"`
+	Config             string             `json:"config"`
+	Constraints        []bench.Constraint `json:"constraints"`
 }
 
 func describeWorkloads(descriptions []bench.Description) []workloadEntry {
@@ -152,12 +249,27 @@ func describeWorkloads(descriptions []bench.Description) []workloadEntry {
 				Default:            defaultValue,
 				DefaultDescription: param.DefaultDescription,
 				Env:                param.Env,
-				LegacyAliases:      append([]string{}, param.LegacyEnvAliases...),
+				Aliases:            append([]string{}, param.Aliases...),
 				Config:             param.Config,
+				Constraints:        append([]bench.Constraint{}, param.Constraints...),
 			})
 		}
 
-		entries = append(entries, workloadEntry{Name: description.Name, Params: params})
+		values := map[string]valueEntry{}
+
+		for name, value := range description.Values {
+			resolved := value.Value
+			if duration, ok := resolved.(time.Duration); ok {
+				resolved = duration.String()
+			}
+
+			values[name] = valueEntry{resolved, value.Info.Source, value.Info.Spelling}
+		}
+
+		entries = append(entries, workloadEntry{
+			Name: description.Name, Params: params, Steps: description.Steps,
+			DriverRefs: description.Drivers, Metrics: description.Metrics, Values: values,
+		})
 	}
 
 	return entries
@@ -234,6 +346,20 @@ func formatCatalog(
 			if len(flags) > 0 {
 				fmt.Fprintf(&builder, "    %-9s %s\n", group.label+":", strings.Join(flags, ", "))
 			}
+		}
+
+		for _, step := range workload.Steps {
+			fmt.Fprintf(&builder, "    step: %s (%s, workers=%d, measured=%t)\n",
+				step.Name, step.Executor, step.Workers, step.Measured)
+		}
+
+		for _, ref := range workload.DriverRefs {
+			fmt.Fprintf(&builder, "    database: %s (%s)\n", ref.Name, ref.Kind)
+		}
+
+		for _, name := range slices.Sorted(maps.Keys(workload.Values)) {
+			value := workload.Values[name]
+			fmt.Fprintf(&builder, "    %s=%v (%s: %s)\n", name, value.Value, value.Source, value.Spelling)
 		}
 
 		builder.WriteString("\n")

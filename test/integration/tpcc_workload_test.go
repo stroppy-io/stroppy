@@ -396,16 +396,26 @@ func assertTpccWorkloadSpecCompliance(t *testing.T, pool *pgxpool.Pool) {
 		query string
 		want  int64
 	}{
-		{"orders total NULL carrier_id (spec: last 900 × 10 districts)",
-			`SELECT COUNT(*) FROM orders WHERE o_carrier_id IS NULL`, 9000},
-		{"orders undelivered with NOT NULL carrier_id (must be 0)",
-			`SELECT COUNT(*) FROM orders WHERE o_id > 2100 AND o_carrier_id IS NOT NULL`, 0},
-		{"orders delivered with NULL carrier_id (must be 0)",
-			`SELECT COUNT(*) FROM orders WHERE o_id <= 2100 AND o_carrier_id IS NULL`, 0},
-		{"order_line undelivered with NOT NULL delivery_d (must be 0)",
-			`SELECT COUNT(*) FROM order_line WHERE ol_o_id > 2100 AND ol_delivery_d IS NOT NULL`, 0},
-		{"order_line delivered with NULL delivery_d (must be 0)",
-			`SELECT COUNT(*) FROM order_line WHERE ol_o_id <= 2100 AND ol_delivery_d IS NULL`, 0},
+		{
+			"orders total NULL carrier_id (spec: last 900 × 10 districts)",
+			`SELECT COUNT(*) FROM orders WHERE o_carrier_id IS NULL`, 9000,
+		},
+		{
+			"orders undelivered with NOT NULL carrier_id (must be 0)",
+			`SELECT COUNT(*) FROM orders WHERE o_id > 2100 AND o_carrier_id IS NOT NULL`, 0,
+		},
+		{
+			"orders delivered with NULL carrier_id (must be 0)",
+			`SELECT COUNT(*) FROM orders WHERE o_id <= 2100 AND o_carrier_id IS NULL`, 0,
+		},
+		{
+			"order_line undelivered with NOT NULL delivery_d (must be 0)",
+			`SELECT COUNT(*) FROM order_line WHERE ol_o_id > 2100 AND ol_delivery_d IS NOT NULL`, 0,
+		},
+		{
+			"order_line delivered with NULL delivery_d (must be 0)",
+			`SELECT COUNT(*) FROM order_line WHERE ol_o_id <= 2100 AND ol_delivery_d IS NULL`, 0,
+		},
 	} {
 		var got int64
 		if err := pool.QueryRow(ctx, c.query).Scan(&got); err != nil {

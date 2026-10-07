@@ -38,7 +38,7 @@ Example stroppy-config.json:
       }
     },
     "drivers": {
-      "0": {
+      "default": {
         "driverType": "postgres",
         "url": "postgres://user:pass@db:5432/bench",
         "insertProgress": { "interval": "30s", "stallAfter": "2m", "mode": "both" },
@@ -51,10 +51,7 @@ Example stroppy-config.json:
       "duration": "30s",
       "queryTimeout": "5s"
     },
-    "params": {},
-    "env": {
-      "WAREHOUSES": "10"
-    },
+    "params": {"scaleFactor": 10},
     "steps": ["create_schema", "load_data"]
   }
 
@@ -64,11 +61,10 @@ Example stroppy-config.json:
     sql      string            Explicit SQL file override (2nd positional)
     global   object            Logger and OTEL exporter config; --log-level/--log-mode override logger fields,
                               while exporter has no CLI equivalent
-    drivers  map[string]obj    Per-index driver configs (keys "0", "1", ...)
+    drivers  map[string]obj    Named driver configs ("default", "primary", ...)
     run      object            Typed scenario params: executor, vus, iterations, duration,
                               queryTimeout
     params   object            Typed parameters declared by the selected workload
-    env      map[string]string Legacy workload env overrides (keys uppercased on load)
     steps    []string          Step allowlist (same as CLI --steps)
     noSteps  []string          Step blocklist (same as CLI --no-steps)
 
@@ -109,10 +105,11 @@ PRECEDENCE (highest to lowest)
 
     1. Typed --name CLI flag
     2. Real environment variable
-    3. -e KEY=VALUE legacy env override
-    4. Matching config object ("run" or "params")
-    5. Config file "env" map
-    6. Declared default
+    3. Matching config object ("run" or "params")
+    4. Declared default
+
+  -e/--env and the config "env" map are removed. Numeric driver keys are replaced
+  by named declarations; use "default" for the default database.
 
   Driver precedence is CLI -d/-D over the config file "drivers" map.
 
@@ -121,17 +118,16 @@ PRECEDENCE (highest to lowest)
     workload / sql positionals:  CLI arg > config file "script"/"sql" fields
     steps / noSteps:             CLI --steps > config file "steps" field
     logger:  --log-level/--log-mode > LOG_LEVEL/LOG_MODE process env >
-             -e LOG_LEVEL/LOG_MODE > global.logger > debug/development
+             global.logger > debug/development
     OTEL exporter: global config only (no CLI equivalent)
 
   Database URLs in configuration diagnostics are redacted: passwords, tokens,
   secrets, credentials, and API keys never appear in logs.
 
   Pass typed executor/vus/iterations/duration/queryTimeout parameters directly.
-  The VUS/DURATION/ITER/QUERY_TIMEOUT environment values remain compatible. A
-  queryTimeout of "0" disables the per-statement deadline. Legacy DURATION
-  without an explicit executor infers constant-vus and emits a warning; prefer
-  an explicit "run.executor" value.
+  VUS/DURATION/ITERATIONS/QUERY_TIMEOUT are their environment projections. A
+  queryTimeout of "0" disables the per-statement deadline. DURATION alone does
+  not select constant-vus; set "run.executor" explicitly.
 
 DEBUG LOGGING
 
@@ -141,10 +137,12 @@ DEBUG LOGGING
 
   At DEBUG level each override decision is logged with source and value:
 
-    config_file    loaded path, script field, env keys, driver indices
+    config_file    loaded path, script field, driver names
     run            when CLI workload/steps override file values
-    env_override   when real env takes precedence over -e or file env keys
-    driver_preset  which source was applied per driver index
+    driver_preset  which source was applied per driver name
+
+  Use 'stroppy probe <workload> --resolved -o json' for typed parameter
+  values and provenance without executing actions.
 
   With the debug/development defaults, stroppy logs:
 

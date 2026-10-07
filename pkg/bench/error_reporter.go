@@ -15,7 +15,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 const (
@@ -128,7 +128,10 @@ func (r *errorReporter) record(
 	}
 
 	kind := classifyError(err, classify).Kind
-	group := errorGroup{operation: boundErrorOperation(operation), kind: normalizeErrorKind(kind)}
+	group := errorGroup{
+		operation: boundErrorOperation(operation),
+		kind:      normalizeErrorKind(kind),
+	}
 	group, state := r.groupState(group)
 	count := state.count.Add(1)
 
@@ -273,10 +276,30 @@ func (r *errorReporter) writeSummary(w io.Writer) {
 	}
 
 	fmt.Fprintln(w, "\n=== bench completed with errors ===")
-	fmt.Fprintf(w, "  %-40s %d\n", "terminal_errors_total", summary.terminalErrors)
-	fmt.Fprintf(w, "  %-40s %d\n", "failed_iterations_total", summary.failedIterations)
-	fmt.Fprintf(w, "  %-40s %d\n", "failed_queries_total", summary.failedQueries)
-	fmt.Fprintf(w, "  %-40s %d\n", "retry_attempts_total", summary.retryAttempts)
+	fmt.Fprintf(
+		w,
+		"  %-40s %d\n",
+		"terminal_errors_total",
+		summary.terminalErrors,
+	)
+	fmt.Fprintf(
+		w,
+		"  %-40s %d\n",
+		"failed_iterations_total",
+		summary.failedIterations,
+	)
+	fmt.Fprintf(
+		w,
+		"  %-40s %d\n",
+		"failed_queries_total",
+		summary.failedQueries,
+	)
+	fmt.Fprintf(
+		w,
+		"  %-40s %d\n",
+		"retry_attempts_total",
+		summary.retryAttempts,
+	)
 	fmt.Fprintln(w, "  representative error groups:")
 
 	for _, group := range summary.groups {
@@ -340,7 +363,7 @@ func canceledError(ctx context.Context, err error) bool {
 
 // RecordQueryError records a query-set error after the workload has decided not
 // to retry it. The query set may continue and the run remains successful.
-func (b *Bench) RecordQueryError(operation string, err error) {
+func (b *Bench) RecordError(operation string, err error) {
 	if b == nil || b.root == nil || b.root.errorReporter == nil || b.vu == nil || err == nil {
 		return
 	}
@@ -354,5 +377,11 @@ func (b *Bench) RecordQueryError(operation string, err error) {
 		classify = b.drv.ClassifyError
 	}
 
-	b.root.errorReporter.record(b.vu, terminalErrorQuery, operation, err, classify)
+	b.root.errorReporter.record(
+		b.vu,
+		terminalErrorQuery,
+		operation,
+		err,
+		classify,
+	)
 }

@@ -3,11 +3,20 @@ package tpcb
 import (
 	"testing"
 
-	"github.com/stroppy-io/stroppy/workloads/internal/workloadtest"
+	"github.com/stroppy-io/stroppy/v6/workloads/internal/workloadtest"
 )
 
 func TestEmbeddedAssetContract(t *testing.T) {
-	workloadtest.Files(t, files, "README.md", "pg.sql", "crdb.sql", "mysql.sql", "pico.sql", "ydb.sql")
+	workloadtest.Files(
+		t,
+		files,
+		"README.md",
+		"pg.sql",
+		"crdb.sql",
+		"mysql.sql",
+		"pico.sql",
+		"ydb.sql",
+	)
 
 	txQueries := make([]workloadtest.Query, 0, len(requiredTxQueries))
 	for _, query := range requiredTxQueries {

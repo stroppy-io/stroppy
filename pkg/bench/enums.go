@@ -1,15 +1,14 @@
 package bench
 
 import (
-	"errors"
 	"fmt"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 var (
-	errUnknownDriverType  = errors.New("unknown driver type")
-	errUnknownTxIsolation = errors.New("unknown tx isolation")
+	errUnknownDriverType  = inputError("unknown driver type")
+	errUnknownTxIsolation = inputError("unknown tx isolation")
 )
 
 // String-typed enums authored by Go workloads and resolved to the config enums
@@ -18,12 +17,13 @@ var (
 type DriverTypeName string
 
 const (
-	DriverPostgres DriverTypeName = "postgres"
-	DriverMySQL    DriverTypeName = "mysql"
-	DriverPicodata DriverTypeName = "picodata"
-	DriverYDB      DriverTypeName = "ydb"
-	DriverNoop     DriverTypeName = "noop"
-	DriverCSV      DriverTypeName = "csv"
+	DriverPostgres  DriverTypeName = "postgres"
+	DriverMySQL     DriverTypeName = "mysql"
+	DriverPicodata  DriverTypeName = "picodata"
+	DriverYDB       DriverTypeName = "ydb"
+	DriverNoop      DriverTypeName = "noop"
+	DriverCSV       DriverTypeName = "csv"
+	DriverRecording DriverTypeName = "recording"
 )
 
 func ParseDriverType(s string) (config.DriverType, error) {
@@ -40,6 +40,8 @@ func ParseDriverType(s string) (config.DriverType, error) {
 		return config.DriverTypeNoop, nil
 	case "csv":
 		return config.DriverTypeCSV, nil
+	case "recording":
+		return config.DriverTypeRecording, nil
 	default:
 		return 0, fmt.Errorf("%w %q", errUnknownDriverType, s)
 	}
@@ -60,6 +62,8 @@ func DriverTypeNameOf(t config.DriverType) DriverTypeName {
 		return DriverNoop
 	case config.DriverTypeCSV:
 		return DriverCSV
+	case config.DriverTypeRecording:
+		return DriverRecording
 	default:
 		return ""
 	}

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver/queries"
 )
 
 var _ queries.Dialect = testDialect{}
@@ -43,6 +43,97 @@ func (failingDialect) Convert(v any) (any, error) {
 	}
 
 	return v, nil
+}
+
+type deduplicatingDialect struct{ testDialect }
+
+func (deduplicatingDialect) Deduplicate() bool { return true }
+
+func TestSQLCacheSeparatesDeduplication(t *testing.T) {
+	t.Parallel()
+
+	const sql = "SELECT :cache_id, :cache_id "
+
+	args := map[string]any{"cache_id": 42}
+	for _, dialect := range []queries.Dialect{testDialect{}, deduplicatingDialect{}, testDialect{}} {
+		gotSQL, gotArgs, err := ProcessArgs(dialect, sql, args)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if gotSQL != "SELECT ?, ? " {
+			t.Fatalf("SQL = %q, want SELECT ?, ? ", gotSQL)
+		}
+
+		want := 2
+		if dialect.Deduplicate() {
+			want = 1
+		}
+
+		if len(gotArgs) != want {
+			t.Fatalf("argument count = %d, want %d", len(gotArgs), want)
+		}
+	}
+}
+
+func TestSQLCacheWarmLookupAllocations(t *testing.T) {
+	const sql = "SELECT * FROM cache_allocations WHERE id = :id "
+
+	dialect := testDialect{}
+	want := lookupOrParse(dialect, sql)
+
+	allocations := testing.AllocsPerRun(1000, func() {
+		if got := lookupOrParse(dialect, sql); got != want {
+			t.Fatal("warm lookup did not reuse the parsed query")
+		}
+	})
+	if allocations != 0 {
+		t.Fatalf("warm SQL lookup allocations = %v, want 0", allocations)
+	}
+}
+
+func TestProcessArgsWarmNoArgumentsAllocations(t *testing.T) {
+	const sql = "SELECT * FROM cache_no_arguments WHERE active = true"
+
+	dialect := testDialect{}
+	lookupOrParse(dialect, sql)
+
+	allocations := testing.AllocsPerRun(1000, func() {
+		gotSQL, gotArgs, err := ProcessArgs(dialect, sql, nil)
+		if err != nil || gotSQL != sql || len(gotArgs) != 0 {
+			t.Fatalf("ProcessArgs() = %q, %v, %v", gotSQL, gotArgs, err)
+		}
+	})
+	if allocations != 0 {
+		t.Fatalf("warm argument-free query allocations = %v, want 0", allocations)
+	}
+}
+
+func BenchmarkSQLCacheWarmLookup(b *testing.B) {
+	const sql = "SELECT * FROM cache_benchmark WHERE id = :id "
+
+	dialect := testDialect{}
+	lookupOrParse(dialect, sql)
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		lookupOrParse(dialect, sql)
+	}
+}
+
+func BenchmarkSQLCacheWarmLookupParallel(b *testing.B) {
+	const sql = "SELECT * FROM cache_parallel_benchmark WHERE id = :id "
+
+	dialect := testDialect{}
+	lookupOrParse(dialect, sql)
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			lookupOrParse(dialect, sql)
+		}
+	})
 }
 
 func TestProcessArgs(t *testing.T) {

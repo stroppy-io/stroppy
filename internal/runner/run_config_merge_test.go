@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/stroppy-io/stroppy/internal/runner"
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/internal/runner"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 func TestEffectiveScript(t *testing.T) {

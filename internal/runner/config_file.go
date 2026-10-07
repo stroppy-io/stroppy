@@ -2,22 +2,17 @@ package runner
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
-	"sort"
-	"strings"
 
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/common/logger"
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/common/logger"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 // DefaultConfigFile is the file auto-discovered in the current directory.
 const DefaultConfigFile = "stroppy-config.json"
-
-var errConfigEnvCollision = errors.New("config env keys collide case-insensitively")
 
 // LoadedConfig keeps the run config separate from typed parameter scopes.
 type LoadedConfig struct {
@@ -62,10 +57,6 @@ func LoadRunConfig(path string) (*LoadedConfig, bool, error) {
 		workloadParams = map[string]json.RawMessage{}
 	}
 
-	if err := normalizeRunConfigEnv(cfg); err != nil {
-		return nil, false, fmt.Errorf("parsing config file %q: %w", path, err)
-	}
-
 	return &LoadedConfig{Path: path, RunConfig: cfg, Run: runParams, Params: workloadParams}, true, nil
 }
 
@@ -83,51 +74,11 @@ func LogConfigFile(loaded *LoadedConfig) {
 		lg.Debug("Config file script", zap.String("script", cfg.GetScript()))
 	}
 
-	if len(cfg.Env) > 0 {
-		keys := make([]string, 0, len(cfg.Env))
-		for key := range cfg.Env {
-			keys = append(keys, key)
-		}
-
-		sort.Strings(keys)
-		lg.Debug("Config file env overrides", zap.Strings("keys", keys))
-	}
-
 	for idx, drv := range cfg.Drivers {
 		lg.Debug("Config file driver",
-			zap.Uint32("index", idx),
+			zap.String("name", idx),
 			zap.String("type", drv.GetDriverType()),
 			zap.String("url", logger.RedactDSN(drv.GetURL())),
 		)
 	}
-}
-
-func normalizeRunConfigEnv(runConfig *config.RunConfig) error {
-	if len(runConfig.Env) == 0 {
-		return nil
-	}
-
-	keys := make([]string, 0, len(runConfig.Env))
-	for key := range runConfig.Env {
-		keys = append(keys, key)
-	}
-
-	sort.Strings(keys)
-
-	normalized := make(map[string]string, len(runConfig.Env))
-	original := make(map[string]string, len(runConfig.Env))
-
-	for _, key := range keys {
-		upper := strings.ToUpper(key)
-		if previous, exists := original[upper]; exists && previous != key {
-			return fmt.Errorf("%w: %q and %q", errConfigEnvCollision, previous, key)
-		}
-
-		normalized[upper] = runConfig.Env[key]
-		original[upper] = key
-	}
-
-	runConfig.Env = normalized
-
-	return nil
 }

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
 // testBounds is a small deterministic histogram layout used only by the unit
@@ -24,7 +24,11 @@ func binSamples(samples []float64) txObservation {
 		buckets[sort.SearchFloat64s(testBounds, s)]++
 	}
 
-	return txObservation{count: uint64(len(samples)), bounds: testBounds, bucketCounts: buckets}
+	return txObservation{
+		count:        uint64(len(samples)),
+		bounds:       testBounds,
+		bucketCounts: buckets,
+	}
 }
 
 func repeat(v float64, n int) []float64 {
@@ -64,7 +68,11 @@ func TestComplianceContributionUsesMeasurementEnd(t *testing.T) {
 	}
 
 	if report.ElapsedSeconds != end.Sub(start).Seconds() {
-		t.Fatalf("elapsed = %v, want %v", report.ElapsedSeconds, end.Sub(start).Seconds())
+		t.Fatalf(
+			"elapsed = %v, want %v",
+			report.ElapsedSeconds,
+			end.Sub(start).Seconds(),
+		)
 	}
 }
 
@@ -107,7 +115,11 @@ func TestComplianceReportPassingPacedRun(t *testing.T) {
 	}
 
 	if report.MixTolerancePct != mixTolerancePct {
-		t.Fatalf("MixTolerancePct = %f, want %f", report.MixTolerancePct, mixTolerancePct)
+		t.Fatalf(
+			"MixTolerancePct = %f, want %f",
+			report.MixTolerancePct,
+			mixTolerancePct,
+		)
 	}
 
 	if newOrder.MixMinPercent == nil || *newOrder.MixMinPercent != 44.0 {
@@ -170,7 +182,11 @@ func TestComplianceReportFailingMix(t *testing.T) {
 
 func TestComplianceReportMismatchedBuckets(t *testing.T) {
 	obs := make([]txObservation, len(complianceTxTable))
-	obs[0] = txObservation{count: 5, bounds: []float64{1, 2}, bucketCounts: []uint64{1, 1}} // missing +Inf bucket
+	obs[0] = txObservation{
+		count:        5,
+		bounds:       []float64{1, 2},
+		bucketCounts: []uint64{1, 1},
+	} // missing +Inf bucket
 
 	if _, err := complianceReport(obs, reportOptions{paced: true, elapsed: time.Second}); err == nil {
 		t.Fatal("complianceReport returned nil error for a histogram missing the +Inf bucket")
@@ -179,7 +195,11 @@ func TestComplianceReportMismatchedBuckets(t *testing.T) {
 
 func TestComplianceReportAcceptsOverflowBucket(t *testing.T) {
 	obs := make([]txObservation, len(complianceTxTable))
-	obs[0] = txObservation{count: 5, bounds: []float64{1, 2}, bucketCounts: []uint64{1, 2, 3}} // +Inf shape
+	obs[0] = txObservation{
+		count:        5,
+		bounds:       []float64{1, 2},
+		bucketCounts: []uint64{1, 2, 3},
+	} // +Inf shape
 
 	report, err := complianceReport(obs, reportOptions{paced: true, elapsed: time.Second})
 	if err != nil {
@@ -325,7 +345,11 @@ func TestSteadySnapshotIncludesFinalPartialSlot(t *testing.T) {
 
 	series := tracker.snapshot(elapsed)
 	if len(series.counts) != minSteadySlots+1 {
-		t.Fatalf("snapshot slots = %d, want %d", len(series.counts), minSteadySlots+1)
+		t.Fatalf(
+			"snapshot slots = %d, want %d",
+			len(series.counts),
+			minSteadySlots+1,
+		)
 	}
 
 	if series.counts[minSteadySlots] != 1 {

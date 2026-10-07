@@ -8,11 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"go.uber.org/zap"
-
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/config"
-	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
 )
 
 // TestProcsRegistered verifies both TPC-B variants are registered and self-name.
@@ -23,7 +20,7 @@ func TestProcsRegistered(t *testing.T) {
 			t.Fatalf("workload %q not registered", name)
 		}
 
-		if got := wl.Name(); got != name {
+		if got := wl.Name; got != name {
 			t.Fatalf("Name() = %q, want %q", got, name)
 		}
 	}
@@ -43,7 +40,11 @@ func TestProcsSharesTxParams(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(tx.Params, procs.Params) {
-		t.Fatalf("procs params diverge from the tx variant:\n  tx:    %+#v\n  procs: %+#v", tx.Params, procs.Params)
+		t.Fatalf(
+			"procs params diverge from the tx variant:\n  tx:    %+#v\n  procs: %+#v",
+			tx.Params,
+			procs.Params,
+		)
 	}
 }
 
@@ -115,15 +116,14 @@ func TestProcsNoopEndToEnd(t *testing.T) {
 		"EXECUTOR", "VUS", "ITERATIONS", "ITER", "DURATION",
 	)
 
-	err := bench.Run(
+	_, err := bench.RunCatalog(
 		context.Background(),
+		bench.RegisteredCatalog(),
 		"tpcb/procs",
-		map[int]*config.DriverConfig{0: {DriverType: config.DriverTypeNoop}},
-		bench.ParamInputs{},
-		nil,
-		nil,
-		zap.NewNop(),
-		&bench.MetricsConfig{},
+		bench.RunOptions{
+			Drivers: map[string]bench.DriverConfig{"": {Kind: bench.DriverNoop}},
+			Metrics: &bench.MetricsConfig{Quiet: true},
+		},
 	)
 	if err != nil {
 		t.Fatalf("tpcb/procs noop run: %v", err)

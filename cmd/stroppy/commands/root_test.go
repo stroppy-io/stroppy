@@ -12,9 +12,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/driver"
-	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
 )
 
 func TestExitCodeFor(t *testing.T) {
@@ -129,14 +129,24 @@ var (
 
 func registerCommandErrorWorkloads() {
 	registerCommandErrorWorkloadsOnce.Do(func() {
-		bench.Register(func() bench.Workload {
-			commandOrdinaryErrorWorkload = &commandErrorWorkload{name: "test/command-ordinary-error"}
+		for _, fatal := range []bool{false, true} {
+			name := "test/command-ordinary-error"
+			if fatal {
+				name = "test/command-fatal-error"
+			}
 
-			return commandOrdinaryErrorWorkload
-		})
-		bench.Register(func() bench.Workload {
-			return &commandErrorWorkload{name: "test/command-fatal-error", fatal: true}
-		})
+			bench.Register(bench.Test{Name: name, Define: func(d *bench.Def) error {
+				w := &commandErrorWorkload{name: name, fatal: fatal}
+				if !fatal {
+					commandOrdinaryErrorWorkload = w
+				}
+
+				settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
+				d.Execution.Step("workload", w.Iterate, settings.Policy())
+
+				return d.Execution.Err()
+			}})
+		}
 	})
 }
 

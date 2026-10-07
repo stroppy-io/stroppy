@@ -3,7 +3,7 @@ package picodata
 import (
 	"errors"
 
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 func (*Driver) ClassifyError(err error) driver.ErrorFacts {

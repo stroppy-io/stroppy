@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
 // tpcbSQL assembles a minimal TPC-B SQL document with both required setup
@@ -49,7 +49,12 @@ func TestValidateSQLNamesEveryMissingRequiredQuery(t *testing.T) {
 			}
 
 			if !strings.Contains(err.Error(), q.section+"/"+q.query) {
-				t.Fatalf("validateSQL error %q does not name %s/%s", err, q.section, q.query)
+				t.Fatalf(
+					"validateSQL error %q does not name %s/%s",
+					err,
+					q.section,
+					q.query,
+				)
 			}
 		})
 	}
@@ -101,7 +106,12 @@ func TestValidateSQLRejectsEmptyQueryBody(t *testing.T) {
 			}
 
 			if !strings.Contains(err.Error(), "empty query "+q.section+"/"+q.query) {
-				t.Fatalf("validateSQL error %q does not name empty %s/%s", err, q.section, q.query)
+				t.Fatalf(
+					"validateSQL error %q does not name empty %s/%s",
+					err,
+					q.section,
+					q.query,
+				)
 			}
 		})
 	}

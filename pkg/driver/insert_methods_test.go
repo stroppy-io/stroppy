@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 // TestInsertMethodsCoverAllDriverTypes guards the matrix against new driver

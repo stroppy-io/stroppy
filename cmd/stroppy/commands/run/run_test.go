@@ -7,17 +7,19 @@ import (
 	"errors"
 	"maps"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
-	"github.com/stroppy-io/stroppy/internal/runner"
-	"github.com/stroppy-io/stroppy/pkg/bench"
-	"github.com/stroppy-io/stroppy/pkg/config"
-	_ "github.com/stroppy-io/stroppy/pkg/driver/noop"
-	_ "github.com/stroppy-io/stroppy/workloads/simple"
+	"github.com/stroppy-io/stroppy/v6/internal/runner"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/noop"
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
+	_ "github.com/stroppy-io/stroppy/v6/workloads/simple"
 )
 
 func unsetLoggerEnv(t *testing.T) {
@@ -76,11 +78,11 @@ func TestResolveLoggerSettingsPrecedence(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			level, err := resolveLogLevel(test.cli, test.legacy, fileLogger)
+			level, err := resolveLogLevel(test.cli, fileLogger)
 			require.NoError(t, err)
 			require.Equal(t, test.wantLevel, level)
 
-			mode, err := resolveLogMode(test.cli, test.legacy, fileLogger)
+			mode, err := resolveLogMode(test.cli, fileLogger)
 			require.NoError(t, err)
 			require.Equal(t, test.wantMode, mode)
 		})
@@ -90,26 +92,34 @@ func TestResolveLoggerSettingsPrecedence(t *testing.T) {
 func TestResolveLoggerSettingsFallbacks(t *testing.T) {
 	unsetLoggerEnv(t)
 
-	level, err := resolveLogLevel(nil, map[string]string{envLogLevel: "LOG_LEVEL_FATAL"}, nil)
+	level, err := resolveLogLevel(nil, &config.LoggerConfig{LogLevel: config.LogLevelFatal})
 	require.NoError(t, err)
 	require.Equal(t, "fatal", level)
 
-	mode, err := resolveLogMode(nil, map[string]string{envLogMode: "0"}, nil)
+	mode, err := resolveLogMode(nil, &config.LoggerConfig{LogMode: config.LogModeDevelopment})
 	require.NoError(t, err)
 	require.Equal(t, "development", mode)
 
-	level, err = resolveLogLevel(nil, nil, nil)
+	level, err = resolveLogLevel(nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, defaultLogLevel, level)
 
-	mode, err = resolveLogMode(nil, nil, nil)
+	mode, err = resolveLogMode(nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, defaultLogMode, mode)
 }
 
 func TestWithoutLoggerParams(t *testing.T) {
-	inputs := map[string]string{"scale-factor": "1", loggerLevelParam: "debug", loggerModeParam: "development"}
-	require.Equal(t, map[string]string{"scale-factor": "1"}, withoutLoggerParams(inputs))
+	inputs := map[string]string{
+		"scale-factor":   "1",
+		loggerLevelParam: "debug",
+		loggerModeParam:  "development",
+	}
+	require.Equal(
+		t,
+		map[string]string{"scale-factor": "1"},
+		withoutLoggerParams(inputs),
+	)
 
 	wantInputs := map[string]string{
 		"scale-factor":   "1",
@@ -135,8 +145,8 @@ func TestParseRunArgs(t *testing.T) {
 		wantTyped     map[string]string
 		wantHelp      bool
 		wantReport    reportOutput
-		wantPresets   map[int]string
-		wantOpts      map[int][][2]string
+		wantPresets   map[string]string
+		wantOpts      map[string][][2]string
 		wantErr       error
 		wantErrStr    string // substring match when wantErr is nil but error expected
 	}
@@ -232,7 +242,7 @@ func TestParseRunArgs(t *testing.T) {
 			name:        "inline SQL query with spaces and equals is single positional",
 			args:        []string{"select a=1", "-d", "pg"},
 			wantScript:  "select a=1",
-			wantPresets: map[int]string{0: "pg"},
+			wantPresets: map[string]string{"": "pg"},
 		},
 
 		// ── Missing script ─────────────────────────────────────────────────
@@ -274,14 +284,14 @@ func TestParseRunArgs(t *testing.T) {
 
 		// ── -e / --env ─────────────────────────────────────────────────────
 		{
-			name:       "-e accepts values starting with dash after equals",
+			name:       "removed -e rejects ordinary pairs",
 			args:       []string{"tpcc", "-e", "TOKEN=-abc"},
-			wantScript: "tpcc",
+			wantErrStr: "unknown run flag",
 		},
 		{
 			name:       "-e followed by steps flag returns missing value",
 			args:       []string{"tpcc", "-e", "--steps", "load"},
-			wantErrStr: "-e: flag requires a value",
+			wantErrStr: "unknown run flag",
 		},
 
 		// ── --steps / --no-steps ───────────────────────────────────────────
@@ -347,49 +357,49 @@ func TestParseRunArgs(t *testing.T) {
 			name:        "-d NAME",
 			args:        []string{"tpcc", "-d", "pg"},
 			wantScript:  "tpcc",
-			wantPresets: map[int]string{0: "pg"},
+			wantPresets: map[string]string{"": "pg"},
 		},
 		{
 			name:        "-d0 is same as -d",
-			args:        []string{"tpcc", "-d0", "pg"},
+			args:        []string{"tpcc", "-d", "pg"},
 			wantScript:  "tpcc",
-			wantPresets: map[int]string{0: "pg"},
+			wantPresets: map[string]string{"": "pg"},
 		},
 		{
 			name:        "-d1 NAME",
-			args:        []string{"tpcc", "-d1", "mysql"},
+			args:        []string{"tpcc", "-dsecondary", "mysql"},
 			wantScript:  "tpcc",
-			wantPresets: map[int]string{1: "mysql"},
+			wantPresets: map[string]string{"secondary": "mysql"},
 		},
 		{
 			name:        "--driver NAME",
 			args:        []string{"tpcc", "--driver", "pg"},
 			wantScript:  "tpcc",
-			wantPresets: map[int]string{0: "pg"},
+			wantPresets: map[string]string{"": "pg"},
 		},
 		{
 			name:        "--driver0 same as --driver",
-			args:        []string{"tpcc", "--driver0", "pg"},
+			args:        []string{"tpcc", "--driver", "pg"},
 			wantScript:  "tpcc",
-			wantPresets: map[int]string{0: "pg"},
+			wantPresets: map[string]string{"": "pg"},
 		},
 		{
 			name:        "--driver1 NAME",
-			args:        []string{"tpcc", "--driver1", "mysql"},
+			args:        []string{"tpcc", "-dsecondary", "mysql"},
 			wantScript:  "tpcc",
-			wantPresets: map[int]string{1: "mysql"},
+			wantPresets: map[string]string{"secondary": "mysql"},
 		},
 		{
 			name:        "--driver=NAME equals form",
 			args:        []string{"tpcc", "--driver=pg"},
 			wantScript:  "tpcc",
-			wantPresets: map[int]string{0: "pg"},
+			wantPresets: map[string]string{"": "pg"},
 		},
 		{
-			name:        "--driver1=NAME equals form",
-			args:        []string{"tpcc", "--driver1=mysql"},
+			name:        "-dsecondary=NAME equals form",
+			args:        []string{"tpcc", "-dsecondary=mysql"},
 			wantScript:  "tpcc",
-			wantPresets: map[int]string{1: "mysql"},
+			wantPresets: map[string]string{"secondary": "mysql"},
 		},
 		{
 			name:       "-d missing value returns error",
@@ -413,9 +423,9 @@ func TestParseRunArgs(t *testing.T) {
 		},
 		{
 			name:        "two drivers -d and -d1",
-			args:        []string{"tpcc", "-d", "pg", "-d1", "mysql"},
+			args:        []string{"tpcc", "-d", "pg", "-dsecondary", "mysql"},
 			wantScript:  "tpcc",
-			wantPresets: map[int]string{0: "pg", 1: "mysql"},
+			wantPresets: map[string]string{"": "pg", "secondary": "mysql"},
 		},
 
 		// ── Driver option flags ────────────────────────────────────────────
@@ -423,12 +433,12 @@ func TestParseRunArgs(t *testing.T) {
 			name:       "-D key=value",
 			args:       []string{"tpcc", "-D", "url=postgres://prod:5432"},
 			wantScript: "tpcc",
-			wantOpts:   map[int][][2]string{0: {{"url", "postgres://prod:5432"}}},
+			wantOpts:   map[string][][2]string{"": {{"url", "postgres://prod:5432"}}},
 		},
 		{
 			name:       "unquoted driver value fragment returns quote hint",
 			args:       []string{"tpcc", "-D", "url=host=localhost", "user=postgres"},
-			wantErrStr: "quote driver/env values",
+			wantErrStr: "quote driver values",
 		},
 		{
 			name:       "unquoted driver value fragment before script returns key value hint",
@@ -437,52 +447,58 @@ func TestParseRunArgs(t *testing.T) {
 		},
 		{
 			name:       "-D1 key=value",
-			args:       []string{"tpcc", "-D1", "url=mysql://prod:3306"},
+			args:       []string{"tpcc", "-Dsecondary", "url=mysql://prod:3306"},
 			wantScript: "tpcc",
-			wantOpts:   map[int][][2]string{1: {{"url", "mysql://prod:3306"}}},
+			wantOpts:   map[string][][2]string{"secondary": {{"url", "mysql://prod:3306"}}},
 		},
 		{
 			name:       "--driver-opt key=value",
 			args:       []string{"tpcc", "--driver-opt", "url=postgres://prod:5432"},
 			wantScript: "tpcc",
-			wantOpts:   map[int][][2]string{0: {{"url", "postgres://prod:5432"}}},
+			wantOpts:   map[string][][2]string{"": {{"url", "postgres://prod:5432"}}},
 		},
 		{
 			name:       "--driver1-opt key=value",
-			args:       []string{"tpcc", "--driver1-opt", "url=mysql://prod:3306"},
+			args:       []string{"tpcc", "-Dsecondary", "url=mysql://prod:3306"},
 			wantScript: "tpcc",
-			wantOpts:   map[int][][2]string{1: {{"url", "mysql://prod:3306"}}},
+			wantOpts:   map[string][][2]string{"secondary": {{"url", "mysql://prod:3306"}}},
 		},
 		{
 			name:       "--driver-opt=key=value equals form",
 			args:       []string{"tpcc", "--driver-opt=url=postgres://prod:5432"},
 			wantScript: "tpcc",
-			wantOpts:   map[int][][2]string{0: {{"url", "postgres://prod:5432"}}},
+			wantOpts:   map[string][][2]string{"": {{"url", "postgres://prod:5432"}}},
 		},
 		{
-			name:       "--driver1-opt=key=value equals form",
-			args:       []string{"tpcc", "--driver1-opt=url=mysql://prod:3306"},
+			name:       "-Dsecondary=key=value equals form",
+			args:       []string{"tpcc", "-Dsecondary=url=mysql://prod:3306"},
 			wantScript: "tpcc",
-			wantOpts:   map[int][][2]string{1: {{"url", "mysql://prod:3306"}}},
+			wantOpts:   map[string][][2]string{"secondary": {{"url", "mysql://prod:3306"}}},
 		},
 		{
 			name:       "-D=key=value equals form",
 			args:       []string{"tpcc", "-D=url=postgres://prod:5432"},
 			wantScript: "tpcc",
-			wantOpts:   map[int][][2]string{0: {{"url", "postgres://prod:5432"}}},
+			wantOpts:   map[string][][2]string{"": {{"url", "postgres://prod:5432"}}},
 		},
 		{
-			name:       "-D1=key=value equals form",
-			args:       []string{"tpcc", "-D1=url=mysql://prod:3306"},
+			name:       "-Dsecondary=key=value equals form",
+			args:       []string{"tpcc", "-Dsecondary=url=mysql://prod:3306"},
 			wantScript: "tpcc",
-			wantOpts:   map[int][][2]string{1: {{"url", "mysql://prod:3306"}}},
+			wantOpts:   map[string][][2]string{"secondary": {{"url", "mysql://prod:3306"}}},
 		},
 		{
-			name:       "multiple -D overrides accumulate",
-			args:       []string{"tpcc", "-D", "url=postgres://prod:5432", "-D", "driverType=postgres"},
+			name: "multiple -D overrides accumulate",
+			args: []string{
+				"tpcc",
+				"-D",
+				"url=postgres://prod:5432",
+				"-D",
+				"driverType=postgres",
+			},
 			wantScript: "tpcc",
-			wantOpts: map[int][][2]string{
-				0: {{"url", "postgres://prod:5432"}, {"driverType", "postgres"}},
+			wantOpts: map[string][][2]string{
+				"": {{"url", "postgres://prod:5432"}, {"driverType", "postgres"}},
 			},
 		},
 		{
@@ -534,10 +550,19 @@ func TestParseRunArgs(t *testing.T) {
 
 		// ── Mixed combinations ─────────────────────────────────────────────
 		{
-			name:          "script plus options and separator tail",
-			args:          []string{"tpcc", "-d", "pg", "--steps", "load,run", "--", "--duration", "5m"},
+			name: "script plus options and separator tail",
+			args: []string{
+				"tpcc",
+				"-d",
+				"pg",
+				"--steps",
+				"load,run",
+				"--",
+				"--duration",
+				"5m",
+			},
 			wantScript:    "tpcc",
-			wantPresets:   map[int]string{0: "pg"},
+			wantPresets:   map[string]string{"": "pg"},
 			wantSteps:     []string{"load", "run"},
 			wantAfterDash: []string{"--duration", "5m"},
 		},
@@ -547,7 +572,7 @@ func TestParseRunArgs(t *testing.T) {
 			wantScript:  "tpcc",
 			wantSQL:     "tpcc/pico",
 			wantFile:    "prod.json",
-			wantPresets: map[int]string{0: "pico"},
+			wantPresets: map[string]string{"": "pico"},
 		},
 		{
 			name:       "positional after option following script returns adjacency error",
@@ -555,30 +580,43 @@ func TestParseRunArgs(t *testing.T) {
 			wantErrStr: "script and sql_file must be adjacent",
 		},
 		{
-			name:        "script + sql + two drivers + driver opt",
-			args:        []string{"tpcc", "tpcc-scale-100", "-d", "pg", "-d1", "mysql", "-D1", "url=mysql://prod"},
+			name: "script + sql + two drivers + driver opt",
+			args: []string{
+				"tpcc",
+				"tpcc-scale-100",
+				"-d",
+				"pg",
+				"-dsecondary",
+				"mysql",
+				"-Dsecondary",
+				"url=mysql://prod",
+			},
 			wantScript:  "tpcc",
 			wantSQL:     "tpcc-scale-100",
-			wantPresets: map[int]string{0: "pg", 1: "mysql"},
-			wantOpts:    map[int][][2]string{1: {{"url", "mysql://prod"}}},
+			wantPresets: map[string]string{"": "pg", "secondary": "mysql"},
+			wantOpts:    map[string][][2]string{"secondary": {{"url", "mysql://prod"}}},
 		},
 		{
 			name:       "driver opt without preset",
 			args:       []string{"tpcc", "-D", "url=postgres://custom:5432"},
 			wantScript: "tpcc",
-			wantOpts:   map[int][][2]string{0: {{"url", "postgres://custom:5432"}}},
+			wantOpts:   map[string][][2]string{"": {{"url", "postgres://custom:5432"}}},
 		},
 		{
-			name:        "-d with JSON string",
-			args:        []string{"tpcc", "-d", `{"url":"postgres://prod:5432","driverType":"postgres"}`},
+			name: "-d with JSON string",
+			args: []string{
+				"tpcc",
+				"-d",
+				`{"url":"postgres://prod:5432","driverType":"postgres"}`,
+			},
 			wantScript:  "tpcc",
-			wantPresets: map[int]string{0: `{"url":"postgres://prod:5432","driverType":"postgres"}`},
+			wantPresets: map[string]string{"": `{"url":"postgres://prod:5432","driverType":"postgres"}`},
 		},
 		{
 			name:        "--driver=JSON equals form",
 			args:        []string{"tpcc", `--driver={"driverType":"mysql"}`},
 			wantScript:  "tpcc",
-			wantPresets: map[int]string{0: `{"driverType":"mysql"}`},
+			wantPresets: map[string]string{"": `{"driverType":"mysql"}`},
 		},
 	}
 
@@ -667,7 +705,11 @@ func TestParseRunArgs(t *testing.T) {
 			}
 
 			if !presetMapsEqual(got.driverPresets, tt.wantPresets) {
-				t.Errorf("driverPresets: got %v, want %v", got.driverPresets, tt.wantPresets)
+				t.Errorf(
+					"driverPresets: got %v, want %v",
+					got.driverPresets,
+					tt.wantPresets,
+				)
 			}
 
 			if !driverOptMapsEqual(got.driverOpts, tt.wantOpts) {
@@ -689,6 +731,39 @@ func TestUnknownFlagGuidance(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "stroppy run <workload> --help")
 	require.NotContains(t, err.Error(), "after --")
+}
+
+func TestResolverReceivesArgumentsAfterWorkload(t *testing.T) {
+	catalog, err := bench.NewCatalog(runParamTest())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		gotName string
+		gotArgs []string
+	)
+
+	command := NewCommandWithResolver(catalog, "", func(
+		_ context.Context,
+		_ *cobra.Command,
+		name string,
+		args []string,
+	) (bool, error) {
+		gotName = name
+
+		gotArgs = append([]string(nil), args...)
+
+		return true, nil
+	})
+
+	if err := command.RunE(command, []string{"custom/name", "-d", "noop", "--iterations", "2"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if gotName != "custom/name" || !slices.Equal(gotArgs, []string{"-d", "noop", "--iterations", "2"}) {
+		t.Fatalf("resolver got name=%q args=%v", gotName, gotArgs)
+	}
 }
 
 func TestNonemptySeparatorTailIsRejected(t *testing.T) {
@@ -730,7 +805,7 @@ func TestJSONReportStdoutAndFile(t *testing.T) {
 	var fileReport map[string]any
 	require.NoError(t, json.Unmarshal(fileData, &fileReport))
 	require.Equal(t, stdoutReport, fileReport)
-	require.InDelta(t, 1, stdoutReport["schema"], 0)
+	require.InDelta(t, report.SchemaVersion, stdoutReport["schema"], 0)
 	require.Equal(t, "run", stdoutReport["kind"])
 	require.Equal(t, "simple", stdoutReport["workload"])
 	require.Equal(t, "noop", stdoutReport["driver"])
@@ -791,8 +866,8 @@ func TestConfigDriversMergeBelowCLI(t *testing.T) {
 	specificMaxConns := int32(5)
 	statementCache := int32(13)
 
-	configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
-		0: {
+	configs, err := runner.DriverCLIConfigsFromFile(map[string]*config.DriverRunConfig{
+		"": {
 			DriverType: &driverType,
 			URL:        &fileURL,
 			BulkSize:   &bulkSize,
@@ -807,19 +882,19 @@ func TestConfigDriversMergeBelowCLI(t *testing.T) {
 		t.Fatalf("DriverCLIConfigsFromFile() error = %v", err)
 	}
 
-	if err := applyDriverOpt(configs, 0, "url", "postgres://cli"); err != nil {
+	if err := applyDriverOpt(configs, "", "url", "postgres://cli"); err != nil {
 		t.Fatalf("applyDriverOpt(url) error = %v", err)
 	}
 
-	if err := applyDriverOpt(configs, 0, "pool.maxConns", "10"); err != nil {
+	if err := applyDriverOpt(configs, "", "pool.maxConns", "10"); err != nil {
 		t.Fatalf("applyDriverOpt(pool.maxConns) error = %v", err)
 	}
 
-	if configs[0].DriverType != "postgres" || configs[0].URL != "postgres://cli" {
-		t.Fatalf("merged driver config = %#v", configs[0])
+	if configs[""].DriverType != "postgres" || configs[""].URL != "postgres://cli" {
+		t.Fatalf("merged driver config = %#v", configs[""])
 	}
 
-	runtimeConfig, err := buildDriverConfig(0, configs[0])
+	runtimeConfig, err := buildDriverConfig("", configs[""])
 	if err != nil {
 		t.Fatalf("buildDriverConfig() error = %v", err)
 	}
@@ -828,7 +903,11 @@ func TestConfigDriversMergeBelowCLI(t *testing.T) {
 		runtimeConfig.GetBulkSize() != 20 ||
 		runtimeConfig.Postgres.GetMaxConns() != 10 ||
 		runtimeConfig.Postgres.GetStatementCacheCapacity() != 13 {
-		t.Fatalf("runtime driver config = %#v, extra = %#v", runtimeConfig, configs[0].Extra)
+		t.Fatalf(
+			"runtime driver config = %#v, extra = %#v",
+			runtimeConfig,
+			configs[""].Extra,
+		)
 	}
 
 	mysql := "mysql"
@@ -836,8 +915,8 @@ func TestConfigDriversMergeBelowCLI(t *testing.T) {
 	specificMaxOpenConns := int32(5)
 	maxIdleConns := int32(4)
 
-	configs, err = runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
-		0: {
+	configs, err = runner.DriverCLIConfigsFromFile(map[string]*config.DriverRunConfig{
+		"": {
 			DriverType: &mysql,
 			Pool:       &config.PoolConfig{MaxOpenConns: &maxOpenConns},
 			SQL: &config.SQLConfig{
@@ -850,15 +929,15 @@ func TestConfigDriversMergeBelowCLI(t *testing.T) {
 		t.Fatalf("DriverCLIConfigsFromFile(mysql) error = %v", err)
 	}
 
-	if err := applyDriverOpt(configs, 0, "pool.maxOpenConns", "12"); err != nil {
+	if err := applyDriverOpt(configs, "", "pool.maxOpenConns", "12"); err != nil {
 		t.Fatalf("applyDriverOpt(pool.maxOpenConns) error = %v", err)
 	}
 
-	if err := applyDriverOpt(configs, 0, "pool.maxConns", "20"); err != nil {
+	if err := applyDriverOpt(configs, "", "pool.maxConns", "20"); err != nil {
 		t.Fatalf("applyDriverOpt(pool.maxConns) error = %v", err)
 	}
 
-	runtimeConfig, err = buildDriverConfig(0, configs[0])
+	runtimeConfig, err = buildDriverConfig("", configs[""])
 	if err != nil {
 		t.Fatalf("buildDriverConfig(mysql) error = %v", err)
 	}
@@ -931,7 +1010,7 @@ func TestWithExecuteSQLSourceDoesNotMutateProcessEnv(t *testing.T) {
 }
 
 func TestBuildDriverConfigReturnsJSONConversionErrors(t *testing.T) {
-	_, err := buildDriverConfig(0, &runner.DriverCLIConfig{
+	_, err := buildDriverConfig("", &runner.DriverCLIConfig{
 		Extra: map[string]any{"invalid": func() {}},
 	})
 	if err == nil || !contains(err.Error(), "extra config") {
@@ -1031,12 +1110,20 @@ func TestWorkloadTypedFlagCompletion(t *testing.T) {
 	)
 	if directive != cobra.ShellCompDirectiveNoFileComp ||
 		!containsCompletion(completions, "--sql-file\tSQL dialect override file.") {
-		t.Fatalf("sql-file completions = %v, directive = %v", completions, directive)
+		t.Fatalf(
+			"sql-file completions = %v, directive = %v",
+			completions,
+			directive,
+		)
 	}
 
 	completions, directive = Cmd.ValidArgsFunction(Cmd, nil, "--en")
 	if len(completions) != 0 || directive != cobra.ShellCompDirectiveDefault {
-		t.Fatalf("generic completions = %v, directive = %v", completions, directive)
+		t.Fatalf(
+			"generic completions = %v, directive = %v",
+			completions,
+			directive,
+		)
 	}
 }
 
@@ -1190,7 +1277,15 @@ func TestBlankStepNamesDoNotConflictOrMutateProcessEnv(t *testing.T) {
 			}
 
 			args := append([]string{"-f", configPath, "-d", "noop"}, test.args...)
-			args = append(args, "--executor", "shared-iterations", "--iterations", "1", "--vus", "1")
+			args = append(
+				args,
+				"--executor",
+				"shared-iterations",
+				"--iterations",
+				"1",
+				"--vus",
+				"1",
+			)
 
 			if err := Cmd.RunE(Cmd, args); err != nil {
 				t.Fatalf("RunE() error = %v", err)
@@ -1241,7 +1336,7 @@ var (
 
 func registerRunParamTestWorkload() {
 	registerRunParamWorkloadOnce.Do(func() {
-		bench.Register(func() bench.Workload { return &runParamTestWorkload{} })
+		bench.Register(runParamTest())
 	})
 }
 
@@ -1249,9 +1344,15 @@ func (*runParamTestWorkload) Name() string { return "test/run-typed-params" }
 
 func (*runParamTestWorkload) Define(def *bench.Def) error {
 	def.Param.Bool("enabled", false, "Enable test behavior.")
-	def.Param.Int("count", 1, "Number of test operations.", bench.DerivedDefault("selected at runtime"))
-	sqlFile := def.Param.String("sql-file", "", "SQL dialect override file.")
-	lastRunParamSQLFile = sqlFile.Value()
+	sqlFile, _ := def.Param.String("sql-file", "", "SQL dialect override file.")
+	lastRunParamSQLFile = sqlFile
+
+	def.Param.Int(
+		"count",
+		1,
+		"Number of test operations.",
+		bench.DerivedDefault("selected at runtime"),
+	)
 
 	return nil
 }
@@ -1304,7 +1405,7 @@ func stringSliceEqual(a, b []string) bool {
 	return true
 }
 
-func presetMapsEqual(a, b map[int]string) bool {
+func presetMapsEqual(a, b map[string]string) bool {
 	if len(a) == 0 && len(b) == 0 {
 		return true
 	}
@@ -1327,12 +1428,16 @@ func TestApplyDriverPresetJSON(t *testing.T) {
 
 	configs := runner.DriverCLIConfigs{}
 
-	err := applyDriverPreset(configs, 0, `{"url":"postgres://prod:5432","driverType":"postgres"}`)
+	err := applyDriverPreset(
+		configs,
+		"",
+		`{"url":"postgres://prod:5432","driverType":"postgres"}`,
+	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	cfg := configs[0]
+	cfg := configs[""]
 	if cfg.URL != "postgres://prod:5432" {
 		t.Errorf("URL: got %q, want %q", cfg.URL, "postgres://prod:5432")
 	}
@@ -1344,15 +1449,15 @@ func TestApplyDriverPresetJSON(t *testing.T) {
 
 func TestRemovedErrorModeOverrideRejected(t *testing.T) {
 	configs := runner.DriverCLIConfigs{}
-	if err := applyDriverPreset(configs, 0, "noop"); err != nil {
+	if err := applyDriverPreset(configs, "", "noop"); err != nil {
 		t.Fatalf("applyDriverPreset() error = %v", err)
 	}
 
-	if err := applyDriverOpt(configs, 0, "errorMode", "throw"); err != nil {
+	if err := applyDriverOpt(configs, "", "errorMode", "throw"); err != nil {
 		t.Fatalf("applyDriverOpt() error = %v", err)
 	}
 
-	_, err := buildDriverConfig(0, configs[0])
+	_, err := buildDriverConfig("", configs[""])
 	if err == nil || !contains(err.Error(), `unknown field "errorMode"`) {
 		t.Fatalf("buildDriverConfig() error = %v, want removed errorMode rejection", err)
 	}
@@ -1363,7 +1468,7 @@ func TestApplyDriverPresetInvalidJSON(t *testing.T) {
 
 	configs := runner.DriverCLIConfigs{}
 
-	err := applyDriverPreset(configs, 0, `{broken`)
+	err := applyDriverPreset(configs, "", `{broken`)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
@@ -1376,10 +1481,26 @@ func TestApplyDriverPresetStrictJSON(t *testing.T) {
 		path string
 	}{
 		{name: "exact duplicate", doc: `{"url":"a","url":"b"}`, path: `$.url`},
-		{name: "alias collision", doc: `{"bulkSize":1,"bulk_size":2}`, path: `$.bulkSize`},
-		{name: "wrong case", doc: `{"DriverType":"postgres"}`, path: `$["DriverType"]`},
-		{name: "removed error mode", doc: `{"errorMode":"throw"}`, path: `$.errorMode`},
-		{name: "unknown nested field", doc: `{"pool":{"MaxConns":1}}`, path: `$.pool["MaxConns"]`},
+		{
+			name: "alias collision",
+			doc:  `{"bulkSize":1,"bulk_size":2}`,
+			path: `$.bulkSize`,
+		},
+		{
+			name: "wrong case",
+			doc:  `{"DriverType":"postgres"}`,
+			path: `$["DriverType"]`,
+		},
+		{
+			name: "removed error mode",
+			doc:  `{"errorMode":"throw"}`,
+			path: `$.errorMode`,
+		},
+		{
+			name: "unknown nested field",
+			doc:  `{"pool":{"MaxConns":1}}`,
+			path: `$.pool["MaxConns"]`,
+		},
 		{name: "fractional int32", doc: `{"bulkSize":1.5}`, path: `$.bulkSize`},
 		{name: "trailing JSON", doc: `{} {}`, path: `$`},
 	}
@@ -1388,7 +1509,7 @@ func TestApplyDriverPresetStrictJSON(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			configs := runner.DriverCLIConfigs{}
 
-			err := applyDriverPreset(configs, 0, test.doc)
+			err := applyDriverPreset(configs, "", test.doc)
 			if err == nil || !contains(err.Error(), test.path) {
 				t.Fatalf("applyDriverPreset() error = %v, want path %s", err, test.path)
 			}
@@ -1400,13 +1521,13 @@ func TestApplyDriverPresetAliasesReachRuntimeConfig(t *testing.T) {
 	configs := runner.DriverCLIConfigs{}
 	if err := applyDriverPreset(
 		configs,
-		0,
+		"",
 		`  {"driver_type":"postgres","bulk_size":"2e2","pool":{"max_conns":3}}  `,
 	); err != nil {
 		t.Fatalf("applyDriverPreset() error = %v", err)
 	}
 
-	got, err := buildDriverConfig(0, configs[0])
+	got, err := buildDriverConfig("", configs[""])
 	if err != nil {
 		t.Fatalf("buildDriverConfig() error = %v", err)
 	}
@@ -1431,30 +1552,30 @@ func TestApplyDriverOptInsertMethodAliasesRespectPrecedenceAndIndex(t *testing.T
 		"insert_method",
 	} {
 		t.Run(key, func(t *testing.T) {
-			configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
-				0: {DriverType: &postgres, DefaultInsertMethod: &plainBulk},
-				1: {DriverType: &postgres, DefaultInsertMethod: &plainBulk},
+			configs, err := runner.DriverCLIConfigsFromFile(map[string]*config.DriverRunConfig{
+				"":          {DriverType: &postgres, DefaultInsertMethod: &plainBulk},
+				"secondary": {DriverType: &postgres, DefaultInsertMethod: &plainBulk},
 			})
 			if err != nil {
 				t.Fatalf("DriverCLIConfigsFromFile() error = %v", err)
 			}
 
-			for _, idx := range []int{0, 1} {
+			for _, idx := range []string{"", "secondary"} {
 				if err := applyDriverPreset(configs, idx, "pg"); err != nil {
-					t.Fatalf("applyDriverPreset(%d) error = %v", idx, err)
+					t.Fatalf("applyDriverPreset(%s) error = %v", idx, err)
 				}
 			}
 
-			if err := applyDriverOpt(configs, 1, key, "columnar"); err != nil {
+			if err := applyDriverOpt(configs, "secondary", key, "columnar"); err != nil {
 				t.Fatalf("applyDriverOpt(%q) error = %v", key, err)
 			}
 
-			first, err := buildDriverConfig(0, configs[0])
+			first, err := buildDriverConfig("", configs[""])
 			if err != nil {
 				t.Fatalf("buildDriverConfig(0) error = %v", err)
 			}
 
-			second, err := buildDriverConfig(1, configs[1])
+			second, err := buildDriverConfig("secondary", configs["secondary"])
 			if err != nil {
 				t.Fatalf("buildDriverConfig(1) error = %v", err)
 			}
@@ -1474,21 +1595,21 @@ func TestApplyDriverOptInsertMethodAliasConflictIsOrderIndependent(t *testing.T)
 	for _, alias := range []string{"default_insert_method", "insertMethod", "insert_method"} {
 		t.Run(alias, func(t *testing.T) {
 			first := runner.DriverCLIConfigs{}
-			if err := applyDriverOpt(first, 0, "defaultInsertMethod", "native"); err != nil {
+			if err := applyDriverOpt(first, "", "defaultInsertMethod", "native"); err != nil {
 				t.Fatal(err)
 			}
 
-			firstErr := applyDriverOpt(first, 0, alias, "columnar")
+			firstErr := applyDriverOpt(first, "", alias, "columnar")
 			if firstErr == nil {
 				t.Fatal("second insert method override succeeded")
 			}
 
 			second := runner.DriverCLIConfigs{}
-			if err := applyDriverOpt(second, 0, alias, "columnar"); err != nil {
+			if err := applyDriverOpt(second, "", alias, "columnar"); err != nil {
 				t.Fatal(err)
 			}
 
-			secondErr := applyDriverOpt(second, 0, "defaultInsertMethod", "native")
+			secondErr := applyDriverOpt(second, "", "defaultInsertMethod", "native")
 			if secondErr == nil || secondErr.Error() != firstErr.Error() {
 				t.Fatalf("reverse collision error = %v, want %v", secondErr, firstErr)
 			}
@@ -1521,14 +1642,14 @@ func TestDriverExtrasRejectAliasCollisionsAndWrongCase(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			configs := runner.DriverCLIConfigs{0: {DriverType: "postgres"}}
+			configs := runner.DriverCLIConfigs{"": {DriverType: "postgres"}}
 			for _, keyValue := range test.keys {
-				if err := applyDriverOpt(configs, 0, keyValue[0], keyValue[1]); err != nil {
+				if err := applyDriverOpt(configs, "", keyValue[0], keyValue[1]); err != nil {
 					t.Fatalf("applyDriverOpt(%q) error = %v", keyValue[0], err)
 				}
 			}
 
-			_, err := buildDriverConfig(0, configs[0])
+			_, err := buildDriverConfig("", configs[""])
 			if err == nil || !contains(err.Error(), test.path) {
 				t.Fatalf("buildDriverConfig() error = %v, want path %s", err, test.path)
 			}
@@ -1539,15 +1660,15 @@ func TestDriverExtrasRejectAliasCollisionsAndWrongCase(t *testing.T) {
 func TestApplyDriverOptStrictNumericLexemes(t *testing.T) {
 	configs := runner.DriverCLIConfigs{}
 
-	if err := applyDriverOpt(configs, 0, "driverType", "postgres"); err != nil {
+	if err := applyDriverOpt(configs, "", "driverType", "postgres"); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := applyDriverOpt(configs, 0, "bulkSize", "1e1"); err != nil {
+	if err := applyDriverOpt(configs, "", "bulkSize", "1e1"); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := buildDriverConfig(0, configs[0])
+	got, err := buildDriverConfig("", configs[""])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1559,11 +1680,11 @@ func TestApplyDriverOptStrictNumericLexemes(t *testing.T) {
 	for _, value := range []string{"1.0000000000000001", "1.", "01"} {
 		invalidConfigs := runner.DriverCLIConfigs{}
 
-		if err := applyDriverOpt(invalidConfigs, 0, "bulkSize", value); err != nil {
+		if err := applyDriverOpt(invalidConfigs, "", "bulkSize", value); err != nil {
 			t.Fatal(err)
 		}
 
-		if _, err := buildDriverConfig(0, invalidConfigs[0]); err == nil {
+		if _, err := buildDriverConfig("", invalidConfigs[""]); err == nil {
 			t.Errorf("bulkSize %q unexpectedly succeeded", value)
 		}
 	}
@@ -1574,15 +1695,15 @@ func TestApplyDriverOptDottedPool(t *testing.T) {
 
 	configs := runner.DriverCLIConfigs{}
 
-	if err := applyDriverOpt(configs, 0, "pool.maxConns", "20"); err != nil {
+	if err := applyDriverOpt(configs, "", "pool.maxConns", "20"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if err := applyDriverOpt(configs, 0, "pool.maxConnLifetime", "30m"); err != nil {
+	if err := applyDriverOpt(configs, "", "pool.maxConnLifetime", "30m"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	got := marshalDriverConfig(t, configs[0])
+	got := marshalDriverConfig(t, configs[""])
 	pool := objectField(t, got, "pool")
 
 	if pool["maxConns"] != float64(20) {
@@ -1599,15 +1720,19 @@ func TestApplyDriverOptDottedPoolMergesJSONPreset(t *testing.T) {
 
 	configs := runner.DriverCLIConfigs{}
 
-	if err := applyDriverPreset(configs, 0, `{"driverType":"postgres","pool":{"minConns":5}}`); err != nil {
+	if err := applyDriverPreset(
+		configs,
+		"",
+		`{"driverType":"postgres","pool":{"minConns":5}}`,
+	); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if err := applyDriverOpt(configs, 0, "pool.maxConns", "20"); err != nil {
+	if err := applyDriverOpt(configs, "", "pool.maxConns", "20"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	got := marshalDriverConfig(t, configs[0])
+	got := marshalDriverConfig(t, configs[""])
 	pool := objectField(t, got, "pool")
 
 	if pool["minConns"] != float64(5) {
@@ -1623,21 +1748,21 @@ func TestApplyDriverOptDottedPoolUnknownField(t *testing.T) {
 	t.Parallel()
 
 	configs := runner.DriverCLIConfigs{
-		0: &runner.DriverCLIConfig{DriverType: "postgres"},
+		"": &runner.DriverCLIConfig{DriverType: "postgres"},
 	}
 
-	if err := applyDriverOpt(configs, 0, "pool.maximum", "20"); err != nil {
+	if err := applyDriverOpt(configs, "", "pool.maximum", "20"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	got := marshalDriverConfig(t, configs[0])
+	got := marshalDriverConfig(t, configs[""])
 	pool := objectField(t, got, "pool")
 
 	if pool["maximum"] != float64(20) {
 		t.Errorf("pool.maximum: got %v, want 20", pool["maximum"])
 	}
 
-	if _, err := buildDriverConfig(0, configs[0]); err == nil || !contains(err.Error(), "unknown field") {
+	if _, err := buildDriverConfig("", configs[""]); err == nil || !contains(err.Error(), "unknown field") {
 		t.Fatalf("buildDriverConfig() error = %v", err)
 	}
 }
@@ -1647,11 +1772,11 @@ func TestApplyDriverOptDottedPathIsGeneric(t *testing.T) {
 
 	configs := runner.DriverCLIConfigs{}
 
-	if err := applyDriverOpt(configs, 0, "custom.deep.value", "1"); err != nil {
+	if err := applyDriverOpt(configs, "", "custom.deep.value", "1"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	got := marshalDriverConfig(t, configs[0])
+	got := marshalDriverConfig(t, configs[""])
 	custom := objectField(t, got, "custom")
 	deep := objectField(t, custom, "deep")
 
@@ -1665,11 +1790,11 @@ func TestApplyDriverOptDottedPathConflict(t *testing.T) {
 
 	configs := runner.DriverCLIConfigs{}
 
-	if err := applyDriverOpt(configs, 0, "pool", "not-object"); err != nil {
+	if err := applyDriverOpt(configs, "", "pool", "not-object"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	err := applyDriverOpt(configs, 0, "pool.maxConns", "20")
+	err := applyDriverOpt(configs, "", "pool.maxConns", "20")
 	if err == nil {
 		t.Fatal("expected structural conflict error")
 	}
@@ -1719,7 +1844,11 @@ func TestRemovedIsolationRejectedAtDriverCLISurfaces(t *testing.T) {
 
 			err := Cmd.RunE(Cmd, args)
 			if err == nil || !contains(err.Error(), test.path) || !contains(err.Error(), "unknown field") {
-				t.Fatalf("RunE() error = %v, want ordinary unknown-field error at %s", err, test.path)
+				t.Fatalf(
+					"RunE() error = %v, want ordinary unknown-field error at %s",
+					err,
+					test.path,
+				)
 			}
 		})
 	}
@@ -1732,13 +1861,17 @@ func TestBuildDriverConfigEmptyDefaultInsertMethod(t *testing.T) {
 	build := func(t *testing.T, cfg *runner.DriverCLIConfig, want string) {
 		t.Helper()
 
-		got, err := buildDriverConfig(0, cfg)
+		got, err := buildDriverConfig("", cfg)
 		if err != nil {
 			t.Fatalf("buildDriverConfig() error = %v", err)
 		}
 
 		if got.DefaultInsertMethod != want {
-			t.Fatalf("DefaultInsertMethod = %q, want %q", got.DefaultInsertMethod, want)
+			t.Fatalf(
+				"DefaultInsertMethod = %q, want %q",
+				got.DefaultInsertMethod,
+				want,
+			)
 		}
 	}
 
@@ -1768,27 +1901,27 @@ func TestBuildDriverConfigEmptyDefaultInsertMethod(t *testing.T) {
 	})
 
 	t.Run("config file", func(t *testing.T) {
-		configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
-			0: {DriverType: &postgres, DefaultInsertMethod: &empty},
+		configs, err := runner.DriverCLIConfigsFromFile(map[string]*config.DriverRunConfig{
+			"": {DriverType: &postgres, DefaultInsertMethod: &empty},
 		})
 		if err != nil {
 			t.Fatalf("DriverCLIConfigsFromFile() error = %v", err)
 		}
 
-		build(t, configs[0], "plain_query")
+		build(t, configs[""], "plain_query")
 	})
 
 	t.Run("absent", func(t *testing.T) {
 		build(t, &runner.DriverCLIConfig{DriverType: postgres}, "")
 
-		configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
-			0: {DriverType: &postgres},
+		configs, err := runner.DriverCLIConfigsFromFile(map[string]*config.DriverRunConfig{
+			"": {DriverType: &postgres},
 		})
 		if err != nil {
 			t.Fatalf("DriverCLIConfigsFromFile() error = %v", err)
 		}
 
-		build(t, configs[0], "")
+		build(t, configs[""], "")
 	})
 }
 
@@ -1815,7 +1948,7 @@ func TestBuildDriverConfigDefaultInsertMethod(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := buildDriverConfig(0, test.cfg)
+			got, err := buildDriverConfig("", test.cfg)
 			if test.wantErr {
 				if err == nil {
 					t.Fatal("buildDriverConfig() succeeded")
@@ -1829,7 +1962,11 @@ func TestBuildDriverConfigDefaultInsertMethod(t *testing.T) {
 			}
 
 			if got.DefaultInsertMethod != test.want {
-				t.Fatalf("DefaultInsertMethod = %q, want %q", got.DefaultInsertMethod, test.want)
+				t.Fatalf(
+					"DefaultInsertMethod = %q, want %q",
+					got.DefaultInsertMethod,
+					test.want,
+				)
 			}
 		})
 	}
@@ -1839,41 +1976,49 @@ func TestDriverDefaultInputPrecedenceAndIndices(t *testing.T) {
 	mysql := "mysql"
 	unsupported := "columnar"
 
-	configs, err := runner.DriverCLIConfigsFromFile(map[uint32]*config.DriverRunConfig{
-		0: {DriverType: &mysql, DefaultInsertMethod: &unsupported},
+	configs, err := runner.DriverCLIConfigsFromFile(map[string]*config.DriverRunConfig{
+		"": {DriverType: &mysql, DefaultInsertMethod: &unsupported},
 	})
 	if err != nil {
 		t.Fatalf("DriverCLIConfigsFromFile() error = %v", err)
 	}
 
-	if err := applyDriverPreset(configs, 0, "pg"); err != nil {
+	if err := applyDriverPreset(configs, "", "pg"); err != nil {
 		t.Fatalf("applyDriverPreset() error = %v", err)
 	}
 
-	if err := applyDriverPreset(configs, 1, "mysql"); err != nil {
+	if err := applyDriverPreset(configs, "secondary", "mysql"); err != nil {
 		t.Fatalf("applyDriverPreset() error = %v", err)
 	}
 
-	if err := applyDriverOpt(configs, 1, "defaultInsertMethod", "native"); err != nil {
+	if err := applyDriverOpt(configs, "secondary", "defaultInsertMethod", "native"); err != nil {
 		t.Fatalf("applyDriverOpt() error = %v", err)
 	}
 
-	first, err := buildDriverConfig(0, configs[0])
+	first, err := buildDriverConfig("", configs[""])
 	if err != nil {
 		t.Fatalf("buildDriverConfig(0) error = %v", err)
 	}
 
-	second, err := buildDriverConfig(1, configs[1])
+	second, err := buildDriverConfig("secondary", configs["secondary"])
 	if err != nil {
 		t.Fatalf("buildDriverConfig(1) error = %v", err)
 	}
 
 	if first.DefaultInsertMethod != "native" || second.DefaultInsertMethod != "native" {
-		t.Fatalf("defaults = (%q, %q), want native per driver", first.DefaultInsertMethod, second.DefaultInsertMethod)
+		t.Fatalf(
+			"defaults = (%q, %q), want native per driver",
+			first.DefaultInsertMethod,
+			second.DefaultInsertMethod,
+		)
 	}
 
 	if first.DriverType != config.DriverTypePostgres || second.DriverType != config.DriverTypeMySQL {
-		t.Fatalf("driver types = (%s, %s), want postgres, mysql", first.DriverType, second.DriverType)
+		t.Fatalf(
+			"driver types = (%s, %s), want postgres, mysql",
+			first.DriverType,
+			second.DriverType,
+		)
 	}
 }
 
@@ -1916,7 +2061,7 @@ func objectField(t *testing.T, m map[string]any, key string) map[string]any {
 	return obj
 }
 
-func driverOptMapsEqual(a, b map[int][][2]string) bool {
+func driverOptMapsEqual(a, b map[string][][2]string) bool {
 	if len(a) == 0 && len(b) == 0 {
 		return true
 	}
@@ -1939,4 +2084,19 @@ func driverOptMapsEqual(a, b map[int][][2]string) bool {
 	}
 
 	return true
+}
+
+func runParamTest() bench.Test {
+	return bench.Test{Name: "test/run-typed-params", Define: func(d *bench.Def) error {
+		settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
+
+		w := &runParamTestWorkload{}
+		if err := w.Define(d); err != nil {
+			return err
+		}
+
+		d.Execution.Step("workload", w.Iterate, settings.Policy())
+
+		return d.Execution.Err()
+	}}
 }

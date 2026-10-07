@@ -29,6 +29,8 @@ func (b *Bench) CollectedMetrics() (map[string]MetricSnapshot, error) {
 		return nil, err
 	}
 
+	mergeMetricWriters(&data)
+
 	out := make(map[string]MetricSnapshot)
 
 	for _, scope := range data.ScopeMetrics {

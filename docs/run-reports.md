@@ -19,14 +19,21 @@ stroppy run simple -d noop --no-report
 ```
 
 `--report-format` currently accepts `json`. `--report-file` publishes the file
-atomically. A requested output failure returns a nonzero exit status. When a run
-itself fails after reporting starts, Stroppy still writes the requested report
-with `status: "failed"` or `status: "canceled"`, then returns the run error.
+atomically. A requested output failure returns a nonzero exit status. Every
+constructed report is also saved under `~/.stroppy/reports/`; `--no-report`
+disables both report construction and automatic history. History failures warn
+on stderr without failing the run. When a run itself fails after reporting starts,
+Stroppy still writes the requested report with `status: "failed"` or
+`status: "canceled"`, then returns the run error.
 
 Common fields include report schema and identity, Stroppy version, timestamps,
 host runtime facts, driver types, effective scenario and parameter values,
 parameter sources, step selection and observed step results, measurement time,
-metrics, bounded error groups, and terminal failure information. Driver URLs,
+metrics, bounded error groups, and terminal failure information. Schema 3 adds
+named driver identities, per-step `executions` policy settings, and `measurements`
+windows including actual drain. The `scenario` field is a convenience view of the
+first measured step. Optional `build_digest` identifies cached generated-runtime
+or exported runs; direct installed built-in runs omit it. Driver URLs,
 authentication fields, and OTLP headers are never included.
 
 Counters and gauges contain aggregate totals plus dimensioned series. Histograms
@@ -34,10 +41,18 @@ contain count, sum, average, fixed bounds, bucket counts, p50/p90/p95/p99, and
 dimensioned series. Report metric types are plain JSON and do not expose
 OpenTelemetry SDK types.
 
-Workloads may attach small custom string fields with `Bench.AddReportData`, or add
-independently versioned typed payloads under `workload_reports` through
-`Def.Report`. Custom fields belong under `custom`; callers must not put secrets
-there.
+Workloads may attach small non-secret string fields with `d.Report.Metadata`,
+or add independently versioned payloads under `workload_reports` with
+`d.Report.Contribute(kind, schema, builder)` and `d.Report.Put(kind, schema, data)`.
+Builders receive an independent copied final snapshot with aggregate/label-series
+metrics, reached step outcomes, measurement windows, and run status. `Render`
+writes human output through an explicit writer from the same encoded payload.
+Do not put secrets in metadata, custom fields, or payloads.
+
+`Application.Run` returns a report without saving history. Hosts can call
+`report.Save` explicitly. `Application.Execute` and CLI entrypoints retain
+automatic history behavior. `NoReport` skips builders and payload encoding, not
+metrics or terminal-error accounting.
 
 Built-in typed payloads:
 
@@ -50,5 +65,5 @@ Built-in typed payloads:
 Skipped or failed workload-specific reporting is explicit through each payload's
 `status` and `reason`; unknown payload kinds remain valid report data.
 
-Envelope schema changes only for breaking contract changes. Additive optional
-fields retain current schema. Each workload payload carries its own schema.
+Envelope schema changes when shared provenance or result contracts evolve. Each
+workload payload carries its own schema.

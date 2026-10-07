@@ -1,12 +1,13 @@
 package bench
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
-
-	"github.com/stroppy-io/stroppy/workloads"
 )
 
 // SQL is a parsed SQL file split into named sections and the named/anonymous
@@ -30,10 +31,11 @@ const (
 // ParseSQL parses SQL text into sections (the string form of LoadSQL, for inline SQL).
 func ParseSQL(content string) *SQL { return parseSQL(content) }
 
-// LoadSQL reads a workload SQL file (cwd → workloads/<preset>/ → embedded) and
-// parses it into sections.
-func LoadSQL(preset, filename string) (*SQL, error) {
-	data, err := readSQLFile(preset, filename)
+// QueryFiles loads ordinary workload-owned filesystems with local overrides.
+type QueryFiles struct{}
+
+func (QueryFiles) Load(files fs.FS, filename string) (*SQL, error) {
+	data, err := readSQLFile(files, filename)
 	if err != nil {
 		return nil, err
 	}
@@ -41,20 +43,68 @@ func LoadSQL(preset, filename string) (*SQL, error) {
 	return parseSQL(string(data)), nil
 }
 
-func readSQLFile(preset, filename string) ([]byte, error) {
-	// cwd override first (edit-run loop), mirroring the runner's resolution.
-	for _, p := range []string{filename, path.Join("workloads", preset, filename)} {
-		if b, err := os.ReadFile(p); err == nil {
-			return b, nil
-		}
-	}
-
-	b, err := workloads.ReadPresetFile(preset, filename)
+// Override reads only the explicit filename; missing overrides never use embedded data.
+func (QueryFiles) Override(filename string) (*SQL, error) {
+	data, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("load %s/%s: %w", preset, filename, err)
+		return nil, err
 	}
 
-	return b, nil
+	return parseSQL(string(data)), nil
+}
+
+func readSQLFile(files fs.FS, filename string) ([]byte, error) {
+	if data, err := os.ReadFile(filename); err == nil {
+		return data, nil
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+
+	if data, err := os.ReadFile(filepath.Join(home, ".stroppy", filename)); err == nil {
+		return data, nil
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+
+	if files == nil {
+		return nil, fmt.Errorf("query file %q: %w", filename, fs.ErrNotExist)
+	}
+
+	return fs.ReadFile(files, filename)
+}
+
+// QueryHandle preserves immutable query identity alongside its text.
+type QueryHandle struct {
+	Name string
+	Text string
+}
+
+func (s *SQL) Lookup(section, name string) (QueryHandle, bool) {
+	text, found := s.Query(section, name)
+
+	return QueryHandle{Name: section + "/" + name, Text: text}, found && strings.TrimSpace(text) != ""
+}
+
+func (s *SQL) Require(section, name string) QueryHandle {
+	q, found := s.Lookup(section, name)
+	if !found {
+		invalid("query", inputError("missing required query %s/%s", section, name))
+	}
+
+	return q
+}
+
+func (b *Bench) ExecQuery(ctx context.Context, q QueryHandle, args map[string]any) error {
+	return b.Exec(ctx, q.Text, args)
+}
+
+func (t *Tx) ExecQuery(ctx context.Context, q QueryHandle, args map[string]any) error {
+	return t.Exec(ctx, q.Text, args)
 }
 
 func parseSQL(content string) *SQL {

@@ -74,7 +74,6 @@ Use `-d` to select a driver preset and `-D` to override driver options:
 stroppy run tpcc/tx -d pg
 stroppy run tpcc/tx -d mysql -D url=mysql://root:pass@localhost:3306/bench
 stroppy run tpcc/tx -d pico
-stroppy run tpcc/tx -d pg -d1 mysql        # two drivers
 stroppy run simple -d noop                  # framework/runner overhead only
 ```
 
@@ -85,12 +84,12 @@ use `stroppy run <workload> --help` to inspect that workload's parameters:
 stroppy run tpcc/tx --executor constant-vus --vus 10 --duration 60s
 stroppy run tpcc/tx --executor shared-iterations --iterations 100
 stroppy run tpcc/tx --scale-factor 10 --load-workers 8
-stroppy run tpcc/tx -e pool_size=200   # legacy env compatibility
+stroppy run tpcc/tx -D pool.maxConns=200
 ```
 
 Collect repeated settings in `stroppy-config.json` or an explicit `-f` file.
-Typed scenario parameters belong under `run`, workload parameters under `params`,
-and the string-valued `env` map remains available for compatibility:
+Typed scenario parameters belong under `run`, workload parameters under `params`.
+Driver configuration uses names, with `"default"` for the default database:
 
 ```json
 {
@@ -105,10 +104,17 @@ and the string-valued `env` map remains available for compatibility:
 stroppy run -f prod.json
 ```
 
-Typed parameter precedence is: CLI flag > process environment > `-e` > matching
-`run`/`params` config > config `env` > declared default. Driver precedence is
-`-d/-D` > config `drivers`. Legacy `DURATION` inference remains compatible but
-warns; use an explicit executor.
+Typed parameter precedence is: CLI flag > process environment > matching
+`run`/`params` config > declared default. Driver precedence is `-d/-D` > config
+`drivers`. `-e`, config `env`, numeric driver suffixes, and duration-based executor
+inference are removed. Named multi-driver workloads use `-dprimary`/`-Dprimary`.
+
+Custom Go workloads use the supported [authoring API](docs/workload-authoring-api.md)
+and [standalone application shell](docs/standalone-workloads.md). Runnable
+[examples](examples/authoring/README.md) cover queries, loading, transactions,
+telemetry, reports, and named databases. [Author tooling](docs/author-tooling.md)
+covers `stroppy init`, ordinary noop/recording tests, and safe `stroppy eject` of
+explicitly published workload sources.
 
 Every workload can emit one versioned JSON report containing effective inputs,
 host details, steps, metrics, bounded errors, and workload-specific results:
@@ -121,6 +127,10 @@ stroppy run tpcc/tx -d pg --report-file result.json
 Human output and diagnostics remain on stderr, so requested stdout stays valid
 JSON. See [run reports](docs/run-reports.md) for report fields, output behavior,
 and workload payloads.
+
+Custom Go workloads can run as self-contained applications, join the local catalog,
+and export with built-ins into one portable binary. See
+[standalone workloads](docs/standalone-workloads.md).
 
 Use `stroppy help` to explore available topics:
 

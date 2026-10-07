@@ -10,8 +10,8 @@ import (
 	gomysql "github.com/go-sql-driver/mysql"
 	"go.uber.org/zap"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 const realMySQLDSNEnv = "STROPPY_MYSQL_DSN"

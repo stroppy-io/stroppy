@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stroppy-io/stroppy/pkg/datagen/source"
-	"github.com/stroppy-io/stroppy/pkg/driver/insertprogress"
-	"github.com/stroppy-io/stroppy/pkg/driver/sqldriver/queries"
+	"github.com/stroppy-io/stroppy/v6/pkg/datagen/source"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/insertprogress"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver/queries"
 )
 
 // ErrEmptyColumnOrder is returned when the source reports zero columns;

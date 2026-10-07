@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/stroppy-io/stroppy/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 )
 
 // InsertCapability pairs a driver type with the insert methods its
@@ -54,6 +54,9 @@ var insertMethodsByDriver = map[config.DriverType][]InsertMethod{
 	},
 	config.DriverTypeCSV: {
 		InsertNative,
+	},
+	config.DriverTypeRecording: {
+		InsertPlainQuery, InsertPlainBulk, InsertColumnar, InsertNative,
 	},
 }
 

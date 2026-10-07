@@ -16,12 +16,18 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
-	"github.com/stroppy-io/stroppy/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 func TestErrorReporterSuppressesDuplicatesAndRecordsMetrics(t *testing.T) {
 	core, logs := observer.New(zapcore.WarnLevel)
-	rootState, err := newRootState(zap.New(core), context.Background(), nil, nil, &MetricsConfig{})
+	rootState, err := newrootState(
+		zap.New(core),
+		context.Background(),
+		nil,
+		nil,
+		&MetricsConfig{},
+	)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		rootState.errorReporter.stopAndWait()
@@ -48,7 +54,11 @@ func TestErrorReporterSuppressesDuplicatesAndRecordsMetrics(t *testing.T) {
 	rootState.errorReporter.recordRetry(vu)
 
 	require.Len(t, logs.FilterMessage("nonfatal error; continuing").All(), 2)
-	require.NotContains(t, fmt.Sprint(logs.All()[0].Context), "backend-private")
+	require.NotContains(
+		t,
+		fmt.Sprint(logs.All()[0].Context),
+		"backend-private",
+	)
 
 	snapshot := rootState.errorReporter.snapshot()
 	require.Equal(t, uint64(4), snapshot.terminalErrors)
@@ -60,10 +70,30 @@ func TestErrorReporterSuppressesDuplicatesAndRecordsMetrics(t *testing.T) {
 
 	var data metricdata.ResourceMetrics
 	require.NoError(t, rootState.manualReader.Collect(context.Background(), &data))
-	require.InDelta(t, 4, findSum(t, data, rootState.metricsPrefix+"terminal_errors_total"), 0)
-	require.InDelta(t, 1, findSum(t, data, rootState.metricsPrefix+"failed_iterations_total"), 0)
-	require.InDelta(t, 3, findSum(t, data, rootState.metricsPrefix+"failed_queries_total"), 0)
-	require.InDelta(t, 1, findSum(t, data, rootState.metricsPrefix+"retry_attempts_total"), 0)
+	require.InDelta(
+		t,
+		4,
+		findSum(t, data, rootState.metricsPrefix+"terminal_errors_total"),
+		0,
+	)
+	require.InDelta(
+		t,
+		1,
+		findSum(t, data, rootState.metricsPrefix+"failed_iterations_total"),
+		0,
+	)
+	require.InDelta(
+		t,
+		3,
+		findSum(t, data, rootState.metricsPrefix+"failed_queries_total"),
+		0,
+	)
+	require.InDelta(
+		t,
+		1,
+		findSum(t, data, rootState.metricsPrefix+"retry_attempts_total"),
+		0,
+	)
 
 	for _, scope := range data.ScopeMetrics {
 		for _, m := range scope.Metrics {
@@ -103,7 +133,11 @@ func TestErrorReporterBoundsGroupsAndPeriodicNotices(t *testing.T) {
 	snapshot := reporter.snapshot()
 	require.Equal(t, uint64(maxErrorGroups+10), snapshot.terminalErrors)
 	require.Len(t, snapshot.groups, maxErrorGroups+1)
-	require.Len(t, logs.FilterMessage("nonfatal error; continuing").All(), maxErrorGroups+1)
+	require.Len(
+		t,
+		logs.FilterMessage("nonfatal error; continuing").All(),
+		maxErrorGroups+1,
+	)
 
 	for _, group := range snapshot.groups {
 		require.LessOrEqual(t, len(group.operation), maxErrorOperationBytes)
@@ -121,9 +155,17 @@ func TestBoundErrorOperationSanitizesAndPreservesRuneBoundaries(t *testing.T) {
 
 	bidi := string(rune(0x202e))
 	format := bidi + string(rune(0x200d))
-	require.Equal(t, "safe???[31m??end", boundErrorOperation("safe\r\n\x1b[31m\x00"+bidi+"end"))
+	require.Equal(
+		t,
+		"safe???[31m??end",
+		boundErrorOperation("safe\r\n\x1b[31m\x00"+bidi+"end"),
+	)
 	require.Equal(t, "left??right", boundErrorOperation("left"+format+"right"))
-	require.Equal(t, "a?b", boundErrorOperation(string([]byte{'a', 0xff, 'b'})))
+	require.Equal(
+		t,
+		"a?b",
+		boundErrorOperation(string([]byte{'a', 0xff, 'b'})),
+	)
 
 	prefix := strings.Repeat("a", maxErrorOperationBytes-1)
 	got := boundErrorOperation(prefix + "é")
@@ -139,9 +181,9 @@ func TestRecordQueryErrorExcludesRunCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	rootState := &RootState{errorReporter: reporter, txMetrics: &txMetrics{}}
+	rootState := &rootState{errorReporter: reporter, txMetrics: &txMetrics{}}
 	b := &Bench{root: rootState, vu: &VU{root: rootState, ctx: ctx}}
-	b.RecordQueryError("query", errors.Join(errors.New("backend detail"), context.Canceled))
+	b.RecordError("query", errors.Join(errors.New("backend detail"), context.Canceled))
 
 	snapshot := reporter.snapshot()
 	require.Zero(t, snapshot.terminalErrors)
@@ -149,7 +191,13 @@ func TestRecordQueryErrorExcludesRunCancellation(t *testing.T) {
 }
 
 func TestErrorSummaryIsProminentAndDeterministic(t *testing.T) {
-	rootState, err := newRootState(zap.NewNop(), context.Background(), nil, nil, &MetricsConfig{})
+	rootState, err := newrootState(
+		zap.NewNop(),
+		context.Background(),
+		nil,
+		nil,
+		&MetricsConfig{},
+	)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		rootState.errorReporter.stopAndWait()
@@ -183,7 +231,11 @@ func TestErrorSummaryIsProminentAndDeterministic(t *testing.T) {
 	require.Contains(t, text, "failed_iterations_total")
 	require.Contains(t, text, "failed_queries_total")
 	require.Contains(t, text, "retry_attempts_total")
-	require.Less(t, strings.Index(text, "operation=iteration"), strings.Index(text, "operation=q2"))
+	require.Less(
+		t,
+		strings.Index(text, "operation=iteration"),
+		strings.Index(text, "operation=q2"),
+	)
 	require.NotContains(t, text, "first")
 	require.NotContains(t, text, "second")
 }
