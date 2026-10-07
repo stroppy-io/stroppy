@@ -20,6 +20,19 @@ func init() {
   Build checks the provided directory first, then its workload/ child. No manifest
   or recursive discovery is needed. Custom Go workloads are trusted native code.
 
+BUILT WORKLOADS
+
+  Build registers into the catalog under ~/.stroppy/workloads/; these manage it.
+
+    stroppy list                          built-in and custom workloads
+    stroppy run my-workload -d pg -D url=... runs from its snapshot, no source tree
+    stroppy cache inspect DIGEST          build provenance and the SDK origin used
+    stroppy cache clean                   drop reusable artifacts and private caches
+    stroppy export my-workload -o ./out   portable binary for another machine
+    stroppy remove my-workload            unregister and rebuild the runtime
+
+  Published source is only needed to eject. See docs/author-tooling.md.
+
 TESTS AND RECORDING
 
   bench.DescribeTest validates without actions. pkg/bench/testkit.Run executes
@@ -53,6 +66,11 @@ SOURCE PUBLICATION AND EJECTION
   modules; -y consents to a verified private compiler under ~/.stroppy if needed.
   A dependency failure retains the created project for repair and reports a retry
   command. Direct go commands require system Go; no PATH settings are changed.
+
+  Build compiles against the SDK module pinned in each project. --source-root PATH
+  (or STROPPY_SOURCE_ROOT) compiles against a Stroppy source tree instead, for work
+  on the SDK itself; a workload project is refused. The SDK tree is never inferred
+  from the working directory, and every build reports which one the runtime uses.
 `,
 	})
 }

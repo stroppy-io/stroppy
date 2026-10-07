@@ -13,9 +13,11 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/mod/modfile"
 
 	"github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/probe"
 	runcommand "github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/run"
+	"github.com/stroppy-io/stroppy/v6/internal/author"
 	"github.com/stroppy-io/stroppy/v6/internal/toolchain"
 	"github.com/stroppy-io/stroppy/v6/internal/version"
 	"github.com/stroppy-io/stroppy/v6/internal/workloadcatalog"
@@ -27,15 +29,24 @@ var (
 	errRemoveBuiltIn        = errors.New("cannot remove built-in workload")
 	errOutputFormat         = errors.New("unsupported output format")
 	errRefreshSource        = errors.New("--refresh does not accept a source path")
+	errSourceRoot           = errors.New("invalid SDK source root")
 )
+
+// envSourceRoot names the SDK source tree used to build local artifacts. It is the
+// scripted equivalent of --source-root.
+const envSourceRoot = "STROPPY_SOURCE_ROOT"
+
+// shortDigestLength is the digest prefix used in operator-facing messages.
+const shortDigestLength = 12
 
 //nolint:gocognit // build transaction keeps snapshot, catalog, runtime, and rollback order explicit
 func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobra.Command {
 	var (
-		replace bool
-		refresh bool
-		yes     bool
-		offline bool
+		replace    bool
+		refresh    bool
+		yes        bool
+		offline    bool
+		sourceRoot string
 	)
 
 	command := &cobra.Command{
@@ -45,6 +56,11 @@ func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if refresh && len(args) != 0 {
 				return errRefreshSource
+			}
+
+			stroppyRoot, err := resolveSourceRoot(sourceRoot)
+			if err != nil {
+				return err
 			}
 
 			compiler, err := toolchain.Resolve(cmd.Context(), toolchain.Options{
@@ -58,11 +74,13 @@ func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 			if refresh {
 				active, reused, err := store.RebuildRuntime(
 					cmd.Context(), compiler, cmd.ErrOrStderr(), offline,
-					stroppySourceRoot(), version.Resolve(),
+					stroppyRoot, version.Resolve(),
 				)
 				if err != nil {
 					return err
 				}
+
+				reportRuntimeSource(cmd, &active)
 
 				_, err = fmt.Fprintf(cmd.OutOrStdout(), "%s\t%t\n", active.BuildDigest, reused)
 
@@ -75,7 +93,7 @@ func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 			}
 
 			result, snapshot, err := store.BuildSnapshot(
-				cmd.Context(), compiler, source, cmd.ErrOrStderr(), offline, stroppySourceRoot(),
+				cmd.Context(), compiler, source, cmd.ErrOrStderr(), offline, stroppyRoot,
 			)
 			if err != nil {
 				return err
@@ -104,7 +122,7 @@ func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 
 			active, reused, err := store.RebuildRuntime(
 				cmd.Context(), compiler, cmd.ErrOrStderr(), offline,
-				stroppySourceRoot(), version.Resolve(),
+				stroppyRoot, version.Resolve(),
 			)
 			if err != nil {
 				removeErr := store.Remove(result.Name)
@@ -117,6 +135,8 @@ func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 				return errors.Join(err, removeErr, restoreErr)
 			}
 
+			reportRuntimeSource(cmd, &active)
+
 			_, err = fmt.Fprintf(
 				cmd.OutOrStdout(), "%s\t%s\t%s\t%t\n",
 				entry.Name, snapshot.Digest, active.BuildDigest, reused,
@@ -127,6 +147,8 @@ func newBuildCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 	}
 	command.Flags().BoolVar(&replace, "replace", false, "replace an existing custom workload")
 	command.Flags().BoolVar(&refresh, "refresh", false, "rebuild local runtime from catalog snapshots")
+	command.Flags().StringVar(&sourceRoot, "source-root", "",
+		"SDK source tree to compile the runtime against (default: the pinned module)")
 	command.Flags().BoolVarP(&yes, "yes", "y", false, "allow verified private Go download")
 	command.Flags().BoolVar(&offline, "offline", false, "use only cached tools and modules")
 
@@ -164,8 +186,9 @@ func newListCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobra
 
 func newRemoveCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobra.Command {
 	var (
-		yes     bool
-		offline bool
+		yes        bool
+		offline    bool
+		sourceRoot string
 	)
 
 	command := &cobra.Command{
@@ -175,6 +198,11 @@ func newRemoveCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cob
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if _, builtIn := catalog.Test(args[0]); builtIn {
 				return fmt.Errorf("%w %q", errRemoveBuiltIn, args[0])
+			}
+
+			stroppyRoot, err := resolveSourceRoot(sourceRoot)
+			if err != nil {
+				return err
 			}
 
 			if err := store.Remove(args[0]); err != nil {
@@ -199,12 +227,15 @@ func newRemoveCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cob
 					return err
 				}
 
-				if _, _, err := store.RebuildRuntime(
+				active, _, err := store.RebuildRuntime(
 					cmd.Context(), compiler, cmd.ErrOrStderr(), offline,
-					stroppySourceRoot(), version.Resolve(),
-				); err != nil {
+					stroppyRoot, version.Resolve(),
+				)
+				if err != nil {
 					return err
 				}
+
+				reportRuntimeSource(cmd, &active)
 			}
 
 			_, err = fmt.Fprintln(cmd.OutOrStdout(), args[0])
@@ -214,6 +245,8 @@ func newRemoveCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cob
 	}
 	command.Flags().BoolVarP(&yes, "yes", "y", false, "allow verified private Go download")
 	command.Flags().BoolVar(&offline, "offline", false, "use only cached tools and modules")
+	command.Flags().StringVar(&sourceRoot, "source-root", "",
+		"SDK source tree to compile the runtime against (default: the pinned module)")
 
 	return command
 }
@@ -364,18 +397,104 @@ func toolchainConsent(yes bool) toolchain.Consent {
 	return toolchain.ConsentAsk
 }
 
-func stroppySourceRoot() string {
-	_, source, _, ok := runtime.Caller(0)
-	if !ok {
+// resolveSourceRoot returns the SDK source tree local artifacts are compiled
+// against, or "" to use the pinned SDK module.
+//
+// An explicit --source-root wins, then STROPPY_SOURCE_ROOT. Otherwise the
+// compiled-in source location is used only when it is absolute: a -trimpath
+// build carries a module-relative path, and resolving that against the working
+// directory would silently select whatever module happens to sit above the
+// caller instead of the SDK.
+func resolveSourceRoot(explicit string) (string, error) {
+	candidates := []struct{ value, origin string }{
+		{explicit, "--source-root"},
+		{os.Getenv(envSourceRoot), envSourceRoot},
+	}
+
+	for _, candidate := range candidates {
+		if candidate.value == "" {
+			continue
+		}
+
+		root, err := checkSourceRoot(candidate.value)
+		if err != nil {
+			return "", fmt.Errorf("%s: %w", candidate.origin, err)
+		}
+
+		return root, nil
+	}
+
+	return deriveSourceRoot(compiledSourceFile()), nil
+}
+
+// checkSourceRoot validates an operator-supplied SDK tree. Requiring the module
+// declaration rejects a workload project passed by mistake, which would
+// otherwise replace the SDK with the workload itself.
+func checkSourceRoot(path string) (string, error) {
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("%w: %s: %w", errSourceRoot, path, err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(absolute, "go.mod"))
+	if err != nil {
+		return "", fmt.Errorf("%w: %s: %w", errSourceRoot, absolute, err)
+	}
+
+	if declared := modfile.ModulePath(data); declared != author.SDK {
+		return "", fmt.Errorf("%w: %s declares module %q, want %q",
+			errSourceRoot, absolute, declared, author.SDK)
+	}
+
+	return absolute, nil
+}
+
+// deriveSourceRoot recovers the source tree from an untrimmed build's own file
+// path. Relative paths are refused: they are resolved against the working
+// directory by filepath.Abs, which is exactly the guessing this avoids.
+func deriveSourceRoot(file string) string {
+	if file == "" || !filepath.IsAbs(file) {
 		return ""
 	}
 
-	root, err := moduleRoot(filepath.Dir(source))
+	root, err := moduleRoot(filepath.Dir(file))
 	if err != nil {
 		return ""
 	}
 
 	return root
+}
+
+func compiledSourceFile() string {
+	_, source, _, ok := runtime.Caller(0)
+	if !ok {
+		return ""
+	}
+
+	return source
+}
+
+// reportRuntimeSource states which SDK the activated runtime embeds, so a
+// runtime built from a working tree is never mistaken for the pinned module.
+func reportRuntimeSource(cmd *cobra.Command, active *workloadcatalog.ActiveRuntime) {
+	if active.BuildDigest == "" {
+		return
+	}
+
+	source := fmt.Sprintf("module %s %s", author.SDK, active.StroppyVersion)
+	if active.StroppySource != "" {
+		source = "source tree " + active.StroppySource
+	}
+
+	fmt.Fprintf(cmd.ErrOrStderr(), "runtime %s: sdk %s\n", shortDigest(active.BuildDigest), source)
+}
+
+func shortDigest(digest string) string {
+	if len(digest) <= shortDigestLength {
+		return digest
+	}
+
+	return digest[:shortDigestLength]
 }
 
 func moduleRoot(start string) (string, error) {

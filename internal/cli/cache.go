@@ -48,9 +48,9 @@ func newCacheInspectCommand(store *workloadcatalog.Store) *cobra.Command {
 				return encoder.Encode(manifest)
 			case "human":
 				_, err = fmt.Fprintf(
-					cmd.OutOrStdout(), "%s\t%s/%s\tgo%s\t%d workloads\n",
+					cmd.OutOrStdout(), "%s\t%s/%s\tgo%s\t%d workloads\tsdk=%s\n",
 					manifest.Digest, manifest.TargetOS, manifest.TargetArch,
-					manifest.GoVersion, len(manifest.Workloads),
+					manifest.GoVersion, len(manifest.Workloads), buildSDKOrigin(store, &manifest),
 				)
 
 				return err
@@ -82,4 +82,23 @@ func newCacheCleanCommand(store *workloadcatalog.Store) *cobra.Command {
 			return err
 		},
 	}
+}
+
+// buildSDKOrigin names the SDK a cached artifact embeds: the exact source tree
+// when it is the active runtime's, otherwise the recorded source hash or the
+// pinned module.
+func buildSDKOrigin(store *workloadcatalog.Store, manifest *workloadcatalog.BuildManifest) string {
+	if active, err := store.ActiveRuntime(); err == nil && active.BuildDigest == manifest.Digest {
+		if active.StroppySource != "" {
+			return "source tree " + active.StroppySource
+		}
+
+		return "module " + active.StroppyVersion
+	}
+
+	if manifest.StroppySource != "" {
+		return "source hash " + shortDigest(manifest.StroppySource)
+	}
+
+	return "module " + manifest.StroppyVersion
 }

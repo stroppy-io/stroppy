@@ -26,6 +26,7 @@ type ActiveRuntime struct {
 	Schema         int       `json:"schema"`
 	BuildDigest    string    `json:"build_digest"`
 	StroppyVersion string    `json:"stroppy_version"`
+	StroppySource  string    `json:"stroppy_source,omitempty"`
 	CatalogDigest  string    `json:"catalog_digest"`
 	ArtifactPath   string    `json:"artifact_path"`
 	BuiltAt        time.Time `json:"built_at"`
@@ -140,7 +141,7 @@ func (store *Store) RebuildRuntime(
 
 	active := ActiveRuntime{
 		Schema: runtimeSchemaVersion, BuildDigest: manifest.Digest,
-		StroppyVersion: activeVersion, CatalogDigest: catalogDigest,
+		StroppyVersion: activeVersion, StroppySource: stroppyRoot, CatalogDigest: catalogDigest,
 		ArtifactPath: finalArtifact, BuiltAt: time.Now().UTC(),
 	}
 
