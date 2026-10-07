@@ -93,12 +93,12 @@ func buildSDKOrigin(store *workloadcatalog.Store, manifest *workloadcatalog.Buil
 			return "source tree " + active.StroppySource
 		}
 
-		return "module " + active.StroppyVersion
+		return "module " + active.SDKModuleVersion()
 	}
 
 	if manifest.StroppySource != "" {
 		return "source hash " + shortDigest(manifest.StroppySource)
 	}
 
-	return "module " + manifest.StroppyVersion
+	return "module " + manifest.SDKModuleVersion()
 }

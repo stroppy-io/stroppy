@@ -481,7 +481,7 @@ func reportRuntimeSource(cmd *cobra.Command, active *workloadcatalog.ActiveRunti
 		return
 	}
 
-	source := fmt.Sprintf("module %s %s", author.SDK, active.StroppyVersion)
+	source := fmt.Sprintf("module %s %s", author.SDK, active.SDKModuleVersion())
 	if active.StroppySource != "" {
 		source = "source tree " + active.StroppySource
 	}

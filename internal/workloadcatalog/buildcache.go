@@ -18,21 +18,22 @@ import (
 const driverBundleVersion = "standard-v1"
 
 type buildIdentity struct {
-	Schema          int               `json:"schema"`
-	StroppyVersion  string            `json:"stroppy_version"`
-	StroppySource   string            `json:"stroppy_source,omitempty"`
-	GoVersion       string            `json:"go_version"`
-	TargetOS        string            `json:"target_os"`
-	TargetArch      string            `json:"target_arch"`
-	TargetSettings  map[string]string `json:"target_settings,omitempty"`
-	GOFLAGSSHA256   string            `json:"goflags_sha256"`
-	IncludeBuiltIns bool              `json:"include_built_ins"`
-	Workloads       []string          `json:"workloads"`
-	SnapshotDigests []string          `json:"snapshot_digests,omitempty"`
-	SourceDigests   []string          `json:"source_digests,omitempty"`
-	Modules         []ModuleIdentity  `json:"modules"`
-	RunnerSHA256    string            `json:"runner_sha256"`
-	DriverBundle    string            `json:"driver_bundle"`
+	Schema               int               `json:"schema"`
+	StroppyVersion       string            `json:"stroppy_version"`
+	StroppySource        string            `json:"stroppy_source,omitempty"`
+	StroppyModuleVersion string            `json:"stroppy_module_version,omitempty"`
+	GoVersion            string            `json:"go_version"`
+	TargetOS             string            `json:"target_os"`
+	TargetArch           string            `json:"target_arch"`
+	TargetSettings       map[string]string `json:"target_settings,omitempty"`
+	GOFLAGSSHA256        string            `json:"goflags_sha256"`
+	IncludeBuiltIns      bool              `json:"include_built_ins"`
+	Workloads            []string          `json:"workloads"`
+	SnapshotDigests      []string          `json:"snapshot_digests,omitempty"`
+	SourceDigests        []string          `json:"source_digests,omitempty"`
+	Modules              []ModuleIdentity  `json:"modules"`
+	RunnerSHA256         string            `json:"runner_sha256"`
+	DriverBundle         string            `json:"driver_bundle"`
 }
 
 // Cache stores completed generated binaries by build identity.
@@ -169,8 +170,9 @@ func (cache *Cache) build(
 	manifest = BuildManifest{
 		Schema: BuildSchemaVersion, Digest: digest, CreatedAt: time.Now().UTC(),
 		ArtifactSHA256: artifactDigest, StroppyVersion: identity.StroppyVersion,
-		StroppySource: identity.StroppySource, GoVersion: identity.GoVersion,
-		TargetOS: identity.TargetOS, TargetArch: identity.TargetArch,
+		StroppySource: identity.StroppySource, StroppyModuleVersion: identity.StroppyModuleVersion,
+		GoVersion: identity.GoVersion,
+		TargetOS:  identity.TargetOS, TargetArch: identity.TargetArch,
 		TargetSettings: identity.TargetSettings, GOFLAGSSHA256: identity.GOFLAGSSHA256,
 		IncludeBuiltIns: identity.IncludeBuiltIns, Workloads: identity.Workloads,
 		SnapshotDigests: identity.SnapshotDigests, SourceDigests: identity.SourceDigests,
@@ -250,7 +252,7 @@ func runnerIdentity(compiler *toolchain.Compiler, request *RunnerRequest) (build
 		return modules[left].Replacement < modules[right].Replacement
 	})
 
-	runnerSource, moduleSource, err := runnerSources(
+	runnerSource, moduleSource, sdkVersion, err := runnerSources(
 		request.Packages, request.IncludeBuiltIns, request.StroppyRoot, "", "",
 	)
 	if err != nil {
@@ -272,7 +274,7 @@ func runnerIdentity(compiler *toolchain.Compiler, request *RunnerRequest) (build
 
 	return buildIdentity{
 		Schema: BuildSchemaVersion, StroppyVersion: stroppyVersion,
-		StroppySource: stroppySource, GoVersion: compiler.Version,
+		StroppySource: stroppySource, StroppyModuleVersion: sdkVersion, GoVersion: compiler.Version,
 		TargetOS: targetOS, TargetArch: targetArch,
 		TargetSettings:  targetSettings(targetOS, targetArch),
 		GOFLAGSSHA256:   digestBytes([]byte(os.Getenv("GOFLAGS"))),

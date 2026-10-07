@@ -65,8 +65,11 @@ project metadata. Do not put credentials in published source or recordings.
 ## Building against an SDK source tree
 
 `build`, `remove`, and `export` compile local artifacts against the SDK module
-pinned in each project. To compile against a Stroppy source tree instead — the
-loop for working on the SDK itself — name that tree explicitly:
+their projects pin, raised to the CLI's own SDK version when that is newer: the
+generated runner always imports the built-ins, which belong to the CLI's
+version, and the highest requirement wins. To compile against a Stroppy source
+tree instead — the loop for working on the SDK itself — name that tree
+explicitly:
 
 ```sh
 stroppy build . --source-root /path/to/stroppy

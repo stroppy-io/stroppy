@@ -60,7 +60,7 @@ func buildRunnerUncached(ctx context.Context, compiler *toolchain.Compiler, requ
 		return errEmptyRunner
 	}
 
-	mainSource, moduleSource, err := runnerSources(
+	mainSource, moduleSource, _, err := runnerSources(
 		request.Packages, request.IncludeBuiltIns, request.StroppyRoot,
 		request.BuildVersion, request.BuildDigest,
 	)
@@ -119,11 +119,15 @@ func buildRunnerUncached(ctx context.Context, compiler *toolchain.Compiler, requ
 	return os.Rename(temporaryPath, request.Output)
 }
 
+// runnerSources renders the generated runner. It also returns the SDK module
+// version the generated go.mod ends up requiring: requirements are merged with
+// every workload's own pin, and the identity and provenance records must report
+// what the artifact embeds rather than what the caller requested.
 func runnerSources(
 	packages []Package,
 	includeBuiltIns bool,
 	stroppyRoot, buildVersion, buildDigest string,
-) (mainSource, moduleSource []byte, err error) {
+) (mainSource, moduleSource []byte, sdkVersion string, err error) {
 	requirements := map[string]string{stroppyModulePath: stroppyModuleVersion()}
 
 	replacements := moduleReplacements{}
@@ -141,13 +145,13 @@ func runnerSources(
 
 		packageRequirements, packageReplacements, err := ModuleConfig(&pkg)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, "", err
 		}
 
 		mergeRequirements(requirements, packageRequirements)
 
 		if err := mergeReplacements(replacements, packageReplacements); err != nil {
-			return nil, nil, err
+			return nil, nil, "", err
 		}
 	}
 
@@ -155,7 +159,14 @@ func runnerSources(
 		buildVersion = stroppyVersion()
 	}
 
-	return formatRunnerSources(imports, requirements, replacements, buildVersion, buildDigest)
+	mainSource, moduleSource, err = formatRunnerSources(
+		imports, requirements, replacements, buildVersion, buildDigest,
+	)
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	return mainSource, moduleSource, requirements[stroppyModulePath], nil
 }
 
 func mergeRequirements(destination, source map[string]string) {

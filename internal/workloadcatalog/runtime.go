@@ -23,13 +23,24 @@ var (
 
 // ActiveRuntime identifies one published local Stroppy executable.
 type ActiveRuntime struct {
-	Schema         int       `json:"schema"`
-	BuildDigest    string    `json:"build_digest"`
-	StroppyVersion string    `json:"stroppy_version"`
-	StroppySource  string    `json:"stroppy_source,omitempty"`
-	CatalogDigest  string    `json:"catalog_digest"`
-	ArtifactPath   string    `json:"artifact_path"`
-	BuiltAt        time.Time `json:"built_at"`
+	Schema               int       `json:"schema"`
+	BuildDigest          string    `json:"build_digest"`
+	StroppyVersion       string    `json:"stroppy_version"`
+	StroppySource        string    `json:"stroppy_source,omitempty"`
+	StroppyModuleVersion string    `json:"stroppy_module_version,omitempty"`
+	CatalogDigest        string    `json:"catalog_digest"`
+	ArtifactPath         string    `json:"artifact_path"`
+	BuiltAt              time.Time `json:"built_at"`
+}
+
+// SDKModuleVersion is the SDK module version this executable embeds: the merged
+// requirement the generated go.mod carries, not the version the caller asked for.
+func (runtime *ActiveRuntime) SDKModuleVersion() string {
+	if runtime.StroppyModuleVersion != "" {
+		return runtime.StroppyModuleVersion
+	}
+
+	return runtime.StroppyVersion
 }
 
 // RuntimeProcess describes direct argument and stream forwarding to local Stroppy.
@@ -141,7 +152,8 @@ func (store *Store) RebuildRuntime(
 
 	active := ActiveRuntime{
 		Schema: runtimeSchemaVersion, BuildDigest: manifest.Digest,
-		StroppyVersion: activeVersion, StroppySource: stroppyRoot, CatalogDigest: catalogDigest,
+		StroppyVersion: activeVersion, StroppySource: stroppyRoot,
+		StroppyModuleVersion: manifest.SDKModuleVersion(), CatalogDigest: catalogDigest,
 		ArtifactPath: finalArtifact, BuiltAt: time.Now().UTC(),
 	}
 
