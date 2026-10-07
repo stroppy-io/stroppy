@@ -25,20 +25,31 @@ then `PATH/workload`. It never scans recursively or rewrites the installed binar
 A package inspection/build failure names the candidate and its cause.
 
 `init --module example.org/team/load` chooses module identity. Release binaries
-use their linked/injected module version. Development binaries need an explicit
-compatible release or commit pseudo-version:
+use their linked/injected module version; a development binary that carries only
+a local commit records that commit's pseudo-version instead:
 
 ```sh
 stroppy init my-workload --sdk-version v6.2.0
 ```
 
-Use an SDK version containing these author tools; do not substitute an old v6
-release with the earlier provisional API. The example version is illustrative.
+Pass `--sdk-version` only to pin something other than the running binary's own
+version. It must name a version the Go module proxy can resolve *and* that
+contains these author tools; an old v6 release with the earlier provisional API
+will not do, and a version that does not exist fails dependency resolution
+during `init`. Check what is published before pinning:
+
+```sh
+go list -m -versions github.com/stroppy-io/stroppy/v6
+```
+
 `init` resolves dependencies through the selected Go compiler before reporting
 success. `--offline` limits module access to cache; `-y` consents to a verified
 private compiler download if compatible system Go is absent. Private tools remain
 under `~/.stroppy`; no PATH or persistent Go configuration is changed. Direct
-`go run`/`go test` commands require Go 1.27 or newer available to the user.
+`go run`/`go test` commands require Go 1.27 or newer available to the user. To
+work against unpublished SDK changes rather than a pinned version, keep the
+project's own requirement and pass the source tree at build time — see
+[Building against an SDK source tree](#building-against-an-sdk-source-tree).
 
 Dependency resolution uses the actual project's import and test graph. If it
 fails after files were created, the error says so and gives the retry command:
@@ -50,6 +61,51 @@ go list -mod=mod -deps -test ./...
 The project is retained for repair, never silently removed after module download
 failure. Proxy/private-module credentials are inherited by Go but not stored in
 project metadata. Do not put credentials in published source or recordings.
+
+## Building against an SDK source tree
+
+`build`, `remove`, and `export` compile local artifacts against the SDK module
+their projects pin, raised to the CLI's own SDK version when that is newer: the
+generated runner always imports the built-ins, which belong to the CLI's
+version, and the highest requirement wins. To compile against a Stroppy source
+tree instead — the loop for working on the SDK itself — name that tree
+explicitly:
+
+```sh
+stroppy build . --source-root /path/to/stroppy
+STROPPY_SOURCE_ROOT=/path/to/stroppy stroppy build .
+```
+
+The tree must be the SDK module (`module github.com/stroppy-io/stroppy/v6`); a
+workload project is rejected by name. The SDK tree is never inferred from the
+working directory, so running `stroppy build` inside a workload project cannot
+select that project as the SDK. Every build reports its origin, and
+`stroppy cache inspect DIGEST` records it:
+
+```
+runtime 9b77caf3482e: sdk source tree /path/to/stroppy
+runtime c1c165709e3b: sdk module github.com/stroppy-io/stroppy/v6 v6.1.1
+```
+
+Without an explicit tree, artifacts use the pinned module and stay reproducible.
+
+## Manage built workloads
+
+The catalog under `~/.stroppy/workloads/` holds every workload `build` registered:
+
+```sh
+stroppy list                        # built-in and custom workloads, -o json for machine output
+stroppy run my-workload -D url=...  # runs from its owned snapshot, source tree not needed
+stroppy cache inspect DIGEST        # build provenance: platform, Go, workloads, SDK origin
+stroppy cache clean                 # drop reusable artifacts and private Go caches
+stroppy remove my-workload          # unregister, rebuilding the runtime without it
+stroppy export my-workload -o ./my-workload-stroppy   # portable binary for another machine
+```
+
+`remove` and `export` rebuild or bundle the runtime, so they accept the same
+`--source-root` as `build`. `list` reports origin (`built-in` or `custom`), and a
+custom workload keeps running from its snapshot after its project directory is
+deleted; only `eject` needs the original source publication.
 
 ## Ordinary Go workload tests
 

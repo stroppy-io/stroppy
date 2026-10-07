@@ -67,24 +67,35 @@ type Snapshot struct {
 
 // BuildManifest records non-secret inputs and output integrity for one cached executable.
 type BuildManifest struct {
-	Schema          int               `json:"schema"`
-	Digest          string            `json:"digest"`
-	CreatedAt       time.Time         `json:"created_at"`
-	ArtifactSHA256  string            `json:"artifact_sha256"`
-	StroppyVersion  string            `json:"stroppy_version"`
-	StroppySource   string            `json:"stroppy_source,omitempty"`
-	GoVersion       string            `json:"go_version"`
-	TargetOS        string            `json:"target_os"`
-	TargetArch      string            `json:"target_arch"`
-	TargetSettings  map[string]string `json:"target_settings,omitempty"`
-	GOFLAGSSHA256   string            `json:"goflags_sha256"`
-	IncludeBuiltIns bool              `json:"include_built_ins"`
-	Workloads       []string          `json:"workloads"`
-	SnapshotDigests []string          `json:"snapshot_digests,omitempty"`
-	SourceDigests   []string          `json:"source_digests,omitempty"`
-	Modules         []ModuleIdentity  `json:"modules"`
-	RunnerSHA256    string            `json:"runner_sha256"`
-	DriverBundle    string            `json:"driver_bundle"`
+	Schema               int               `json:"schema"`
+	Digest               string            `json:"digest"`
+	CreatedAt            time.Time         `json:"created_at"`
+	ArtifactSHA256       string            `json:"artifact_sha256"`
+	StroppyVersion       string            `json:"stroppy_version"`
+	StroppySource        string            `json:"stroppy_source,omitempty"`
+	StroppyModuleVersion string            `json:"stroppy_module_version,omitempty"`
+	GoVersion            string            `json:"go_version"`
+	TargetOS             string            `json:"target_os"`
+	TargetArch           string            `json:"target_arch"`
+	TargetSettings       map[string]string `json:"target_settings,omitempty"`
+	GOFLAGSSHA256        string            `json:"goflags_sha256"`
+	IncludeBuiltIns      bool              `json:"include_built_ins"`
+	Workloads            []string          `json:"workloads"`
+	SnapshotDigests      []string          `json:"snapshot_digests,omitempty"`
+	SourceDigests        []string          `json:"source_digests,omitempty"`
+	Modules              []ModuleIdentity  `json:"modules"`
+	RunnerSHA256         string            `json:"runner_sha256"`
+	DriverBundle         string            `json:"driver_bundle"`
+}
+
+// SDKModuleVersion is the SDK module version this artifact embeds: the merged
+// requirement, not the version the caller requested.
+func (manifest *BuildManifest) SDKModuleVersion() string {
+	if manifest.StroppyModuleVersion != "" {
+		return manifest.StroppyModuleVersion
+	}
+
+	return manifest.StroppyVersion
 }
 
 //nolint:tagliatelle // Go command JSON uses exported Go field names.

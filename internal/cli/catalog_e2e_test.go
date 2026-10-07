@@ -66,6 +66,11 @@ func TestManagedCatalogCommands(t *testing.T) {
 		t.Fatalf("run = %q, %v", output, err)
 	}
 
+	output, err = execute("run", "managed/example", "--help")
+	if err != nil || !strings.Contains(output, "stroppy run managed/example") {
+		t.Fatalf("run --help = %q, %v", output, err)
+	}
+
 	if err := os.RemoveAll(project); err != nil {
 		t.Fatal(err)
 	}
@@ -82,6 +87,41 @@ func TestManagedCatalogCommands(t *testing.T) {
 
 	if _, err := store.Get("managed/example"); err == nil {
 		t.Fatal("removed entry remains")
+	}
+}
+
+// The documented authoring flow runs `stroppy build` from inside the workload
+// project. The SDK source tree must never be inferred from that working
+// directory: it selects the workload project itself, which cannot replace the SDK.
+func TestBuildFromInsideWorkloadProject(t *testing.T) {
+	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	project, _ := createWorkloadProject(t, repoRoot, "managed/local", "first")
+
+	store, err := workloadcatalog.OpenAt(filepath.Join(t.TempDir(), "catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Chdir(project)
+
+	var stdout, stderr bytes.Buffer
+
+	if err := Execute(t.Context(), &Options{
+		Catalog: bench.RegisteredCatalog(), ManagedCatalog: store,
+	}, []string{"build", "."}, &stdout, &stderr); err != nil {
+		t.Fatalf("build from the project directory: %v\n%s%s", err, stdout.String(), stderr.String())
+	}
+
+	if !strings.Contains(stdout.String(), "managed/local") {
+		t.Fatalf("build output = %q", stdout.String())
+	}
+
+	if strings.Contains(stderr.String(), project) {
+		t.Fatalf("build used the workload project as the SDK source tree: %s", stderr.String())
 	}
 }
 

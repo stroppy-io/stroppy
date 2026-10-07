@@ -766,6 +766,133 @@ func TestResolverReceivesArgumentsAfterWorkload(t *testing.T) {
 	}
 }
 
+func TestResolverReceivesHelpForCustomWorkload(t *testing.T) {
+	catalog, err := bench.NewCatalog(runParamTest())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		calls   int
+		gotName string
+		gotArgs []string
+	)
+
+	command := NewCommandWithResolver(catalog, "", func(
+		_ context.Context,
+		_ *cobra.Command,
+		name string,
+		args []string,
+	) (bool, error) {
+		calls++
+		gotName = name
+
+		gotArgs = append([]string(nil), args...)
+
+		return true, nil
+	})
+
+	if err := command.RunE(command, []string{"custom/name", "--help"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if calls != 1 || gotName != "custom/name" || !slices.Equal(gotArgs, []string{"--help"}) {
+		t.Fatalf("resolver calls=%d name=%q args=%v", calls, gotName, gotArgs)
+	}
+
+	if err := command.RunE(command, []string{"custom/name", "-d", "noop", "--help"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if calls != 2 || !slices.Equal(gotArgs, []string{"-d", "noop", "--help"}) {
+		t.Fatalf("resolver calls=%d args=%v", calls, gotArgs)
+	}
+}
+
+func TestResolverUntouchedForInProcessWorkloadHelp(t *testing.T) {
+	catalog, err := bench.NewCatalog(runParamTest())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	command := NewCommandWithResolver(catalog, "", func(
+		context.Context, *cobra.Command, string, []string,
+	) (bool, error) {
+		t.Error("resolver consulted for an in-process workload")
+
+		return false, nil
+	})
+
+	var output bytes.Buffer
+
+	command.SetOut(&output)
+
+	if err := command.RunE(command, []string{"test/run-typed-params", "--help"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !contains(output.String(), "Workload parameters:") {
+		t.Fatalf("help output = %q", output.String())
+	}
+}
+
+func TestWorkloadHelpRendersPositionalAndSections(t *testing.T) {
+	withoutParams := renderWorkloadHelp(t, bench.Test{Name: "test/bare", Define: func(d *bench.Def) error {
+		settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
+		d.Execution.Step("workload", func(context.Context, *bench.Bench) error { return nil }, settings.Policy())
+
+		return d.Execution.Err()
+	}})
+
+	if !contains(withoutParams, "stroppy run test/bare [flags]") {
+		t.Fatalf("bare usage line advertises a positional it rejects:\n%s", withoutParams)
+	}
+
+	if contains(withoutParams, "[sql_file]") {
+		t.Fatalf("bare usage line still advertises [sql_file]:\n%s", withoutParams)
+	}
+
+	if contains(withoutParams, "Workload parameters:") {
+		t.Fatalf("bare workload renders an empty parameter section:\n%s", withoutParams)
+	}
+
+	if !contains(withoutParams, "Run parameters:") {
+		t.Fatalf("bare workload lost its run parameter section:\n%s", withoutParams)
+	}
+
+	withParams := renderWorkloadHelp(t, runParamTest())
+
+	if !contains(withParams, "stroppy run test/run-typed-params [sql_file] [flags]") {
+		t.Fatalf("declared sql-file is not advertised:\n%s", withParams)
+	}
+
+	for _, expected := range []string{"Workload parameters:", "--sql-file", "--enabled=true|false", "--count"} {
+		if !contains(withParams, expected) {
+			t.Fatalf("workload help missing %q:\n%s", expected, withParams)
+		}
+	}
+}
+
+func renderWorkloadHelp(t *testing.T, test bench.Test) string {
+	t.Helper()
+
+	description, err := bench.DescribeTest(test)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var output bytes.Buffer
+
+	command := &cobra.Command{}
+	command.SetOut(&output)
+
+	if err := printWorkloadHelp(command, &description); err != nil {
+		t.Fatal(err)
+	}
+
+	return output.String()
+}
+
 func TestNonemptySeparatorTailIsRejected(t *testing.T) {
 	err := Cmd.RunE(Cmd, []string{"tpch/tx", "--", "--legacy-flag"})
 	require.Error(t, err)

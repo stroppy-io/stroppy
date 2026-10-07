@@ -26,10 +26,11 @@ var (
 //nolint:gocognit // export validation and build sequence stays explicit
 func newExportCommand(store *workloadcatalog.Store) *cobra.Command {
 	var (
-		all     bool
-		output  string
-		yes     bool
-		offline bool
+		all        bool
+		output     string
+		yes        bool
+		offline    bool
+		sourceRoot string
 	)
 
 	command := &cobra.Command{
@@ -95,6 +96,11 @@ func newExportCommand(store *workloadcatalog.Store) *cobra.Command {
 
 			absoluteOutput = targetOutputPath(absoluteOutput, targetOS)
 
+			stroppyRoot, err := resolveSourceRoot(sourceRoot)
+			if err != nil {
+				return err
+			}
+
 			compiler, err := toolchain.Resolve(cmd.Context(), toolchain.Options{
 				Root: store.StroppyRoot(), Consent: toolchainConsent(yes),
 				Input: cmd.InOrStdin(), Output: cmd.ErrOrStderr(), Offline: offline,
@@ -107,7 +113,7 @@ func newExportCommand(store *workloadcatalog.Store) *cobra.Command {
 				cmd.Context(), compiler, &workloadcatalog.RunnerRequest{
 					Packages: packages, IncludeBuiltIns: true, Output: absoluteOutput,
 					TargetOS: targetOS, TargetArch: targetArch, Offline: offline,
-					Diagnostics: cmd.ErrOrStderr(), StroppyRoot: stroppySourceRoot(),
+					Diagnostics: cmd.ErrOrStderr(), StroppyRoot: stroppyRoot,
 					CacheRoot: store.StroppyRoot(),
 				},
 			)
@@ -126,6 +132,8 @@ func newExportCommand(store *workloadcatalog.Store) *cobra.Command {
 	}
 	command.Flags().BoolVar(&all, "all", false, "include all custom catalog workloads")
 	command.Flags().StringVarP(&output, "output", "o", "", "portable binary output path")
+	command.Flags().StringVar(&sourceRoot, "source-root", "",
+		"SDK source tree to compile against (default: the pinned module)")
 	command.Flags().BoolVarP(&yes, "yes", "y", false, "allow verified private Go download")
 	command.Flags().BoolVar(&offline, "offline", false, "use only cached tools and modules")
 

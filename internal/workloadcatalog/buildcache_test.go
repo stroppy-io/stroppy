@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"golang.org/x/mod/semver"
 
 	"github.com/stroppy-io/stroppy/v6/internal/toolchain"
 )
@@ -96,6 +100,96 @@ func TestBuildCachedRebuildsCorruptEntry(t *testing.T) {
 
 	if _, err := os.Stat(filepath.Join(entry, "leftover")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("corrupt entry was not replaced: %v", err)
+	}
+}
+
+func TestRunnerSourcesReportTheMergedSDKVersion(t *testing.T) {
+	cliVersion := stroppyModuleVersion()
+	newer := "v6.99.99"
+
+	for name, pinned := range map[string]string{
+		"workload pinned older than the CLI": "v6.0.0",
+		"workload pinned newer than the CLI": newer,
+	} {
+		t.Run(name, func(t *testing.T) {
+			moduleRoot := t.TempDir()
+			moduleData := fmt.Sprintf(
+				"module example.com/input\n\ngo 1.27\n\nrequire %s %s\n",
+				stroppyModulePath, pinned,
+			)
+
+			if err := os.WriteFile(filepath.Join(moduleRoot, "go.mod"), []byte(moduleData), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			pkg := Package{
+				ImportPath: "example.com/input", Directory: moduleRoot,
+				ModulePath: "example.com/input", ModuleRoot: moduleRoot,
+			}
+
+			_, moduleSource, effective, err := runnerSources([]Package{pkg}, true, "", "", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			want := cliVersion
+			if semver.Compare(pinned, want) > 0 {
+				want = pinned
+			}
+
+			if effective != want {
+				t.Fatalf("effective SDK version = %q, want %q", effective, want)
+			}
+
+			// The generated go.mod is the authority: the reported version must be
+			// the one the artifact is actually built against.
+			require.Contains(t, string(moduleSource), stroppyModulePath+" "+want)
+		})
+	}
+}
+
+func TestRunnerIdentityRecordsTheMergedSDKVersion(t *testing.T) {
+	moduleRoot := t.TempDir()
+	pinned := "v6.99.99"
+	moduleData := fmt.Sprintf(
+		"module example.com/input\n\ngo 1.27\n\nrequire %s %s\n", stroppyModulePath, pinned,
+	)
+
+	if err := os.WriteFile(filepath.Join(moduleRoot, "go.mod"), []byte(moduleData), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(
+		filepath.Join(moduleRoot, "workload.go"), []byte("package input\nconst Value = 1\n"), 0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler, err := toolchain.Resolve(t.Context(), toolchain.Options{
+		Root: t.TempDir(), Consent: toolchain.ConsentNever,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pkg := Package{
+		ImportPath: "example.com/input", Directory: moduleRoot,
+		ModulePath: "example.com/input", ModuleRoot: moduleRoot,
+	}
+
+	identity, err := runnerIdentity(compiler, &RunnerRequest{Packages: []Package{pkg}, IncludeBuiltIns: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if identity.StroppyModuleVersion != pinned {
+		t.Fatalf("identity SDK module version = %q, want the merged %q",
+			identity.StroppyModuleVersion, pinned)
+	}
+
+	// The requested release version stays the runner's own identity.
+	if identity.StroppyVersion == pinned {
+		t.Fatalf("requested version = %q; it must not be replaced by the merged pin", identity.StroppyVersion)
 	}
 }
 

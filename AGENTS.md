@@ -106,6 +106,14 @@ publishes package-local source or a complete project containing go.mod/main.go.
 and resolves project imports after exclusive confined copying. Dependency errors
 retain the created project and report the retry command. See docs/author-tooling.md.
 
+Local artifacts compile against the SDK module pinned in each project. Pass
+`--source-root PATH` / `STROPPY_SOURCE_ROOT` (build, remove, export) to compile
+against a Stroppy source tree instead; the path must declare the SDK module, and
+the SDK tree is never inferred from the working directory or from the binary —
+`make build` is `-trimpath`, so nothing can be recovered from it. Every build
+prints the SDK origin it activated, and `cache inspect` records it. Working on the
+SDK therefore needs the flag, or an untrimmed binary.
+
 Recording is repository-provided (`-d recording -D url=recording.json`), not a plugin
 API. Set testkit/recording options before running; query replies are explicit and
 unknown reads have no rows. Recordings may contain authored query data, never put
