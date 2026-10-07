@@ -183,7 +183,10 @@ Signals:
 			}
 
 			if parsed.help && parsed.scriptArg != "" {
-				return printSelectedWorkloadHelp(cmd, catalog, parsed.scriptArg, parsed.sqlArg)
+				return selectedWorkloadHelp(
+					cmd, catalog, resolve, parsed.scriptArg, parsed.sqlArg,
+					argsAfterScript(args, parsed.scriptArg),
+				)
 			}
 
 			// Load configuration without emitting diagnostics. The effective logger is
@@ -210,7 +213,10 @@ Signals:
 					return cmd.Help()
 				}
 
-				return printSelectedWorkloadHelp(cmd, catalog, scriptArg, sqlArg)
+				return selectedWorkloadHelp(
+					cmd, catalog, resolve, scriptArg, sqlArg,
+					argsAfterScript(args, parsed.scriptArg),
+				)
 			}
 
 			if scriptArg == "" {
@@ -370,10 +376,7 @@ func withEffectiveSQLFile(
 		return inputs, err
 	}
 
-	acceptsSQLFile := slices.ContainsFunc(description.Params, func(param bench.ParamSchema) bool {
-		return param.Scope == bench.ParamScopeWorkload && param.Name == "sql-file"
-	})
-	if !acceptsSQLFile {
+	if !acceptsSQLFile(&description) {
 		return inputs, fmt.Errorf("%w for workload %q", errSQLFilePositional, name)
 	}
 
@@ -599,17 +602,58 @@ func completeRunArgs(catalog *bench.Catalog) cobra.CompletionFunc {
 	}
 }
 
-func printSelectedWorkloadHelp(
+// selectedWorkloadHelp prints help for a selected workload. A name the
+// in-process catalog cannot describe may still be registered in the managed
+// catalog, so it is delegated to the runtime that owns that workload's
+// descriptor; an unhandled name falls back to the local unknown-workload error.
+func selectedWorkloadHelp(
 	cmd *cobra.Command,
 	catalog *bench.Catalog,
+	resolve Resolver,
 	scriptArg, sqlArg string,
+	extra []string,
 ) error {
+	if _, err := describeSelectedWorkload(catalog, scriptArg, sqlArg); err == nil {
+		return printSelectedWorkloadHelp(cmd, catalog, scriptArg, sqlArg)
+	}
+
+	if resolve != nil {
+		delegated := append([]string(nil), extra...)
+		if !slices.Contains(delegated, "--help") && !slices.Contains(delegated, "-h") {
+			delegated = append(delegated, "--help")
+		}
+
+		handled, err := resolve(cmd.Context(), cmd, scriptArg, delegated)
+		if err != nil {
+			return err
+		}
+
+		if handled {
+			return nil
+		}
+	}
+
+	return printSelectedWorkloadHelp(cmd, catalog, scriptArg, sqlArg)
+}
+
+func describeSelectedWorkload(
+	catalog *bench.Catalog,
+	scriptArg, sqlArg string,
+) (bench.Description, error) {
 	describeName := scriptArg
 	if name, _, _, ok := executeSQLGoRoute(scriptArg, sqlArg); ok {
 		describeName = name
 	}
 
-	description, err := catalog.Describe(describeName)
+	return catalog.Describe(describeName)
+}
+
+func printSelectedWorkloadHelp(
+	cmd *cobra.Command,
+	catalog *bench.Catalog,
+	scriptArg, sqlArg string,
+) error {
+	description, err := describeSelectedWorkload(catalog, scriptArg, sqlArg)
 	if err != nil {
 		return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
 	}
@@ -620,10 +664,16 @@ func printSelectedWorkloadHelp(
 func printWorkloadHelp(cmd *cobra.Command, description *bench.Description) error {
 	var output strings.Builder
 
+	sqlFile := ""
+	if acceptsSQLFile(description) {
+		sqlFile = " [sql_file]"
+	}
+
 	fmt.Fprintf(
 		&output,
-		"Usage:\n  stroppy run %s [sql_file] [flags]\n\n",
+		"Usage:\n  stroppy run %s%s [flags]\n\n",
 		description.Name,
+		sqlFile,
 	)
 	output.WriteString("Static flags:\n")
 	output.WriteString("  -f, --file PATH          Load a config file\n")
@@ -664,16 +714,23 @@ func writeParamHelpSection(
 	params []bench.ParamSchema,
 	scope bench.ParamScope,
 ) {
+	selected := make([]*bench.ParamSchema, 0, len(params))
+
+	for idx := range params {
+		if params[idx].Scope == scope {
+			selected = append(selected, &params[idx])
+		}
+	}
+
+	if len(selected) == 0 {
+		return
+	}
+
 	output.WriteByte('\n')
 	output.WriteString(title)
 	output.WriteString(":\n")
 
-	for idx := range params {
-		param := &params[idx]
-		if param.Scope != scope {
-			continue
-		}
-
+	for _, param := range selected {
 		flag := param.Flag
 		if param.Type == bench.ParamTypeBool {
 			flag += "=true|false"
@@ -708,6 +765,14 @@ func writeParamHelpSection(
 
 func invalidConfig(err error) error {
 	return fmt.Errorf("invalid config: %w", err)
+}
+
+// acceptsSQLFile reports whether a workload binds the optional positional SQL
+// override, which the run command accepts only when the workload declares it.
+func acceptsSQLFile(description *bench.Description) bool {
+	return slices.ContainsFunc(description.Params, func(param bench.ParamSchema) bool {
+		return param.Scope == bench.ParamScopeWorkload && param.Name == "sql-file"
+	})
 }
 
 // executeSQLGoRoute detects the execute_sql cases that have no registered Go workload

@@ -66,6 +66,11 @@ func TestManagedCatalogCommands(t *testing.T) {
 		t.Fatalf("run = %q, %v", output, err)
 	}
 
+	output, err = execute("run", "managed/example", "--help")
+	if err != nil || !strings.Contains(output, "stroppy run managed/example") {
+		t.Fatalf("run --help = %q, %v", output, err)
+	}
+
 	if err := os.RemoveAll(project); err != nil {
 		t.Fatal(err)
 	}
