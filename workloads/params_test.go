@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 	_ "github.com/stroppy-io/stroppy/v6/workloads/all"
@@ -138,6 +139,9 @@ func isEnvRead(name string) bool {
 }
 
 func tpccParamSchema() []bench.ParamSchema {
+	warmup := param("warmup", bench.ParamTypeDuration, "0s", "WARMUP", "warmup")
+	warmup.Constraints = []bench.Constraint{{Kind: "min", Value: time.Duration(0)}}
+
 	return []bench.ParamSchema{
 		derivedParam(
 			"load-items",
@@ -155,6 +159,7 @@ func tpccParamSchema() []bench.ParamSchema {
 		param("sql-file", bench.ParamTypeString, "", "SQL_FILE", "sqlFile"),
 		param("tx-isolation", bench.ParamTypeString, "", "TX_ISOLATION", "txIsolation"),
 		param("warehouse-start", bench.ParamTypeInt, 1, "WAREHOUSE_START", "warehouseStart"),
+		warmup,
 	}
 }
 

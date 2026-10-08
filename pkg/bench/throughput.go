@@ -178,7 +178,11 @@ func (b *Bench) LogicalOperation(fn func() error) error {
 	}
 
 	err := fn()
-	if writer != nil && err == nil && b.vu.ctx.Err() == nil {
+	if outer {
+		b.vu.logicalSucceeded = err == nil && b.vu.ctx.Err() == nil
+	}
+
+	if writer != nil && b.vu.logicalSucceeded {
 		writer.transactions.Add(1)
 	}
 

@@ -36,7 +36,7 @@ func TestWarehouseDistribution(t *testing.T) {
 			seen := map[int64]bool{}
 
 			for _, operation := range recorder.Operations() {
-				if operation.Kind != "query" {
+				if operation.Kind != "query" || operation.SQL == "SELECT COALESCE(MAX(h_id), 0) FROM history" {
 					continue
 				}
 

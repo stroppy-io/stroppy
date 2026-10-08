@@ -12,6 +12,7 @@ import (
 	"math/rand/v2"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -21,6 +22,8 @@ import (
 var txNames = []string{"new_order", "payment", "order_status", "delivery", "stock_level"}
 
 var (
+	errWarmupExecutor           = errors.New("tpcc: warmup requires constant-vus executor")
+	errHistoryExhausted         = errors.New("history ID space exhausted")
 	errProcsDriverUnsupported   = errors.New("tpcc/procs only supports postgres and mysql; use tpcc/tx for picodata/ydb")
 	errDistrictNotFound         = errors.New("new_order: district not found")
 	errNewOrderCustomerMissing  = errors.New("new_order: customer not found")
@@ -63,11 +66,16 @@ type workload struct {
 
 	m *metrics
 
-	measureStart time.Time
-	measureEnd   time.Time
-	steady       *steady
+	measureStart    time.Time
+	measureEnd      time.Time
+	measureDuration time.Duration
+	steady          *steady
+	warmup          time.Duration
 
-	vuStates []*vuState
+	historyOnce sync.Once
+	historyID   atomic.Int64
+	historyErr  error
+	vuStates    []*vuState
 }
 
 type metrics struct {
@@ -77,7 +85,7 @@ type metrics struct {
 	orderStatusByname                                                             *bench.CounterHandle
 	remoteLineTotal, remoteLineRemote                                             *bench.CounterHandle
 	retryAttempts, populationRetryAttempts                                        *bench.CounterHandle
-	newOrderDur, paymentDur, orderStatusDur, deliveryDur, stockLevelDur           *bench.HistogramHandle
+	durations                                                                     map[string]*bench.HistogramHandle
 }
 
 var (
@@ -115,6 +123,14 @@ func define(d *bench.Def, variant string) error {
 		"spread-warehouses", false,
 		"Choose a home warehouse uniformly for each transaction; not fixed-terminal TPC-C.",
 	)
+
+	w.warmup, _ = d.Param.Duration(
+		"warmup", 0, "Unmeasured traffic duration before the workload step.", bench.Min(time.Duration(0)),
+	)
+	if w.warmup > 0 && settings.Executor != "constant-vus" {
+		return errWarmupExecutor
+	}
+
 	w.pacing, _ = d.Param.Bool("pacing", false, "Apply keying and think times.")
 	w.retryAttempts, _ = d.Param.Int("retry-attempts", 3, "Maximum transaction attempts.")
 	w.pgUnlogged, _ = d.Param.Bool("pg-unlogged", false, "Use unlogged tables while loading.")
@@ -177,6 +193,16 @@ func define(d *bench.Def, variant string) error {
 	}
 
 	d.Execution.Step("validate_population", w.validate)
+
+	if w.warmup > 0 {
+		d.Execution.Step("warmup", w.Iterate,
+			bench.ConstantWorkers(settings.Workers, w.warmup, settings.Drain))
+	}
+
+	if settings.Executor == "constant-vus" {
+		w.measureDuration = settings.Duration
+	}
+
 	w.measureStart = time.Now()
 	w.steady = w.initSteady()
 	d.Execution.Step("workload", w.Iterate, settings.Policy())
@@ -265,6 +291,13 @@ func (w *workload) initSteady() *steady {
 
 // initMetrics wires the per-transaction counters and duration trends.
 func (w *workload) initMetrics(b *bench.MetricDeclarations) *metrics {
+	durations := make(map[string]*bench.HistogramHandle, len(txNames))
+	for _, name := range txNames {
+		durations[name] = b.Histogram("tpcc_"+name+"_duration",
+			bench.LabelValues("phase", "warmup", "measurement", "drain"),
+			bench.LabelValues("outcome", "success", "error", "canceled"))
+	}
+
 	return &metrics{
 		newOrderTotal:           b.Counter("tpcc_new_order_total"),
 		paymentTotal:            b.Counter("tpcc_payment_total"),
@@ -281,11 +314,7 @@ func (w *workload) initMetrics(b *bench.MetricDeclarations) *metrics {
 		remoteLineRemote:        b.Counter("tpcc_remote_line_remote"),
 		retryAttempts:           b.Counter("tpcc_retry_attempts"),
 		populationRetryAttempts: b.Counter("tpcc_population_retry_attempts"),
-		newOrderDur:             b.Histogram("tpcc_new_order_duration"),
-		paymentDur:              b.Histogram("tpcc_payment_duration"),
-		orderStatusDur:          b.Histogram("tpcc_order_status_duration"),
-		deliveryDur:             b.Histogram("tpcc_delivery_duration"),
-		stockLevelDur:           b.Histogram("tpcc_stock_level_duration"),
+		durations:               durations,
 	}
 }
 
@@ -358,49 +387,93 @@ func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64)
 }
 
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
+	if err := w.initializeHistory(ctx, b); err != nil {
+		return bench.Fatal(err)
+	}
 	//nolint:gosec // worker is nonnegative and bounded by allocated worker state.
 	vs := w.vuState(uint64(b.Worker()+1), w.warehouseStart, w.warehouses)
 	if w.spreadWarehouses {
 		vs.homeWID = vs.warehouseStart + vs.homeWh.Int64N(vs.warehouses)
 	}
 
-	if w.variant == "procs" {
-		return w.iterateProcs(ctx, b, vs)
-	}
+	idx := weightedPick(vs.picker, txWeights)
+	name := txNames[idx]
 
-	return b.LogicalOperation(func() error {
-		idx := weightedPick(vs.picker, txWeights)
-		name := txNames[idx]
-
-		if w.pacing {
-			sleepSeconds(float64(keyingTime[name]))
+	return w.runPaced(ctx, b, vs, name, func() error {
+		if w.variant == "procs" {
+			return w.iterateProcs(ctx, b, vs, idx)
 		}
-
-		var err error
 
 		switch idx {
 		case 0:
-			err = w.newOrder(ctx, b, vs)
+			return w.newOrder(ctx, b, vs)
 		case 1:
-			err = w.payment(ctx, b, vs)
+			return w.payment(ctx, b, vs)
 		case 2:
-			err = w.orderStatus(ctx, b, vs)
+			return w.orderStatus(ctx, b, vs)
 		case 3:
-			err = w.delivery(ctx, b, vs)
-		case 4:
-			err = w.stockLevel(ctx, b, vs)
+			return w.delivery(ctx, b, vs)
+		default:
+			return w.stockLevel(ctx, b, vs)
 		}
+	})
+}
 
-		if err != nil {
+func (w *workload) runPaced(
+	ctx context.Context, b *bench.Bench, vs *vuState, name string, operation func() error,
+) error {
+	if w.pacing {
+		if err := sleepSeconds(ctx, float64(keyingTime[name])); err != nil {
 			return err
 		}
+	}
 
-		if w.pacing {
-			sleepSeconds(thinkTime(vs.picker, thinkTimeMean[name]))
-		}
+	started := time.Now()
+	err := b.LogicalOperation(operation)
 
-		return nil
-	})
+	phase := w.completionPhase()
+	if w.m != nil {
+		w.m.durations[name].Record(ctx, float64(time.Since(started).Milliseconds()),
+			bench.LabelValue("phase", phase), bench.LabelValue("outcome", operationOutcome(ctx, err)))
+	}
+
+	if err == nil && ctx.Err() == nil && name == "new_order" && phase == "measurement" {
+		w.recordSteady()
+	}
+
+	if !w.pacing || bench.IsFatalError(err) || ctx.Err() != nil ||
+		errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+
+	// Thinking is terminal idle time, not part of the completed operation.
+	_ = sleepSeconds(ctx, thinkTime(vs.picker, thinkTimeMean[name]))
+
+	return err
+}
+
+func (w *workload) completionPhase() string {
+	if w.measureStart.IsZero() {
+		return "warmup"
+	}
+
+	if w.measureDuration > 0 && time.Since(w.measureStart) >= w.measureDuration {
+		return "drain"
+	}
+
+	return "measurement"
+}
+
+func operationOutcome(ctx context.Context, err error) string {
+	if ctx.Err() != nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return "canceled"
+	}
+
+	if err != nil {
+		return "error"
+	}
+
+	return "success"
 }
 
 func (w *workload) Teardown(context.Context, *bench.Bench) error {
@@ -431,9 +504,6 @@ func (w *workload) q(section, name string) string {
 
 func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.newOrderTotal.Add(ctx, 1)
-
-	start := time.Now()
-	defer func() { w.m.newOrderDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
 
 	wID := vs.homeWID
 	dID := vs.ri(vs.noDID, 1, districtsPerWarehouse)
@@ -483,8 +553,6 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) er
 	}); err != nil {
 		return err
 	}
-
-	w.recordSteady()
 
 	return nil
 }
@@ -738,14 +806,15 @@ func (w *workload) batchRead(
 func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.paymentTotal.Add(ctx, 1)
 
-	start := time.Now()
-	defer func() { w.m.paymentDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
-
 	wID := vs.homeWID
 	dID := vs.ri(vs.payDID, 1, districtsPerWarehouse)
 	amount := vs.rf(vs.payHAmount, 1, 5000)
 	hData := vs.ascii(vs.payHData, 12, 24)
-	hID := vs.nextHid()
+
+	hID, err := vs.nextHid()
+	if err != nil {
+		return err
+	}
 
 	isRemote := w.warehouses > 1 && vs.ri(vs.payRemote, 1, 100) <= 15
 	if isRemote {
@@ -773,7 +842,7 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) err
 
 	var wasBC bool
 
-	err := bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+	err = bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
 		wasBC = false
 
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "payment"}, func(tx *bench.Tx) error {
@@ -1021,9 +1090,6 @@ func (w *workload) customerByName(
 func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.orderStatusTotal.Add(ctx, 1)
 
-	start := time.Now()
-	defer func() { w.m.orderStatusDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
-
 	wID := vs.homeWID
 	dID := vs.ri(vs.osDID, 1, districtsPerWarehouse)
 	cIDPick := vs.nurand(vs.osCID, 1023, 1, customersPerDistrict, vs.osCIDSalt)
@@ -1122,9 +1188,6 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.deliveryTotal.Add(ctx, 1)
 
-	start := time.Now()
-	defer func() { w.m.deliveryDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
-
 	wID := vs.homeWID
 	carrierID := vs.ri(vs.dCarrier, 1, 10)
 
@@ -1204,9 +1267,6 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) er
 func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.stockLevelTotal.Add(ctx, 1)
 
-	start := time.Now()
-	defer func() { w.m.stockLevelDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
-
 	wID := vs.homeWID
 	dID := vs.ri(vs.slDID, 1, districtsPerWarehouse)
 	threshold := vs.ri(vs.slThreshold, 10, 20)
@@ -1270,6 +1330,32 @@ func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) 
 	})
 }
 
+func (w *workload) initializeHistory(ctx context.Context, b *bench.Bench) error {
+	w.historyOnce.Do(func() {
+		row, err := b.RawRow(ctx, "SELECT COALESCE(MAX(h_id), 0) FROM history", nil)
+		if err != nil {
+			w.historyErr = fmt.Errorf("initialize history IDs: %w", err)
+
+			return
+		}
+
+		var last int64
+		if len(row) > 0 {
+			last = toInt64(row[0])
+		}
+
+		if last == math.MaxInt64 {
+			w.historyErr = errHistoryExhausted
+
+			return
+		}
+
+		w.historyID.Store(max(last, 0))
+	})
+
+	return w.historyErr
+}
+
 // --- per-VU state + tx-time generators ---
 
 type vuState struct {
@@ -1300,7 +1386,7 @@ type vuState struct {
 	nurand255Salt uint64
 	remoteWh      *rand.Rand
 
-	hid atomic.Int64
+	hid *atomic.Int64
 }
 
 func (w *workload) vuState(vuid uint64, warehouseStart, warehouses int64) *vuState {
@@ -1347,13 +1433,24 @@ func (w *workload) vuState(vuid uint64, warehouseStart, warehouses int64) *vuSta
 		osCIDSalt:      seedOf("ostat.c_id", vuid),
 		nurand255Salt:  seedOf("nurand255", vuid),
 	}
-	vs.hid.Store(int64(vuid) * 10_000_000) //nolint:gosec // G115: value bounded by scale factor, no overflow path
+	vs.hid = &w.historyID
 	w.vuStates[vuid-1] = vs
 
 	return vs
 }
 
-func (v *vuState) nextHid() int64 { return v.hid.Add(1) }
+func (v *vuState) nextHid() (int64, error) {
+	for {
+		last := v.hid.Load()
+		if last == math.MaxInt64 {
+			return 0, bench.Fatal(errHistoryExhausted)
+		}
+
+		if v.hid.CompareAndSwap(last, last+1) {
+			return last + 1, nil
+		}
+	}
+}
 
 // pickRemoteWh returns a uniform warehouse other than homeWID (only when W>1).
 // It draws from [1, W-1], shifts into the global warehouse range, and skips homeWID.
@@ -1454,12 +1551,24 @@ func fmtAmount(amount float64) string {
 	return fmt.Sprintf("%.2f", amount)
 }
 
-func sleepSeconds(s float64) {
-	if s <= 0 {
-		return
+func sleepSeconds(ctx context.Context, s float64) error {
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
-	time.Sleep(time.Duration(s * float64(time.Second)))
+	if s <= 0 {
+		return nil
+	}
+
+	timer := time.NewTimer(time.Duration(s * float64(time.Second)))
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return ctx.Err()
+	}
 }
 
 // thinkTime draws a negative-exponential delay truncated at 10× the mean.

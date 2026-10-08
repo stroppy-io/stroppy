@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -117,6 +118,10 @@ var (
 // report memory on high-throughput runs. bucketCounts carries len(bounds)+1
 // entries: the trailing count is the +Inf overflow bucket.
 type txObservation struct {
+	successful   uint64
+	failed       uint64
+	canceled     uint64
+	drained      uint64
 	count        uint64
 	bounds       []float64 // histogram bucket upper bounds, milliseconds, ascending
 	bucketCounts []uint64  // observations per bucket; len(bounds)+1 (last is +Inf)
@@ -126,7 +131,7 @@ type txObservation struct {
 // boundary, in milliseconds. The overflow (+Inf) bucket resolves to the last
 // finite bound, matching the generic bench summary's histogram quantiles (an
 // upper bound of the true percentile).
-func (o txObservation) quantile(q float64) float64 {
+func (o *txObservation) quantile(q float64) float64 {
 	if o.count == 0 || len(o.bucketCounts) == 0 {
 		return 0
 	}
@@ -161,6 +166,8 @@ type Report struct {
 	SpreadWarehouses     bool        `json:"spread_warehouses,omitempty"`
 	ComplianceApplicable bool        `json:"compliance_applicable"`
 	ElapsedSeconds       float64     `json:"elapsed_seconds"`
+	WarmupSeconds        float64     `json:"warmup_seconds,omitempty"`
+	DrainSeconds         float64     `json:"drain_seconds,omitempty"`
 	TpmC                 float64     `json:"tpm_c"`
 	MixCompliant         *bool       `json:"mix_compliant"`
 	ResponseCompliant    *bool       `json:"response_compliant"`
@@ -177,6 +184,10 @@ type Report struct {
 type TxReport struct {
 	Name             string   `json:"name"`
 	Count            uint64   `json:"count"`
+	Successful       uint64   `json:"successful"`
+	Failed           uint64   `json:"failed"`
+	Canceled         uint64   `json:"canceled"`
+	Drained          uint64   `json:"drained"`
 	MixPercent       float64  `json:"mix_percent"`
 	ThroughputPerSec float64  `json:"throughput_per_sec"`
 	P50Ms            float64  `json:"p50_ms"`
@@ -316,7 +327,7 @@ func complianceReport(obs []txObservation, opts reportOptions) (Report, error) {
 
 		total += o.count
 		if complianceTxTable[i].kind == txNewOrder {
-			newOrderCount = o.count
+			newOrderCount = o.successful
 		}
 	}
 
@@ -349,7 +360,11 @@ func complianceReport(obs []txObservation, opts reportOptions) (Report, error) {
 		txr := TxReport{
 			Name:             spec.name,
 			Count:            o.count,
-			ThroughputPerSec: throughput(o.count, elapsedSeconds),
+			Successful:       o.successful,
+			Failed:           o.failed,
+			Canceled:         o.canceled,
+			Drained:          o.drained,
+			ThroughputPerSec: throughput(o.successful, elapsedSeconds),
 			P50Ms:            o.quantile(0.50),
 			P90Ms:            o.quantile(0.90),
 			P95Ms:            o.quantile(0.95),
@@ -569,7 +584,8 @@ func (r *Report) text() string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "=== TPC-C compliance report (%s) ===\n", r.Workload)
-	fmt.Fprintf(&b, "elapsed=%.1fs paced=%t\n", r.ElapsedSeconds, r.Paced)
+	fmt.Fprintf(&b, "measurement=%.1fs warmup=%.1fs drain=%.1fs paced=%t\n",
+		r.ElapsedSeconds, r.WarmupSeconds, r.DrainSeconds, r.Paced)
 
 	if !r.ComplianceApplicable {
 		if r.SpreadWarehouses {
@@ -591,7 +607,8 @@ func (r *Report) text() string {
 
 	fmt.Fprintln(&b)
 
-	for _, t := range r.Transactions {
+	for i := range r.Transactions {
+		t := &r.Transactions[i]
 		fmt.Fprintf(&b, "%-12s %8d %6.1f%% %9.3f %7.0fms %7.0fms %7.0fms %7.0fms",
 			t.Name, t.Count, t.MixPercent, t.ThroughputPerSec,
 			t.P50Ms, t.P90Ms, t.P95Ms, t.P99Ms)
@@ -601,6 +618,12 @@ func (r *Report) text() string {
 		}
 
 		fmt.Fprintln(&b)
+	}
+
+	for i := range r.Transactions {
+		transaction := &r.Transactions[i]
+		fmt.Fprintf(&b, "%s outcomes: success=%d failed=%d canceled=%d drain=%d\n",
+			transaction.Name, transaction.Successful, transaction.Failed, transaction.Canceled, transaction.Drained)
 	}
 
 	if !r.ComplianceApplicable {
@@ -658,13 +681,11 @@ func (w *workload) complianceContribution(context bench.ReportContext) (bench.Re
 	obs := make([]txObservation, len(complianceTxTable))
 
 	for i, spec := range complianceTxTable {
-		duration, ok := context.Metrics["tpcc_"+spec.name+"_duration"]
-		if !ok {
-			continue
-		}
+		var err error
 
-		obs[i] = txObservation{
-			count: duration.Count, bounds: duration.Bounds, bucketCounts: duration.Buckets,
+		obs[i], err = measuredObservation(context, "tpcc_"+spec.name+"_duration")
+		if err != nil {
+			return bench.ReportContribution{}, err
 		}
 	}
 
@@ -683,6 +704,10 @@ func (w *workload) complianceContribution(context bench.ReportContext) (bench.Re
 		elapsed = time.Duration(seconds * float64(time.Second))
 	}
 
+	if w.measureDuration > 0 {
+		elapsed = min(elapsed, w.measureDuration)
+	}
+
 	var series steadySeries
 	if w.steady != nil {
 		series = w.steady.snapshot(elapsed)
@@ -695,7 +720,59 @@ func (w *workload) complianceContribution(context bench.ReportContext) (bench.Re
 		return bench.ReportContribution{}, err
 	}
 
+	compliance.WarmupSeconds = context.Measurements["warmup"]
+	compliance.DrainSeconds = max(0, context.Measurements["workload"]-elapsed.Seconds())
+
 	return bench.ReportContribution{Data: compliance}, nil
+}
+
+func measuredObservation(context bench.ReportContext, name string) (txObservation, error) {
+	if context.Series == nil {
+		duration := context.Metrics[name]
+
+		return txObservation{
+			count: duration.Count, successful: duration.Count, bounds: duration.Bounds, bucketCounts: duration.Buckets,
+		}, nil
+	}
+
+	var observation txObservation
+
+	for _, point := range context.Series[name].Series {
+		if point.Attributes["step"] != "workload" || point.Count == nil {
+			continue
+		}
+
+		if point.Attributes["phase"] == "drain" {
+			observation.drained += *point.Count
+
+			continue
+		}
+
+		switch point.Attributes["outcome"] {
+		case "error":
+			observation.failed += *point.Count
+		case "canceled":
+			observation.canceled += *point.Count
+		default:
+			observation.successful += *point.Count
+		}
+
+		if observation.bucketCounts == nil {
+			observation.bounds = point.Bounds
+			observation.bucketCounts = make([]uint64, len(point.BucketCounts))
+		}
+
+		if !slices.Equal(observation.bounds, point.Bounds) || len(observation.bucketCounts) != len(point.BucketCounts) {
+			return txObservation{}, errBucketMismatch
+		}
+
+		observation.count += *point.Count
+		for i, count := range point.BucketCounts {
+			observation.bucketCounts[i] += count
+		}
+	}
+
+	return observation, nil
 }
 
 func renderCompliance(output io.Writer, data json.RawMessage) error {

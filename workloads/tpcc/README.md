@@ -35,6 +35,8 @@ Typed workload parameters are listed by `stroppy run tpcc/tx --help` and
   to true only when `warehouse-start` is 1.
 - `--load-workers` sets the workers used to load each table.
 - `--pacing` applies the TPC-C keying and think times.
+- `--warmup` adds traffic before the measured `workload` step (default `0s`,
+  `constant-vus` only); `--duration` remains the measured workload duration.
 - `--retry-attempts` sets the maximum transaction attempts.
 - `--pg-unlogged` uses PostgreSQL unlogged tables during the load.
 - `--tx-isolation` overrides the driver-specific isolation default.
@@ -112,6 +114,56 @@ stroppy run tpcc/tx tpcc/ydb -d ydb -D url=grpc://host:2136/db \
 ```
 
 A normal run with no step filter performs setup and measurement together.
+
+## Warmup, pacing, and measurements
+
+```bash
+# Reuse loaded data, warm up for five minutes, then measure for thirty minutes.
+./build/stroppy run tpcc/procs -d pg -D url=postgres://host/db \
+  --executor constant-vus --vus 10000 --pacing=true \
+  --warmup 5m --duration 30m --steps warmup,workload
+```
+
+Warmup uses the same transaction mix, worker RNG state, and history ID counter
+as measurement. Both phases export the existing metric names, distinguished by
+`step=warmup` and `step=workload`. The TPC-C report selects only `workload`
+histograms and its measurement window. Duration histograms also carry
+`phase=warmup|measurement|drain` and `outcome=success|error|canceled`, based on
+operation completion. TPC-C throughput counts successful completions during
+measurement; drain completions and cancellations are reported separately.
+Latency and transaction mix include failed measured operations. Generic
+summaries retain both phases and drain; filter exported series by `step` and
+`phase` when comparing measured traffic. Step filters
+apply normally: `--steps workload` excludes warmup even when `--warmup` is set.
+Each phase uses the configured drain policy, so elapsed time can exceed
+warmup plus duration. Workers activate immediately at each phase boundary;
+warmup alone does not guarantee steady state.
+
+Keying waits precede database work. Think time follows each successful or
+nonfatal failed logical transaction, once after all retries. Fatal errors and
+cancellation stop immediately. Both waits observe cancellation; canceling
+post-transaction thinking does not turn an already successful transaction into
+a failure. Native success counters update before thinking, while native TPS
+still uses the executor wall-clock window, including drain.
+
+Latency measures have different scopes:
+
+- `tpcc_<transaction>_duration`: logical database operation, including pool
+  acquisition, retries, and failed outcomes; excludes keying and thinking.
+- `tx_total_duration`: one database transaction attempt, not the full retry loop.
+- `iteration_duration`: entire iteration, including keying, retries, and thinking.
+
+At the first traffic iteration, history IDs start above the table's current
+maximum and are unique across workers and phases. Sequential runs can reuse a
+dataset without truncating `history`. Concurrent independent transaction
+processes must not share that history ID space: maximum-based initialization
+does not reserve ranges across processes. Distributed loading of disjoint
+warehouse ranges remains supported.
+
+Pacing is a TPC-C-style stress profile, not an audited TPC-C result. Strict
+terminal/district and deferred Delivery semantics are tracked in
+[#193](https://github.com/stroppy-io/stroppy/issues/193); reusable gradual worker
+activation is tracked in [#194](https://github.com/stroppy-io/stroppy/issues/194).
 Environment variables and `-e` remain compatibility inputs; direct flags and
 typed config are preferred.
 
