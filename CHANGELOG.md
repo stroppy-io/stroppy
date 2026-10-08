@@ -12,8 +12,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
-- TPC-C can spread each VU's transactions across all configured warehouses with `--spread-warehouses`, independently of concurrency.
-- TPC-C supports optional `--warmup` traffic before measurement, using existing `step=warmup` and `step=workload` metric labels.
+- TPC-C can spread each VU's transactions across all configured warehouses with `--spread-warehouses`, independently of concurrency. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
+- TPC-C supports optional `--warmup` traffic before measurement, using existing `step=warmup` and `step=workload` metric labels. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
 - `stroppy build`, `stroppy remove`, and `stroppy export` accept `--source-root PATH` (or `STROPPY_SOURCE_ROOT`) to compile local artifacts against a Stroppy source tree instead of the pinned SDK module, and every build states which SDK the activated runtime uses, including the effective module version when a workload pins a newer one. ([#191](https://github.com/stroppy-io/stroppy/pull/191))
 - `stroppy init` creates a minimal standalone Go workload, and `stroppy eject` restores explicitly published workload source into a new or empty directory, including built-in sources and exported collections. ([#188](https://github.com/stroppy-io/stroppy/pull/188))
 - Workload tests can use public noop/recording helpers and a recording driver that captures typed query arguments, transactions, and inserts without a database. ([#188](https://github.com/stroppy-io/stroppy/pull/188))
@@ -38,9 +38,9 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
-- TPC-C pacing waits stop on cancellation, think once after nonfatal failures, and preserve successful transactions when post-transaction thinking is interrupted.
-- TPC-C reports count successful measured completions separately from failures and drain, with phase and outcome labels on existing latency metrics.
-- TPC-C transaction history IDs continue above existing data across sequential runs instead of colliding when a dataset is reused.
+- TPC-C pacing waits stop on cancellation, think once after nonfatal failures, and preserve successful transactions when post-transaction thinking is interrupted. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
+- TPC-C reports count successful measured completions separately from failures and drain, with phase and outcome labels on existing latency metrics. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
+- TPC-C transaction history IDs continue above existing data across sequential runs instead of colliding when a dataset is reused. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
 - Custom workload builds no longer infer the SDK source tree from the working directory, which made `stroppy build` inside a workload project replace the SDK with that project and fail. ([#191](https://github.com/stroppy-io/stroppy/pull/191))
 - Selected-workload help no longer advertises the optional positional SQL file for workloads that reject it, and omits an empty "Workload parameters" section for workloads that declare none. ([#191](https://github.com/stroppy-io/stroppy/pull/191))
 - `stroppy run <name> --help` prints the selected workload's parameters and steps for custom compiled workloads too, instead of reporting that the workload is unknown. ([#191](https://github.com/stroppy-io/stroppy/pull/191))
