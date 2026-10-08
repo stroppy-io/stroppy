@@ -154,6 +154,52 @@ func TestDrainExpiryCannotBecomeLogicalSuccess(t *testing.T) {
 	require.Equal(t, report.StatusCompletedWithErrors, result.Status)
 	require.Equal(t, uint64(1), result.Errors.FailedIterations)
 	require.InDelta(t, 0, *result.Metrics["successful_transactions_total"].Total, 0)
+	require.Equal(t, "timeout", result.Errors.Groups[0].Class)
+}
+
+func TestDrainExpiryAfterLogicalSuccess(t *testing.T) {
+	test := Test{Name: "drain-idle", Define: func(d *Def) error {
+		d.Execution.Step("work", func(ctx context.Context, b *Bench) error {
+			if err := b.LogicalOperation(func() error { return nil }); err != nil {
+				return err
+			}
+
+			<-ctx.Done()
+
+			return nil
+		}, ConstantWorkers(1, 20*time.Millisecond, DrainTimeout(0)))
+
+		return d.Execution.Err()
+	}}
+	result, err := RunTest(t.Context(), test, noopRunOptions())
+	require.NoError(t, err)
+	require.Equal(t, report.StatusCompleted, result.Status)
+	require.Zero(t, result.Errors.FailedIterations)
+	require.InDelta(t, 1, *result.Metrics["successful_transactions_total"].Total, 0)
+}
+
+func TestLogicalSuccessIsResetBetweenIterations(t *testing.T) {
+	var calls int
+
+	test := Test{Name: "drain-reset", Define: func(d *Def) error {
+		d.Execution.Step("work", func(ctx context.Context, b *Bench) error {
+			calls++
+			if calls == 1 {
+				return b.LogicalOperation(func() error { return nil })
+			}
+
+			<-ctx.Done()
+
+			return nil
+		}, ConstantWorkers(1, 20*time.Millisecond, DrainTimeout(0)))
+
+		return d.Execution.Err()
+	}}
+	result, err := RunTest(t.Context(), test, noopRunOptions())
+	require.NoError(t, err)
+	require.Equal(t, report.StatusCompletedWithErrors, result.Status)
+	require.Equal(t, uint64(1), result.Errors.FailedIterations)
+	require.InDelta(t, 1, *result.Metrics["successful_transactions_total"].Total, 0)
 }
 
 func TestParentCancellationAndDetachedCleanup(t *testing.T) {
