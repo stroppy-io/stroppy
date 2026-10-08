@@ -27,6 +27,9 @@ Typed workload parameters are listed by `stroppy run tpcc/tx --help` and
 `stroppy run tpcc/procs --help`:
 
 - `--scale-factor` sets the warehouse count.
+- `--spread-warehouses` chooses a home warehouse uniformly for each transaction
+  instead of pinning each VU to one warehouse. The choice stays fixed across
+  retries; this stress mode is not fixed-terminal TPC-C.
 - `--warehouse-start` sets the first warehouse ID for a distributed slice.
 - `--load-items` controls loading the shared 100,000-row item table; it defaults
   to true only when `warehouse-start` is 1.
@@ -53,8 +56,10 @@ Several processes can load disjoint warehouse ranges into one database:
   --steps load_data,validate_population
 ```
 
-Each virtual user is pinned to a home warehouse within its configured slice;
-remote warehouse choices also stay inside that slice. On YDB, run
+By default, each virtual user is pinned to a home warehouse within its configured
+slice. With `--spread-warehouses`, every transaction chooses a home warehouse from
+the full slice, so a small VU count can exercise a large warehouse range. Remote
+warehouse choices stay inside that slice and exclude the current home warehouse. On YDB, run
 `create_schema` once with the total warehouse range so generated partition keys
 cover every loader. Population validation is restricted to the configured
 slice.

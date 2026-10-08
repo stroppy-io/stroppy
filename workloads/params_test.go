@@ -151,6 +151,7 @@ func tpccParamSchema() []bench.ParamSchema {
 		param("pg-unlogged", bench.ParamTypeBool, false, "PG_UNLOGGED", "pgUnlogged"),
 		param("retry-attempts", bench.ParamTypeInt, 3, "RETRY_ATTEMPTS", "retryAttempts"),
 		param("scale-factor", bench.ParamTypeInt, 1, "SCALE_FACTOR", "scaleFactor", "warehouses"),
+		param("spread-warehouses", bench.ParamTypeBool, false, "SPREAD_WAREHOUSES", "spreadWarehouses"),
 		param("sql-file", bench.ParamTypeString, "", "SQL_FILE", "sqlFile"),
 		param("tx-isolation", bench.ParamTypeString, "", "TX_ISOLATION", "txIsolation"),
 		param("warehouse-start", bench.ParamTypeInt, 1, "WAREHOUSE_START", "warehouseStart"),

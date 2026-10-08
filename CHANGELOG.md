@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- TPC-C can spread each VU's transactions across all configured warehouses with `--spread-warehouses`, independently of concurrency.
 - `stroppy build`, `stroppy remove`, and `stroppy export` accept `--source-root PATH` (or `STROPPY_SOURCE_ROOT`) to compile local artifacts against a Stroppy source tree instead of the pinned SDK module, and every build states which SDK the activated runtime uses, including the effective module version when a workload pins a newer one. ([#191](https://github.com/stroppy-io/stroppy/pull/191))
 - `stroppy init` creates a minimal standalone Go workload, and `stroppy eject` restores explicitly published workload source into a new or empty directory, including built-in sources and exported collections. ([#188](https://github.com/stroppy-io/stroppy/pull/188))
 - Workload tests can use public noop/recording helpers and a recording driver that captures typed query arguments, transactions, and inserts without a database. ([#188](https://github.com/stroppy-io/stroppy/pull/188))

@@ -55,10 +55,11 @@ type workload struct {
 	sqlFile       string
 	loadWorkers   int
 
-	warehouses     int64
-	warehouseStart int64
-	wIDMax         int64
-	loadItems      bool
+	warehouses       int64
+	warehouseStart   int64
+	wIDMax           int64
+	loadItems        bool
+	spreadWarehouses bool
 
 	m *metrics
 
@@ -109,6 +110,10 @@ func define(d *bench.Def, variant string) error {
 		w.warehouseStart == 1,
 		"Load shared item table.",
 		bench.DerivedDefault("true when warehouse-start is 1"),
+	)
+	w.spreadWarehouses, _ = d.Param.Bool(
+		"spread-warehouses", false,
+		"Choose a home warehouse uniformly for each transaction; not fixed-terminal TPC-C.",
 	)
 	w.pacing, _ = d.Param.Bool("pacing", false, "Apply keying and think times.")
 	w.retryAttempts, _ = d.Param.Int("retry-attempts", 3, "Maximum transaction attempts.")
@@ -355,6 +360,10 @@ func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64)
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
 	//nolint:gosec // worker is nonnegative and bounded by allocated worker state.
 	vs := w.vuState(uint64(b.Worker()+1), w.warehouseStart, w.warehouses)
+	if w.spreadWarehouses {
+		vs.homeWID = vs.warehouseStart + vs.homeWh.Int64N(vs.warehouses)
+	}
+
 	if w.variant == "procs" {
 		return w.iterateProcs(ctx, b, vs)
 	}
@@ -1269,6 +1278,7 @@ type vuState struct {
 	warehouseStart int64
 
 	picker *rand.Rand
+	homeWh *rand.Rand
 
 	noDID, noOlCnt, noQty, noRemoteLine, noRollback *rand.Rand
 	noCID, noItem                                   *rand.Rand
@@ -1308,6 +1318,7 @@ func (w *workload) vuState(vuid uint64, warehouseStart, warehouses int64) *vuSta
 		warehouses:     warehouses,
 		warehouseStart: warehouseStart,
 		picker:         newRand("picker"),
+		homeWh:         newRand("home.warehouse"),
 		noDID:          newRand("neword.d_id"),
 		noCID:          newRand("neword.c_id"),
 		noOlCnt:        newRand("neword.ol_cnt"),
