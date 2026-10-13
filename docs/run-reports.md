@@ -30,6 +30,87 @@ on stderr without failing the run. When a run itself fails after reporting start
 Stroppy still writes the requested report with `status: "failed"` or
 `status: "canceled"`, then returns the run error.
 
+## HTML reports and local viewer
+
+```bash
+# One self-contained HTML file, generated during a run
+stroppy run tpcc/tx -d pg --report-html result.html
+
+# JSON and HTML can be requested together, with or without history saving
+stroppy run tpcc/tx -d pg --no-save-report \
+  --report-format json --report-html result.html
+
+# Export an existing report by its history ID
+stroppy reports export 2026-10-13T09-15-00Z-tpcc-tx --file result.html
+stroppy reports export 2026-10-13T09-15-00Z-tpcc-tx > result.html
+
+# Browse saved reports; the actual loopback URL is printed
+stroppy reports serve
+stroppy reports serve --listen 127.0.0.1:8080
+```
+
+The same Go renderer powers run output, saved-report export, and the local server.
+Exported HTML includes its stylesheet, SVG charts, and complete original JSON;
+there are no scripts, CDN assets, external fonts, or frontend runtime requirements.
+Open the file directly in a browser. Native expandable sections, numeric tables,
+chart hover/focus details, anchors, and JSON download work without JavaScript.
+
+The report starts with a compact overview and a collapsed identity/configuration
+section. Expand it to inspect timestamps, report/run IDs, build/runtime identity,
+parameter values and sources, driver identities, metadata, execution policies,
+and unknown envelope fields. Nested objects use expandable key/value views;
+arrays of objects become tables with identity columns first when their shape is
+bounded. Sparse or overly wide arrays use an expandable list instead, avoiding
+quadratic empty-cell allocation while keeping every authored value. Custom metrics and
+workload-owned results use those same generic views, without requiring a workload
+adapter. Large integer identifiers are preserved as JSON numbers, not rounded
+through JavaScript floating-point conversion. Complete JSON remains downloadable
+byte-for-byte from saved reports, including fields the viewer does not understand.
+
+Metrics are grouped by type with naturally ordered names and aligned preview
+columns. Distributions show count, average, and p99; counters and gauges show their
+recorded aggregate value. Human-readable labels retain the exact metric key below.
+Numeric previews use digit grouping, bounded decimal precision, and large-number
+suffixes; `≈` marks approximation. Exact original values remain in hover titles,
+expanded metric data, and the JSON download. Series charts expand independently.
+
+Charts show recorded step durations, histogram bucket counts with overflow, and
+small labeled numeric payload tables or compatible metric series. Bucket intervals
+retain their reported units, and histogram bars represent counts, not probability
+density or reconstructed samples. Empty finite buckets are omitted from the plot
+with an explicit count, while overflow remains visible and all original buckets
+remain in exact metric data. Step, phase, and outcome dimensions stay separate;
+ambiguous or aggregate-only native headline values are omitted rather than summed
+or assumed to cover the workload step. The catalog uses the same workload-only
+TPS boundary and shows every named driver identity. Missing values
+are not converted to zero. Charts are optional projections: unsuitable or large
+arrays remain available in structured views, and every plotted value has a table alternative.
+No throughput timeline is inferred from final aggregates. Native TPS is not TPC-C
+tpmC, and the viewer does not issue audited benchmark-compliance claims.
+
+`serve` uses an available port on `127.0.0.1` by default and does not open a browser
+automatically. The catalog provides workload, driver, status, start-time, and order
+filters plus 20-report pages using ordinary GET forms. Report pages and original
+JSON downloads are read-only; no web route runs workloads or deletes history.
+Cancel the command to stop the server; active responses get a five-second drain
+before forced connection closure. `--listen` can explicitly select another
+interface; there is no authentication or multi-user hosting contract, so use it
+only in the intended trusted environment.
+
+Malformed entries warn in the catalog without hiding healthy reports. The inherited
+32 MiB metadata-inspection limit still applies to catalog discovery; explicit
+export or viewing by ID reads the full report. Unfamiliar envelope schemas display
+a warning and recognizable shared fields plus complete original data. Report text
+is HTML-escaped, including authored SQL, logs, and payload strings.
+
+`--report-html` does not change `--report-format` or `--report-file`; JSON and HTML
+paths must differ. `--no-report` conflicts with any requested output, including
+HTML, while `--no-save-report` leaves HTML available. HTML files are published
+atomically, and a requested write/rendering failure returns a nonzero exit status.
+Filesystem aliases, including symlinked parent directories, cannot select the
+same JSON/HTML destination; HTML export also refuses to replace its source history
+entry. If stdout fails, independently requested file outputs are still attempted.
+
 ## Saved report history
 
 The installed and standalone CLIs expose the same history commands:

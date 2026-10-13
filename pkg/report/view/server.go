@@ -1,0 +1,206 @@
+package view
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"io/fs"
+	"net/http"
+	"net/url"
+	"strconv"
+	"time"
+
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
+)
+
+const catalogPageSize = 20
+
+var errCatalogQuery = errors.New("invalid report catalog filter")
+
+type catalogPage struct {
+	Entries  []report.HistoryEntry
+	Problems []report.HistoryProblem
+	Query    url.Values
+	Previous string
+	Next     string
+	Total    int
+}
+
+// Handler serves a read-only history catalog, HTML reports, and original JSON.
+func Handler(history *report.History) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		serveCatalog(w, r, history)
+	})
+	mux.HandleFunc("GET /reports/{id}", func(w http.ResponseWriter, r *http.Request) {
+		data, err := history.Get(r.PathValue("id"))
+		if err != nil {
+			reportHTTPError(w, err)
+
+			return
+		}
+
+		var buffer bytes.Buffer
+		if err := renderServed(&buffer, data, r.PathValue("id"), r.URL.Path+"/json"); err != nil {
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write(buffer.Bytes())
+	})
+	mux.HandleFunc("GET /reports/{id}/json", func(w http.ResponseWriter, r *http.Request) {
+		data, err := history.Get(r.PathValue("id"))
+		if err != nil {
+			reportHTTPError(w, err)
+
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Disposition", `attachment; filename="report.json"`)
+		_, _ = w.Write(data) //nolint:gosec // validated JSON attachment, never rendered as HTML.
+	})
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; "+
+			"img-src data:; form-action 'self'; frame-ancestors 'none'")
+		mux.ServeHTTP(w, r)
+	})
+}
+
+func serveCatalog(w http.ResponseWriter, r *http.Request, history *report.History) {
+	query, err := catalogQuery(r.URL.Query())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	entries, problems, err := history.List(query)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	index, err := strconv.Atoi(r.URL.Query().Get("page"))
+	if r.URL.Query().Get("page") == "" {
+		index = 0
+		err = nil
+	}
+
+	lastPage := max(0, (len(entries)-1)/catalogPageSize)
+	if err != nil || index < 0 || index > lastPage {
+		http.Error(w, "invalid catalog page", http.StatusBadRequest)
+
+		return
+	}
+
+	start := index * catalogPageSize
+	end := min(start+catalogPageSize, len(entries))
+
+	page := catalogPage{Entries: entries[start:end], Problems: problems, Query: r.URL.Query(), Total: len(entries)}
+	if index > 0 {
+		page.Previous = catalogLink(r.URL.Query(), index-1)
+	}
+
+	if end < len(entries) {
+		page.Next = catalogLink(r.URL.Query(), index+1)
+	}
+
+	var buffer bytes.Buffer
+	if err := templates.ExecuteTemplate(&buffer, "catalog", page); err != nil {
+		http.Error(w, "cannot render report catalog", http.StatusInternalServerError)
+
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write(buffer.Bytes())
+}
+
+func reportHTTPError(w http.ResponseWriter, err error) {
+	status := http.StatusUnprocessableEntity
+	if errors.Is(err, fs.ErrNotExist) {
+		status = http.StatusNotFound
+	} else if errors.Is(err, report.ErrInvalidHistoryID) {
+		status = http.StatusBadRequest
+	}
+
+	http.Error(w, err.Error(), status)
+}
+
+func catalogQuery(values url.Values) (report.HistoryQuery, error) {
+	if order := values.Get("order"); order != "" && order != "newest" && order != "oldest" {
+		return report.HistoryQuery{}, errCatalogQuery
+	}
+
+	query := report.HistoryQuery{
+		Workloads: values["workload"], Drivers: values["driver"], Reverse: values.Get("order") == "oldest",
+	}
+	for i, driver := range query.Drivers {
+		switch driver {
+		case "pg":
+			query.Drivers[i] = "postgres"
+		case "pico":
+			query.Drivers[i] = "picodata"
+		}
+	}
+
+	for _, status := range values["status"] {
+		switch report.Status(status) {
+		case "":
+		case report.StatusCompleted, report.StatusCompletedWithErrors, report.StatusFailed, report.StatusCanceled:
+			query.Statuses = append(query.Statuses, report.Status(status))
+		default:
+			return query, fmt.Errorf("%w: invalid status %q", errCatalogQuery, status)
+		}
+	}
+
+	if len(query.Workloads) == 1 && query.Workloads[0] == "" {
+		query.Workloads = nil
+	}
+
+	if len(query.Drivers) == 1 && query.Drivers[0] == "" {
+		query.Drivers = nil
+	}
+
+	var err error
+
+	query.Since, err = catalogTime(values.Get("since"))
+	if err != nil {
+		return query, err
+	}
+
+	query.Until, err = catalogTime(values.Get("until"))
+
+	return query, err
+}
+
+func catalogTime(value string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, nil
+	}
+
+	for _, layout := range []string{time.RFC3339Nano, time.DateOnly} {
+		if result, err := time.Parse(layout, value); err == nil {
+			return result, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("%w: invalid date %q", errCatalogQuery, value)
+}
+
+func catalogLink(values url.Values, page int) string {
+	query := url.Values{}
+	for key, value := range values {
+		query[key] = value
+	}
+
+	query.Set("page", strconv.Itoa(page))
+
+	return "/?" + query.Encode()
+}
