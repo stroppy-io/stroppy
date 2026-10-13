@@ -39,7 +39,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
-- Run-report failure and diagnostic messages redact configured database credentials and exporter headers before saving or JSON output. ([#199](https://github.com/stroppy-io/stroppy/pull/199))
+- Run-report failure and built-in validation diagnostics redact configured database credentials and decoded exporter headers before saving or JSON output. ([#199](https://github.com/stroppy-io/stroppy/pull/199))
+- Report-history commands handle empty cleanup selections, show their own help in standalone workloads, bound oversized-report inspection, and reject files replaced after selection; saving also works without filesystem hard-link support. ([#199](https://github.com/stroppy-io/stroppy/pull/199))
 - TPC-C pacing waits stop on cancellation, think once after nonfatal failures, and preserve successful transactions when post-transaction thinking is interrupted. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
 - TPC-C reports count successful measured completions separately from failures and drain, with phase and outcome labels on existing latency metrics. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
 - TPC-C transaction history IDs continue above existing data across sequential runs instead of colliding when a dataset is reused. ([#195](https://github.com/stroppy-io/stroppy/pull/195))

@@ -87,7 +87,11 @@ func writeHistoryFile(dir, name string, data []byte) (path string, err error) {
 	if err != nil {
 		return "", fmt.Errorf("create report history file: %w", err)
 	}
-	defer func() { err = errors.Join(err, root.Remove(temporary)) }()
+	defer func() {
+		if removeErr := root.Remove(temporary); !errors.Is(removeErr, fs.ErrNotExist) {
+			err = errors.Join(err, removeErr)
+		}
+	}()
 
 	_, writeErr := file.Write(data)
 	if writeErr == nil {
@@ -104,9 +108,21 @@ func writeHistoryFile(dir, name string, data []byte) (path string, err error) {
 			fileName = fmt.Sprintf("%s-%d.json", name, suffix)
 		}
 
-		if err := root.Link(temporary, fileName); errors.Is(err, fs.ErrExist) {
+		reservation := ".publish-" + fileName
+		if err := root.Mkdir(reservation, historyDirPerm); errors.Is(err, fs.ErrExist) {
 			continue
 		} else if err != nil {
+			return "", fmt.Errorf("reserve report history: %w", err)
+		}
+
+		publishErr := publishHistory(root, temporary, fileName)
+
+		cleanupErr := root.Remove(reservation)
+		if errors.Is(publishErr, fs.ErrExist) && cleanupErr == nil {
+			continue
+		}
+
+		if err := errors.Join(publishErr, cleanupErr); err != nil {
 			return "", fmt.Errorf("publish report history: %w", err)
 		}
 
@@ -114,6 +130,24 @@ func writeHistoryFile(dir, name string, data []byte) (path string, err error) {
 	}
 
 	return "", fmt.Errorf("%w: %s", errHistoryNameExhausted, name)
+}
+
+func publishHistory(root *os.Root, temporary, name string) error {
+	if err := root.Link(temporary, name); err == nil || errors.Is(err, fs.ErrExist) {
+		return err
+	}
+
+	return renameHistory(root, temporary, name)
+}
+
+func renameHistory(root *os.Root, temporary, name string) error {
+	if _, err := root.Lstat(name); err == nil {
+		return fs.ErrExist
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+
+	return root.Rename(temporary, name)
 }
 
 func safeName(name string) string {

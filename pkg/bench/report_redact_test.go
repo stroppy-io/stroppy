@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func TestReportDiagnosticRedaction(t *testing.T) {
@@ -54,6 +56,43 @@ func TestReportDiagnosticRedaction(t *testing.T) {
 				t.Fatalf("credential remained: %s", message)
 			}
 		})
+	}
+}
+
+func TestReportDecodedHeadersAndUsernames(t *testing.T) {
+	t.Parallel()
+
+	headers := "authorization=Bearer%20private-token"
+	redactor := reportRedactor(map[string]DriverConfig{"default": {
+		Kind: DriverPostgres, URL: "postgres://private-user:private-password@localhost/db",
+	}}, &MetricsConfig{Headers: headers})
+
+	message := boundReportError(errors.New("user=private-user Bearer private-token"), redactor)
+	if strings.Contains(message, "private-") {
+		t.Fatalf("decoded credentials retained: %s", message)
+	}
+}
+
+func TestReportInvalidConninfoDoesNotPublishSecrets(t *testing.T) {
+	t.Parallel()
+
+	connection := "host=localhost password=private-password auth_token=private-token sslmode=invalid"
+
+	_, err := pgconn.ParseConfig(connection)
+	if err == nil {
+		t.Fatal("invalid connection accepted")
+	}
+
+	redactor := reportRedactor(map[string]DriverConfig{"default": {Kind: DriverPostgres, URL: connection}}, nil)
+
+	message := boundReportError(err, redactor)
+	if strings.Contains(message, "private-") || !strings.Contains(message, "cannot parse database connection string") {
+		t.Fatalf("invalid conninfo exposed: %s", message)
+	}
+
+	diagnostic := (ReportContext{redactor: redactor}).Diagnostic(err.Error())
+	if strings.Contains(diagnostic, "private-") {
+		t.Fatalf("string diagnostic exposed invalid conninfo: %s", diagnostic)
 	}
 }
 

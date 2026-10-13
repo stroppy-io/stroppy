@@ -54,7 +54,10 @@ normalized lowercase workload name, and an optional collision suffix (`-2`,
 which may be user-supplied and reused. Existing history files keep their IDs;
 there is no migration. `get` returns the stored JSON unchanged, including unknown
 fields and workload payloads. Files are published only after their contents are
-written, so concurrent readers do not see partly written reports.
+written, so concurrent readers do not see partly written reports. On filesystems
+without hard links, publication uses a reserved filename and atomic rename.
+Interrupted publication can leave hidden `.report-*` or `.publish-*` artifacts;
+read commands ignore them and later saves use a different collision suffix.
 
 `list` defaults to the newest 20 reports. `--limit 0` returns all results;
 `--reverse` orders oldest first. Ordering uses `started_at`, then history ID,
@@ -79,11 +82,16 @@ status and removal previews/results. Diagnostics go to stderr, not JSON stdout.
 `status` reports location, existence, healthy/unreadable counts, and bytes in
 regular candidate report files. A missing history directory is empty and is not
 created by read commands. Malformed or unreadable files produce warnings without
-blocking healthy reports. Cleanup skips those files because their start time
-cannot be trusted; an explicitly named corrupt regular report can still be
-removed. Symlinks and arbitrary paths are rejected. Explicit batch removal
-validates all targets before deleting any, but filesystem errors during deletion
-can still leave a partially removed batch and return a nonzero exit status.
+blocking healthy reports. Metadata inspection is bounded to 32 MiB per report;
+larger entries warn and are skipped by list/status/prune, while `get` still
+retrieves them in full. Cleanup skips unreadable entries because their start
+time cannot be trusted; an explicitly named corrupt or oversized regular report
+can still be removed. Symlinks and arbitrary paths are rejected. Explicit batch removal
+validates all targets before deleting any, pins the selected directory and file
+identities, and rejects replacements. Filesystem errors during deletion can
+still leave a partially removed batch and return a nonzero exit status. If a
+replacement is detected after staging, it is retained rather than deleted at the reported
+`.remove-*` recovery location.
 
 `prune` requires a positive Go duration such as `720h` (30 days). It selects run
 starts strictly older than that age and accepts the same workload, driver,
@@ -110,8 +118,10 @@ first measured step. Optional `build_digest` identifies cached generated-runtime
 or exported runs; direct installed built-in runs omit it. Driver URLs,
 authentication fields, and OTLP headers are not included as configuration.
 Configured connection strings and credential values are also redacted from
-report failure and diagnostic messages before truncation. This does not scrub
-arbitrary authored parameters, metadata, or opaque workload payloads, and does
+report failure and diagnostic messages before truncation. Built-in TPC-H/TPC-DS
+validation diagnostics use the same boundary; custom contributors can call
+`snapshot.Diagnostic(message)` for diagnostic fields inside their payloads.
+This does not scrub arbitrary authored parameters, metadata, or opaque workload payloads, and does
 not rewrite existing reports.
 
 Counters and gauges contain aggregate totals plus dimensioned series. Histograms

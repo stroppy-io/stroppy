@@ -18,6 +18,12 @@ func reportRedactor(configurations map[string]DriverConfig, metrics *MetricsConf
 
 	if metrics != nil {
 		values = append(values, metrics.Headers)
+		if headers, err := parseOTLPHeaders(metrics.Headers); err == nil {
+			for _, value := range headers {
+				values = append(values, value)
+			}
+		}
+
 		for header := range strings.SplitSeq(metrics.Headers, ",") {
 			if _, value, ok := strings.Cut(header, "="); ok {
 				values = append(values, strings.TrimSpace(value))
@@ -60,16 +66,15 @@ func driverReportSecrets(configuration *DriverConfig) []string {
 	switch configuration.Kind {
 	case DriverPostgres, DriverPicodata:
 		if parsed, err := pgconn.ParseConfig(configuration.URL); err == nil {
-			values = append(values, parsed.Password)
+			values = append(values, parsed.User, parsed.Password)
+			values = append(values, reportSecretValues(parsed.RuntimeParams)...)
+		} else {
+			values = append(values, err.Error())
 		}
 	case DriverMySQL:
 		if parsed, err := mysql.ParseDSN(configuration.URL); err == nil {
-			values = append(values, parsed.Passwd)
-			for key, value := range parsed.Params {
-				if secretReportKey(key) {
-					values = append(values, value)
-				}
-			}
+			values = append(values, parsed.User, parsed.Passwd)
+			values = append(values, reportSecretValues(parsed.Params)...)
 		}
 	default:
 	}
@@ -87,12 +92,24 @@ func uriReportSecrets(connection string) []string {
 
 	if parsed.User != nil {
 		password, _ := parsed.User.Password()
-		values = append(values, password)
+		values = append(values, parsed.User.Username(), password)
 	}
 
 	for key, items := range parsed.Query() {
 		if secretReportKey(key) {
 			values = append(values, items...)
+		}
+	}
+
+	return values
+}
+
+func reportSecretValues(parameters map[string]string) []string {
+	values := []string{}
+
+	for key, value := range parameters {
+		if secretReportKey(key) {
+			values = append(values, value)
 		}
 	}
 

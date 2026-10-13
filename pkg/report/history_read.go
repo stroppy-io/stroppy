@@ -10,7 +10,11 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
+
+const maxHistoryMetadataBytes = 32 << 20
 
 var (
 	ErrInvalidHistoryID = errors.New("invalid report history ID")
@@ -18,22 +22,26 @@ var (
 	errHistoryFile      = errors.New("report history entry must be a regular file")
 	errHistoryEnvelope  = errors.New("invalid run report envelope")
 	errHistoryQuery     = errors.New("invalid report history query")
+	errHistoryTooLarge  = errors.New("report exceeds 32 MiB metadata inspection limit; use get for full retrieval")
+	errHistoryChanged   = errors.New("report changed after selection")
 )
 
 // HistoryEntry is common metadata, not a workload-specific result projection.
 type HistoryEntry struct {
-	ID         string    `json:"id"`
-	ReportID   string    `json:"report_id"`
-	RunID      string    `json:"run_id,omitempty"`
-	Schema     int       `json:"schema"`
-	StartedAt  time.Time `json:"started_at"`
-	FinishedAt time.Time `json:"finished_at"`
-	Workload   string    `json:"workload"`
-	Driver     string    `json:"driver"`
-	Drivers    []Driver  `json:"drivers"`
-	Status     Status    `json:"status"`
-	TPS        *float64  `json:"tps,omitempty"`
-	SizeBytes  int64     `json:"size_bytes"`
+	ID                string    `json:"id"`
+	ReportID          string    `json:"report_id"`
+	RunID             string    `json:"run_id,omitempty"`
+	Schema            int       `json:"schema"`
+	StartedAt         time.Time `json:"started_at"`
+	FinishedAt        time.Time `json:"finished_at"`
+	Workload          string    `json:"workload"`
+	Driver            string    `json:"driver"`
+	Drivers           []Driver  `json:"drivers"`
+	Status            Status    `json:"status"`
+	TPS               *float64  `json:"tps,omitempty"`
+	SizeBytes         int64     `json:"size_bytes"`
+	identity          fs.FileInfo
+	directoryIdentity fs.FileInfo
 }
 
 // HistoryProblem identifies an unreadable entry without hiding healthy entries.
@@ -60,6 +68,7 @@ type HistoryQuery struct {
 	Statuses  []Status
 	Since     time.Time
 	Until     time.Time
+	OlderThan time.Time
 	Reverse   bool
 	Limit     int
 }
@@ -115,6 +124,10 @@ func (q *HistoryQuery) matches(entry *HistoryEntry) bool {
 		return false
 	}
 
+	if !q.OlderThan.IsZero() && !entry.StartedAt.Before(q.OlderThan) {
+		return false
+	}
+
 	if len(q.Drivers) == 0 || slices.Contains(q.Drivers, entry.Driver) {
 		return true
 	}
@@ -152,6 +165,11 @@ func (h *History) scan() ([]HistoryEntry, HistoryStatus, error) {
 
 	status.Exists = true
 
+	directoryInfo, err := root.Stat(".")
+	if err != nil {
+		return nil, status, err
+	}
+
 	files, err := fs.ReadDir(root.FS(), ".")
 	if err != nil {
 		return nil, status, fmt.Errorf("list report history: %w", err)
@@ -164,7 +182,7 @@ func (h *History) scan() ([]HistoryEntry, HistoryStatus, error) {
 
 		id := strings.TrimSuffix(file.Name(), ".json")
 
-		data, info, readErr := readHistoryFile(root, id)
+		data, info, readErr := readHistoryFile(root, id, maxHistoryMetadataBytes)
 		if info != nil && info.Mode().IsRegular() {
 			status.SizeBytes += info.Size()
 		}
@@ -181,6 +199,8 @@ func (h *History) scan() ([]HistoryEntry, HistoryStatus, error) {
 		}
 
 		entry.SizeBytes = info.Size()
+		entry.identity = info
+		entry.directoryIdentity = directoryInfo
 		entries = append(entries, entry)
 	}
 
@@ -202,7 +222,7 @@ func (h *History) Get(id string) ([]byte, error) {
 	}
 	defer root.Close()
 
-	data, _, err := readHistoryFile(root, id)
+	data, _, err := readHistoryFile(root, id, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -216,34 +236,9 @@ func (h *History) Get(id string) ([]byte, error) {
 
 // CheckRemoval validates every explicit target before a batch removal starts.
 func (h *History) CheckRemoval(ids []string) error {
-	if len(ids) == 0 {
-		return nil
-	}
+	_, err := h.SelectRemoval(ids)
 
-	for _, id := range ids {
-		if err := validateHistoryID(id); err != nil {
-			return err
-		}
-	}
-
-	root, err := openHistory(h.Directory)
-	if err != nil {
-		return err
-	}
-	defer root.Close()
-
-	for _, id := range ids {
-		info, err := root.Lstat(id + ".json")
-		if err != nil {
-			return fmt.Errorf("report %q: %w", id, err)
-		}
-
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf("report %q: %w", id, errHistoryFile)
-		}
-	}
-
-	return nil
+	return err
 }
 
 // Remove deletes only regular files with managed history names. Corrupt reports
@@ -268,7 +263,117 @@ func (h *History) Remove(id string) error {
 		return errHistoryFile
 	}
 
-	return root.Remove(id + ".json")
+	return removeHistoryEntry(root, &HistoryEntry{ID: id, identity: info})
+}
+
+// SelectRemoval snapshots explicit targets, including corrupt regular reports.
+func (h *History) SelectRemoval(ids []string) ([]HistoryEntry, error) {
+	entries := make([]HistoryEntry, 0, len(ids))
+	if len(ids) == 0 {
+		return entries, nil
+	}
+
+	for _, id := range ids {
+		if err := validateHistoryID(id); err != nil {
+			return nil, err
+		}
+	}
+
+	root, err := openHistory(h.Directory)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+
+	directory, err := root.Stat(".")
+	if err != nil {
+		return nil, err
+	}
+
+	for _, id := range ids {
+		info, err := root.Lstat(id + ".json")
+		if err != nil || !info.Mode().IsRegular() {
+			return nil, errors.Join(errHistoryFile, err)
+		}
+
+		entries = append(entries, HistoryEntry{ID: id, identity: info, directoryIdentity: directory})
+	}
+
+	return entries, nil
+}
+
+// RemoveSelected removes only unchanged files from the selected history root.
+func (h *History) RemoveSelected(entries []HistoryEntry) ([]string, error) {
+	removed := []string{}
+	if len(entries) == 0 {
+		return removed, nil
+	}
+
+	root, err := openHistory(h.Directory)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+
+	directory, err := root.Stat(".")
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range entries {
+		entry := &entries[i]
+		if entry.directoryIdentity == nil || entry.identity == nil ||
+			!os.SameFile(entry.directoryIdentity, directory) {
+			return nil, errHistoryChanged
+		}
+
+		current, err := root.Lstat(entry.ID + ".json")
+		if err != nil || !sameHistoryFile(entry.identity, current) {
+			return nil, errors.Join(errHistoryChanged, err)
+		}
+	}
+
+	var removalErr error
+
+	for i := range entries {
+		if err := removeHistoryEntry(root, &entries[i]); err != nil {
+			removalErr = errors.Join(removalErr, fmt.Errorf("remove report %q: %w", entries[i].ID, err))
+		} else {
+			removed = append(removed, entries[i].ID)
+		}
+	}
+
+	return removed, removalErr
+}
+
+func sameHistoryFile(expected, current fs.FileInfo) bool {
+	return current != nil && current.Mode().IsRegular() && os.SameFile(expected, current) &&
+		expected.Size() == current.Size() && expected.ModTime().Equal(current.ModTime())
+}
+
+func removeHistoryEntry(root *os.Root, entry *HistoryEntry) error {
+	if err := validateHistoryID(entry.ID); err != nil {
+		return err
+	}
+
+	name := entry.ID + ".json"
+
+	quarantine := ".remove-" + uuid.NewString()
+	if err := root.Mkdir(quarantine, historyDirPerm); err != nil {
+		return err
+	}
+
+	staged := quarantine + "/report.json"
+	if err := root.Rename(name, staged); err != nil {
+		return errors.Join(err, root.Remove(quarantine))
+	}
+
+	info, err := root.Lstat(staged)
+	if err != nil || !sameHistoryFile(entry.identity, info) {
+		return fmt.Errorf("%w; replacement retained at %s", errors.Join(errHistoryChanged, err), staged)
+	}
+
+	return errors.Join(root.Remove(staged), root.Remove(quarantine))
 }
 
 func openHistory(directory string) (*os.Root, error) {
@@ -281,10 +386,22 @@ func openHistory(directory string) (*os.Root, error) {
 		return nil, errHistorySymlink
 	}
 
-	return os.OpenRoot(directory)
+	root, err := os.OpenRoot(directory)
+	if err != nil {
+		return nil, err
+	}
+
+	opened, err := root.Stat(".")
+	if err != nil || !os.SameFile(info, opened) {
+		root.Close()
+
+		return nil, errors.Join(errHistorySymlink, err)
+	}
+
+	return root, nil
 }
 
-func readHistoryFile(root *os.Root, id string) ([]byte, fs.FileInfo, error) {
+func readHistoryFile(root *os.Root, id string, limit int64) ([]byte, fs.FileInfo, error) {
 	if err := validateHistoryID(id); err != nil {
 		return nil, nil, err
 	}
@@ -298,7 +415,11 @@ func readHistoryFile(root *os.Root, id string) ([]byte, fs.FileInfo, error) {
 		return nil, info, errHistoryFile
 	}
 
-	file, err := root.Open(id + ".json")
+	if limit > 0 && info.Size() > limit {
+		return nil, info, errHistoryTooLarge
+	}
+
+	file, err := openHistoryReport(root, id+".json")
 	if err != nil {
 		return nil, info, err
 	}
@@ -309,11 +430,19 @@ func readHistoryFile(root *os.Root, id string) ([]byte, fs.FileInfo, error) {
 		return nil, info, err
 	}
 
-	if !os.SameFile(info, opened) {
+	if !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
 		return nil, info, errHistoryFile
 	}
 
-	data, err := io.ReadAll(file)
+	var reader io.Reader = file
+	if limit > 0 {
+		reader = io.LimitReader(file, limit+1)
+	}
+
+	data, err := io.ReadAll(reader)
+	if limit > 0 && int64(len(data)) > limit {
+		return nil, info, errHistoryTooLarge
+	}
 
 	return data, info, err
 }

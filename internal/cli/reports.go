@@ -28,6 +28,7 @@ var (
 
 func newReportsCommand() *cobra.Command {
 	command := &cobra.Command{Use: "reports", Short: "List, retrieve, and remove saved run reports"}
+	command.SetHelpFunc(command.HelpFunc())
 	command.AddCommand(
 		newReportsListCommand(), newReportsGetCommand(), newReportsRemoveCommand(),
 		newReportsPruneCommand(), newReportsStatusCommand(),
@@ -121,7 +122,12 @@ func newReportsRemoveCommand() *cobra.Command {
 			slices.Sort(ids)
 			ids = slices.Compact(ids)
 
-			return removeReports(cmd, history, ids, yes, format)
+			entries, err := history.SelectRemoval(ids)
+			if err != nil {
+				return err
+			}
+
+			return removeReports(cmd, history, entries, yes, format)
 		},
 	}
 	command.Flags().BoolVarP(&yes, "yes", "y", false, "delete selected reports instead of previewing")
@@ -156,9 +162,7 @@ func newReportsPruneCommand() *cobra.Command {
 			}
 
 			cutoff := time.Now().UTC().Add(-age)
-			if query.Until.IsZero() || cutoff.Before(query.Until) {
-				query.Until = cutoff
-			}
+			query.OlderThan = cutoff
 
 			history, err := report.DefaultHistory()
 			if err != nil {
@@ -172,13 +176,7 @@ func newReportsPruneCommand() *cobra.Command {
 
 			warnReportProblems(cmd.ErrOrStderr(), problems)
 
-			ids := make([]string, 0, len(entries))
-			for i := range entries {
-				entry := &entries[i]
-				ids = append(ids, entry.ID)
-			}
-
-			return removeReports(cmd, history, ids, yes, format)
+			return removeReports(cmd, history, entries, yes, format)
 		},
 	}
 	selection.flags(command)
@@ -362,25 +360,18 @@ func writeReportEntries(output io.Writer, format string, entries []report.Histor
 	return writer.Flush()
 }
 
-func removeReports(cmd *cobra.Command, history *report.History, ids []string, yes bool, format string) error {
-	if err := history.CheckRemoval(ids); err != nil {
-		return err
+func removeReports(
+	cmd *cobra.Command, history *report.History, entries []report.HistoryEntry, yes bool, format string,
+) error {
+	selected := make([]string, 0, len(entries))
+	for i := range entries {
+		selected = append(selected, entries[i].ID)
 	}
-
-	selected := ids
 
 	var removalErr error
 
 	if yes {
-		selected = []string{}
-
-		for _, id := range ids {
-			if err := history.Remove(id); err != nil {
-				removalErr = errors.Join(removalErr, fmt.Errorf("remove report %q: %w", id, err))
-			} else {
-				selected = append(selected, id)
-			}
-		}
+		selected, removalErr = history.RemoveSelected(entries)
 	}
 
 	if format == "json" {

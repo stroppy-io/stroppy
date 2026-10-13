@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
@@ -35,6 +36,12 @@ type ReportContext struct {
 	Steps        []report.Step
 	Measurements map[string]float64
 	Status       report.Status
+	redactor     *strings.Replacer
+}
+
+// Diagnostic formats a report diagnostic without configured credentials.
+func (c ReportContext) Diagnostic(message string) string {
+	return boundReportText(message, c.redactor)
 }
 
 // ReportContribution is one workload-owned report result.
@@ -261,6 +268,7 @@ func finalizeRunReport(
 			Steps:        slices.Clone(run.Steps),
 			Measurements: maps.Clone(run.Measurements),
 			Status:       run.Status,
+			redactor:     root.reportRedactor,
 		}
 	}, root.reportRedactor)
 }
@@ -333,9 +341,17 @@ func reportErrors(summary errorSummary) report.ErrorSummary {
 }
 
 func boundReportError(err error, redactor *strings.Replacer) string {
+	message := err.Error()
+	if parseError, ok := errors.AsType[*pgconn.ParseConfigError](err); ok {
+		message = strings.ReplaceAll(message, parseError.Error(), "cannot parse database connection string")
+	}
+
+	return boundReportText(message, redactor)
+}
+
+func boundReportText(message string, redactor *strings.Replacer) string {
 	const maxBytes = 2048
 
-	message := err.Error()
 	if redactor != nil {
 		message = redactor.Replace(message)
 	}
