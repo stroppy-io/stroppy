@@ -303,9 +303,10 @@ func (e *Execution) execute(parent context.Context, name string, action Action, 
 				}
 
 				started := time.Now()
+				vu.logicalSucceeded = false
 
 				err := action(vu.ctx, b)
-				if err == nil && errors.Is(context.Cause(ctx), errDrainExpired) {
+				if err == nil && !vu.logicalSucceeded && errors.Is(context.Cause(ctx), errDrainExpired) {
 					err = errDrainExpired
 				}
 
@@ -375,4 +376,4 @@ func (e *Execution) execute(parent context.Context, name string, action Action, 
 	return parent.Err()
 }
 
-var errDrainExpired = errors.New("duration drain expired")
+var errDrainExpired = fmt.Errorf("duration drain expired: %w", context.DeadlineExceeded)

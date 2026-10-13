@@ -19,6 +19,7 @@ func TestTpccProcedureRollbackAccounting(t *testing.T) {
 	pool := NewTmpfsPG(t)
 	ResetSchema(t, pool)
 	_, err := pool.Exec(context.Background(), `
+CREATE TABLE history (h_id bigint PRIMARY KEY);
 CREATE FUNCTION stroppy_test_rollback(forced boolean) RETURNS integer AS $$
 BEGIN
   IF forced THEN

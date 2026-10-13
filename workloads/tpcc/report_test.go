@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
 // testBounds is a small deterministic histogram layout used only by the unit
@@ -26,6 +27,7 @@ func binSamples(samples []float64) txObservation {
 
 	return txObservation{
 		count:        uint64(len(samples)),
+		successful:   uint64(len(samples)),
 		bounds:       testBounds,
 		bucketCounts: buckets,
 	}
@@ -73,6 +75,75 @@ func TestComplianceContributionUsesMeasurementEnd(t *testing.T) {
 			report.ElapsedSeconds,
 			end.Sub(start).Seconds(),
 		)
+	}
+}
+
+func TestComplianceContributionExcludesWarmup(t *testing.T) {
+	warmup, first, second := uint64(1000), uint64(2), uint64(3)
+	w := &workload{variant: "procs"}
+
+	contribution, err := w.complianceContribution(bench.ReportContext{
+		Measurements: map[string]float64{"warmup": 60, "workload": 10},
+		Metrics: map[string]bench.MetricSnapshot{
+			"tpcc_new_order_duration": {Count: 1005},
+		},
+		Series: map[string]report.Metric{"tpcc_new_order_duration": {
+			Series: []report.MetricSeries{
+				{
+					Attributes: map[string]any{"step": "warmup"}, Count: &warmup,
+					Bounds: []float64{100, 500}, BucketCounts: []uint64{0, 0, 1000},
+				},
+				{
+					Attributes: map[string]any{"step": "workload", "worker": 0}, Count: &first,
+					Bounds: []float64{100, 500}, BucketCounts: []uint64{2, 0, 0},
+				},
+				{
+					Attributes: map[string]any{"step": "workload", "worker": 1}, Count: &second,
+					Bounds: []float64{100, 500}, BucketCounts: []uint64{0, 3, 0},
+				},
+			},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	value := contribution.Data.(Report)
+	if value.ElapsedSeconds != 10 || value.Transactions[0].Count != 5 || value.Transactions[0].P90Ms != 500 {
+		t.Fatalf("measured report includes warmup or fails to merge worker buckets: %+v", value)
+	}
+}
+
+func TestComplianceContributionSeparatesOutcomesAndDrain(t *testing.T) {
+	count := uint64(5)
+
+	points := make([]report.MetricSeries, 0, 4)
+	for _, pair := range [][2]string{
+		{"measurement", "success"}, {"measurement", "error"}, {"measurement", "canceled"}, {"drain", "success"},
+	} {
+		points = append(points, report.MetricSeries{
+			Attributes: map[string]any{"step": "workload", "phase": pair[0], "outcome": pair[1]},
+			Count:      &count, Bounds: []float64{100}, BucketCounts: []uint64{5, 0},
+		})
+	}
+
+	w := &workload{variant: "tx", measureDuration: 10 * time.Second}
+
+	contribution, err := w.complianceContribution(bench.ReportContext{
+		Measurements: map[string]float64{"workload": 15},
+		Series:       map[string]report.Metric{"tpcc_new_order_duration": {Series: points}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	value := contribution.Data.(Report)
+
+	transaction := value.Transactions[0]
+	if value.ElapsedSeconds != 10 || value.DrainSeconds != 5 || value.TpmC != 30 ||
+		transaction.Count != 15 || transaction.Successful != 5 || transaction.Failed != 5 ||
+		transaction.Canceled != 5 || transaction.Drained != 5 || transaction.ThroughputPerSec != 0.5 {
+		t.Fatalf("wrong measured outcome accounting: %+v", value)
 	}
 }
 
@@ -278,7 +349,7 @@ func TestObservationQuantile(t *testing.T) {
 		t.Fatalf("quantile(0.50) = %f, want 10000", got)
 	}
 
-	if got := (txObservation{}).quantile(0.90); got != 0 {
+	if got := (&txObservation{}).quantile(0.90); got != 0 {
 		t.Fatalf("empty quantile = %f, want 0", got)
 	}
 }

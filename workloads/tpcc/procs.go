@@ -3,7 +3,6 @@ package tpcc
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
@@ -23,47 +22,23 @@ func bynameInt(b bool) int64 {
 // only — Setup rejects picodata/ydb. Dialect-specific DML lives inside the procs, so
 // the HAS_RETURNING / IS_PICODATA branches of the tx variant are absent here. The
 // by-name / remote-wh / rollback decisions stay client-side (they feed proc params).
-func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, vs *vuState) error {
-	return b.LogicalOperation(func() error {
-		idx := weightedPick(vs.picker, txWeights)
-		name := txNames[idx]
-
-		if w.pacing {
-			sleepSeconds(float64(keyingTime[name]))
-		}
-
-		var err error
-
-		switch idx {
-		case 0:
-			err = w.procNewOrder(ctx, b, vs)
-		case 1:
-			err = w.procPayment(ctx, b, vs)
-		case 2:
-			err = w.procOrderStatus(ctx, b, vs)
-		case 3:
-			err = w.procDelivery(ctx, b, vs)
-		case 4:
-			err = w.procStockLevel(ctx, b, vs)
-		}
-
-		if err != nil {
-			return err
-		}
-
-		if w.pacing {
-			sleepSeconds(thinkTime(vs.picker, thinkTimeMean[name]))
-		}
-
-		return nil
-	})
+func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, vs *vuState, idx int) error {
+	switch idx {
+	case 0:
+		return w.procNewOrder(ctx, b, vs)
+	case 1:
+		return w.procPayment(ctx, b, vs)
+	case 2:
+		return w.procOrderStatus(ctx, b, vs)
+	case 3:
+		return w.procDelivery(ctx, b, vs)
+	default:
+		return w.procStockLevel(ctx, b, vs)
+	}
 }
 
 func (w *workload) procNewOrder(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.newOrderTotal.Add(ctx, 1)
-
-	start := time.Now()
-	defer func() { w.m.newOrderDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
 
 	forceRollback := vs.ri(vs.noRollback, 1, 100) <= 1
 	if forceRollback {
@@ -106,20 +81,19 @@ func (w *workload) procNewOrder(ctx context.Context, b *bench.Bench, vs *vuState
 		return err
 	}
 
-	w.recordSteady()
-
 	return nil
 }
 
 func (w *workload) procPayment(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.paymentTotal.Add(ctx, 1)
 
-	start := time.Now()
-	defer func() { w.m.paymentDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
-
 	dID := vs.ri(vs.payDID, 1, districtsPerWarehouse)
 	amount := vs.rf(vs.payHAmount, 1, 5000)
-	hID := vs.nextHid()
+
+	hID, err := vs.nextHid()
+	if err != nil {
+		return err
+	}
 
 	isRemote := w.warehouses > 1 && vs.ri(vs.payRemote, 1, 100) <= 15
 	if isRemote {
@@ -148,7 +122,7 @@ func (w *workload) procPayment(ctx context.Context, b *bench.Bench, vs *vuState)
 		"p_w_id": vs.homeWID, "p_d_id": dID, "p_c_w_id": cWID, "p_c_d_id": cDID,
 		"p_c_id": cIDPick, "byname": bynameInt(isByName), "h_amount": amount, "c_last": cLastPick, "p_h_id": hID,
 	}
-	err := bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+	err = bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "payment"}, func(tx *bench.Tx) error {
 			return tx.Exec(ctx, w.q("workload_procs", "payment"), args)
 		})
@@ -163,9 +137,6 @@ func (w *workload) procPayment(ctx context.Context, b *bench.Bench, vs *vuState)
 
 func (w *workload) procOrderStatus(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.orderStatusTotal.Add(ctx, 1)
-
-	start := time.Now()
-	defer func() { w.m.orderStatusDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
 
 	dID := vs.ri(vs.osDID, 1, districtsPerWarehouse)
 	cIDPick := vs.nurand(vs.osCID, 1023, 1, customersPerDistrict, vs.osCIDSalt)
@@ -200,9 +171,6 @@ func (w *workload) procOrderStatus(ctx context.Context, b *bench.Bench, vs *vuSt
 func (w *workload) procDelivery(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.deliveryTotal.Add(ctx, 1)
 
-	start := time.Now()
-	defer func() { w.m.deliveryDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
-
 	carrierID := vs.ri(vs.dCarrier, 1, 10)
 	args := map[string]any{"d_w_id": vs.homeWID, "d_o_carrier_id": carrierID}
 
@@ -215,9 +183,6 @@ func (w *workload) procDelivery(ctx context.Context, b *bench.Bench, vs *vuState
 
 func (w *workload) procStockLevel(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.stockLevelTotal.Add(ctx, 1)
-
-	start := time.Now()
-	defer func() { w.m.stockLevelDur.Record(ctx, float64(time.Since(start).Milliseconds())) }()
 
 	dID := vs.ri(vs.slDID, 1, districtsPerWarehouse)
 	threshold := vs.ri(vs.slThreshold, 10, 20)
