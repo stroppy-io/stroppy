@@ -1,0 +1,127 @@
+package banking
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+)
+
+// The injecting variant fails transactions on purpose, so the invariants are
+// checked against interruptions rather than only against concurrency. It needs a
+// fault injector in the server: Macavity (https://github.com/CrystallineCore/Macavity)
+// hooks the transaction callbacks through supported APIs and injects at
+// before_commit — the moment a banking test cares about, because the client cannot
+// tell from the error alone whether the commit happened.
+//
+// PostgreSQL's own injection points cannot do this: they are compiled out of
+// stock builds, and (measured on 18.6) there is no injection point in the commit
+// path at all — the only dependable core point is mid-UPDATE.
+const variantInject = "inject"
+
+// errInjectDriverUnsupported rejects the inject variant on a driver where the
+// Macavity extension cannot exist. Recording and noop are allowed so the variant
+// stays testable and describable without a server.
+var errInjectDriverUnsupported = errors.New(
+	"banking/inject: needs the postgres driver with the Macavity extension available")
+
+// Inject is the fault-injecting variant: postgres only, and it requires the
+// Macavity extension to be installable on the server.
+var Inject = bench.Test{
+	Name:   "banking/inject",
+	Define: defineInject,
+	Source: publication("Inject"),
+}
+
+func init() { bench.Register(Inject) }
+
+func defineInject(d *bench.Def) error { return defineVariant(d, variantInject) }
+
+type injectConfig struct {
+	arm        bench.QueryHandle
+	point      string
+	action     string
+	occurrence int64
+	every      int64
+}
+
+// configureVariant is the seam between the two variants: the plain one does
+// nothing here, the injecting one adds its parameters, its setup step and the
+// handle it fires.
+func (w *workload) configureVariant(d *bench.Def, variant string) error {
+	if variant != variantInject {
+		return nil
+	}
+
+	point, _ := d.Param.String("inject-point", "before_commit",
+		"Fault point to inject at (Macavity point name).")
+	action, _ := d.Param.String("inject-action", "error",
+		"Injected action: error fails the commit, crash kills the backend.")
+	occurrence, _ := d.Param.Int64("inject-occurrence", 1,
+		"Fire the armed event on this matching hit.")
+	every, _ := d.Param.Int64("inject-every", 25,
+		"Arm the injector every Nth transfer; 0 disables injection.")
+
+	switch action {
+	case "error", "crash":
+	default:
+		return fmt.Errorf("banking/inject: unknown --inject-action %q, want error or crash", action)
+	}
+
+	switch w.driverType {
+	case bench.DriverPostgres, bench.DriverNoop, bench.DriverRecording:
+	default:
+		return fmt.Errorf("%w: driver is %s", errInjectDriverUnsupported, w.driverType)
+	}
+
+	if every < 0 {
+		return fmt.Errorf("banking/inject: --inject-every must not be negative, got %d", every)
+	}
+
+	w.inject = &injectConfig{
+		arm:        w.sql.Require("injection", "arm"),
+		point:      point,
+		action:     action,
+		occurrence: occurrence,
+		every:      every,
+	}
+
+	// Arming inside the transfer's own transaction is deliberate: with Macavity,
+	// arming in autocommit skips the arming statement's own commit, but arming
+	// inside an explicit transaction does not — that transaction's COMMIT is the
+	// first hit. So occurrence 1 fails exactly the transfer that armed it, which is
+	// the commit this workload wants to interrupt.
+	//
+	// The extension is created in setup rather than opportunistically, and it is
+	// not PUBLIC: connecting as a role that may not execute macavity_arm fails
+	// there with a permission error rather than mid-run.
+	d.Execution.Step("setup_injection", sqlSection{sql: w.sql, name: "setup_injection"}.Run)
+
+	return nil
+}
+
+// maybeInject arms one injected fault inside the transfer's transaction, shortly
+// before it commits. The transfer itself is untouched: what the run then observes
+// is the client's reaction to a failed or lost commit, and whether the invariants
+// survive it.
+func (w *workload) maybeInject(ctx context.Context, tx *bench.Tx, b *bench.Bench) error {
+	if w.inject == nil || w.inject.every == 0 {
+		return nil
+	}
+
+	if b.Iteration()%uint64(w.inject.every) != 0 { //nolint:gosec // modulo against a positive int64
+		return nil
+	}
+
+	err := tx.Exec(ctx, w.inject.arm.Text, map[string]any{
+		"point":      w.inject.point,
+		"action":     w.inject.action,
+		"occurrence": w.inject.occurrence,
+	})
+	if err != nil {
+		return fmt.Errorf("arm %s/%s: %w", w.inject.point, w.inject.action, err)
+	}
+
+	return nil
+}
