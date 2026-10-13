@@ -73,6 +73,24 @@ func TestReportDecodedHeadersAndUsernames(t *testing.T) {
 	}
 }
 
+func TestReportBearerTokenRedaction(t *testing.T) {
+	t.Parallel()
+
+	for _, headers := range []string{
+		"authorization=Bearer%20private-token",
+		"Authorization=bEaReR%20%20private-token",
+		"x-api-key=private-token",
+	} {
+		redactor := reportRedactor(nil, &MetricsConfig{Headers: headers})
+		for _, diagnostic := range []string{"private-token", "Bearer private-token"} {
+			message := boundReportError(errors.New(diagnostic), redactor)
+			if strings.Contains(message, "private-token") {
+				t.Fatalf("header %q retained token: %s", headers, message)
+			}
+		}
+	}
+}
+
 func TestReportInvalidConninfoDoesNotPublishSecrets(t *testing.T) {
 	t.Parallel()
 

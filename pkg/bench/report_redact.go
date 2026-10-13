@@ -20,7 +20,7 @@ func reportRedactor(configurations map[string]DriverConfig, metrics *MetricsConf
 		values = append(values, metrics.Headers)
 		if headers, err := parseOTLPHeaders(metrics.Headers); err == nil {
 			for _, value := range headers {
-				values = append(values, value)
+				values = append(values, value, reportBearerToken(value))
 			}
 		}
 
@@ -48,6 +48,14 @@ func reportRedactor(configurations map[string]DriverConfig, metrics *MetricsConf
 	}
 
 	return strings.NewReplacer(pairs...)
+}
+
+func reportBearerToken(value string) string {
+	if scheme, token, ok := strings.Cut(value, " "); ok && strings.EqualFold(scheme, "Bearer") {
+		return strings.TrimSpace(token)
+	}
+
+	return ""
 }
 
 func driverReportSecrets(configuration *DriverConfig) []string {
