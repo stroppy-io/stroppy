@@ -63,6 +63,7 @@ func NewRoot(options *Options) *cobra.Command {
 		newVersionCommand(options.Version, options.ManagedCatalog),
 		probeCommand,
 		help.NewCommand(),
+		newReportsCommand(),
 		newInitCommand(),
 		newEjectCommand(catalog, options.ManagedCatalog),
 	)

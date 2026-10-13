@@ -251,7 +251,7 @@ func finalizeRunReport(
 	}
 
 	if runErr != nil {
-		run.Failure = &report.Failure{Phase: phase, Reason: boundReportError(runErr)}
+		run.Failure = &report.Failure{Phase: phase, Reason: boundReportError(runErr, root.reportRedactor)}
 	}
 
 	run.WorkloadReports = buildWorkloadReports(definitions, func() ReportContext {
@@ -262,10 +262,14 @@ func finalizeRunReport(
 			Measurements: maps.Clone(run.Measurements),
 			Status:       run.Status,
 		}
-	})
+	}, root.reportRedactor)
 }
 
-func buildWorkloadReports(definitions []reportDefinition, snapshot func() ReportContext) []report.WorkloadReport {
+func buildWorkloadReports(
+	definitions []reportDefinition,
+	snapshot func() ReportContext,
+	redactor *strings.Replacer,
+) []report.WorkloadReport {
 	out := make([]report.WorkloadReport, 0, len(definitions))
 	for _, definition := range definitions {
 		item := report.WorkloadReport{
@@ -281,7 +285,7 @@ func buildWorkloadReports(definitions []reportDefinition, snapshot func() Report
 		contribution, err := definition.contributor(snapshot())
 		if err != nil {
 			item.Status = report.WorkloadReportError
-			item.Reason = boundReportError(err)
+			item.Reason = boundReportError(err, redactor)
 			out = append(out, item)
 
 			continue
@@ -293,11 +297,15 @@ func buildWorkloadReports(definitions []reportDefinition, snapshot func() Report
 		}
 
 		item.Reason = contribution.Reason
+		if redactor != nil {
+			item.Reason = redactor.Replace(item.Reason)
+		}
+
 		if contribution.Data != nil {
 			encoded, marshalErr := json.Marshal(contribution.Data)
 			if marshalErr != nil {
 				item.Status = report.WorkloadReportError
-				item.Reason = boundReportError(fmt.Errorf("marshal report data: %w", marshalErr))
+				item.Reason = boundReportError(fmt.Errorf("marshal report data: %w", marshalErr), redactor)
 			} else {
 				item.Data = encoded
 			}
@@ -324,10 +332,15 @@ func reportErrors(summary errorSummary) report.ErrorSummary {
 	return out
 }
 
-func boundReportError(err error) string {
+func boundReportError(err error, redactor *strings.Replacer) string {
 	const maxBytes = 2048
 
-	message := strings.ToValidUTF8(err.Error(), "?")
+	message := err.Error()
+	if redactor != nil {
+		message = redactor.Replace(message)
+	}
+
+	message = strings.ToValidUTF8(message, "?")
 	if len(message) <= maxBytes {
 		return message
 	}
