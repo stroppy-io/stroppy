@@ -14,6 +14,7 @@ import (
 	"math/rand/v2"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 const (
@@ -154,7 +155,7 @@ func (w *workload) transfer(ctx context.Context, b *bench.Bench) error {
 	return b.Transaction(ctx, bench.TransactionOptions{
 		Name:      "transfer",
 		Isolation: w.iso,
-		Retry:     bench.RetryOptions{MaxAttempts: w.retries},
+		Retry:     w.retryOptions(),
 	}, func(ctx context.Context, tx *bench.Tx) error {
 		fromToken, err := w.readToken(ctx, tx, from)
 		if err != nil {
@@ -182,6 +183,29 @@ func (w *workload) transfer(ctx context.Context, b *bench.Bench) error {
 
 		return w.maybeInject(ctx, tx, b)
 	})
+}
+
+// retryOptions is what makes a transfer retryable, including for the two failures
+// that classify as unknown — the default policy fails closed on those.
+//
+// One is the conflict this workload detects itself: a conditional write that no
+// longer matches means a concurrent transfer reached the row first, which is
+// exactly the contention a retry is for. The other is the fault injector's error.
+//
+// Retrying is safe because the transaction is the unit of work: a failed attempt
+// leaves nothing behind, and even a repeat of a transfer that did commit cannot
+// break an invariant, because a transfer moves a fixed amount between two
+// accounts and conserves the total — applying it twice is indistinguishable from
+// two transfers.
+func (w *workload) retryOptions() bench.RetryOptions {
+	actions := bench.DefaultErrorActions()
+	actions[driver.ErrorKindUnknown] = bench.ErrorActionRetry
+
+	return bench.RetryOptions{
+		MaxAttempts: w.retries,
+		Idempotent:  true,
+		Actions:     actions,
+	}
 }
 
 // tokenMove is one conditional token write: the row, the value it should end up

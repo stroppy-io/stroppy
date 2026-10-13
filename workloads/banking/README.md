@@ -26,8 +26,12 @@ UPDATE bank_account SET token = :token WHERE id = :id AND token = :expected
 ```
 
 A token moves *conditionally* on the value that was read, so a concurrent
-transfer on either row is detected as a conflict and retried by the transaction's
-retry policy — not silently overwritten. Three updates rather than two because the
+transfer on either row is detected as a conflict — and *retried*, because the
+workload widens the retry policy to cover it (the default policy fails closed on
+error kinds it does not know, and a conflict detected by the workload itself is
+one of those). Retrying is safe because the transaction is the unit of work, and
+a repeated transfer cannot break either invariant: it moves the same amount
+between the same two accounts and conserves the total. Three updates rather than two because the
 swap needs a sentinel: the first row puts its token aside (`-id`), which is
 outside `1..accounts` and unique to that row, because two rows cannot hold a token
 at once under an immediate `UNIQUE` constraint. OrioleDB's version of this test
@@ -85,11 +89,14 @@ stroppy run banking/inject -d pg -D url=postgres://user@localhost:5432/scratch \
 
 What to expect:
 
-- **`error` is the safe one, and it is safe to retry.** The error arrives at
+- **`error` is the safe one, and the workload retries it.** The error arrives at
   `XACT_EVENT_PRE_COMMIT`, before the commit record is written, so the transaction
-  is aborted and the client may simply retry — measured: an interrupted attempt
-  leaves its counter at 0 and the retry commits it once. The session is left idle,
-  not in a failed transaction block.
+  is aborted — measured by arming it and watching a counter: the interrupted
+  attempt leaves it at 0 and the retry commits it once. The session is left idle,
+  not in a failed transaction block. The transfer retries this because the
+  injector's error classifies as *unknown*, and the default policy fails closed on
+  unknown kinds; the workload widens that map, which is also what makes its own
+  lost-rotation conflict retryable.
 - **`crash` restarts the cluster.** It SIGKILLs the backend; the postmaster then
   terminates *every* other backend and recovers, so other VUs lose their
   connections too and iterations fail while recovery runs (sub-second on a small
