@@ -53,6 +53,12 @@ type workload struct {
 	// inject is nil for the plain variant and set by the fault-injecting one.
 	inject *injectConfig
 
+	// injectArmedFor records, per worker, the iteration the injector was last armed
+	// for. A retry must not arm a second time: the event is one-shot, so re-arming
+	// inside the retry loop would fail every attempt of that iteration and no retry
+	// could absorb the fault.
+	injectArmedFor []uint64
+
 	// driverType is the declared driver's kind, kept so a variant can refuse a
 	// driver it cannot work with.
 	driverType bench.DriverTypeName
@@ -68,9 +74,14 @@ func defineVariant(d *bench.Def, variant string) error {
 	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
 
 	w := &workload{
-		retries: 3,
-		iso:     bench.IsoReadCommitted,
-		randoms: make([]*rand.Rand, max(settings.Workers, 1)),
+		retries:        3,
+		iso:            bench.IsoReadCommitted,
+		randoms:        make([]*rand.Rand, max(settings.Workers, 1)),
+		injectArmedFor: make([]uint64, max(settings.Workers, 1)),
+	}
+
+	for worker := range w.injectArmedFor {
+		w.injectArmedFor[worker] = neverArmed
 	}
 
 	accounts, _ := d.Param.Int64("accounts", defaultAccounts,

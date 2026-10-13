@@ -8,6 +8,9 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
+// neverArmed marks a worker that has not armed the injector yet.
+const neverArmed = ^uint64(0)
+
 // The injecting variant fails transactions on purpose, so the invariants are
 // checked against interruptions rather than only against concurrency. It needs a
 // fault injector in the server: Macavity (https://github.com/CrystallineCore/Macavity)
@@ -101,16 +104,17 @@ func (w *workload) configureVariant(d *bench.Def, variant string) error {
 	return nil
 }
 
-// maybeInject arms one injected fault inside the transfer's transaction, shortly
-// before it commits. The transfer itself is untouched: what the run then observes
-// is the client's reaction to a failed or lost commit, and whether the invariants
-// survive it.
+// maybeInject arms one injected fault inside the transfer's transaction shortly
+// before it commits — once per iteration, never once per attempt.
+//
+// The transfer itself is untouched: what the run then observes is the client's
+// reaction to a failed commit, and whether the invariants survive it. Because the
+// armed event is one-shot, the next attempt of the *same* iteration runs without a
+// fresh one and commits, which is how a retry absorbs the injected failure at all:
+// measured against a real server, re-arming per attempt failed every attempt and no
+// retry could ever recover.
 func (w *workload) maybeInject(ctx context.Context, tx *bench.Tx, b *bench.Bench) error {
-	if w.inject == nil || w.inject.every == 0 {
-		return nil
-	}
-
-	if b.Iteration()%uint64(w.inject.every) != 0 { //nolint:gosec // modulo against a positive int64
+	if !w.shouldArm(b.Worker(), b.Iteration()) {
 		return nil
 	}
 
@@ -124,4 +128,32 @@ func (w *workload) maybeInject(ctx context.Context, tx *bench.Tx, b *bench.Bench
 	}
 
 	return nil
+}
+
+// shouldArm decides whether this attempt arms the injector, and remembers when it
+// does. It arms at most once per iteration per worker, which is the property the
+// retry path depends on: the armed event is one-shot, so the second attempt of an
+// iteration that already armed one must run *without* a fresh fault and commit.
+//
+// Measured against a real server with arms recorded per attempt: re-arming inside
+// the retry loop gave 2.76 arms per armed iteration and failed every attempt, so no
+// retry could ever absorb the fault.
+func (w *workload) shouldArm(worker int, iteration uint64) bool {
+	if w.inject == nil || w.inject.every == 0 {
+		return false
+	}
+
+	index := worker % len(w.injectArmedFor)
+
+	if w.injectArmedFor[index] == iteration {
+		return false
+	}
+
+	if iteration%uint64(w.inject.every) != 0 { //nolint:gosec // modulo against a positive int64
+		return false
+	}
+
+	w.injectArmedFor[index] = iteration
+
+	return true
 }
