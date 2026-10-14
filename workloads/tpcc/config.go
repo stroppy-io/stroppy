@@ -1,6 +1,8 @@
 package tpcc
 
 import (
+	"io/fs"
+
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
@@ -65,14 +67,23 @@ func sqlFile(dt bench.DriverTypeName, override string) string {
 		return override
 	}
 
+	// An engine that speaks another protocol may still ship its own asset: prefer it
+	// when the workload embeds one, and fall back to the protocol's otherwise.
+	if stem := bench.DriverDialectStem(dt); stem != "" {
+		if _, err := fs.Stat(files, stem+".sql"); err == nil {
+			return stem + ".sql"
+		}
+	}
+
 	switch dt {
-	case bench.DriverMySQL:
+	case bench.DriverMySQL, bench.DriverTiDB:
 		return "mysql.sql"
 	case bench.DriverPicodata:
 		return "pico.sql"
 	case bench.DriverYDB:
 		return "ydb.sql"
 	default:
+		// postgres, and the engines that speak its protocol.
 		return "pg.sql"
 	}
 }
