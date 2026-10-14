@@ -13,6 +13,12 @@ import (
 )
 
 var (
+	// errCockroachUnsupported refuses TPC-DS on CockroachDB at define time rather than
+	// failing eleven queries into a run that has already loaded its data. CRDB does not
+	// implement ROLLUP, CUBE or GROUPING SETS (crdb#46280), and 11 of the 103 query
+	// bodies use them — exactly the 11 that fail. Its bare ANALYZE is a smaller second
+	// blocker, one an asset could fix; the queries cannot be.
+	errCockroachUnsupported      = errors.New("[tpcds] CockroachDB does not implement ROLLUP/CUBE/GROUPING SETS (crdb#46280), which 11 of the 103 queries use, so TPC-DS is not supported there")
 	errScaleFactorMustBePositive = errors.New("SCALE_FACTOR must be positive")
 	errUnknownDialect            = errors.New("dsqgen: unknown dialect")
 	errIncompleteQuerySet        = errors.New("tpcds: generated query set is incomplete")
@@ -52,6 +58,13 @@ var Test = bench.Test{Name: "tpcds", Define: define, Source: publication("Test")
 
 func init() { bench.Register(Test) }
 
+// tpcdsSupported reports whether TPC-DS can run on dt at all.
+//
+// CockroachDB cannot: it does not implement ROLLUP, CUBE or GROUPING SETS (its issue
+// #46280), and eleven of the 103 query bodies use one of them. Nothing an asset can do
+// changes that, so the workload refuses at define time instead of failing mid-run.
+func tpcdsSupported(dt bench.DriverTypeName) bool { return dt != bench.DriverCRDB }
+
 //nolint:gocognit,cyclop,funlen // query choices precede schema-changing actions.
 func define(d *bench.Def) error {
 	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
@@ -80,6 +93,11 @@ func define(d *bench.Def) error {
 
 	db := d.Drivers.Declare("default", bench.DriverConfig{})
 	w.driver = db.Kind()
+
+	if !tpcdsSupported(w.driver) {
+		return errCockroachUnsupported
+	}
+
 	w.isPgOrMs = w.driver == bench.DriverPostgres || w.driver == bench.DriverMySQL
 	w.ydbColumn = w.driver == bench.DriverYDB && w.ydbStoreMode == "column"
 	w.useUnlogged = w.useUnlogged && w.driver == bench.DriverPostgres
