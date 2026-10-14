@@ -97,15 +97,32 @@ What to expect:
   injector's error classifies as *unknown*, and the default policy fails closed on
   unknown kinds; the workload widens that map, which is also what makes its own
   lost-rotation conflict retryable.
-- **`crash` restarts the cluster.** It SIGKILLs the backend; the postmaster then
-  terminates *every* other backend and recovers, so other VUs lose their
-  connections too and iterations fail while recovery runs (sub-second on a small
-  cluster). Point it at a disposable database, and expect the run to report
-  failures — the invariants are what must still hold afterwards.
-- **The extension must be installed and the role must be allowed to use it.**
-  `setup_injection` runs `CREATE EXTENSION IF NOT EXISTS macavity` and fails early
-  if that is not possible; Macavity revokes its functions from `PUBLIC`, so the
-  connecting role needs superuser or an explicit
-  `GRANT EXECUTE ON FUNCTION macavity_arm(text, text, integer)`.
+- **`crash` reinitializes the whole cluster, and the run cannot finish while it is
+  recovering.** It SIGKILLs the backend; the postmaster then terminates every other
+  backend and reinitializes — same process, no restart — so the pool loses its
+  connections and iterates against `FATAL: the database system is in recovery mode`.
+  Measured on a small cluster: recovery of 0.3–3.8 s, and the cluster was ready for
+  only 12–58 ms before the next crash, so a 10 s run crashed 6–11 times and was
+  usable for about a tenth of a second in total. The invariants still held after
+  every crash (the money and the token permutation both survived, with no sentinel
+  left behind), which is exactly what this variant exists to show. Point it at a
+  disposable database.
+- **`verify` waits for a server that is not answering yet.** It retries a bounded
+  number of times (6 s), because otherwise a crashed run could never report on the
+  invariants at all — the first refusal used to abort the step. A genuine violation
+  is still reported, after the wait and unchanged.
+- **The extension needs superuser, and the role running the workload needs the arm
+  grant.** Macavity's control file is `trusted = false`, so no `GRANT` substitutes
+  for superuser when creating it; a non-superuser role additionally needs
+  `GRANT EXECUTE ON FUNCTION macavity_arm(text, text, integer)`. Both were needed in
+  practice: with them a non-superuser run armed 689 faults 1:1 and held its
+  invariants.
+  Where the failure lands depends on whether the extension already exists:
+  `setup_injection` fails early only when it is *absent*. Once a superuser has
+  created it, `CREATE EXTENSION IF NOT EXISTS` succeeds silently and a missing arm
+  grant surfaces mid-run, as a transfer failure — and the run still exits 0, since
+  permission errors are ordinary per-iteration errors. Expect a permission error to
+  be retried a few times before it appears: it classifies as *unknown*, exactly like
+  the injector's own error.
 - Build Macavity against the server's headers with `make USE_PGXS=1 with_llvm=no`
   — the plain `make` fails on the LLVM bitcode rule unless `clang-19` is present.

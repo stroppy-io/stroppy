@@ -225,3 +225,44 @@ func mustInt64(t *testing.T, value any, name string) int64 {
 
 	return number
 }
+
+// TestVerifyWaitsOutARecoveringServer pins the behaviour the crash variant needs:
+// the check must not give up on the first refusal, because that variant leaves the
+// cluster reinitializing, and must still report a real violation.
+func TestVerifyWaitsOutARecoveringServer(t *testing.T) {
+	attempts := 0
+
+	err := retryCheck(t.Context(), 5, 0, func() error {
+		attempts++
+
+		if attempts < 3 {
+			return errors.New("the database system is in recovery mode")
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("retryCheck = %v, want nil once the server answered", err)
+	}
+
+	if attempts != 3 {
+		t.Errorf("checked %d time(s), want 3", attempts)
+	}
+
+	// A violation is reported after the attempts are spent, not swallowed.
+	violation := errors.New("verify: total balance is 49999, want 50000")
+	calls := 0
+
+	err = retryCheck(t.Context(), 4, 0, func() error {
+		calls++
+
+		return violation
+	})
+	if !errors.Is(err, violation) {
+		t.Errorf("retryCheck = %v, want the violation reported", err)
+	}
+
+	if calls != 4 {
+		t.Errorf("checked %d time(s), want 4", calls)
+	}
+}

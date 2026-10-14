@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
@@ -317,10 +318,56 @@ func (w *workload) rotateToken(ctx context.Context, tx *bench.Tx, id, token, exp
 	return nil
 }
 
-// verify asserts both invariants after the run: the money is conserved and the
-// tokens are still a permutation of 1..accounts. A lost or duplicated transfer
-// breaks the second even when the first happens to hold.
+// verifyAttempts and verifyDelay bound how long the invariant check waits for a
+// server that is not answering yet.
+//
+// The crash variant leaves the cluster reinitializing: measured against a real
+// server, recovery took 0.3–3.8 s and the cluster was ready for only 12–58 ms
+// before the next crash, so a check that gave up on the first refusal could never
+// report on the invariants after a crash — which is the whole point of that variant.
+const (
+	verifyAttempts = 12
+	verifyDelay    = 500 * time.Millisecond
+)
+
+// verify asserts both invariants, waiting out a server that is still recovering.
 func (w *workload) verify(ctx context.Context, b *bench.Bench) error {
+	return retryCheck(ctx, verifyAttempts, verifyDelay, func() error {
+		return w.checkInvariants(ctx, b)
+	})
+}
+
+// retryCheck runs check until it succeeds or the attempts are spent, returning the
+// last error. A genuine invariant violation is not swallowed: it is reported after
+// the wait, unchanged.
+func retryCheck(ctx context.Context, attempts int, delay time.Duration, check func() error) error {
+	var last error
+
+	for attempt := range attempts {
+		if attempt > 0 && delay > 0 {
+			select {
+			case <-ctx.Done():
+				return last
+			case <-time.After(delay):
+			}
+		}
+
+		if err := check(); err != nil {
+			last = err
+
+			continue
+		}
+
+		return nil
+	}
+
+	return last
+}
+
+// checkInvariants asserts both invariants: the money is conserved and the tokens
+// are still a permutation of 1..accounts. A lost or duplicated transfer breaks the
+// second even when the first happens to hold.
+func (w *workload) checkInvariants(ctx context.Context, b *bench.Bench) error {
 	total, err := b.QueryValue[int64](ctx, w.total.Text, nil)
 	if err != nil {
 		return fmt.Errorf("verify total: %w", err)
