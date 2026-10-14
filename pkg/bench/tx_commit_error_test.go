@@ -89,7 +89,8 @@ func TestRejectedCommitStillEndsTheTransaction(t *testing.T) {
 	require.NotNil(t, handle)
 
 	if !handle.done {
-		t.Error("a rejected COMMIT left the transaction open: the deferred cleanup will try to roll back a closed transaction, and the metrics will not record the failure")
+		t.Error("a rejected COMMIT left the transaction open: the deferred cleanup will " +
+			"try to roll back a closed transaction, and the metrics will not record the failure")
 	}
 
 	if tx.rollbacks != 0 {
