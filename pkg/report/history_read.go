@@ -176,7 +176,7 @@ func (h *History) scan() ([]HistoryEntry, HistoryStatus, error) {
 	}
 
 	for _, file := range files {
-		if !strings.HasSuffix(file.Name(), ".json") {
+		if strings.HasPrefix(file.Name(), ".") || !strings.HasSuffix(file.Name(), ".json") {
 			continue
 		}
 
