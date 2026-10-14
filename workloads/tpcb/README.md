@@ -95,6 +95,18 @@ go test -tags=integration -count=1 -run TestTpcbWorkloadEndToEnd ./test/integrat
 make tmpfs-down
 ```
 
+### TiDB SQL
+
+TiDB speaks the mysql protocol, but it has no stored procedures, so it gets its own
+variant — `tidb.sql`: the mysql asset without the `DROP PROCEDURE`, the
+`create_procedures` section and the `workload_procs` call. `-d tidb` selects it.
+
+Measured: without it, `tpcb/tx` on TiDB fails at the **first** statement of
+`mysql.sql` with `Error 8108 (HY000): Unsupported type *resolve.NodeW`, because that
+`DROP PROCEDURE` runs during setup even for the raw-transaction variant. The procedure
+variant (`tpcb/procs`) is therefore not available on TiDB, and the workload's
+required-query check reports that rather than failing somewhere mid-run.
+
 ### CockroachDB SQL
 
 Run with the `crdb` driver — `-d crdb` — and the workload selects its CockroachDB
