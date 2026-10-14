@@ -93,9 +93,24 @@ var driverPresets = map[string]DriverPreset{
 	},
 }
 
+// driverPresetAliases maps the longer spellings of a driver name onto the preset
+// that serves them.
+//
+// bench.ParseDriverType accepts "postgres" and "picodata", so those names survive
+// parsing and then failed here with "unknown driver", listing only short names a
+// user following the documentation had no reason to know.
+var driverPresetAliases = map[string]string{
+	"postgres": "pg",
+	"picodata": "pico",
+}
+
 // LookupDriverPreset returns a preset by short name, or an error if not found.
 func LookupDriverPreset(name string) (DriverPreset, error) {
 	name = strings.ToLower(name)
+
+	if canonical, ok := driverPresetAliases[name]; ok {
+		name = canonical
+	}
 
 	preset, ok := driverPresets[name]
 	if !ok {
