@@ -156,11 +156,11 @@ stroppy probe -o json
 ├─ simple                 (smoke / overhead benchmark)
 ├─ tpcb
 │  ├─ tx                  (raw transactions — any DB)
-│  └─ pg.sql mysql.sql pico.sql ydb.sql
+│  └─ pg.sql crdb.sql mysql.sql pico.sql ydb.sql
 ├─ tpcc
 │  ├─ tx                  (raw transactions — any DB)
 │  ├─ procs               (stored procedures — pg/mysql)
-│  └─ pg.sql mysql.sql pico.sql ydb.sql ydb_no_indexes.sql
+│  └─ pg.sql crdb.sql mysql.sql pico.sql ydb.sql ydb_no_indexes.sql
 ├─ tpch
 │  ├─ tx                  (relational load + 22 queries)
 │  └─ pg.sql mysql.sql pico.sql ydb.sql distributions.json answers_sf1.json

@@ -34,6 +34,33 @@ DRIVER PRESETS (-d / --driver)
              url=noop://localhost
              discards all I/O; benchmarks stroppy's own overhead
 
+    crdb     driverType=crdb
+             url=postgres://root@localhost:26257/defaultdb?sslmode=disable
+             CockroachDB, over the postgres driver; serializable only
+
+    yugabyte driverType=yugabyte
+             url=postgres://yugabyte@localhost:5433/yugabyte?sslmode=disable
+             YugabyteDB (YSQL), over the postgres driver
+
+    tidb     driverType=tidb
+             url=root:@tcp(localhost:4000)/test
+             TiDB, over the mysql driver
+
+  An engine that speaks another's protocol gets its own name because what differs
+  is not the wire but the defaults: which SQL asset a workload selects, and which
+  transaction isolation it can honour.
+
+  A workload may ship an engine-specific asset and will prefer it. TPC-B and TPC-C
+  ship a crdb.sql for one reason — CockroachDB rejects a bare ANALYZE — and one that
+  would otherwise be unreachable, since assets are embedded and --sql-file wants a
+  path on disk.
+
+  Isolation is the other difference, and it is not cosmetic: CockroachDB supports
+  serializable only, so those workloads default to it there, while YugabyteDB and
+  TiDB take their protocol's level. TiDB advertises REPEATABLE-READ but implements
+  snapshot isolation, and has no gap locking, so range statements block differently
+  than they do on MySQL.
+
   Each preset includes default credentials for local development.
   Use -D url=... to override the connection URL.
 
@@ -74,7 +101,7 @@ DRIVER OPTIONS (-D / --driver-opt)
 
     url                    string    Database connection URL
     driverType             string    postgres | mysql | picodata | ydb |
-                                     noop | csv
+                                     crdb | yugabyte | tidb | noop | csv
     bulkSize               int       Rows per bulk INSERT (default: 2500)
     insertProgress.enabled bool      Enable load progress watcher
     insertProgress.interval duration Progress log/metric cadence (default: 10s)
