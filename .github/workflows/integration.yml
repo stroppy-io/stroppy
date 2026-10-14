@@ -100,3 +100,44 @@ jobs:
           path: build/stroppy
           if-no-files-found: error
           retention-days: 7
+  # The injecting variant is the only part of the suite that needs a C extension inside
+  # the server, so it gets its own job. Macavity is built here from the audited fork with
+  # the same make target the workload's README documents — never fetched prebuilt, since
+  # the extension is a .so that has to match the server it loads into. The check that
+  # matters is the workload's own `verify` step: it runs with faults injected at commit,
+  # and fails the job if the invariants did not hold.
+  banking-inject:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install PostgreSQL and its build headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql postgresql-server-dev-all build-essential
+
+      - name: Build and install Macavity from the audited fork
+        run: make macavity-install
+
+      - name: Start the cluster and create the extension
+        run: |
+          sudo service postgresql start
+          sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+          sudo -u postgres psql -c "CREATE EXTENSION macavity;"
+          sudo -u postgres psql -c "SELECT point FROM macavity_points();"
+
+      - name: Run the injecting variant with faults at commit
+        run: |
+          make build
+          ./build/stroppy run banking/inject -d pg \
+            -D url='postgres://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable' \
+            --executor constant-vus --vus 4 --duration 10s --accounts 50 \
+            --inject-action error --inject-every 5

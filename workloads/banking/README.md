@@ -77,7 +77,8 @@ PostgreSQL's own injection points cannot interrupt a commit on a stock build:
 they are compiled out, and even a server built with `--enable-injection-points`
 has no point in the commit path at all (`xact.c` has none; the one reliable core
 point is mid-`UPDATE`). This variant therefore injects through
-[Macavity](https://github.com/CrystallineCore/Macavity), which hooks the
+[Macavity](https://github.com/stroppy-io/Macavity) — the stroppy-io fork of it, pinned
+at the commit this repository audited — which hooks the
 transaction callbacks through supported APIs.
 
 ```bash
@@ -130,5 +131,13 @@ What to expect:
   permission errors are ordinary per-iteration errors. Expect a permission error to
   be retried a few times before it appears: it classifies as *unknown*, exactly like
   the injector's own error.
-- Build Macavity against the server's headers with `make USE_PGXS=1 with_llvm=no`
-  — the plain `make` fails on the LLVM bitcode rule unless `clang-19` is present.
+- **Build it into the server it will run in**, from the fork at the audited commit:
+  `make macavity-install` clones `stroppy-io/Macavity` at `865b9b42b24c`, builds it with
+  `USE_PGXS=1 with_llvm=no` and installs it. It is never fetched prebuilt — the extension
+  is a `.so` that has to match the server's ABI. `make macavity` builds without installing.
+  The `with_llvm=no` matters: the server's bitcode rule wants clang-19 on Ubuntu 24.04,
+  where the packaged headers pull a different LLVM. If the headers are missing there,
+  `apt-get download postgresql-server-dev-<version>` + `dpkg-deb -x` avoids that entirely.
+  `setup_injection` then creates the extension; a missing one fails the run immediately,
+  and CI runs this variant from the same target, so the dependency is exercised there
+  rather than assumed.
