@@ -81,11 +81,12 @@ func TestDriverDerivedDefaults(t *testing.T) {
 		{bench.DriverMySQL, bench.IsoRepeatableRead},
 		{bench.DriverPicodata, bench.IsoNone},
 		{bench.DriverYDB, bench.IsoSerializable},
-		// CockroachDB supports serializable only, so it does not take this
-		// workload's protocol default.
+		// CockroachDB defaults to its native serializable level rather than this
+		// workload's (it accepts read committed too, measured slower).
 		{bench.DriverCRDB, bench.IsoSerializable},
-		// YugabyteDB and TiDB speak a protocol and take its default.
-		{bench.DriverYugabyte, bench.IsoRepeatableRead},
+		// YugabyteDB takes MySQL's level rather than postgres's: measured on YSQL, the
+		// protocol default failed a few percent of iterations here.
+		{bench.DriverYugabyte, bench.IsoReadCommitted},
 		{bench.DriverTiDB, bench.IsoRepeatableRead},
 	}
 	for _, tt := range isolationTests {

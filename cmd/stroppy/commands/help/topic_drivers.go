@@ -36,7 +36,7 @@ DRIVER PRESETS (-d / --driver)
 
     crdb     driverType=crdb
              url=postgres://root@localhost:26257/defaultdb?sslmode=disable
-             CockroachDB, over the postgres driver; serializable only
+             CockroachDB, over the postgres driver; serializable by default
 
     yugabyte driverType=yugabyte
              url=postgres://yugabyte@localhost:5433/yugabyte?sslmode=disable
@@ -55,10 +55,13 @@ DRIVER PRESETS (-d / --driver)
   would otherwise be unreachable, since assets are embedded and --sql-file wants a
   path on disk.
 
-  Isolation is the other difference, and it is not cosmetic: CockroachDB supports
-  serializable only, so those workloads default to it there, while YugabyteDB and
-  TiDB take their protocol's level. TiDB advertises REPEATABLE-READ but implements
-  snapshot isolation, and has no gap locking, so range statements block differently
+  Isolation is the other difference, and it is not cosmetic. CockroachDB's native
+  level is serializable, so transactional workloads default to it there; it also
+  accepts read committed, which measured slower for them. YugabyteDB and TiDB take
+  their protocol's level, with one measured exception: TPC-C on YugabyteDB runs read
+  committed, where the default repeatable read cost a few percent of iterations and
+  roughly half the throughput. TiDB advertises REPEATABLE-READ but implements
+  snapshot isolation and has no gap locking, so range statements block differently
   than they do on MySQL.
 
   Each preset includes default credentials for local development.

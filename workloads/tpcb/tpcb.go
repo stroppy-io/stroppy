@@ -301,7 +301,7 @@ func resolveIsolation(dt bench.DriverTypeName, override bench.TxIsolationName) b
 	case bench.DriverYDB:
 		return bench.IsoSerializable
 	case bench.DriverCRDB:
-		// CockroachDB supports serializable only.
+		// Its native level: read committed is accepted too, and measured slower.
 		return bench.IsoSerializable
 	default:
 		return bench.IsoReadCommitted

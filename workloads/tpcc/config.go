@@ -58,8 +58,12 @@ func resolveIsolation(dt bench.DriverTypeName, override bench.TxIsolationName) b
 	case bench.DriverYDB:
 		return bench.IsoSerializable
 	case bench.DriverCRDB:
-		// CockroachDB supports serializable only.
+		// Its native level: read committed is accepted too, and measured slower.
 		return bench.IsoSerializable
+	case bench.DriverYugabyte:
+		// Measured on YSQL: the protocol default cost a few percent of iterations
+		// here and ran at roughly half the throughput.
+		return bench.IsoReadCommitted
 	default: // postgres, mysql
 		return bench.IsoRepeatableRead
 	}
