@@ -38,6 +38,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- A rejected `COMMIT` is now counted as an ended transaction: it reaches `tx_errors_total`, and it no longer leaves the client with a spurious `tx is closed` beside the real error. Previously `tx_errors_total` under-reported exactly the runs worth measuring — a workload with commit failures showed none of them there while `failed_iterations_total` showed all of them. ([#204](https://github.com/stroppy-io/stroppy/pull/204))
 - TPC-C pacing waits stop on cancellation, think once after nonfatal failures, and preserve successful transactions when post-transaction thinking is interrupted. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
 - TPC-C reports count successful measured completions separately from failures and drain, with phase and outcome labels on existing latency metrics. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
 - TPC-C transaction history IDs continue above existing data across sequential runs instead of colliding when a dataset is reused. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
