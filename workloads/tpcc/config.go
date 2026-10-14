@@ -57,6 +57,9 @@ func resolveIsolation(dt bench.DriverTypeName, override bench.TxIsolationName) b
 		return bench.IsoNone
 	case bench.DriverYDB:
 		return bench.IsoSerializable
+	case bench.DriverCRDB:
+		// CockroachDB supports serializable only.
+		return bench.IsoSerializable
 	default: // postgres, mysql
 		return bench.IsoRepeatableRead
 	}

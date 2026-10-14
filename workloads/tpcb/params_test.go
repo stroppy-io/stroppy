@@ -30,6 +30,12 @@ func TestDriverDerivedDefaults(t *testing.T) {
 		{bench.DriverMySQL, bench.IsoReadCommitted},
 		{bench.DriverPicodata, bench.IsoNone},
 		{bench.DriverYDB, bench.IsoSerializable},
+		// CockroachDB supports serializable only, so it does not take this
+		// workload's protocol default.
+		{bench.DriverCRDB, bench.IsoSerializable},
+		// YugabyteDB and TiDB speak a protocol and take its default.
+		{bench.DriverYugabyte, bench.IsoReadCommitted},
+		{bench.DriverTiDB, bench.IsoReadCommitted},
 	}
 	for _, tt := range isolationTests {
 		if got := resolveIsolation(tt.driver, ""); got != tt.want {
