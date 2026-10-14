@@ -24,8 +24,8 @@ func SameOutput(a, b string) (bool, error) {
 	firstInfo, firstErr := os.Stat(a)
 
 	secondInfo, secondErr := os.Stat(b)
-	if firstErr == nil && secondErr == nil && os.SameFile(firstInfo, secondInfo) {
-		return true, nil
+	if firstErr == nil && secondErr == nil {
+		return os.SameFile(firstInfo, secondInfo), nil
 	}
 
 	firstParent, firstErr := os.Stat(filepath.Dir(first))
@@ -33,10 +33,36 @@ func SameOutput(a, b string) (bool, error) {
 	secondParent, secondErr := os.Stat(filepath.Dir(second))
 	if firstErr == nil && secondErr == nil && os.SameFile(firstParent, secondParent) &&
 		strings.EqualFold(filepath.Base(first), filepath.Base(second)) {
-		return true, nil
+		return caseInsensitiveDirectory(filepath.Dir(first))
 	}
 
 	return false, nil
+}
+
+func caseInsensitiveDirectory(directory string) (insensitive bool, err error) {
+	probe, err := os.CreateTemp(directory, ".stroppy-case-*")
+	if err != nil {
+		return false, err
+	}
+
+	name := probe.Name()
+	defer func() { err = errors.Join(err, probe.Close(), os.Remove(name)) }()
+
+	original, err := probe.Stat()
+	if err != nil {
+		return false, err
+	}
+
+	upper, err := os.Stat(filepath.Join(directory, strings.ToUpper(filepath.Base(name))))
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return os.SameFile(original, upper), nil
 }
 
 func outputIdentity(path string) (string, error) {

@@ -109,7 +109,16 @@ HTML, while `--no-save-report` leaves HTML available. HTML files are published
 atomically, and a requested write/rendering failure returns a nonzero exit status.
 Filesystem aliases, including symlinked parent directories, cannot select the
 same JSON/HTML destination; HTML export also refuses to replace its source history
-entry. If stdout fails, independently requested file outputs are still attempted.
+entry. Case variants are distinct when the destination filesystem is case-sensitive;
+for absent outputs, a temporary probe in their parent directory checks this behavior.
+If stdout fails, independently requested file outputs are still attempted.
+
+Explicit HTML file exports use owner-only mode `0600`, matching JSON report files.
+For sharing through another user or web server, change permissions explicitly after
+export (for example, `chmod 644 result.html`). Atomic publication replaces an output
+symlink itself rather than writing through it; the symlink target remains unchanged.
+Shell redirection (`reports export ID > result.html`) uses the shell's usual file
+creation and permission rules.
 
 ## Saved report history
 

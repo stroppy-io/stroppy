@@ -603,7 +603,8 @@ footer {
   border-radius:5px;
   padding:8px;
   color:var(--ink);
-  font:12px inherit;
+  font-family:inherit;
+  font-size:12px;
   width:125px
 }
 .catalog td {

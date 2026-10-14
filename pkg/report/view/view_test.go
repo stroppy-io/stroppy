@@ -202,6 +202,34 @@ func TestAtomicExport(t *testing.T) {
 	}
 }
 
+func TestHTMLExportPermissionsAndSymlinkPublication(t *testing.T) {
+	t.Parallel()
+	directory := t.TempDir()
+
+	target := filepath.Join(directory, "target.html")
+	if err := os.WriteFile(target, []byte("keep target"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(directory, "report.html")
+	if err := os.Symlink(target, path); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := WriteFile(path, []byte(fixture), ""); err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0o600 {
+		t.Fatalf("HTML output mode: %v, %v", info, err)
+	}
+
+	if data, err := os.ReadFile(target); err != nil || string(data) != "keep target" {
+		t.Fatalf("symlink target changed: %s, %v", data, err)
+	}
+}
+
 func TestCatalogPagination(t *testing.T) {
 	t.Parallel()
 
