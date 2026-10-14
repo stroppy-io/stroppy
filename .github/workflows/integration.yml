@@ -119,17 +119,32 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Install PostgreSQL and its build headers
+      - name: Install PostgreSQL's build headers
         run: |
+          # The runner already carries PGDG's postgresql-common, so Ubuntu's
+          # postgresql-server-dev-all cannot coexist with it (it pins postgresql-common
+          # to the distro version). Install the headers matching the server that is
+          # already here, from the same repository — which is what this extension needs
+          # in any case, since it compiles against the ABI it will load into.
+          sudo apt-get install -y curl ca-certificates build-essential
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsS -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] http://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
-          sudo apt-get install -y postgresql postgresql-server-dev-all build-essential
+          major=$(pg_config --major 2>/dev/null || ls /usr/lib/postgresql | sort -V | tail -1)
+          sudo apt-get install -y "postgresql-server-dev-${major}"
 
       - name: Build and install Macavity from the audited fork
         run: make macavity-install
 
       - name: Start the cluster and create the extension
         run: |
-          sudo service postgresql start
+          # The PGDG packages may be installed without a cluster; create one if the
+          # service has nothing to start.
+          sudo service postgresql start || sudo pg_createcluster "$(pg_config --major)" main --start
+          pg_isready -h 127.0.0.1 -p 5432
           sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
           sudo -u postgres psql -c "CREATE EXTENSION macavity;"
           sudo -u postgres psql -c "SELECT point FROM macavity_points();"
