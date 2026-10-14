@@ -220,7 +220,7 @@ SELECT l_returnflag, l_linestatus,
        avg(l_discount) AS avg_disc,
        count(*) AS count_order
 FROM   lineitem
-WHERE  l_shipdate <= date '1998-12-01' - (:delta * interval '1 day')
+WHERE  l_shipdate <= date '1998-12-01' - (:delta::int * interval '1 day')
 GROUP  BY l_returnflag, l_linestatus
 ORDER  BY l_returnflag, l_linestatus;
 

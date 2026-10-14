@@ -92,6 +92,10 @@ integration: # Run mandatory tagged PostgreSQL, MySQL, CSV, and OTEL integration
 	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
 	go test -tags=integration -count=1 -timeout=15m ./test/integration
 
+integration-engines: # Run the borrowed-protocol engines CI provides (CockroachDB, TiDB)
+	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
+	go test -tags='integration integration_optional' -count=1 -timeout=30m -run 'TestTpchLoadOn(CockroachDB|TiDB)' ./test/integration
+
 integration-optional: # Run optional tagged integration tests (Picodata, YDB, CockroachDB, YugabyteDB, TiDB)
 	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
 	go test -tags='integration integration_optional' -count=1 -timeout=30m -run 'TestTpchLoadOn(Picodata|YDB|CockroachDB|Yugabyte|TiDB)' ./test/integration
