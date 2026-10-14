@@ -139,6 +139,13 @@ func TestDriverDefaults(t *testing.T) {
 	}{
 		{bench.DriverPostgres, "pg.sql"},
 		{bench.DriverMySQL, "mysql.sql"},
+		// TiDB speaks the mysql wire; without this case it fell to pg.sql — measured,
+		// with a run that loaded the postgres asset over the mysql wire.
+		{bench.DriverTiDB, "mysql.sql"},
+		// CockroachDB and YugabyteDB speak the postgres wire, and this workload ships
+		// no asset of its own for either, so they take it.
+		{bench.DriverCRDB, "pg.sql"},
+		{bench.DriverYugabyte, "pg.sql"},
 		{bench.DriverPicodata, "pico.sql"},
 		{bench.DriverYDB, "ydb.sql"},
 	} {

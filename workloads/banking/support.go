@@ -28,13 +28,16 @@ func (s sqlSection) Run(ctx context.Context, b *bench.Bench) error {
 // with the same sections and named queries.
 func sqlFileFor(dt bench.DriverTypeName) string {
 	switch dt {
-	case bench.DriverMySQL:
+	case bench.DriverMySQL, bench.DriverTiDB:
 		return "mysql.sql"
 	case bench.DriverPicodata:
 		return "pico.sql"
 	case bench.DriverYDB:
 		return "ydb.sql"
 	default:
+		// postgres, and the engines that speak its protocol. Measured: TiDB reached
+		// this default until it was given its own case, which loaded the postgres
+		// asset over the mysql wire.
 		return "pg.sql"
 	}
 }
