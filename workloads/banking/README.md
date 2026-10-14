@@ -15,6 +15,12 @@ After the workload step, `verify` asserts both invariants:
 - `sum(balance)` is exactly `accounts * 1000` — no money created or destroyed;
 - the tokens are still the permutation `1..accounts` — none lost, none duplicated.
 
+On Picodata the second is not checked, and the run says so: a unique constraint on the
+token is not expressible there (unique indexes are limited to sharding-key columns) and
+a two-row transfer cannot be atomic (transactions are single-bucket), so that dialect
+carries a reduced asset and checks the total balance only. The run's report records it,
+under `token_witness`, naming what is therefore not detectable.
+
 `accounts` defaults to 100, so the expected total is 100000.
 
 ## The transfer
