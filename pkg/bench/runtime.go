@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap"
 
+	"github.com/stroppy-io/stroppy/v6/internal/capture"
 	"github.com/stroppy-io/stroppy/v6/internal/testdriver"
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
@@ -46,14 +47,19 @@ type RunOptions struct {
 	Logger  Logger
 	Metrics *MetricsConfig
 	Report  *ReportOptions
+	Capture *CaptureOptions
 }
 
 // RunTest observes a definition, validates inputs, then executes a fresh replay.
 // Reports are returned as data; this function never writes report history.
 //
-//nolint:gocognit,nestif,cyclop,funlen,gocritic // observation, execution and finalization form one operation.
+//nolint:gocognit,gocyclo,nestif,cyclop,funlen,gocritic,maintidx // one observed/executed run lifecycle.
 func RunTest(ctx context.Context, test Test, options RunOptions) (result *report.Run, err error) {
 	defer recoverValidation(&err)
+
+	if options.Capture != nil && options.Report == nil {
+		return nil, errCaptureNoReport
+	}
 
 	observed, err := observeSelected(
 		test,
@@ -73,8 +79,38 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 		log = zap.NewNop()
 	}
 
+	if options.Report != nil {
+		result = newRunReport(test.Name, observed.resolved, options.Steps, options.NoSteps, *options.Report)
+	}
+
+	var recording *capture.Writer
+
+	if options.Capture != nil {
+		selected := options.Capture
+
+		interval := selected.Interval
+		if interval == 0 {
+			interval = time.Second
+		}
+
+		recording, err = capture.New(capture.Options{
+			Directory: selected.Directory, Logs: selected.Logs,
+			Metrics: selected.Metrics, Interval: interval, MaxBytes: selected.MaxBytes,
+			ReportID: result.ID, RunID: result.RunID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("start capture: %w", err)
+		}
+
+		log = recording.Logger(log)
+	}
+
 	root, err := newrootState(log, ctx, options.Steps, options.NoSteps, options.Metrics)
 	if err != nil {
+		if recording != nil {
+			recording.Close()
+		}
+
 		return nil, err
 	}
 	defer root.shutdownMetrics()
@@ -91,14 +127,18 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 	e.policies = map[string]report.Execution{}
 
 	e.reporting = options.Report != nil
-	if options.Report != nil {
-		result = newRunReport(
-			test.Name,
-			observed.resolved,
-			options.Steps,
-			options.NoSteps,
-			*options.Report,
-		)
+
+	if recording != nil {
+		interval := options.Capture.Interval
+		if interval == 0 {
+			interval = time.Second
+		}
+
+		root.capture = &runCapture{
+			writer: recording, root: root, interval: interval,
+			metrics: options.Capture.Metrics, stop: make(chan struct{}), done: make(chan struct{}),
+		}
+		root.capture.start()
 	}
 
 	defer func() {
@@ -110,6 +150,10 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 			} else {
 				panicValue = value
 			}
+		}
+
+		if root.capture != nil {
+			root.capture.writer.Event("teardown_start", "", "", 0, 0, 0)
 		}
 
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), defaultCleanupTimeout)
@@ -195,7 +239,19 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 			phase = e.phase
 		}
 
+		if root.capture != nil {
+			root.capture.writer.Event("teardown_end", "", "", 0, 0, 0)
+			root.capture.stopSampling()
+		}
+
 		result, err = finishRun(result, root, d.reports, err, phase)
+		if root.capture != nil && result != nil {
+			root.capture.finish(result)
+		}
+
+		if root.capture != nil && result == nil {
+			root.capture.writer.Close()
+		}
 
 		if panicValue != nil {
 			panic(panicValue)

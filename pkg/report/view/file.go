@@ -6,10 +6,28 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
 // WriteFile atomically publishes a standalone HTML report.
-func WriteFile(path string, data []byte, id string) (err error) {
+func WriteFile(path string, data []byte, id string) error {
+	return WriteCaptureFile(path, data, id, ".")
+}
+
+// WriteCaptureFile resolves sidecar streams against their report directory.
+func WriteCaptureFile(path string, data []byte, id, base string) (err error) {
+	capture, err := report.CaptureFromJSON(data)
+	if err != nil {
+		return err
+	}
+
+	if same, err := report.OutputOverwritesCapture(path, base, capture); err != nil {
+		return err
+	} else if same {
+		return report.ErrCaptureArtifact
+	}
+
 	file, err := os.CreateTemp(filepath.Dir(path), ".stroppy-html-*.tmp")
 	if err != nil {
 		return fmt.Errorf("create HTML report: %w", err)
@@ -23,7 +41,7 @@ func WriteFile(path string, data []byte, id string) (err error) {
 		}
 	}()
 
-	if err := Render(file, data, id); err != nil {
+	if err := RenderCapture(file, data, id, base, nil); err != nil {
 		return err
 	}
 

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -36,17 +35,16 @@ func newReportsExportCommand() *cobra.Command {
 			}
 
 			if path != "" {
-				same, err := report.SameOutput(path, filepath.Join(history.Directory, args[0]+".json"))
-				if err != nil {
+				if err := checkReportExport(path, history, args[0], data); err != nil {
 					return err
-				}
-
-				if same {
-					return errReportExportSource
 				}
 			}
 
-			return view.Export(cmd.OutOrStdout(), path, data, args[0])
+			if path != "" {
+				return view.WriteCaptureFile(path, data, args[0], history.Directory)
+			}
+
+			return view.RenderCapture(cmd.OutOrStdout(), data, args[0], history.Directory, nil)
 		},
 	}
 	command.Flags().StringVar(&path, "file", "", "HTML output path; omit to write stdout")

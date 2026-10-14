@@ -41,6 +41,7 @@ type rootState struct {
 	reportMu       sync.Mutex
 	reportData     map[string]string
 	reportRedactor *strings.Replacer
+	capture        *runCapture
 }
 
 func newrootState(

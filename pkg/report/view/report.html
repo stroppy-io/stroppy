@@ -176,6 +176,7 @@
 <th>Driver</th>
 <th>Status</th>
 <th>Workload TPS</th>
+<th>Capture</th>
 </tr>
 </thead>
 <tbody>
@@ -197,11 +198,11 @@
 </td>
 <td class="numeric">
 {{if .TPS}}{{.TPS}}{{else}}—{{end}}
-</td>
+</td><td>{{if .CaptureState}}{{.CaptureState}}{{else}}—{{end}}</td>
 </tr>
 {{else}}
 <tr>
-<td colspan="5" class="catalog-empty">No matching reports. Run a workload to save its first report.</td>
+<td colspan="6" class="catalog-empty">No matching reports. Run a workload to save its first report.</td>
 </tr>
 {{end}}
 </tbody>
@@ -288,6 +289,7 @@
 </section>
 <nav class="section-nav" aria-label="Report sections">
 <a href="#execution">Execution</a>
+{{if .Capture}}<a href="#capture">Recording</a>{{end}}
 <a href="#metrics">Metrics <span>{{len .Metrics}}
 </span>
 </a>
@@ -339,6 +341,19 @@
 <p class="empty">No metrics recorded.</p>
 {{end}}
 </section>
+{{if .Capture}}<section class="section" id="capture">
+<div class="section-heading"><h2>Recorded run evolution</h2><p>Capture state: {{.Capture.State}}</p></div>
+{{if not .Capture.Complete}}<p class="notice">Recording is {{.Capture.State}}. Gaps, lost records, or unfinished writes may exist; inspect capture accounting below.</p>{{end}}
+{{if .Capture.Notice}}<p class="notice">{{.Capture.Notice}}</p>{{end}}
+<details class="panel"><summary>Capture identity, settings, gaps &amp; limits</summary><div class="details-body">{{template "node" .Capture.Manifest}}</div></details>
+<div class="actions">{{if .Catalog}}<a href="/reports/{{.ID}}/bundle">Download complete bundle</a>{{end}}{{if .Capture.ArtifactBase}}<a href="{{.Capture.ArtifactBase}}manifest.json" download>Capture manifest</a>{{if .Capture.MetricsEnabled}}<a href="{{.Capture.ArtifactBase}}metrics.jsonl" download>Metric samples</a>{{end}}{{if .Capture.LogsEnabled}}<a href="{{.Capture.ArtifactBase}}logs.jsonl" download>Logs</a>{{end}}{{if .Capture.EventsEnabled}}<a href="{{.Capture.ArtifactBase}}events.jsonl" download>Events</a>{{end}}{{end}}</div>
+{{if .Catalog}}<form class="filters" method="get"><label>Metric<input name="metric" value="{{.Capture.Query.Get "metric"}}" list="capture-metrics" placeholder="Native rates"><datalist id="capture-metrics">{{range .Capture.MetricNames}}<option value="{{.}}">{{end}}</datalist></label><label>Log level<input name="level" value="{{.Capture.Query.Get "level"}}" placeholder="info"></label><label>Step<input name="step" value="{{.Capture.Query.Get "step"}}" placeholder="workload"></label><label>Elapsed from<input name="from" value="{{.Capture.Query.Get "from"}}"></label><label>Elapsed to<input name="to" value="{{.Capture.Query.Get "to"}}"></label><label>Log text<input name="text" value="{{.Capture.Query.Get "text"}}"></label><button>Apply</button></form>{{else}}<p class="scope-note">Bounded offline preview. Complete recording streams remain in the portable bundle.</p>{{end}}
+{{range .Capture.Timeline}}<details class="timeline-details" open><summary><span>{{.Name}}</span><small>{{.Scope}}</small></summary><figure class="chart timeline-chart"><figcaption><h3>{{.Name}}</h3><p>{{.Scope}} · {{.Unit}} · {{.Semantics}}</p>{{if .Omitted}}<p class="timeline-notice">{{.Omitted}} intermediate samples omitted from this bounded plot; full stream remains available.</p>{{end}}</figcaption>
+<div class="chart-scroll"><svg viewBox="0 0 720 230" role="img" aria-label="{{.Name}} timeline"><text x="102" y="35" text-anchor="end">{{.Maximum}}</text><text x="102" y="183" text-anchor="end">{{.Minimum}}</text><text x="110" y="210">0 seconds</text><text x="650" y="210" text-anchor="end">{{.Elapsed}} seconds</text>{{range .Markers}}<g><title>{{.Label}}</title><line class="timeline-marker" x1="{{.X}}" x2="{{.X}}" y1="28" y2="180"/></g>{{end}}{{range .Segments}}<polyline class="timeline-line" points="{{.}}"/>{{end}}{{range .Points}}<g class="timeline-point" tabindex="0" aria-label="{{.Time}} seconds: {{.Value}}"><title>{{.Time}} seconds: {{.Value}}</title><circle class="timeline-hit" cx="{{.X}}" cy="{{.Y}}" r="12"/><line class="timeline-crosshair" x1="{{.X}}" x2="{{.X}}" y1="28" y2="180"/><circle class="timeline-dot" cx="{{.X}}" cy="{{.Y}}" r="4"/><text class="timeline-tooltip" x="{{.X}}" y="{{.Y}}" dy="-14">{{.Time}} s · {{.Value}}</text></g>{{end}}</svg></div>
+<details><summary>Numeric samples</summary><table><thead><tr><th>Elapsed seconds</th><th>Recorded value</th></tr></thead><tbody>{{range .Points}}<tr><td>{{if $.Catalog}}<a href="{{.Nearby}}">{{.Time}}</a>{{else}}{{.Time}}{{end}}</td><td>{{.Value}}</td></tr>{{end}}</tbody></table></details></figure></details>{{else}}<p class="empty">No selected timeline with at least two numeric samples.</p>{{end}}
+<p class="timeline-summary">Vertical markers indicate execution boundaries and recorded errors; hover markers or expand events for exact phase labels. Lines break across missing samples.</p><details class="panel"><summary>Execution phase events</summary><div class="details-body">{{template "node" .Capture.Events}}</div></details>
+<h3 id="captured-logs">Captured logs</h3><div class="panel table-scroll"><table><thead><tr><th>Elapsed / level</th><th>Logger / message</th><th>Structured fields</th></tr></thead><tbody>{{range .Capture.Logs}}<tr><td>{{.Elapsed}} s<br>{{.Level}}<details><summary>Timestamp</summary>{{.Time}}</details></td><td><small>{{.Logger}}</small><p>{{.Message}}</p></td><td>{{template "node" .Fields}}</td></tr>{{else}}<tr><td colspan="3">No matching captured logs.</td></tr>{{end}}</tbody></table></div>{{if .Catalog}}<nav class="pagination">{{if .Capture.Previous}}<a href="{{.Capture.Previous}}">Previous logs</a>{{end}}{{if .Capture.Next}}<a href="{{.Capture.Next}}">Next logs</a>{{end}}</nav>{{end}}
+</section>{{end}}
 <section class="section" id="results">
 <div class="section-heading">
 <h2>Workload results</h2>

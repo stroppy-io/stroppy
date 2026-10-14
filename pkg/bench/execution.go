@@ -127,6 +127,10 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 	if !e.root.stepFilter.enabled(name) {
 		record(Skipped, 0)
 
+		if e.root.capture != nil {
+			e.root.capture.writer.Event("step_end", name, string(Skipped), 0, 0, 0)
+		}
+
 		return Result{Status: Skipped}
 	}
 
@@ -136,6 +140,10 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 		}
 
 		record(Blocked, 0)
+
+		if e.root.capture != nil {
+			e.root.capture.writer.Event("step_end", name, string(Blocked), 0, 0, 0)
+		}
 
 		return Result{Status: Blocked}
 	}
@@ -150,7 +158,12 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 
 	started := time.Now()
 	e.phase = name
+
 	before := e.root.errorReporter.snapshot().terminalErrors
+	if e.root.capture != nil {
+		e.root.capture.writer.Event("step_start", name, "running", opts.policy.workers,
+			opts.policy.duration, opts.policy.drain.duration)
+	}
 
 	measured := opts.measured || opts.policy.mode != "once"
 	if measured {
@@ -212,6 +225,10 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 
 	record(status, elapsed)
 
+	if e.root.capture != nil {
+		e.root.capture.writer.Event("step_end", name, string(status), opts.policy.workers, elapsed, 0)
+	}
+
 	return Result{status, err}
 }
 
@@ -249,6 +266,21 @@ func (e *Execution) execute(parent context.Context, name string, action Action, 
 	var drainTimer *time.Timer
 
 	if opts.policy.mode == "constant-vus" {
+		if e.root.capture != nil {
+			phaseDone := make(chan struct{})
+
+			phaseTimer := time.AfterFunc(opts.policy.duration, func() {
+				defer close(phaseDone)
+
+				e.root.capture.writer.Event("drain_start", name, "", opts.policy.workers, 0, opts.policy.drain.duration)
+			})
+			defer func() {
+				if !phaseTimer.Stop() {
+					<-phaseDone
+				}
+			}()
+		}
+
 		deadline = time.Now().Add(opts.policy.duration)
 		if !opts.policy.drain.unlimited {
 			drainTimer = time.AfterFunc(opts.policy.duration+opts.policy.drain.duration, func() { cancel(errDrainExpired) })

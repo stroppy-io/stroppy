@@ -32,6 +32,7 @@ func newReportsCommand() *cobra.Command {
 	command.AddCommand(
 		newReportsListCommand(), newReportsGetCommand(), newReportsRemoveCommand(),
 		newReportsPruneCommand(), newReportsStatusCommand(), newReportsExportCommand(), newReportsServeCommand(),
+		newReportsArtifactCommand(), newReportsBundleCommand(),
 	)
 
 	return command
@@ -328,7 +329,7 @@ func writeReportEntries(output io.Writer, format string, entries []report.Histor
 	}
 
 	writer := tabwriter.NewWriter(output, 0, 0, reportColumnPadding, ' ', 0)
-	if _, err := fmt.Fprintln(writer, "ID\tSTARTED_AT\tWORKLOAD\tDRIVER(S)\tSTATUS\tTPS"); err != nil {
+	if _, err := fmt.Fprintln(writer, "ID\tSTARTED_AT\tWORKLOAD\tDRIVER(S)\tSTATUS\tTPS\tCAPTURE"); err != nil {
 		return err
 	}
 
@@ -349,9 +350,9 @@ func writeReportEntries(output io.Writer, format string, entries []report.Histor
 			tps = fmt.Sprintf("%.2f", *entry.TPS)
 		}
 
-		if _, err := fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		if _, err := fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			entry.ID, entry.StartedAt.UTC().Format(time.RFC3339Nano), entry.Workload,
-			strings.Join(drivers, ","), entry.Status, tps,
+			strings.Join(drivers, ","), entry.Status, tps, entry.CaptureState,
 		); err != nil {
 			return err
 		}

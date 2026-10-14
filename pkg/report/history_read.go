@@ -39,6 +39,7 @@ type HistoryEntry struct {
 	Drivers           []Driver  `json:"drivers"`
 	Status            Status    `json:"status"`
 	TPS               *float64  `json:"tps,omitempty"`
+	CaptureState      string    `json:"capture_state,omitempty"`
 	SizeBytes         int64     `json:"size_bytes"`
 	identity          fs.FileInfo
 	directoryIdentity fs.FileInfo
@@ -196,6 +197,10 @@ func (h *History) scan() ([]HistoryEntry, HistoryStatus, error) {
 			status.Problems = append(status.Problems, HistoryProblem{ID: id, Error: readErr.Error()})
 
 			continue
+		}
+
+		if capture, captureErr := CaptureFromJSON(data); captureErr == nil && capture != nil {
+			entry.CaptureState = CaptureState(h.Directory, capture)
 		}
 
 		entry.SizeBytes = info.Size()
@@ -371,6 +376,15 @@ func removeHistoryEntry(root *os.Root, entry *HistoryEntry) error {
 	info, err := root.Lstat(staged)
 	if err != nil || !sameHistoryFile(entry.identity, info) {
 		return fmt.Errorf("%w; replacement retained at %s", errors.Join(errHistoryChanged, err), staged)
+	}
+
+	data, readErr := root.ReadFile(staged)
+	if readErr != nil {
+		return readErr
+	}
+
+	if err := removeCapture(root, data); err != nil {
+		return fmt.Errorf("remove capture; report retained at %s: %w", staged, err)
 	}
 
 	return errors.Join(root.Remove(staged), root.Remove(quarantine))

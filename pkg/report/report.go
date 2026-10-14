@@ -8,7 +8,7 @@ import (
 
 const (
 	// SchemaVersion is the current run report envelope version.
-	SchemaVersion = 3
+	SchemaVersion = 4
 	// Kind identifies a benchmark run report among future report families.
 	Kind = "run"
 )
@@ -62,6 +62,7 @@ type Run struct {
 	Errors             ErrorSummary         `json:"errors"`
 	Failure            *Failure             `json:"failure,omitempty"`
 	WorkloadReports    []WorkloadReport     `json:"workload_reports"`
+	Capture            *Capture             `json:"capture,omitempty"`
 }
 
 // Driver identifies one configured driver without persisting connection data.
