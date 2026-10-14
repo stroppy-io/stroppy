@@ -1,6 +1,6 @@
 package help
 
-//nolint:gosec // help text contains example default credentials for local development
+//nolint:gosec,funlen // help text carries example credentials, and its body is one literal.
 func init() {
 	Register(Topic{
 		Name:  "drivers",
@@ -48,7 +48,7 @@ DRIVER PRESETS (-d / --driver)
 
   An engine that speaks another's protocol gets its own name because what differs
   is not the wire but the defaults: which SQL asset a workload selects, and which
-  transaction isolation it can honour.
+  transaction isolation it can honor.
 
   A workload may ship an engine-specific asset and will prefer it. TPC-B and TPC-C
   ship a crdb.sql for one reason — CockroachDB rejects a bare ANALYZE — and one that

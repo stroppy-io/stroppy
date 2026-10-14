@@ -378,7 +378,9 @@ func (w *workload) analyze(ctx context.Context, b *bench.Bench) func() error {
 		case bench.DriverPostgres, bench.DriverYugabyte:
 			return b.Exec(ctx, "ANALYZE", nil)
 		case bench.DriverCRDB:
-			// CockroachDB rejects a bare ANALYZE and takes one table at a time.
+			// CockroachDB rejects a bare ANALYZE and takes one table at a time. TPC-DS is
+			// otherwise unsupported there — its rollup queries are unimplemented (CRDB
+			// issue #46280) — but this keeps the step honest if someone tries.
 			for _, table := range tpcdsTables {
 				if err := b.Exec(ctx, "ANALYZE "+table, nil); err != nil {
 					return fmt.Errorf("analyze %s: %w", table, err)
@@ -393,7 +395,7 @@ func (w *workload) analyze(ctx context.Context, b *bench.Bench) func() error {
 		case bench.DriverPicodata, bench.DriverYDB, bench.DriverNoop, bench.DriverCSV, bench.DriverRecording:
 			// no ANALYZE; planner runs on index stats from create_indexes.
 		}
-		// ydb/picodata: no ANALYZE; planner runs on index stats from create_indexes.
+
 		return nil
 	}
 }
