@@ -39,32 +39,6 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
-      # Engines that speak another's protocol get their own service so the
-      # integration matrix can reach them. Tags are `latest` because the version
-      # schemes differ per vendor; pin them once a run confirms the tag.
-      cockroachdb:
-        image: cockroachdb/cockroach:latest
-        ports:
-          - 26257:26257
-        # Insecure single node, as the workload's crdb preset expects.
-        options: >-
-          --health-cmd "cockroach sql --insecure -e 'SELECT 1'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 12
-
-      yugabytedb:
-        image: yugabytedb/yugabyte:latest
-        ports:
-          - 5433:5433
-        # Its master bootstrap measured ~65 s on a small VM, so the retries are
-        # generous and the tests would otherwise start before YSQL is up.
-        options: >-
-          --health-cmd "/home/yugabyte/bin/ysqlsh -h 127.0.0.1 -p 5433 -c 'SELECT 1'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 20
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -140,6 +114,33 @@ jobs:
           echo "tidb did not become ready; last lines of its log:"
           tail -50 /tmp/tidb.log
           exit 1
+
+      # CockroachDB and YugabyteDB cannot be services: a service passes `options`
+      # to docker create *before* the image, and CockroachDB's image entrypoint
+      # requires a mode argument, so it dies with "mode unset". Both start here
+      # instead, where the command can be given. The measured YB bootstrap is ~65 s,
+      # hence the generous waits.
+      - name: Start CockroachDB and YugabyteDB
+        run: |
+          docker run -d --name crdb -p 26257:26257 \
+            cockroachdb/cockroach:latest start-single-node --insecure
+          docker run -d --name yb -p 5433:5433 yugabytedb/yugabyte:latest
+
+          for _ in $(seq 1 30); do
+            if docker exec crdb cockroach sql --insecure -e 'SELECT 1' >/dev/null 2>&1; then
+              echo "cockroachdb is accepting connections"
+              break
+            fi
+            sleep 5
+          done
+
+          for _ in $(seq 1 40); do
+            if docker exec yb bash -lc 'ysqlsh -h 127.0.0.1 -p 5433 -c "SELECT 1"' >/dev/null 2>&1; then
+              echo "yugabytedb is accepting connections"
+              break
+            fi
+            sleep 5
+          done
 
       # The engines that speak another protocol, on one workload each. Optional in
       # the harness's sense: absent services skip them rather than failing the job.
