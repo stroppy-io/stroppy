@@ -32,6 +32,20 @@ const (
 
 var errTokenLost = errors.New("banking: token rotation lost to a concurrent transfer")
 
+// Values the workload's defaults and its verify step share, named so a reader — and
+// the magic-number gate — can see what they mean.
+const (
+	defaultRetries = 3
+	minAccounts    = 2
+	rngSeed        = 0x5EED
+)
+
+// Errors a caller can match on. Built here and wrapped where they gain detail.
+var (
+	errBalanceMismatch  = errors.New("verify: total balance")
+	errTokenPermutation = errors.New("verify: tokens are not the permutation")
+)
+
 // Test is the portable variant: no fault injection, works on any supported
 // driver.
 var Test = bench.Test{Name: "banking", Define: define, Source: publication("Test")}
@@ -75,7 +89,7 @@ func defineVariant(d *bench.Def, variant string) error {
 	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
 
 	w := &workload{
-		retries:        3,
+		retries:        defaultRetries,
 		iso:            bench.IsoReadCommitted,
 		randoms:        make([]*rand.Rand, max(settings.Workers, 1)),
 		injectArmedFor: make([]uint64, max(settings.Workers, 1)),
@@ -87,9 +101,9 @@ func defineVariant(d *bench.Def, variant string) error {
 
 	accounts, _ := d.Param.Int64("accounts", defaultAccounts,
 		"Number of bank accounts; the invariant is accounts * 1000.")
-	w.accounts = max(accounts, 2)
+	w.accounts = max(accounts, minAccounts)
 
-	w.retries, _ = d.Param.Int("retry-attempts", 3, "Maximum transaction attempts.")
+	w.retries, _ = d.Param.Int("retry-attempts", defaultRetries, "Maximum transaction attempts.")
 	iso, _ := d.Param.String("tx-isolation", "", "Transaction isolation override.")
 	sqlFile, _ := d.Param.String("sql-file", "", "SQL dialect file override.")
 
@@ -103,6 +117,7 @@ func defineVariant(d *bench.Def, variant string) error {
 	} else {
 		w.sql, err = d.Queries.Load(files, sqlFileFor(db.Kind()))
 	}
+
 	if err != nil {
 		return err
 	}
@@ -120,7 +135,7 @@ func defineVariant(d *bench.Def, variant string) error {
 
 	for worker := range w.randoms {
 		//nolint:gosec // benchmark data generator, not security randomness.
-		w.randoms[worker] = rand.New(rand.NewPCG(uint64(worker)+1, 0x5EED))
+		w.randoms[worker] = rand.New(rand.NewPCG(uint64(worker)+1, rngSeed))
 	}
 
 	if err := w.configureVariant(d, variant); err != nil {
@@ -162,6 +177,7 @@ func (w *workload) transfer(ctx context.Context, b *bench.Bench) error {
 
 	from := int64(random.IntN(int(w.accounts))) + 1
 	to := int64(random.IntN(int(w.accounts))) + 1
+
 	if from == to {
 		to = from%w.accounts + 1
 	}
@@ -406,7 +422,7 @@ func (w *workload) checkInvariants(ctx context.Context, b *bench.Bench) error {
 	}
 
 	if want := w.accounts * initialBalance; total != want {
-		return fmt.Errorf("verify: total balance is %d, want %d", total, want)
+		return fmt.Errorf("%w is %d, want %d", errBalanceMismatch, total, want)
 	}
 
 	// Without the witness there is nothing more to check, and the weaker guarantee
@@ -450,8 +466,8 @@ func (w *workload) checkInvariants(ctx context.Context, b *bench.Bench) error {
 	// count — a duplicate paired with a loss still shows up here as a repeat.
 	if rows != w.accounts || repeated != 0 || lowest != 1 || highest != w.accounts {
 		return fmt.Errorf(
-			"verify: tokens are not the permutation 1..%d (rows %d, repeated %d, min %d, max %d)",
-			w.accounts, rows, repeated, lowest, highest,
+			"%w 1..%d (rows %d, repeated %d, min %d, max %d)",
+			errTokenPermutation, w.accounts, rows, repeated, lowest, highest,
 		)
 	}
 

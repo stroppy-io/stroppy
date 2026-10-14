@@ -11,6 +11,9 @@ import (
 // neverArmed marks a worker that has not armed the injector yet.
 const neverArmed = ^uint64(0)
 
+// defaultInjectEvery arms the injector on every Nth transfer unless told otherwise.
+const defaultInjectEvery = 25
+
 // The injecting variant fails transactions on purpose, so the invariants are
 // checked against interruptions rather than only against concurrency. It needs a
 // fault injector in the server: Macavity (https://github.com/CrystallineCore/Macavity)
@@ -26,8 +29,12 @@ const variantInject = "inject"
 // errInjectDriverUnsupported rejects the inject variant on a driver where the
 // Macavity extension cannot exist. Recording and noop are allowed so the variant
 // stays testable and describable without a server.
-var errInjectDriverUnsupported = errors.New(
-	"banking/inject: needs the postgres driver with the Macavity extension available")
+var (
+	errUnknownInjectAction     = errors.New("banking/inject: unknown --inject-action")
+	errNegativeInjectEvery     = errors.New("banking/inject: --inject-every must not be negative")
+	errInjectDriverUnsupported = errors.New(
+		"banking/inject: needs the postgres driver with the Macavity extension available")
+)
 
 // Inject is the fault-injecting variant: postgres only, and it requires the
 // Macavity extension to be installable on the server.
@@ -63,13 +70,13 @@ func (w *workload) configureVariant(d *bench.Def, variant string) error {
 		"Injected action: error fails the commit, crash kills the backend.")
 	occurrence, _ := d.Param.Int64("inject-occurrence", 1,
 		"Fire the armed event on this matching hit.")
-	every, _ := d.Param.Int64("inject-every", 25,
+	every, _ := d.Param.Int64("inject-every", defaultInjectEvery,
 		"Arm the injector every Nth transfer; 0 disables injection.")
 
 	switch action {
 	case "error", "crash":
 	default:
-		return fmt.Errorf("banking/inject: unknown --inject-action %q, want error or crash", action)
+		return fmt.Errorf("%w %q, want error or crash", errUnknownInjectAction, action)
 	}
 
 	switch w.driverType {
@@ -79,7 +86,7 @@ func (w *workload) configureVariant(d *bench.Def, variant string) error {
 	}
 
 	if every < 0 {
-		return fmt.Errorf("banking/inject: --inject-every must not be negative, got %d", every)
+		return fmt.Errorf("%w, got %d", errNegativeInjectEvery, every)
 	}
 
 	w.inject = &injectConfig{

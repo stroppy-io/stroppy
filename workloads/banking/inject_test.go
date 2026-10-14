@@ -26,7 +26,8 @@ func TestArmingHappensOncePerIteration(t *testing.T) {
 	}
 
 	if w.shouldArm(0, 5) {
-		t.Error("a retry of the same iteration armed a second event: every attempt would fail and no retry could absorb the fault")
+		t.Error("a retry of the same iteration armed a second event: every attempt " +
+			"would fail and no retry could absorb the fault")
 	}
 
 	if w.shouldArm(0, 5) {

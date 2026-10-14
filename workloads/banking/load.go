@@ -2,6 +2,13 @@ package banking
 
 import "github.com/stroppy-io/stroppy/v6/pkg/gen"
 
+// loadBatchRows and loadBatchBytes size the load's batches: enough rows to be worth a
+// round trip, capped so a batch stays a reasonable message.
+const (
+	loadBatchRows  = 64
+	loadBatchBytes = 4096
+)
+
 // account is one row of bank_account. gen.FromRows derives the column names from
 // these fields, so they must match the table: id, balance, token.
 type account struct {
@@ -18,5 +25,5 @@ func accountRows(accounts int64) gen.BatchSource {
 		id := int64(index) + 1 //nolint:gosec // benchmark row index, bounded by accounts
 
 		return account{ID: id, Balance: initialBalance, Token: id}, nil
-	}, gen.BatchRows(64), gen.MaxBytes(4096))
+	}, gen.BatchRows(loadBatchRows), gen.MaxBytes(loadBatchBytes))
 }

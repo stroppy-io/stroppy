@@ -75,7 +75,7 @@ func TestPicodataAssetCarriesNoWitness(t *testing.T) {
 	// should see the limit in the asset, not a query that silently never runs.
 	for _, forbidden := range []string{"rotate_token", "token_stats", "read_token"} {
 		if strings.Contains(string(parsed), forbidden+"\n") {
-			t.Errorf("pico.sql declares %s, which the driver cannot honour", forbidden)
+			t.Errorf("pico.sql declares %s, which the driver cannot honor", forbidden)
 		}
 	}
 }
@@ -257,7 +257,7 @@ func mustInt64(t *testing.T, value any, name string) int64 {
 	return number
 }
 
-// TestVerifyWaitsOutARecoveringServer pins the behaviour the crash variant needs:
+// TestVerifyWaitsOutARecoveringServer pins the behavior the crash variant needs:
 // the check must not give up on the first refusal, because that variant leaves the
 // cluster reinitializing, and must still report a real violation.
 func TestVerifyWaitsOutARecoveringServer(t *testing.T) {
