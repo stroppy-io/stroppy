@@ -3,6 +3,7 @@ package banking
 import (
 	"errors"
 	"io"
+	"io/fs"
 	"strings"
 	"testing"
 
@@ -33,7 +34,9 @@ func TestEmbeddedAssetContract(t *testing.T) {
 		{Section: verifySection, Name: "token_stats"},
 	}
 
-	for _, dialect := range []string{"pg.sql", "mysql.sql", "pico.sql", "ydb.sql"} {
+	// The three dialects that carry the full witness. Picodata is deliberately not
+	// in this list: TestPicodataAssetCarriesNoWitness holds it to its reduced set.
+	for _, dialect := range []string{"pg.sql", "mysql.sql", "ydb.sql"} {
 		t.Run(dialect, func(t *testing.T) {
 			workloadtest.SQL(t, files, dialect, sections, queries)
 		})
@@ -47,6 +50,34 @@ func TestEmbeddedAssetContract(t *testing.T) {
 			{Section: "injection", Name: "arm"},
 		},
 	)
+}
+
+// TestPicodataAssetCarriesNoWitness pins the deliberate difference: Picodata cannot
+// express the token's uniqueness (unique indexes are limited to sharding-key
+// columns) and cannot make a cross-shard transfer atomic, so its asset must carry
+// the reduced transfer and the total-balance check instead — and must not carry the
+// queries that would imply a guarantee the engine cannot give.
+func TestPicodataAssetCarriesNoWitness(t *testing.T) {
+	workloadtest.SQL(t, files, "pico.sql",
+		[]string{"drop_schema", "create_schema", transferSection, verifySection},
+		[]workloadtest.Query{
+			{Section: transferSection, Name: "move_balance"},
+			{Section: verifySection, Name: "total_balance"},
+		},
+	)
+
+	parsed, err := fs.ReadFile(files, "pico.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The reduced dialect must not mention the witness queries at all: a reader
+	// should see the limit in the asset, not a query that silently never runs.
+	for _, forbidden := range []string{"rotate_token", "token_stats", "read_token"} {
+		if strings.Contains(string(parsed), forbidden+"\n") {
+			t.Errorf("pico.sql declares %s, which the driver cannot honour", forbidden)
+		}
+	}
 }
 
 // TestInjectVariantDescribesItsOwnKnobs holds the injecting variant to the two

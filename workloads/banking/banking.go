@@ -107,12 +107,16 @@ func defineVariant(d *bench.Def, variant string) error {
 		return err
 	}
 
-	w.read = w.sql.Require("workload_tx_transfer", "read_account")
-	w.tokenOnly = w.sql.Require("workload_tx_transfer", "read_token")
-	w.rotate = w.sql.Require("workload_tx_transfer", "rotate_token")
 	w.move = w.sql.Require("workload_tx_transfer", "move_balance")
 	w.total = w.sql.Require("verify", "total_balance")
-	w.tokens = w.sql.Require("verify", "token_stats")
+
+	// The witness' own queries exist only where the engine can carry it.
+	if w.tokenWitness() {
+		w.read = w.sql.Require("workload_tx_transfer", "read_account")
+		w.tokenOnly = w.sql.Require("workload_tx_transfer", "read_token")
+		w.rotate = w.sql.Require("workload_tx_transfer", "rotate_token")
+		w.tokens = w.sql.Require("verify", "token_stats")
+	}
 
 	for worker := range w.randoms {
 		//nolint:gosec // benchmark data generator, not security randomness.
@@ -169,6 +173,10 @@ func (w *workload) transfer(ctx context.Context, b *bench.Bench) error {
 		Isolation: w.iso,
 		Retry:     w.retryOptions(),
 	}, func(ctx context.Context, tx *bench.Tx) error {
+		if !w.tokenWitness() {
+			return w.moveBalances(ctx, tx, from, to, amount)
+		}
+
 		fromToken, err := w.readToken(ctx, tx, from)
 		if err != nil {
 			return err
@@ -196,6 +204,30 @@ func (w *workload) transfer(ctx context.Context, b *bench.Bench) error {
 		return w.maybeInject(ctx, tx, b)
 	})
 }
+
+// moveBalances is the reduced transfer: the two relative updates, without the token
+// swap that needs either a transaction or a unique constraint to be meaningful.
+func (w *workload) moveBalances(ctx context.Context, tx *bench.Tx, from, to, amount int64) error {
+	for _, move := range balanceMoves(from, to, amount) {
+		if err := tx.Exec(ctx, w.move.Text, map[string]any{"id": move.id, "delta": move.delta}); err != nil {
+			return fmt.Errorf("move_balance: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// tokenWitness reports whether this driver can carry the second witness: the
+// UNIQUE token that makes a lost or duplicated transfer detectable even when the
+// balances happen to sum right.
+//
+// Picodata cannot, for reasons that are the engine's own rules: unique indexes are
+// only allowed on sharding-key columns, so a constraint on the token is not
+// expressible; transactions are single-bucket `DO $$ … END $$` blocks, and the two
+// rows a transfer moves money between are two sharding keys, so nothing makes the
+// swap atomic. There the run checks the total balance only, and says so in its
+// report data.
+func (w *workload) tokenWitness() bool { return w.driverType != bench.DriverPicodata }
 
 // retryOptions is what makes a transfer retryable, including for the two failures
 // that classify as unknown — the default policy fails closed on those.
@@ -375,6 +407,17 @@ func (w *workload) checkInvariants(ctx context.Context, b *bench.Bench) error {
 
 	if want := w.accounts * initialBalance; total != want {
 		return fmt.Errorf("verify: total balance is %d, want %d", total, want)
+	}
+
+	// Without the witness there is nothing more to check, and the weaker guarantee
+	// must be visible where a run's output is read rather than only in this file.
+	if !w.tokenWitness() {
+		b.AddReportData("token_witness",
+			"unavailable on this driver: unique indexes are limited to sharding-key "+
+				"columns, and a two-row transfer is cross-shard so it cannot be atomic — "+
+				"the total balance is checked, a lost or duplicated transfer is not detectable")
+
+		return nil
 	}
 
 	row, err := b.QueryRow(ctx, w.tokens.Text, nil)
