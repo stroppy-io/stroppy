@@ -13,6 +13,7 @@ func TestEmbeddedAssetContract(t *testing.T) {
 		"crdb.sql",
 		"crdb24.sql",
 		"mysql.sql",
+		"tidb.sql",
 		"pico.sql",
 		"ydb.sql",
 		"ydb_no_indexes.sql",

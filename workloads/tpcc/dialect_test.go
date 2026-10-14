@@ -19,7 +19,7 @@ func TestEngineSpecificAssetIsSelected(t *testing.T) {
 		{bench.DriverCRDB, "crdb.sql", "CockroachDB needs per-table ANALYZE, and tpcc ships a crdb.sql for it"},
 		{bench.DriverYugabyte, "pg.sql", "speaks the postgres protocol and ships no asset of its own, so it falls back"},
 		{bench.DriverMySQL, "mysql.sql", "a different protocol"},
-		{bench.DriverTiDB, "mysql.sql", "speaks the mysql protocol, and tpcc ships no tidb.sql"},
+		{bench.DriverTiDB, "tidb.sql", "TiDB has no stored procedures, so tpcc ships a variant without them"},
 		{bench.DriverPicodata, "pico.sql", "a different protocol"},
 		{bench.DriverYDB, "ydb.sql", "a different protocol"},
 	} {
