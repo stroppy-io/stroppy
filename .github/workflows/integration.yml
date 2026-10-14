@@ -39,6 +39,32 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      # Engines that speak another's protocol get their own service so the
+      # integration matrix can reach them. Tags are `latest` because the version
+      # schemes differ per vendor; pin them once a run confirms the tag.
+      cockroachdb:
+        image: cockroachdb/cockroach:latest
+        ports:
+          - 26257:26257
+        # Insecure single node, as the workload's crdb preset expects.
+        options: >-
+          --health-cmd "cockroach sql --insecure -e 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+      yugabytedb:
+        image: yugabytedb/yugabyte:latest
+        ports:
+          - 5433:5433
+        # Its master bootstrap measured ~65 s on a small VM, so the retries are
+        # generous and the tests would otherwise start before YSQL is up.
+        options: >-
+          --health-cmd "/home/yugabyte/bin/ysqlsh -h 127.0.0.1 -p 5433 -c 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -92,6 +118,34 @@ jobs:
           STROPPY_PG_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
           STROPPY_MYSQL_URL: myuser:mypassword@tcp(127.0.0.1:3306)/mydb?parseTime=true&multiStatements=true
         run: make integration
+
+      # TiDB cannot be a service: a TiDB server is a playground of three processes
+      # (pd, tikv, tidb), so it starts here and the matrix reaches it on 4000. The
+      # version is pinned, unlike the services above, because tiup resolves a bare
+      # `playground` to nightly and then fails to find it.
+      - name: Start TiDB
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
+          ~/.tiup/bin/tiup playground v8.5.8 --without-monitor > /tmp/tidb.log 2>&1 &
+          for _ in $(seq 1 60); do
+            if mysqladmin ping -h 127.0.0.1 -P 4000 -u root --silent >/dev/null 2>&1; then
+              echo "tidb is accepting connections"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "tidb did not become ready; last lines of its log:"
+          tail -50 /tmp/tidb.log
+          exit 1
+
+      # The engines that speak another protocol, on one workload each. Optional in
+      # the harness's sense: absent services skip them rather than failing the job.
+      - name: Run optional engine integration suite
+        env:
+          STROPPY_CRDB_URL: postgres://root@127.0.0.1:26257/defaultdb?sslmode=disable
+          STROPPY_YUGABYTE_URL: postgres://yugabyte@127.0.0.1:5433/yugabyte?sslmode=disable
+          STROPPY_TIDB_URL: root:@tcp(127.0.0.1:4000)/test?parseTime=true&multiStatements=true
+        run: make integration-optional
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v7

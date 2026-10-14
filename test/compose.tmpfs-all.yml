@@ -128,5 +128,27 @@ services:
     # ephemeral storage. Mounting corrupts pdisk state on restart
     # (code 2017: "database doesn't have storage pools at all").
 
+  crdb-tmpfs-all:
+    image: cockroachdb/cockroach:latest
+    container_name: stroppy-crdb-tmpfs-all
+    ports:
+      - "26257:26257"
+    # CockroachDB can keep its store in memory, which suits this harness.
+    command: start-single-node --insecure --store=type=mem,size=1GiB
+
+  yb-tmpfs-all:
+    image: yugabytedb/yugabyte:latest
+    container_name: stroppy-yb-tmpfs-all
+    ports:
+      - "5433:5433"
+    tmpfs:
+      - /home/yugabyte/var:size=2g
+
+  # TiDB is deliberately absent: a TiDB server is a playground of three
+  # processes (pd, tikv, tidb), which compose can only express as three
+  # coordinated services for little gain. Start it the way CI does —
+  # `tiup playground v8.5.8 --without-monitor` — and run
+  # `make integration-optional` with STROPPY_TIDB_URL set.
+
 volumes:
   pico_data_tmpfs:
