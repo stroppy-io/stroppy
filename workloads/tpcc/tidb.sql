@@ -6,6 +6,21 @@
 -- Measured: without this, tpcc/tx on TiDB fails in drop_schema with
 -- `Error 8108 (HY000): Unsupported type *resolve.NodeW`, the same first-statement
 -- failure TPC-B had. TPC-C's procedure variant is therefore not available on TiDB.
+--
+-- Running it against a single-node TiDB needs one further step, also measured. Seed a
+-- cheap samplerate before measuring, or `ANALYZE TABLE` over nine tables takes minutes
+-- each and exhausts the box — with it, all nine finished in about a second, against
+-- 6m54s without:
+--
+--   SET GLOBAL tidb_server_memory_limit='1000MB';
+--   ANALYZE TABLE warehouse, district, customer, history, new_order, orders,
+--                 order_line, item, stock WITH 0.02 SAMPLERATE;
+--   stroppy run tpcc/tx -d tidb --steps analyze,workload
+--
+-- Measured that way the run exits 0: 704 transactions, 701 commits, all five transaction
+-- types non-zero, and 295 rows in `history`, which only payments write. Start the
+-- playground with `--tiflash 0` and pre-download its components: that keeps it to three
+-- servers (tikv, tidb, pd), which is what fits.
 
 --+ drop_schema
 --= set_foreign_keys
