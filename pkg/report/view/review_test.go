@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,33 @@ import (
 
 	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
+
+func TestCatalogQueryPreservesDriverValues(t *testing.T) {
+	t.Parallel()
+
+	values := url.Values{
+		"driver":   {"pg", "pico", "mysql"},
+		"workload": {"custom"},
+	}
+	original := values.Encode()
+
+	query, err := catalogQuery(values)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Join(query.Drivers, ",") != "postgres,picodata,mysql" {
+		t.Fatalf("driver aliases changed: %v", query.Drivers)
+	}
+
+	if values.Encode() != original {
+		t.Fatalf("input query mutated: %v", values)
+	}
+
+	if strings.Join(query.Workloads, ",") != "custom" {
+		t.Fatalf("workload filter changed: %v", query.Workloads)
+	}
+}
 
 func TestSparseArraysUseLinearGenericView(t *testing.T) {
 	t.Parallel()

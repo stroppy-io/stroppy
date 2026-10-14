@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"time"
 
@@ -139,7 +140,7 @@ func catalogQuery(values url.Values) (report.HistoryQuery, error) {
 	}
 
 	query := report.HistoryQuery{
-		Workloads: values["workload"], Drivers: values["driver"], Reverse: values.Get("order") == "oldest",
+		Workloads: values["workload"], Drivers: slices.Clone(values["driver"]), Reverse: values.Get("order") == "oldest",
 	}
 	for i, driver := range query.Drivers {
 		switch driver {
