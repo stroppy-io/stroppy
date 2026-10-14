@@ -18,7 +18,8 @@ var (
 	// implement ROLLUP, CUBE or GROUPING SETS (crdb#46280), and 11 of the 103 query
 	// bodies use them — exactly the 11 that fail. Its bare ANALYZE is a smaller second
 	// blocker, one an asset could fix; the queries cannot be.
-	errCockroachUnsupported      = errors.New("[tpcds] CockroachDB does not implement ROLLUP/CUBE/GROUPING SETS (crdb#46280), which 11 of the 103 queries use, so TPC-DS is not supported there")
+	errCockroachUnsupported = errors.New("[tpcds] CockroachDB does not implement ROLLUP/CUBE/GROUPING SETS " +
+		"(crdb#46280), which 11 of the 103 queries use, so TPC-DS is not supported there")
 	errScaleFactorMustBePositive = errors.New("SCALE_FACTOR must be positive")
 	errUnknownDialect            = errors.New("dsqgen: unknown dialect")
 	errIncompleteQuerySet        = errors.New("tpcds: generated query set is incomplete")
