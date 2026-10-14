@@ -132,7 +132,9 @@ services:
     image: cockroachdb/cockroach:latest
     container_name: stroppy-crdb-tmpfs-all
     ports:
-      - "26257:26257"
+      # Loopback only: --insecure means passwordless root, and publishing that on
+      # every interface would expose a developer's machine to the network.
+      - "127.0.0.1:26257:26257"
     # CockroachDB can keep its store in memory, which suits this harness.
     command: start-single-node --insecure --store=type=mem,size=1GiB
 
@@ -140,9 +142,15 @@ services:
     image: yugabytedb/yugabyte:latest
     container_name: stroppy-yb-tmpfs-all
     ports:
-      - "5433:5433"
+      # A distinct host port: ydb-tmpfs-all already publishes 5433, and two
+      # services cannot bind the same one. multidb.go's default URL matches this.
+      - "127.0.0.1:5435:5433"
     tmpfs:
       - /home/yugabyte/var:size=2g
+    # The image needs its start command spelled out, and the node listens on the
+    # container hostname rather than loopback — which is why a readiness probe
+    # against 127.0.0.1 inside it fails even once the node is up.
+    command: bin/yugabyted start --background=false
 
   # TiDB is deliberately absent: a TiDB server is a playground of three
   # processes (pd, tikv, tidb), which compose can only express as three

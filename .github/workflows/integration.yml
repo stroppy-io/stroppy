@@ -128,13 +128,20 @@ jobs:
           docker run -d --name crdb -p 26257:26257 \
             cockroachdb/cockroach:latest start-single-node --insecure
 
+          ready=0
           for _ in $(seq 1 30); do
             if docker exec crdb cockroach sql --insecure -e 'SELECT 1' >/dev/null 2>&1; then
               echo "cockroachdb is accepting connections"
+              ready=1
               break
             fi
             sleep 5
           done
+          if [ "$ready" != 1 ]; then
+            echo "cockroachdb did not become ready; its last lines:"
+            docker logs crdb 2>&1 | tail -30
+            exit 1
+          fi
 
       # The engines that speak another protocol, on one workload each. `integration`
       # (above) runs the mandatory suite; this runs the engines CI actually provides —

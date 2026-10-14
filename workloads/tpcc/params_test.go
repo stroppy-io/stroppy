@@ -84,8 +84,9 @@ func TestDriverDerivedDefaults(t *testing.T) {
 		// CockroachDB defaults to its native serializable level rather than this
 		// workload's (it accepts read committed too, measured slower).
 		{bench.DriverCRDB, bench.IsoSerializable},
-		// YugabyteDB takes MySQL's level rather than postgres's: measured on YSQL, the
-		// protocol default failed a few percent of iterations here.
+		// Measured on YSQL: this workload's protocol default — repeatable read, for both
+		// postgres and mysql here — failed a few percent of iterations, at roughly half
+		// the throughput, so YSQL takes read committed.
 		{bench.DriverYugabyte, bench.IsoReadCommitted},
 		{bench.DriverTiDB, bench.IsoRepeatableRead},
 	}

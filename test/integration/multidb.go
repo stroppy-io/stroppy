@@ -33,7 +33,7 @@ const (
 	// default uses: CockroachDB's insecure listener, YugabyteDB's YSQL, TiDB's
 	// mysql-wire endpoint.
 	defaultCRDBAllURL     = "postgres://root@localhost:26257/defaultdb?sslmode=disable"
-	defaultYugabyteAllURL = "postgres://yugabyte@localhost:5433/yugabyte?sslmode=disable"
+	defaultYugabyteAllURL = "postgres://yugabyte@localhost:5435/yugabyte?sslmode=disable"
 	defaultTiDBAllURL     = "root:@tcp(localhost:4000)/test?parseTime=true&multiStatements=true"
 
 	envPGAllURL       = "STROPPY_PG_URL"
@@ -80,7 +80,11 @@ func newPGPool(t *testing.T, engine, envKey, defaultURL string) *pgxpool.Pool {
 
 	url := envOr(envKey, defaultURL)
 
-	ctx := context.Background()
+	// Bounded, like newSQLDB's ping: pgxpool.New does not itself wait for a
+	// connection, so an endpoint that stops answering would hang the test rather
+	// than fail it.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	pool, err := pgxpool.New(ctx, url)
 	if err != nil {

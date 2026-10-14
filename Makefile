@@ -303,8 +303,8 @@ tmpfs-psql: # Open psql shell into the tmpfs Postgres container
 
 .PHONY: tmpfs-all-up tmpfs-all-down tmpfs-all-clean
 
-tmpfs-all-up: # Start optional PostgreSQL, MySQL, Picodata, and YDB harness
-	docker compose -f test/compose.tmpfs-all.yml up -d --wait pg-tmpfs-all mysql-tmpfs-all picodata-tmpfs-all ydb-tmpfs-all
+tmpfs-all-up: # Start the optional harness: PostgreSQL, MySQL, Picodata, YDB, CockroachDB, YugabyteDB
+	docker compose -f test/compose.tmpfs-all.yml up -d --wait pg-tmpfs-all mysql-tmpfs-all picodata-tmpfs-all ydb-tmpfs-all crdb-tmpfs-all yb-tmpfs-all
 	docker compose -f test/compose.tmpfs-all.yml up picodata-init
 
 tmpfs-all-down: # Stop + remove all 4 DBs and their volumes
