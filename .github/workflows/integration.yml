@@ -115,18 +115,22 @@ jobs:
           tail -50 /tmp/tidb.log
           exit 1
 
-      # CockroachDB cannot be a service: a service passes `options` to docker create
-      # *before* the image, and its image entrypoint requires a mode argument, so it
-      # dies with "mode unset". It starts here instead, where the command can be given.
+      # CockroachDB and YugabyteDB cannot be services: a service passes `options` to
+      # docker create *before* the image, and CockroachDB's image entrypoint requires a
+      # mode argument, so it dies with "mode unset". Both start here, where the command
+      # can be given.
       #
-      # YugabyteDB is deliberately absent: its container start did not come up in CI
-      # (the matrix reached it and found 5433 refused), and it is verified by hand with
-      # the vendor's tarball, where it needs locale-gen en_US.UTF-8 before initdb. Making
-      # it start here is worth doing, but not by guessing at its flags in a red pipeline.
-      - name: Start CockroachDB
+      # YugabyteDB is back after leaving this workflow once: the two reasons it never came
+      # up are now measured — the image needs its start command spelled out, and its node
+      # listens on the container hostname rather than loopback, so a probe against
+      # 127.0.0.1 inside it fails even when the node is ready. Its bootstrap takes ~65 s,
+      # hence the longer wait than CockroachDB's.
+      - name: Start CockroachDB and YugabyteDB
         run: |
           docker run -d --name crdb -p 26257:26257 \
             cockroachdb/cockroach:latest start-single-node --insecure
+          docker run -d --name yb -p 5433:5433 \
+            yugabytedb/yugabyte:latest bin/yugabyted start --background=false
 
           ready=0
           for _ in $(seq 1 30); do
@@ -143,6 +147,22 @@ jobs:
             exit 1
           fi
 
+          # The probe runs inside the container, so it must use the hostname, not loopback.
+          ready=0
+          for _ in $(seq 1 40); do
+            if docker exec yb bash -lc 'ysqlsh -h "$(hostname)" -p 5433 -c "SELECT 1"' >/dev/null 2>&1; then
+              echo "yugabytedb is accepting connections"
+              ready=1
+              break
+            fi
+            sleep 5
+          done
+          if [ "$ready" != 1 ]; then
+            echo "yugabytedb did not become ready; its last lines:"
+            docker logs yb 2>&1 | tail -30
+            exit 1
+          fi
+
       # The engines that speak another protocol, on one workload each. `integration`
       # (above) runs the mandatory suite; this runs the engines CI actually provides —
       # Picodata and YDB are not among them, so the broader optional target would fail
@@ -150,6 +170,7 @@ jobs:
       - name: Run borrowed-protocol engine integration suite
         env:
           STROPPY_CRDB_URL: postgres://root@127.0.0.1:26257/defaultdb?sslmode=disable
+          STROPPY_YUGABYTE_URL: postgres://yugabyte@127.0.0.1:5433/yugabyte?sslmode=disable
           STROPPY_TIDB_URL: root:@tcp(127.0.0.1:4000)/test?parseTime=true&multiStatements=true
         run: make integration-engines
 
