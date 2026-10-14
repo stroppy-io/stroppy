@@ -40,6 +40,51 @@ func TestTpchLoadOnYDB(t *testing.T) {
 	assertTpchQueriesLogged(t, out)
 }
 
+// TestTpchLoadOnCockroachDB exercises the optional CockroachDB dialect, which
+// speaks the postgres wire but needs its own asset: CRDB rejects the bare ANALYZE
+// that pg.sql ends with, and selects crdb.sql instead.
+func TestTpchLoadOnCockroachDB(t *testing.T) {
+	pool := NewCRDB(t)
+
+	url := envOr(envCRDBAllURL, defaultCRDBAllURL)
+	out := runTpchStroppy(t, "crdb", url, 3*time.Minute)
+
+	assertTpchLoadMarkers(t, out)
+	assertTpchRowCountsPG(t, pool)
+	assertTpchFKIntegrityPico(t, pool)
+	assertTpchQueriesLogged(t, out)
+}
+
+// TestTpchLoadOnYugabyte exercises the optional YugabyteDB dialect. It speaks the
+// postgres wire and needs no asset of its own — YSQL accepts the bare ANALYZE that
+// CRDB rejects.
+func TestTpchLoadOnYugabyte(t *testing.T) {
+	pool := NewYugabyte(t)
+
+	url := envOr(envYugabyteAllURL, defaultYugabyteAllURL)
+	out := runTpchStroppy(t, "yugabyte", url, 3*time.Minute)
+
+	assertTpchLoadMarkers(t, out)
+	assertTpchRowCountsPG(t, pool)
+	assertTpchFKIntegrityPico(t, pool)
+	assertTpchQueriesLogged(t, out)
+}
+
+// TestTpchLoadOnTiDB exercises the optional TiDB dialect, which speaks the mysql
+// wire and needs no asset of its own.
+func TestTpchLoadOnTiDB(t *testing.T) {
+	db := NewTiDB(t)
+	ResetMySQL(t, db, tpchTables)
+
+	url := envOr(envTiDBAllURL, defaultTiDBAllURL)
+	out := runTpchStroppy(t, "tidb", url, 3*time.Minute)
+
+	assertTpchLoadMarkers(t, out)
+	assertTpchRowCountsMySQL(t, db)
+	assertTpchFKIntegrityMySQL(t, db)
+	assertTpchQueriesLogged(t, out)
+}
+
 func assertTpchRowCountsPG(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 
