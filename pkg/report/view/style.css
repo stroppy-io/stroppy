@@ -771,6 +771,58 @@ footer {
     font-size:9px
   }
 }
+.captured-log-list {
+  max-height:480px;
+  overflow:auto
+}
+.captured-log {
+  border-bottom:1px solid var(--line)
+}
+.captured-log:last-child {
+  border-bottom:0
+}
+.captured-log>summary {
+  gap:10px;
+  padding:10px 12px;
+  font-size:12px
+}
+.log-elapsed {
+  flex:0 0 105px;
+  color:var(--muted);
+  font-variant-numeric:tabular-nums
+}
+.log-level {
+  flex:0 0 45px;
+  font:11px ui-monospace,monospace
+}
+.log-message {
+  min-width:0;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis
+}
+.log-full-message {
+  white-space:pre-wrap;
+  overflow-wrap:anywhere
+}
+.captured-log .details-body {
+  border-top:1px solid var(--line)
+}
+.captured-log .details-body>.fields+.fields {
+  margin-top:16px
+}
+@media(max-width:720px) {
+  .captured-log>summary {
+    flex-wrap:wrap
+  }
+  .log-elapsed {
+    flex-basis:auto
+  }
+  .log-message {
+    flex-basis:100%;
+    margin-left:22px
+  }
+}
 .timeline-details {
   margin:16px 0
 }

@@ -3,6 +3,8 @@ package view
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -96,5 +98,37 @@ func TestCaptureViewerBoundsLogsAndPreservesGaps(t *testing.T) {
 	if strings.Contains(output.String(), "<script>raw</script>") ||
 		!strings.Contains(output.String(), "Recorded run evolution") {
 		t.Fatal("rich HTML unsafe or missing")
+	}
+
+	checkCollapsedLogPages(t, c, document)
+}
+
+func checkCollapsedLogPages(t *testing.T, c *report.Capture, document []byte) {
+	t.Helper()
+
+	var stream, output bytes.Buffer
+	for i := range 3000 {
+		fmt.Fprintf(&stream, "{\"elapsed_seconds\":%d,\"level\":\"info\",\"message\":\"log-record-%04d\"}\n", i, i)
+	}
+
+	if err := os.WriteFile(filepath.Join(c.Directory, "logs.jsonl"), stream.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Render(&output, document, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Count(output.String(), `<details class="captured-log">`) != capturePageRecords ||
+		strings.Contains(output.String(), `<details class="captured-log" open`) ||
+		!strings.Contains(output.String(), "log-record-0099") || strings.Contains(output.String(), "log-record-0100") ||
+		!strings.Contains(output.String(), `href="#captured-logs"`) {
+		t.Fatal("log preview not bounded, collapsed, or navigable")
+	}
+
+	page := loadCapture(".", c, url.Values{"log_page": {"1"}})
+	if len(page.Logs) != capturePageRecords || page.Logs[0].Message != "log-record-0100" ||
+		page.Previous == "" || page.Next == "" {
+		t.Fatal("log pagination lost bounded records")
 	}
 }

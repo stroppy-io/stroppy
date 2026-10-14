@@ -227,7 +227,10 @@ preview, while `reports bundle` retains `index.html`, portable `report.json`, th
 capture manifest, and **complete** original streams. Extract the ZIP and open
 `index.html` offline; artifact links are relative. The viewer inspects at most
 8 MiB and 2,000 records per metric/event preview and shows 100 filtered logs per
-page within its bounded scan. It never silently labels a preview as the full
+page within its bounded scan. Logs use a height-limited, scrollable list of
+collapsed records: elapsed time, level, and message are visible; expand a record
+for its full message, timestamp, logger, and structured fields. A Logs navigation
+link jumps directly to this list. It never silently labels a preview as the full
 recording. Download the streams when more data is needed. Ordinary reports remain
 valid without capture and require no sidecar files.
 

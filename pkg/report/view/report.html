@@ -289,7 +289,7 @@
 </section>
 <nav class="section-nav" aria-label="Report sections">
 <a href="#execution">Execution</a>
-{{if .Capture}}<a href="#capture">Recording</a>{{end}}
+{{if .Capture}}<a href="#capture">Recording</a>{{if .Capture.LogsEnabled}}<a href="#captured-logs">Logs</a>{{end}}{{end}}
 <a href="#metrics">Metrics <span>{{len .Metrics}}
 </span>
 </a>
@@ -352,7 +352,20 @@
 <div class="chart-scroll"><svg viewBox="0 0 720 230" role="img" aria-label="{{.Name}} timeline"><text x="102" y="35" text-anchor="end">{{.Maximum}}</text><text x="102" y="183" text-anchor="end">{{.Minimum}}</text><text x="110" y="210">0 seconds</text><text x="650" y="210" text-anchor="end">{{.Elapsed}} seconds</text>{{range .Markers}}<g><title>{{.Label}}</title><line class="timeline-marker" x1="{{.X}}" x2="{{.X}}" y1="28" y2="180"/></g>{{end}}{{range .Segments}}<polyline class="timeline-line" points="{{.}}"/>{{end}}{{range .Points}}<g class="timeline-point" tabindex="0" aria-label="{{.Time}} seconds: {{.Value}}"><title>{{.Time}} seconds: {{.Value}}</title><circle class="timeline-hit" cx="{{.X}}" cy="{{.Y}}" r="12"/><line class="timeline-crosshair" x1="{{.X}}" x2="{{.X}}" y1="28" y2="180"/><circle class="timeline-dot" cx="{{.X}}" cy="{{.Y}}" r="4"/><text class="timeline-tooltip" x="{{.X}}" y="{{.Y}}" dy="-14">{{.Time}} s · {{.Value}}</text></g>{{end}}</svg></div>
 <details><summary>Numeric samples</summary><table><thead><tr><th>Elapsed seconds</th><th>Recorded value</th></tr></thead><tbody>{{range .Points}}<tr><td>{{if $.Catalog}}<a href="{{.Nearby}}">{{.Time}}</a>{{else}}{{.Time}}{{end}}</td><td>{{.Value}}</td></tr>{{end}}</tbody></table></details></figure></details>{{else}}<p class="empty">No selected timeline with at least two numeric samples.</p>{{end}}
 <p class="timeline-summary">Vertical markers indicate execution boundaries and recorded errors; hover markers or expand events for exact phase labels. Lines break across missing samples.</p><details class="panel"><summary>Execution phase events</summary><div class="details-body">{{template "node" .Capture.Events}}</div></details>
-<h3 id="captured-logs">Captured logs</h3><div class="panel table-scroll"><table><thead><tr><th>Elapsed / level</th><th>Logger / message</th><th>Structured fields</th></tr></thead><tbody>{{range .Capture.Logs}}<tr><td>{{.Elapsed}} s<br>{{.Level}}<details><summary>Timestamp</summary>{{.Time}}</details></td><td><small>{{.Logger}}</small><p>{{.Message}}</p></td><td>{{template "node" .Fields}}</td></tr>{{else}}<tr><td colspan="3">No matching captured logs.</td></tr>{{end}}</tbody></table></div>{{if .Catalog}}<nav class="pagination">{{if .Capture.Previous}}<a href="{{.Capture.Previous}}">Previous logs</a>{{end}}{{if .Capture.Next}}<a href="{{.Capture.Next}}">Next logs</a>{{end}}</nav>{{end}}
+<h3 id="captured-logs">Captured logs</h3>
+<p class="scope-note">Showing {{len .Capture.Logs}} matching records in this bounded preview, up to 100 per page. Expand a record for its full message and structured fields.</p>
+<div class="panel captured-log-list" role="region" aria-label="Captured log records" tabindex="0">
+{{range .Capture.Logs}}
+<details class="captured-log">
+<summary><span class="log-elapsed">{{.Elapsed}} s</span><span class="log-level">{{.Level}}</span><span class="log-message">{{.Message}}</span></summary>
+<div class="details-body">
+<dl class="fields"><div><dt>Timestamp</dt><dd>{{.Time}}</dd></div><div><dt>Logger</dt><dd>{{if .Logger}}{{.Logger}}{{else}}—{{end}}</dd></div><div><dt>Message</dt><dd class="log-full-message">{{.Message}}</dd></div></dl>
+{{template "node" .Fields}}
+</div>
+</details>
+{{else}}<p class="catalog-empty">No matching captured logs.</p>{{end}}
+</div>
+{{if .Catalog}}<nav class="pagination">{{if .Capture.Previous}}<a href="{{.Capture.Previous}}">Previous logs</a>{{end}}{{if .Capture.Next}}<a href="{{.Capture.Next}}">Next logs</a>{{end}}</nav>{{end}}
 </section>{{end}}
 <section class="section" id="results">
 <div class="section-heading">
