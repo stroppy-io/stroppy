@@ -64,6 +64,12 @@ DRIVER PRESETS (-d / --driver)
   snapshot isolation and has no gap locking, so range statements block differently
   than they do on MySQL.
 
+  Two other differences are worth knowing before reading a run's numbers. YugabyteDB
+  ignores the unlogged-table option with a notice rather than an error, so
+  --pg-unlogged changes nothing there. And on the engines that borrow a protocol, a
+  non-zero terminal_errors_total beside exit status 0 is the expected shape for a
+  workload that retries its own conflicts — not a failed run.
+
   Each preset includes default credentials for local development.
   Use -D url=... to override the connection URL.
 

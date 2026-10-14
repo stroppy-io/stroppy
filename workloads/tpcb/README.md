@@ -97,5 +97,11 @@ make tmpfs-down
 
 ### CockroachDB SQL
 
-Use `--sql-file crdb.sql` with the PostgreSQL driver for CockroachDB.
-This variant analyzes each workload table explicitly and supports both tx and procs.
+Run with the `crdb` driver — `-d crdb` — and the workload selects its CockroachDB
+asset itself. TPC-B ships one because CockroachDB rejects a bare `ANALYZE`: the
+variant names each table explicitly and supports both tx and procs.
+
+Note that `--sql-file` takes a **filesystem path**, not the name of an embedded
+asset, so it cannot select a shipped variant — earlier versions of this file said
+`--sql-file crdb.sql`, which fails with `open crdb.sql: no such file or directory`.
+Use `-d crdb`, or extract the asset yourself and pass its path.
