@@ -91,21 +91,23 @@ type (
 		Sequence            uint64
 	}
 	timelineMarker struct {
-		X     float64
-		Label string
+		X       float64
+		Elapsed float64
+		Label   string
 	}
 	timeline struct {
-		Name      string
-		Scope     string
-		Unit      string
-		Semantics string
-		Points    []timelinePoint
-		Segments  []string
-		Markers   []timelineMarker
-		Maximum   string
-		Minimum   string
-		Elapsed   string
-		Omitted   int
+		Name       string
+		MetricType string
+		Scope      string
+		Unit       string
+		Semantics  string
+		Points     []timelinePoint
+		Segments   []string
+		Markers    []timelineMarker
+		Maximum    string
+		Minimum    string
+		Elapsed    string
+		Omitted    int
 	}
 )
 
@@ -364,7 +366,7 @@ func timelines(samples, events []any, query url.Values, interval float64) (plots
 						}
 
 						group = &timeline{
-							Name: timelineName(name, statistic, metric["type"]), Unit: unit,
+							Name: timelineName(name, statistic, metric["type"]), Unit: unit, MetricType: text(metric["type"]),
 							Scope: string(attrs), Semantics: text(sample["semantics"]),
 						}
 						groups[key] = group
@@ -499,7 +501,7 @@ func projectTimeline(group *timeline, events []any, interval float64) {
 		}
 
 		group.Markers = append(group.Markers, timelineMarker{
-			X:     timelineLeft + elapsed/last*timelineWidth,
+			X: timelineLeft + elapsed/last*timelineWidth, Elapsed: elapsed,
 			Label: strings.TrimSpace(text(event["kind"]) + " " + text(event["step"]) + " " + text(event["state"])),
 		})
 	}

@@ -14,14 +14,28 @@ import (
 //go:embed report.html
 var reportTemplate string
 
+//go:embed comparison.html
+var comparisonTemplate string
+
 //go:embed style.css
 var stylesheet string
 
 var templates = template.Must(template.New("report").Funcs(template.FuncMap{
-	"statuses": func() []string { return []string{"completed", "completed_with_errors", "failed", "canceled"} },
-	"style":    embeddedStyle,
-	"download": jsonDownload,
-}).Parse(reportTemplate))
+	"statuses":     func() []string { return []string{"completed", "completed_with_errors", "failed", "canceled"} },
+	"previousPage": func(page int) int { return max(0, page-1) },
+	"nextPage":     func(page int) int { return page + 1 },
+	"style":        embeddedStyle,
+	"download":     jsonDownload,
+	"selected": func(selection []catalogSelection, id string) bool {
+		for _, item := range selection {
+			if item.ID == id {
+				return true
+			}
+		}
+
+		return false
+	},
+}).Parse(reportTemplate + comparisonTemplate))
 
 func embeddedStyle() template.CSS {
 	return template.CSS(stylesheet) //nolint:gosec // embedded application CSS, not report data.

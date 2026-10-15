@@ -1,0 +1,104 @@
+package view
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http/httptest"
+	"net/url"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
+)
+
+func TestComparisonHTTPSelectionExportAndUnknownPayload(t *testing.T) {
+	t.Parallel()
+	history := &report.History{Directory: t.TempDir()}
+	ids := make([]string, 0, 22)
+
+	for i := range 22 {
+		value := float64(i)
+
+		path, err := history.Save(&report.Run{
+			Schema: report.SchemaVersion, Kind: report.Kind, ID: "run", Workload: "<custom>",
+			Status: report.StatusCompleted, StartedAt: time.Now().Add(time.Duration(i) * time.Second),
+			Metrics: map[string]report.Metric{"custom": {Type: "gauge", Unit: "s", Total: &value}},
+			WorkloadReports: []report.WorkloadReport{{
+				Kind: "unknown", Schema: 7, Data: json.RawMessage(`{"text":"<script>unsafe</script>"}`),
+			}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ids = append(ids, strings.TrimSuffix(filepath.Base(path), ".json"))
+	}
+
+	server := httptest.NewServer(Handler(history))
+	defer server.Close()
+
+	get := func(path string, status int) string {
+		t.Helper()
+
+		response, err := server.Client().Get(server.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+
+		data, err := io.ReadAll(response.Body)
+		if err != nil || response.StatusCode != status {
+			t.Fatalf("GET %s: %d %v %s", path, response.StatusCode, err, data)
+		}
+
+		return string(data)
+	}
+	query := url.Values{"id": {ids[0], ids[21]}, "reference": {ids[21]}}
+
+	page := get("/compare?"+query.Encode(), 200)
+	if !strings.Contains(page, "Selected benchmark runs") || !strings.Contains(page, "Run 2") ||
+		strings.Contains(page, "<script>unsafe") {
+		t.Fatal("comparison page unsafe or incomplete")
+	}
+
+	export := get("/compare/export?"+query.Encode(), 200)
+	if !strings.Contains(export, "comparison.json") || strings.Contains(export, `href="/reports/`) {
+		t.Fatal("offline comparison depends on server")
+	}
+
+	catalog := get("/?"+query.Encode(), 200)
+	if !strings.Contains(catalog, `type="hidden" name="id" value="`+ids[0]+`"`) ||
+		!strings.Contains(catalog, `form="catalog-selection" name="page" value="1"`) {
+		t.Fatal("catalog selection lost across pages")
+	}
+
+	get("/compare?id="+ids[0], 400)
+	get("/compare?id="+ids[0]+"&id="+ids[21]+"&reference=missing", 400)
+}
+
+func TestComparisonTimelineKeepsClockAndSequenceGaps(t *testing.T) {
+	t.Parallel()
+
+	group := comparisonTimeline{Series: []comparisonLine{
+		{Label: "Run 1", Interval: 1, Samples: []timelinePoint{
+			{Time: "0", Value: "0", Sequence: 1},
+			{Time: "1", Value: "2", Sequence: 2},
+			{Time: "3", Value: "3", Sequence: 4},
+		}, Markers: []timelineMarker{{Elapsed: 1, Label: "step_start"}}},
+		{Label: "Run 2", Interval: 1, Samples: []timelinePoint{
+			{Time: "0", Value: "0", Sequence: 1}, {Time: "6", Value: "6", Sequence: 2},
+		}},
+	}}
+	projectComparisonTimeline(&group)
+
+	if len(group.Series[0].Segments) != 2 || len(group.Series[1].Segments) != 2 || group.Elapsed != "6" {
+		t.Fatal("missing interval hidden")
+	}
+
+	if fmt.Sprintf("%.0f", group.Series[0].Markers[0].X) != "202" {
+		t.Fatalf("marker not aligned to common clock: %+v", group)
+	}
+}

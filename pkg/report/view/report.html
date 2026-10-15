@@ -132,7 +132,8 @@
 <p class="eyebrow">REPORT HISTORY</p>
 <h1>Your benchmark runs</h1>
 <p class="subtitle">{{.Total}} matching reports · newest first unless selected otherwise</p>
-<form class="filters" method="get" action="/">
+<form id="catalog-selection" class="filters" method="get" action="/">
+{{range .Selection}}{{if not .OnPage}}<input type="hidden" name="id" value="{{.ID}}">{{end}}{{end}}
 <label>Since (inclusive)<input name="since" value="{{.Query.Get "since"}}" placeholder="2026-10-01">
 </label>
 <label>Until (exclusive)<input name="until" value="{{.Query.Get "until"}}" placeholder="2026-10-14">
@@ -154,7 +155,8 @@
 <option value="oldest" {{if eq (.Query.Get "order") "oldest"}}selected{{end}}>Oldest first</option>
 </select>
 </label>
-<button type="submit">Filter</button>
+<button type="submit">Filter / keep selection</button>
+<button type="submit" formaction="/compare">Compare selected</button>
 <a href="/">Reset</a>
 </form>
 </section>
@@ -171,7 +173,7 @@
 <table class="catalog">
 <thead>
 <tr>
-<th>Workload / identity</th>
+<th>Select</th><th>Workload / identity</th>
 <th>Started (UTC)</th>
 <th>Driver</th>
 <th>Status</th>
@@ -182,6 +184,7 @@
 <tbody>
 {{range .Entries}}
 <tr>
+<td><input type="checkbox" form="catalog-selection" name="id" value="{{.ID}}" aria-label="Select {{.ID}}" {{if selected $.Selection .ID}}checked{{end}}></td>
 <td>
 <a class="workload" href="/reports/{{.ID}}">{{.Workload}}
 </a>
@@ -202,22 +205,17 @@
 </tr>
 {{else}}
 <tr>
-<td colspan="6" class="catalog-empty">No matching reports. Run a workload to save its first report.</td>
+<td colspan="7" class="catalog-empty">No matching reports. Run a workload to save its first report.</td>
 </tr>
 {{end}}
 </tbody>
 </table>
 </div>
 <nav class="pagination">
-{{if .Previous}}
-<a href="{{.Previous}}">Previous</a>
-{{else}}
-<span>
-</span>
-{{end}}{{if .Next}}
-<a href="{{.Next}}">Next</a>
-{{end}}
+{{if .Previous}}<button form="catalog-selection" name="page" value="{{previousPage .Page}}">Previous</button>{{else}}<span></span>{{end}}
+{{if .Next}}<button form="catalog-selection" name="page" value="{{nextPage .Page}}">Next</button>{{end}}
 </nav>
+{{if .Selection}}<details class="panel"><summary>{{len .Selection}} selected reports</summary><div class="details-body">{{range .Selection}}<p>{{.ID}}</p>{{end}}</div></details>{{end}}
 </main>
 <footer>Stroppy · local report catalog<span>Filters and navigation work without JavaScript.</span>
 </footer>
