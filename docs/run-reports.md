@@ -272,6 +272,66 @@ sustained lossless log performance. Collection cost grows with metric cardinalit
 and structured field encoding remains on the logging call path. Choose sampling,
 log level, and budgets to suit the benchmark, and inspect capture accounting.
 
+## Comparing saved runs
+
+```bash
+stroppy reports compare ID_A ID_B
+stroppy reports compare ID_A ID_B ID_C --reference ID_B -o json
+stroppy reports compare ID_A ID_B -o html --file comparison.html
+```
+
+Select 2–8 distinct history IDs. Input order is retained; the first run is the
+reference unless `--reference` selects another input. `-o human|json|html` uses one
+comparison model. `--file` atomically publishes any format and refuses to replace
+selected source reports or capture artifacts. JSON contains calculated values,
+unavailability reasons, configuration/result differences, and complete original
+report documents. Source numbers and opaque workload payloads remain intact.
+
+The catalog supports report checkboxes, filtering, and pagination without
+JavaScript. Filter/page submissions retain selections, including reports outside
+the visible page. Compare selected reports, choose a reference, and share the
+local `/compare?id=...&id=...` URL. Source reports and per-run logs remain linked.
+Export comparison HTML from that page for an offline snapshot with embedded source
+JSON; local-server links and filtering controls are omitted from offline output.
+
+Metrics match by name, type, recorded unit, complete dimensions, and statistic.
+Missing values are unavailable, not zero. An empty recorded unit means unspecified;
+no unit conversion is attempted. Aggregate-only values never match dimensioned
+series, and aggregate deltas require matching recorded step scopes. Warmup,
+measurement, transaction type, outcome, and other dimensions remain separate.
+Unit/type/scope mismatches retain source values with unavailable comparison cells.
+
+Absolute change is candidate minus reference. Percentage change is
+`100 * (candidate - reference) / abs(reference)`; a zero reference has no percentage.
+Decimal subtraction preserves exact source numbers. Repeating percentage decimals
+are rounded to 12 places and flagged approximate; display previews may round
+further, with exact values in JSON. A positive change is not an improvement verdict.
+Native TPS is not TPC-C tpmC. No significance or benchmark-compliance claim is made.
+
+Histogram buckets compare only with identical recorded boundaries. Percentiles
+are not averaged across series. Recorded aggregate percentiles are comparable only
+in their unambiguous scope. Per-series `bucket_p50/p90/p95/p99` estimates use linear
+interpolation within a finite bucket, explicitly marked approximate; quantiles in
+an unbounded first/overflow bucket are unavailable. Histograms retain count, sum,
+average, and original buckets for inspection. Unknown metric types and report
+schemas remain inspectable without guessed numeric comparisons. Workload-owned
+results receive generic structural differences, not inferred units or adapters.
+
+Configuration/result differences include parameters and sources, named drivers,
+versions/build IDs, runtime facts, execution policies, measurement/drain windows,
+status, failures, retries, and workload payload schemas/data. Deliberate cross-host
+or cross-driver experiments remain allowed. Matching recorded inputs is not proof
+of equivalent database hardware/settings or identical workload source.
+
+Capture overlays use elapsed time since run start, never inferred measurement
+alignment. Only matching metric/unit/dimension/statistic series share a plot.
+Dash patterns and run labels distinguish sources; numeric tables retain samples.
+Phase markers, sequence/time gaps, sampling intervals, omissions, and incomplete
+capture notices remain visible. No resampling, interpolation between samples, or
+derived instantaneous rate is applied. Missing captures do not block comparison.
+Offline HTML embeds bounded timeline previews, not complete capture sidecars;
+retrieve each source run's bundle for complete recordings.
+
 ## Saved report history
 
 The installed and standalone CLIs expose the same history commands:

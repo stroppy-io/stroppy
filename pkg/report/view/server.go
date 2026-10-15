@@ -20,17 +20,26 @@ const catalogPageSize = 20
 var errCatalogQuery = errors.New("invalid report catalog filter")
 
 type catalogPage struct {
-	Entries  []report.HistoryEntry
-	Problems []report.HistoryProblem
-	Query    url.Values
-	Previous string
-	Next     string
-	Total    int
+	Entries           []report.HistoryEntry
+	Problems          []report.HistoryProblem
+	Query             url.Values
+	Previous          string
+	Next              string
+	Total             int
+	Selection         []catalogSelection
+	SelectionProblems []string
+	Page              int
 }
 
 // Handler serves a read-only history catalog, HTML reports, and original JSON.
 func Handler(history *report.History) http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /compare", func(w http.ResponseWriter, r *http.Request) {
+		serveComparison(w, r, history, false)
+	})
+	mux.HandleFunc("GET /compare/export", func(w http.ResponseWriter, r *http.Request) {
+		serveComparison(w, r, history, true)
+	})
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		serveCatalog(w, r, history)
 	})
@@ -151,6 +160,8 @@ func serveCatalog(w http.ResponseWriter, r *http.Request, history *report.Histor
 	end := min(start+catalogPageSize, len(entries))
 
 	page := catalogPage{Entries: entries[start:end], Problems: problems, Query: r.URL.Query(), Total: len(entries)}
+	prepareCatalogSelection(&page, history)
+
 	if index > 0 {
 		page.Previous = catalogLink(r.URL.Query(), index-1)
 	}

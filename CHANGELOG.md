@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- Saved runs can be compared with `stroppy reports compare` or catalog selection, with shared numeric deltas, configuration differences, script-free comparison HTML, and aligned captured metric timelines. ([#210](https://github.com/stroppy-io/stroppy/pull/210))
 - Runs can optionally record timestamped metrics and structured logs with independent `--capture-metrics` and `--capture-logs` flags; rich reports show timelines, phase events, and searchable, expandable logs, and `reports artifact` / `reports bundle` retrieve complete recordings with report-owned cleanup. ([#209](https://github.com/stroppy-io/stroppy/pull/209))
 - Saved runs can be browsed with `stroppy reports serve` or exported as self-contained HTML with `stroppy reports export` and `--report-html`; generic metrics, custom results, charts, and full report identity remain readable without JavaScript. ([#203](https://github.com/stroppy-io/stroppy/pull/203))
 - `stroppy reports` lists and filters saved runs, retrieves complete JSON, previews or removes reports, and shows storage health; `--no-save-report` disables history for one run without disabling report output. ([#199](https://github.com/stroppy-io/stroppy/pull/199))
@@ -41,6 +42,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Comparison timelines scale to recorded values instead of forcing zero into the Y-axis range, making small latency changes easier to see. ([#210](https://github.com/stroppy-io/stroppy/pull/210))
+- Comparison HTML export keeps selected runs and filters, metric navigation targets the right section, and stale or oversized selections no longer block catalog browsing. ([#210](https://github.com/stroppy-io/stroppy/pull/210))
 - A rejected `COMMIT` is now counted as an ended transaction: it reaches `tx_errors_total`, and it no longer leaves the client with a spurious `tx is closed` beside the real error. Previously `tx_errors_total` under-reported exactly the runs worth measuring — a workload with commit failures showed none of them there while `failed_iterations_total` showed all of them. ([#204](https://github.com/stroppy-io/stroppy/pull/204))
 - Rich-report sample links retain selected metrics and log filters, and failed capture cleanup restores the report without overwriting concurrent replacements. ([#209](https://github.com/stroppy-io/stroppy/pull/209))
 - Capture retains larger execution-event bursts, and unfinished manifests omit the finish timestamp instead of showing a year-one date. ([#209](https://github.com/stroppy-io/stroppy/pull/209))

@@ -32,7 +32,7 @@ func newReportsCommand() *cobra.Command {
 	command.AddCommand(
 		newReportsListCommand(), newReportsGetCommand(), newReportsRemoveCommand(),
 		newReportsPruneCommand(), newReportsStatusCommand(), newReportsExportCommand(), newReportsServeCommand(),
-		newReportsArtifactCommand(), newReportsBundleCommand(),
+		newReportsArtifactCommand(), newReportsBundleCommand(), newReportsCompareCommand(),
 	)
 
 	return command

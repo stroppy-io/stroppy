@@ -771,6 +771,51 @@ footer {
     font-size:9px
   }
 }
+.comparison-runs {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:12px
+}
+.comparison-runs .history-id {
+  font:11px ui-monospace,monospace;
+  overflow-wrap:anywhere;
+  margin:12px 0
+}
+.comparison-metric>summary small {
+  margin-left:auto;
+  color:var(--muted)
+}
+.comparison-scope {
+  display:block;
+  font:10px ui-monospace,monospace;
+  color:var(--muted);
+  margin-top:4px
+}
+.comparison-number strong,.comparison-number small {
+  display:block;
+  font-variant-numeric:tabular-nums
+}
+.comparison-number small {
+  color:var(--muted);
+  margin-top:5px
+}
+.timeline-legend {
+  display:flex;
+  flex-wrap:wrap;
+  gap:18px;
+  margin:12px 0
+}
+.timeline-legend span {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:12px
+}
+.timeline-legend svg {
+  width:42px;
+  min-width:0;
+  height:12px
+}
 .captured-log-list {
   max-height:480px;
   overflow:auto
