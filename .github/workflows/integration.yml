@@ -133,7 +133,10 @@ jobs:
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] http://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
-          major=$(pg_config --major 2>/dev/null || ls /usr/lib/postgresql | sort -V | tail -1)
+          # `pg_config --major` only exists from PostgreSQL 18, so the major version is
+          # derived from --version, with a fallback to the installed server directories.
+          major=$(pg_config --version 2>/dev/null | sed -E 's/^[^0-9]*([0-9]+).*/\1/')
+          [ -n "$major" ] || major=$(ls /usr/lib/postgresql 2>/dev/null | sort -V | tail -1)
           sudo apt-get install -y "postgresql-server-dev-${major}"
 
       - name: Build and install Macavity from the audited fork
@@ -142,8 +145,10 @@ jobs:
       - name: Start the cluster and create the extension
         run: |
           # The PGDG packages may be installed without a cluster; create one if the
-          # service has nothing to start.
-          sudo service postgresql start || sudo pg_createcluster "$(pg_config --major)" main --start
+          # service has nothing to start. Same version derivation as above, because
+          # `pg_config --major` needs PostgreSQL 18.
+          major=$(pg_config --version | sed -E 's/^[^0-9]*([0-9]+).*/\1/')
+          sudo service postgresql start || sudo pg_createcluster "$major" main --start
           pg_isready -h 127.0.0.1 -p 5432
           sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
           sudo -u postgres psql -c "CREATE EXTENSION macavity;"
