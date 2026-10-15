@@ -20,14 +20,15 @@ const catalogPageSize = 20
 var errCatalogQuery = errors.New("invalid report catalog filter")
 
 type catalogPage struct {
-	Entries   []report.HistoryEntry
-	Problems  []report.HistoryProblem
-	Query     url.Values
-	Previous  string
-	Next      string
-	Total     int
-	Selection []catalogSelection
-	Page      int
+	Entries           []report.HistoryEntry
+	Problems          []report.HistoryProblem
+	Query             url.Values
+	Previous          string
+	Next              string
+	Total             int
+	Selection         []catalogSelection
+	SelectionProblems []string
+	Page              int
 }
 
 // Handler serves a read-only history catalog, HTML reports, and original JSON.
@@ -159,11 +160,7 @@ func serveCatalog(w http.ResponseWriter, r *http.Request, history *report.Histor
 	end := min(start+catalogPageSize, len(entries))
 
 	page := catalogPage{Entries: entries[start:end], Problems: problems, Query: r.URL.Query(), Total: len(entries)}
-	if err := prepareCatalogSelection(&page, history); err != nil {
-		reportHTTPError(w, err)
-
-		return
-	}
+	prepareCatalogSelection(&page, history)
 
 	if index > 0 {
 		page.Previous = catalogLink(r.URL.Query(), index-1)

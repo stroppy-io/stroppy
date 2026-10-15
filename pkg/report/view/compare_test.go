@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/html"
+
 	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
@@ -64,7 +66,9 @@ func TestComparisonHTTPSelectionExportAndUnknownPayload(t *testing.T) {
 		t.Fatal("comparison page unsafe or incomplete")
 	}
 
-	export := get("/compare/export?"+query.Encode(), 200)
+	exportURL := comparisonExportLink(t, page, query)
+
+	export := get(exportURL, 200)
 	if !strings.Contains(export, "comparison.json") || strings.Contains(export, `href="/reports/`) {
 		t.Fatal("offline comparison depends on server")
 	}
@@ -77,6 +81,52 @@ func TestComparisonHTTPSelectionExportAndUnknownPayload(t *testing.T) {
 
 	get("/compare?id="+ids[0], 400)
 	get("/compare?id="+ids[0]+"&id="+ids[21]+"&reference=missing", 400)
+}
+
+func comparisonExportLink(t *testing.T, page string, query url.Values) string {
+	t.Helper()
+
+	document, err := html.Parse(strings.NewReader(page))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ids := map[string]string{}
+	export := ""
+
+	var inspect func(*html.Node)
+
+	inspect = func(node *html.Node) {
+		for _, attr := range node.Attr {
+			if attr.Key == "id" {
+				if ids[attr.Val] != "" {
+					t.Errorf("duplicate document ID %q", attr.Val)
+				}
+
+				ids[attr.Val] = node.Data
+			}
+
+			if node.Data == "a" && attr.Key == "href" && strings.HasPrefix(attr.Val, "/compare/export?") {
+				export = attr.Val
+			}
+		}
+
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			inspect(child)
+		}
+	}
+	inspect(document)
+
+	link, err := url.Parse(export)
+	if err != nil || export == "" || link.Query().Encode() != query.Encode() {
+		t.Fatalf("export link lost selection: %q %v", export, err)
+	}
+
+	if ids["comparison-metrics"] != "section" || ids["comparison-metric-names"] != "datalist" {
+		t.Fatal("metric navigation target is not unique")
+	}
+
+	return export
 }
 
 func TestComparisonTimelineKeepsClockAndSequenceGaps(t *testing.T) {

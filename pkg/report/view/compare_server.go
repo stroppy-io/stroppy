@@ -67,22 +67,32 @@ func serveComparison(w http.ResponseWriter, r *http.Request, history *report.His
 	_, _ = w.Write(buffer.Bytes())
 }
 
-func prepareCatalogSelection(page *catalogPage, history *report.History) error {
-	ids, err := selectedReportIDs(page.Query)
-	if err != nil {
-		return err
-	}
+func prepareCatalogSelection(page *catalogPage, history *report.History) {
+	seen := map[string]bool{}
+	retained := []string{}
 
-	for _, id := range ids {
-		if _, err := history.Get(id); err != nil {
-			return err
+	for _, id := range page.Query["id"] {
+		if seen[id] {
+			continue
 		}
 
+		seen[id] = true
+		if _, err := history.Get(id); err != nil {
+			page.SelectionProblems = append(page.SelectionProblems, "Dropped selection "+id+": "+err.Error())
+
+			continue
+		}
+
+		retained = append(retained, id)
 		onPage := slices.ContainsFunc(page.Entries, func(entry report.HistoryEntry) bool { return entry.ID == id })
 		page.Selection = append(page.Selection, catalogSelection{ID: id, OnPage: onPage})
 	}
 
-	page.Page, _ = strconv.Atoi(page.Query.Get("page"))
+	page.Query["id"] = retained
+	if len(retained) > compare.MaxRuns {
+		page.SelectionProblems = append(page.SelectionProblems,
+			"More than eight reports selected; uncheck reports before comparing.")
+	}
 
-	return nil
+	page.Page, _ = strconv.Atoi(page.Query.Get("page"))
 }

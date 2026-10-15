@@ -160,6 +160,7 @@
 <a href="/">Reset</a>
 </form>
 </section>
+{{if .SelectionProblems}}<div class="notice">{{range .SelectionProblems}}<p>{{.}}</p>{{end}}</div>{{end}}
 {{if .Problems}}
 <details class="notice">
 <summary>{{len .Problems}} unreadable entries</summary>

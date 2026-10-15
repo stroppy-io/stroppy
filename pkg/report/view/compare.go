@@ -21,6 +21,7 @@ type comparisonPage struct {
 	Highlights      []*comparisonMetric
 	Runs            []comparisonRun
 	Original        string
+	ExportURL       string
 	Query           url.Values
 	Served          bool
 	Timeline        []comparisonTimeline
@@ -68,7 +69,7 @@ func RenderComparison(output io.Writer, result *compare.Result, base string, que
 		query = url.Values{}
 	}
 
-	p := comparisonPage{Result: result, Query: query, Served: served}
+	p := comparisonPage{Result: result, Query: query, Served: served, ExportURL: "/compare/export?" + query.Encode()}
 
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {

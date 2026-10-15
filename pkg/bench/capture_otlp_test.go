@@ -1,6 +1,7 @@
 package bench
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,8 @@ import (
 
 	collectorpb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
 func TestCaptureAndOTLPKeepFinalMetrics(t *testing.T) {
@@ -36,11 +39,21 @@ func TestCaptureAndOTLPKeepFinalMetrics(t *testing.T) {
 	result, err := RunTest(t.Context(), captureFixture(), RunOptions{
 		Report: &ReportOptions{}, Logger: NewLogger(io.Discard),
 		Metrics: &MetricsConfig{HTTPEndpoint: strings.TrimPrefix(server.URL, "http://"), Insecure: true, Quiet: true},
-		Capture: &CaptureOptions{Directory: t.TempDir(), Metrics: true, Interval: 15 * time.Millisecond},
+		Capture: &CaptureOptions{Directory: t.TempDir(), Metrics: true, Interval: time.Hour},
 	})
-	if err != nil || result.Capture.State != "complete" {
-		t.Fatalf("capture + OTLP: %v", err)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	if result.Capture == nil || result.Capture.State != "complete" {
+		t.Fatalf("capture + OTLP: capture=%+v", result.Capture)
+	}
+
+	if total := result.Metrics["custom_completed"].Total; total == nil || *total != 10 {
+		t.Fatalf("final report counter changed: %v", total)
+	}
+
+	assertFinalCapturedCounter(t, result.Capture)
 
 	select {
 	case request := <-received:
@@ -66,5 +79,36 @@ func TestCaptureAndOTLPKeepFinalMetrics(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("OTLP not exported")
+	}
+}
+
+func assertFinalCapturedCounter(t *testing.T, capture *report.Capture) {
+	t.Helper()
+
+	file, err := report.OpenCaptureFile(".", capture, "metrics.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+
+	var last report.MetricSample
+
+	for {
+		var sample report.MetricSample
+		if err := decoder.Decode(&sample); err != nil {
+			if err != io.EOF {
+				t.Fatal(err)
+			}
+
+			break
+		}
+
+		last = sample
+	}
+
+	if total := last.Metrics["custom_completed"].Total; total == nil || *total != 10 {
+		t.Fatalf("final captured counter changed: %v", total)
 	}
 }
