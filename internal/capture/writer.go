@@ -112,7 +112,7 @@ func New(options Options) (*Writer, error) {
 		}
 
 		capacity := queueRecords
-		if name != "logs" {
+		if name == "metrics" {
 			capacity = metadataQueueRecords
 		}
 

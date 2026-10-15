@@ -41,6 +41,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Rich-report sample links retain selected metrics and log filters, and failed capture cleanup restores the report without overwriting concurrent replacements. ([#209](https://github.com/stroppy-io/stroppy/pull/209))
+- Capture retains larger execution-event bursts, and unfinished manifests omit the finish timestamp instead of showing a year-one date. ([#209](https://github.com/stroppy-io/stroppy/pull/209))
 - JSON and HTML reports can use case-distinct filenames on case-sensitive filesystems, while aliases remain rejected; catalog filter controls inherit the report font correctly. ([#203](https://github.com/stroppy-io/stroppy/pull/203))
 - Listing reports during concurrent saves ignores hidden publication artifacts instead of warning that partial reports are unreadable. ([#203](https://github.com/stroppy-io/stroppy/pull/203))
 - Run-report failure and built-in validation diagnostics redact configured database credentials and decoded exporter headers before saving or JSON output. ([#199](https://github.com/stroppy-io/stroppy/pull/199))

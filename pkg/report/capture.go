@@ -17,7 +17,7 @@ type Capture struct {
 	Directory       string                   `json:"directory"`
 	State           string                   `json:"state"`
 	StartedAt       time.Time                `json:"started_at"`
-	FinishedAt      time.Time                `json:"finished_at,omitempty"`
+	FinishedAt      time.Time                `json:"finished_at,omitzero"`
 	IntervalSeconds float64                  `json:"interval_seconds"`
 	MissedSamples   uint64                   `json:"missed_samples"`
 	Streams         map[string]CaptureStream `json:"streams"`

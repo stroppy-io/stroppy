@@ -378,16 +378,24 @@ func removeHistoryEntry(root *os.Root, entry *HistoryEntry) error {
 		return fmt.Errorf("%w; replacement retained at %s", errors.Join(errHistoryChanged, err), staged)
 	}
 
-	data, readErr := root.ReadFile(staged)
-	if readErr != nil {
-		return readErr
+	data, err := root.ReadFile(staged)
+	if err == nil {
+		err = removeCapture(root, data)
 	}
 
-	if err := removeCapture(root, data); err != nil {
-		return fmt.Errorf("remove capture; report retained at %s: %w", staged, err)
+	if err != nil {
+		return restoreHistoryEntry(root, staged, name, quarantine, err)
 	}
 
 	return errors.Join(root.Remove(staged), root.Remove(quarantine))
+}
+
+func restoreHistoryEntry(root *os.Root, staged, name, quarantine string, cause error) error {
+	if err := root.Link(staged, name); err != nil {
+		return fmt.Errorf("remove capture; report retained at %s: %w", staged, errors.Join(cause, err))
+	}
+
+	return errors.Join(fmt.Errorf("remove capture: %w", cause), root.Remove(staged), root.Remove(quarantine))
 }
 
 func openHistory(directory string) (*os.Root, error) {

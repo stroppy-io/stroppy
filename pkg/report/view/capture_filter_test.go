@@ -44,10 +44,39 @@ func TestHistogramTimelineKeepsCumulativeAverageAndCountSeparate(t *testing.T) {
 		})
 	}
 
-	plots, _ := timelines(samples, nil, "", 1)
+	plots, _ := timelines(samples, nil, nil, 1)
 	if len(plots) != 2 || plots[0].Unit != "ms" || plots[0].Name != "latency · cumulative average" ||
 		plots[1].Unit != "observations" || plots[1].Name != "latency · cumulative observations" {
 		t.Fatalf("histogram statistics conflated: %+v", plots)
+	}
+}
+
+func TestNearbyCaptureLogsPreservesFilters(t *testing.T) {
+	t.Parallel()
+
+	query := url.Values{
+		"metric": {"custom_latency"}, "level": {"warn"}, "step": {"measured"}, "text": {"query failed"},
+		"from": {"1"}, "to": {"2"}, "log_page": {"3"},
+	}
+
+	link, err := url.Parse(nearbyCaptureLogs(query, 10, 0.5))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, key := range []string{"metric", "level", "step", "text"} {
+		if link.Query().Get(key) != query.Get(key) {
+			t.Fatalf("nearby link lost %s: %s", key, link)
+		}
+	}
+
+	if link.Fragment != "captured-logs" || link.Query().Get("from") != "9.500" ||
+		link.Query().Get("to") != "10.500" || link.Query().Get("log_page") != "0" {
+		t.Fatalf("nearby link range or pagination incorrect: %s", link)
+	}
+
+	if query.Get("from") != "1" || query.Get("to") != "2" || query.Get("log_page") != "3" {
+		t.Fatal("nearby link mutated current filters")
 	}
 }
 

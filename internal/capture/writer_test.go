@@ -74,6 +74,27 @@ func TestIndependentCaptureStreamsAndStructuredLogger(t *testing.T) {
 	}
 }
 
+func TestCaptureRetainsExecutionEventBursts(t *testing.T) {
+	w, err := New(Options{Directory: t.TempDir(), Logs: true, Metrics: true, Interval: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cap(w.streams["events"].queue) != queueRecords || cap(w.streams["metrics"].queue) != metadataQueueRecords {
+		t.Fatal("event bursts share the smaller metric queue capacity")
+	}
+
+	const events = 128
+	for range events {
+		w.Event("step_end", "filtered", "skipped", 0, 0, 0)
+	}
+
+	result := w.Close()
+	if result.State != "complete" || result.Streams["events"].Records != events {
+		t.Fatalf("execution event burst lost: %+v", result)
+	}
+}
+
 func TestCaptureBoundsAndLossAccounting(t *testing.T) {
 	w, err := New(Options{
 		Directory: t.TempDir(), Logs: true, Metrics: true, Interval: time.Second, MaxBytes: MaxRecordBytes,
@@ -139,7 +160,15 @@ func TestUnfinishedManifestRemainsRecording(t *testing.T) {
 	}
 
 	var result report.Capture
-	if json.Unmarshal(data, &result) != nil || result.State != "recording" {
+	if json.Unmarshal(data, &result) != nil || result.State != "recording" ||
+		strings.Contains(string(data), `"finished_at"`) {
 		t.Fatalf("unfinished capture claims completion: %s", data)
+	}
+
+	finished := w.Close()
+
+	data, err = json.Marshal(finished)
+	if err != nil || finished.FinishedAt.IsZero() || !strings.Contains(string(data), `"finished_at"`) {
+		t.Fatalf("completed capture missing finish time: %s %v", data, err)
 	}
 }

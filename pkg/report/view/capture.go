@@ -132,7 +132,7 @@ func loadCapture(base string, c *report.Capture, query url.Values) captureView {
 	if c.Streams["metrics"].Enabled {
 		samples, metricProblem := captureRecords(base, c, "metrics.jsonl")
 		result.Notice += " " + metricProblem
-		result.Timeline, result.MetricNames = timelines(samples, events, query.Get("metric"), c.IntervalSeconds)
+		result.Timeline, result.MetricNames = timelines(samples, events, query, c.IntervalSeconds)
 	}
 
 	result.Notice = strings.TrimSpace(result.Notice)
@@ -284,12 +284,25 @@ func captureLogs(base string, c *report.Capture, query url.Values) (logs []logVi
 	return logs, previous, next, problem
 }
 
-func capturePageLink(values url.Values, page int) string {
+func copyCaptureQuery(values url.Values) url.Values {
 	query := url.Values{}
 	for key, value := range values {
 		query[key] = value
 	}
 
+	return query
+}
+
+func nearbyCaptureLogs(values url.Values, elapsed, interval float64) string {
+	query := copyCaptureQuery(values)
+	query.Set("from", fmt.Sprintf("%.3f", max(0, elapsed-interval)))
+	query.Set("to", fmt.Sprintf("%.3f", elapsed+interval))
+
+	return capturePageLink(query, 0)
+}
+
+func capturePageLink(values url.Values, page int) string {
+	query := copyCaptureQuery(values)
 	query.Set("log_page", strconv.Itoa(page))
 
 	return "?" + query.Encode() + "#captured-logs"
@@ -304,7 +317,8 @@ func selectedCaptureMetric(name, selected string) bool {
 }
 
 //nolint:gocognit // project optional metric shapes without conflating series or units.
-func timelines(samples, events []any, selected string, interval float64) (plots []timeline, metricNames []string) {
+func timelines(samples, events []any, query url.Values, interval float64) (plots []timeline, metricNames []string) {
+	selected := query.Get("metric")
 	groups := map[string]*timeline{}
 	names := map[string]any{}
 
@@ -359,7 +373,7 @@ func timelines(samples, events []any, selected string, interval float64) (plots 
 					group.Points = append(group.Points, timelinePoint{
 						X: elapsed, Y: recorded, Time: compact(elapsed), Value: text(point[statistic]),
 						Sequence: sequence,
-						Nearby:   fmt.Sprintf("?from=%.3f&to=%.3f#captured-logs", max(0, elapsed-interval), elapsed+interval),
+						Nearby:   nearbyCaptureLogs(query, elapsed, interval),
 					})
 				}
 			}
@@ -385,7 +399,10 @@ func timelines(samples, events []any, selected string, interval float64) (plots 
 
 	metricNames = sortedKeys(names)
 	if len(result) == 0 && selected == "" && len(metricNames) > 0 {
-		return timelines(samples, events, metricNames[0], interval)
+		query = copyCaptureQuery(query)
+		query.Set("metric", metricNames[0])
+
+		return timelines(samples, events, query, interval)
 	}
 
 	return result, metricNames
