@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/url"
@@ -34,6 +35,12 @@ func Handler(history *report.History) http.Handler {
 		serveCatalog(w, r, history)
 	})
 	mux.HandleFunc("GET /reports/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if err := validateCaptureQuery(r.URL.Query()); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+
+			return
+		}
+
 		data, err := history.Get(r.PathValue("id"))
 		if err != nil {
 			reportHTTPError(w, err)
@@ -42,7 +49,9 @@ func Handler(history *report.History) http.Handler {
 		}
 
 		var buffer bytes.Buffer
-		if err := renderServed(&buffer, data, r.PathValue("id"), r.URL.Path+"/json"); err != nil {
+
+		err = renderServed(&buffer, data, r.PathValue("id"), r.URL.Path+"/json", history.Directory, r.URL.Query())
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 
 			return
@@ -62,6 +71,44 @@ func Handler(history *report.History) http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Disposition", `attachment; filename="report.json"`)
 		_, _ = w.Write(data) //nolint:gosec // validated JSON attachment, never rendered as HTML.
+	})
+
+	mux.HandleFunc("GET /reports/{id}/artifacts/{name}", func(w http.ResponseWriter, r *http.Request) {
+		file, err := history.OpenArtifact(r.PathValue("id"), r.PathValue("name"))
+		if err != nil {
+			reportHTTPError(w, err)
+
+			return
+		}
+		defer file.Close()
+
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", `attachment; filename="`+r.PathValue("name")+`"`)
+
+		if r.Method == http.MethodHead {
+			return
+		}
+
+		_, _ = io.Copy(w, file)
+	})
+	mux.HandleFunc("GET /reports/{id}/bundle", func(w http.ResponseWriter, r *http.Request) {
+		data, err := history.Get(r.PathValue("id"))
+		if err != nil {
+			reportHTTPError(w, err)
+
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/zip")
+		w.Header().Set("Content-Disposition", `attachment; filename="report.zip"`)
+
+		if r.Method == http.MethodHead {
+			return
+		}
+
+		if err := BundleData(w, data, r.PathValue("id"), history.Directory); err != nil {
+			panic(http.ErrAbortHandler)
+		}
 	})
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

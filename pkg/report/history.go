@@ -55,7 +55,7 @@ func Save(run *Run) (string, error) {
 }
 
 // Save publishes a complete report without replacing an existing entry.
-func (h *History) Save(run *Run) (string, error) {
+func (h *History) Save(run *Run) (path string, err error) {
 	if run == nil {
 		return "", errNilRunReport
 	}
@@ -64,7 +64,17 @@ func (h *History) Save(run *Run) (string, error) {
 		return "", fmt.Errorf("create report history: %w", err)
 	}
 
-	data, err := json.MarshalIndent(run, "", "  ")
+	attached, err := AttachCapture(run, ".", h.Directory)
+	if err != nil {
+		return "", fmt.Errorf("attach capture: %w", err)
+	}
+	defer func() {
+		if err != nil && attached.Capture != nil {
+			err = errors.Join(err, os.RemoveAll(filepath.Join(h.Directory, filepath.FromSlash(attached.Capture.Directory))))
+		}
+	}()
+
+	data, err := json.MarshalIndent(attached, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("marshal report history: %w", err)
 	}

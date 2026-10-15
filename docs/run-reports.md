@@ -120,6 +120,158 @@ symlink itself rather than writing through it; the symlink target remains unchan
 Shell redirection (`reports export ID > result.html`) uses the shell's usual file
 creation and permission rules.
 
+## Optional log and metric recording
+
+Final reports always retain the existing metric summary. Historical samples and
+structured logs are separate, independently enabled recordings:
+
+```bash
+stroppy run tpcc/tx -d pg --capture-metrics
+stroppy run tpcc/tx -d pg --capture-logs
+stroppy run tpcc/tx -d pg --capture-logs --capture-metrics \
+  --capture-interval 1s --capture-max-bytes 67108864
+
+# Explicit output without history saving
+stroppy run tpcb/tx -d noop --capture-metrics --no-save-report \
+  --report-file run.json --report-html run.html
+
+# Retrieve complete append-only streams or a portable rich-report ZIP
+stroppy reports artifact ID metrics.jsonl > metrics.jsonl
+stroppy reports artifact ID logs.jsonl > logs.jsonl
+stroppy reports bundle ID --file run.zip
+```
+
+Both recording flags default off. `--capture-interval` defaults to one second and
+is independent of the OTLP export interval. `--capture-max-bytes` is a per-stream
+byte budget (64 MiB by default, at least 256 KiB). `--capture-dir` selects a
+persistent recording root; every invocation creates a fresh UUID subdirectory,
+even when `run_id` is reused. Capture-only settings without an enabled stream are
+rejected. `--no-report` conflicts with capture. With `--no-save-report`, supply
+`--capture-dir`, `--report-file`, or `--report-html` so recording has a persistent
+location. Final JSON remains small: schema 4 adds only the optional versioned
+`capture` manifest, not the potentially large streams.
+
+### Recording semantics and correlation
+
+Metric samples retain names, units, public dimensions, cumulative counters and
+histogram buckets/count/sum, and gauges as recorded. Collection uses the same
+manual reader and public projection as the final report, after merging private
+worker series. The sampler stops and joins before final report collection; one
+last snapshot is recorded after execution. Local capture does not require OTLP,
+and capture plus OTLP export remains supported. Native TPS and query/iteration
+rate gauges are cumulative averages, **not instantaneous rates**. Histograms are
+not raw observations. The final report remains the authoritative result.
+
+Logs contain timestamp, elapsed time, effective level, logger name, message,
+structured fields, and available step/worker context. Log capture tees the
+run-owned logger and preserves existing stderr output and effective log level;
+it does not enable debug logging. Workload, framework, and driver logs routed
+through that logger are eligible. Arbitrary stdout/stderr writes, unrelated
+process logs, database-server logs, profiles, and host telemetry are not captured.
+Transaction/iteration identities are retained when authored in fields; absent
+context is not inferred. Capture and report UUIDs correlate streams, while
+`source_id` retains the original capture identity if history makes a copy.
+
+An event stream records run and execution boundaries, skipped/blocked steps,
+configured worker/duration budgets, actual step completion, drain entry, and
+teardown. Timestamped metric dimensions and those events distinguish setup,
+warmup, measurement, drain, and teardown where those phases were recorded.
+
+### Limits, failures, and interrupted runs
+
+Each stream has its own bounded queue and writer. Workload log calls do not wait
+for file I/O. A full queue drops a capture record, not a benchmark operation.
+Records above 256 KiB are omitted and counted as truncated. Logs cannot consume
+metric/event queue capacity or byte budgets; events have a separate 1 MiB budget.
+When a stream reaches its budget or writing fails, it stops writing. The manifest
+records bytes, records, drops, truncation, missed samples, and write errors.
+Recording state becomes `incomplete` or `failed` rather than claiming completeness.
+Capture warnings do not turn successful database transactions into failures.
+Invalid destinations fail before execution. Existing query/retry/error semantics
+are unchanged.
+
+Sampling never builds an unbounded backlog: only one collection is active, and
+missed ticks are counted. Failed collection and skipped sequence numbers expose
+metric gaps. Graceful cancellation or workload failure retains available data and
+finalizes its capture. A hard interruption leaves a `recording` manifest and
+append-only JSONL streams; complete records remain inspectable, and the viewer
+marks recording incomplete. A partly written final line is omitted with a visible
+warning. A crash before final report saving can leave an unattached UUID directory
+in the recording root; retain it for recovery or remove it manually after checking
+its manifest. No report is invented for a run whose final envelope was never saved.
+
+### History, rich viewing, and export
+
+History stores exclusively owned capture copies under
+`~/.stroppy/reports/captures/<uuid>/`. The saved report uses a relative reference;
+repeated saves have separate storage identities. Listing exposes `capture_state`.
+Explicit artifacts, removal, and age-based pruning resolve only owned UUIDs and
+declared regular files; symlink and traversal targets are rejected. Removing one
+report does not remove another report's recording. Default staging is removed
+after a successful history-only save; explicitly selected roots and captures
+referenced by requested output remain caller-owned. Copy the report and its
+relative `captures/` subtree together when backing up history.
+
+The web report adds metric evolution, per-series numeric samples, execution event
+inspection, and a bounded log list. Log level, step, elapsed range, and text filters
+use ordinary GET forms. Selecting a metric works for custom instruments too;
+histograms show cumulative averages and observation counts on separate plots.
+Timeline series keep dimensions
+separate, label cumulative/gauge semantics, and break lines across missed samples.
+Phase markers and numeric-sample links connect to nearby logs. Missing values are
+not interpolated. Large plots show a bounded selection of points with an omission
+notice instead of pretending omitted data is continuous.
+
+HTML remains usable without JavaScript. Standalone HTML includes a bounded
+preview, while `reports bundle` retains `index.html`, portable `report.json`, the
+capture manifest, and **complete** original streams. Extract the ZIP and open
+`index.html` offline; artifact links are relative. The viewer inspects at most
+8 MiB and 2,000 records per metric/event preview and shows 100 filtered logs per
+page within its bounded scan. Logs use a height-limited, scrollable list of
+collapsed records: elapsed time, level, and message are visible; expand a record
+for its full message, timestamp, logger, and structured fields. A Logs navigation
+link jumps directly to this list. It never silently labels a preview as the full
+recording. Download the streams when more data is needed. Ordinary reports remain
+valid without capture and require no sidecar files.
+
+Rich recordings may contain whatever the workload or driver logs, including
+sensitive authored data. Existing diagnostic redaction remains in place, but
+arbitrary captured fields are not promised secret-free. Log text is HTML-escaped.
+Explicit capture and bundle files are owner-readable; share permissions deliberately.
+
+Programmatic callers set `bench.RunOptions.Capture` or `stroppy.RunRequest.Capture`
+with `bench.CaptureOptions`. They must choose a persistent directory and reporting
+options. Programmatic execution returns the manifest and never silently saves
+history; call `report.Save` explicitly to attach the recording to local history.
+
+### Local overhead evidence
+
+Measured on Apple M5 Pro, macOS/arm64, Go 1.27.2 with a single worker, a custom
+counter/log call per logical operation, logs enabled to a discard writer, and
+three repetitions. These are framework-only measurements, not database TPS.
+
+```bash
+go test ./pkg/bench -run '^$' -bench '^BenchmarkCaptureOverhead$' \
+  -benchmem -benchtime=200000x -count=3
+```
+
+Median fixed-operation costs were approximately 596 ns/op with capture off,
+661 ns/op with metrics only, 1,483 ns/op with logs only, and 1,754 ns/op with both.
+Each capture-on run used a one-second interval and the default byte budgets.
+These short runs produced initial/final metric snapshots only. Log pressure
+produced approximately 43,000–92,000 dropped records per 200,000 operations,
+explicitly accounted in manifests; lossless capture is not claimed. These samples
+were collected while repository validation was active, so scheduling and writer
+contention contribute to the observed variation.
+
+Two-second runs produced three or four metric samples and measured about
+580 ns/op off versus 589 ns/op metrics-only. Log-enabled runs reached the 64 MiB
+budget, stopped detailed encoding, and therefore had lower average per-operation
+cost than the unsaturated fixed-operation case; those runs are not evidence of
+sustained lossless log performance. Collection cost grows with metric cardinality,
+and structured field encoding remains on the logging call path. Choose sampling,
+log level, and budgets to suit the benchmark, and inspect capture accounting.
+
 ## Saved report history
 
 The installed and standalone CLIs expose the same history commands:

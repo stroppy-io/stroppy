@@ -771,6 +771,144 @@ footer {
     font-size:9px
   }
 }
+.captured-log-list {
+  max-height:480px;
+  overflow:auto
+}
+.captured-log {
+  border-bottom:1px solid var(--line)
+}
+.captured-log:last-child {
+  border-bottom:0
+}
+.captured-log>summary {
+  gap:10px;
+  padding:10px 12px;
+  font-size:12px
+}
+.log-elapsed {
+  flex:0 0 105px;
+  color:var(--muted);
+  font-variant-numeric:tabular-nums
+}
+.log-level {
+  flex:0 0 45px;
+  font:11px ui-monospace,monospace
+}
+.log-message {
+  min-width:0;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis
+}
+.log-full-message {
+  white-space:pre-wrap;
+  overflow-wrap:anywhere
+}
+.captured-log .details-body {
+  border-top:1px solid var(--line)
+}
+.captured-log .details-body>.fields+.fields {
+  margin-top:16px
+}
+@media(max-width:720px) {
+  .captured-log>summary {
+    flex-wrap:wrap
+  }
+  .log-elapsed {
+    flex-basis:auto
+  }
+  .log-message {
+    flex-basis:100%;
+    margin-left:22px
+  }
+}
+.timeline-details {
+  margin:16px 0
+}
+.timeline-details>summary {
+  border-bottom:1px solid var(--line);
+  padding:10px 0;
+  font-size:12px;
+  flex-wrap:wrap
+}
+.timeline-details>summary small {
+  margin-left:auto;
+  color:var(--muted);
+  font-size:10px;
+  overflow-wrap:anywhere
+}
+.timeline-details .chart {
+  margin-top:16px
+}
+.timeline-line {
+  fill:none;
+  stroke:var(--accent);
+  stroke-width:2;
+  stroke-linejoin:round;
+  stroke-linecap:round
+}
+.timeline-dot {
+  fill:var(--accent);
+  stroke:var(--surface);
+  stroke-width:2
+}
+.timeline-marker {
+  stroke:var(--line);
+  stroke-width:1;
+  cursor:help
+}
+.timeline-hit {
+  fill:transparent
+}
+.timeline-tooltip {
+  display:none;
+  paint-order:stroke;
+  stroke:var(--surface);
+  stroke-width:4
+}
+.timeline-point:hover .timeline-tooltip,.timeline-point:focus .timeline-tooltip {
+  display:block
+}
+.timeline-point {
+  outline:none
+}
+.timeline-point:hover .timeline-dot,.timeline-point:focus .timeline-dot {
+  r:6
+}
+.timeline-crosshair {
+  display:none;
+  stroke:var(--muted);
+  stroke-width:1
+}
+.timeline-point:hover .timeline-crosshair,.timeline-point:focus .timeline-crosshair {
+  display:block
+}
+.timeline-summary,.timeline-notice {
+  color:var(--muted);
+  font-size:11px
+}
+.timeline-point text {
+  fill:var(--ink)
+}
+.timeline-point circle {
+  cursor:crosshair
+}
+.timeline-chart details {
+  max-height:350px;
+  overflow:auto
+}
+@media(max-width:720px) {
+  .timeline-details>summary small {
+    flex-basis:100%;
+    margin-left:24px
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  html {
+    scroll-behavior:auto
+  }
+}
 @media(forced-colors:active) {
   .bar-fill {
     fill:Highlight

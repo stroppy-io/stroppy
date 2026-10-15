@@ -87,6 +87,7 @@ type page struct {
 	Original     string
 	Download     string
 	Catalog      string
+	Capture      *captureView
 }
 
 func decode(data []byte) (map[string]any, error) {

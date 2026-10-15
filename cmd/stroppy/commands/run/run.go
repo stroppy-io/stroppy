@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -149,6 +150,11 @@ Run reports:
   --report-html PATH      Write a self-contained HTML report.
   --no-report             Disable report construction and output.
   --no-save-report        Do not save history; report output remains available.
+  --capture-logs          Record run-owned structured logs.
+  --capture-metrics       Record timestamped cumulative metrics and gauges.
+  --capture-interval D    Metric sampling interval (default 1s).
+  --capture-dir PATH      Persistent capture root (UUID subdirectory per run).
+  --capture-max-bytes N   Per-stream byte budget (default 67108864).
                           Logs, diagnostics, and human summaries remain on stderr.
 
 Signals:
@@ -695,6 +701,11 @@ func printWorkloadHelp(cmd *cobra.Command, description *bench.Description) error
 	output.WriteString("      --report-html PATH   Write standalone HTML report\n")
 	output.WriteString("      --no-report          Disable report construction\n")
 	output.WriteString("      --no-save-report     Disable automatic report history\n")
+	output.WriteString("      --capture-logs       Record structured run logs\n")
+	output.WriteString("      --capture-metrics    Record metric samples\n")
+	output.WriteString("      --capture-interval D Sampling interval (default 1s)\n")
+	output.WriteString("      --capture-dir PATH  Persistent recording root\n")
+	output.WriteString("      --capture-max-bytes N Per-stream byte budget\n")
 	output.WriteString("  -h, --help               Show this help\n")
 	output.WriteString("\nBoolean parameters require an explicit value: --flag=true or --flag=false.\n")
 
@@ -807,6 +818,8 @@ func executeSQLGoRoute(scriptArg, sqlArg string) (name, body, file string, ok bo
 }
 
 // runGoWorkload adapts command inputs to the public execution boundary.
+//
+//nolint:gocritic,nestif // output options and independent reporting destinations share one lifecycle.
 func runGoWorkload(
 	cmd *cobra.Command,
 	catalog *bench.Catalog,
@@ -836,6 +849,11 @@ func runGoWorkload(
 		options = &reportConfig
 	}
 
+	captureOptions, err := output.captureOptions()
+	if err != nil {
+		return err
+	}
+
 	runReport, runErr := bench.RunCatalog(
 		cmd.Context(),
 		catalog,
@@ -848,21 +866,32 @@ func runGoWorkload(
 			Logger:  bench.LoggerFromBackend(logger.Global()),
 			Metrics: metrics,
 			Report:  options,
+			Capture: captureOptions,
 		},
 	)
 
 	var outputErr error
 
 	if runReport != nil {
+		if runReport.Capture != nil && runReport.Capture.State != "complete" {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: capture %s; inspect manifest at %s\n",
+				runReport.Capture.State, runReport.Capture.Directory)
+		}
+
+		retained := output.noSave
 		if !output.noSave {
 			if _, err := report.Save(runReport); err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "warning: save report history: %v\n", err)
+			} else {
+				retained = true
 			}
 		}
 
 		if output.requested() {
 			outputErr = writeRunReport(cmd.OutOrStdout(), output, runReport)
 		}
+
+		output.cleanupCapture(cmd.ErrOrStderr(), runReport, retained)
 	}
 
 	if runErr != nil {
@@ -886,6 +915,7 @@ func reportOptions(cmd *cobra.Command, cfg *config.RunConfig) bench.ReportOption
 	return options
 }
 
+//nolint:gocritic // independent destination options are copied for output publication.
 func writeRunReport(stdout io.Writer, output reportOutput, runReport *report.Run) error {
 	data, err := json.MarshalIndent(runReport, "", "  ")
 	if err != nil {
@@ -914,7 +944,16 @@ func writeRunReport(stdout io.Writer, output reportOutput, runReport *report.Run
 	}
 
 	if output.file != "" {
-		outputErr = errors.Join(outputErr, writeReportFile(output.file, data))
+		same, err := report.OutputOverwritesCapture(output.file, ".", runReport.Capture)
+		if err == nil && same {
+			err = errReportOutputCollision
+		}
+
+		if err == nil {
+			err = writeReportFile(output.file, data)
+		}
+
+		outputErr = errors.Join(outputErr, err)
 	}
 
 	if output.html != "" {
@@ -1205,14 +1244,19 @@ func poolSQLConfig(pool *config.PoolConfig) *config.SQLConfig {
 }
 
 type reportOutput struct {
-	format   string
-	file     string
-	html     string
-	disabled bool
-	noSave   bool
+	format           string
+	file             string
+	html             string
+	disabled         bool
+	noSave           bool
+	captureLogs      bool
+	captureMetrics   bool
+	captureDirectory string
+	captureInterval  time.Duration
+	captureMaxBytes  int64
 }
 
-func (o reportOutput) requested() bool { return o.format != "" || o.file != "" || o.html != "" }
+func (o *reportOutput) requested() bool { return o.format != "" || o.file != "" || o.html != "" }
 
 // runArgs holds the result of parseRunArgs.
 type runArgs struct {
@@ -1258,6 +1302,7 @@ func parseRunArgs(args []string) (runArgs, error) {
 	parsers := []flagParser{
 		parseHelpFlag,
 		parseReportFlags,
+		parseCaptureFlags,
 		parseStepsFlag,
 		parseFileFlag,
 		parseDriverFlags,
@@ -1288,6 +1333,10 @@ func parseRunArgs(args []string) (runArgs, error) {
 		if same {
 			return runArgs{}, errReportOutputCollision
 		}
+	}
+
+	if _, err := parsed.report.captureOptions(); err != nil {
+		return runArgs{}, err
 	}
 
 	return parsed, nil

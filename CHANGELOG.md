@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- Runs can optionally record timestamped metrics and structured logs with independent `--capture-metrics` and `--capture-logs` flags; rich reports show timelines, phase events, and searchable, expandable logs, and `reports artifact` / `reports bundle` retrieve complete recordings with report-owned cleanup. ([#209](https://github.com/stroppy-io/stroppy/pull/209))
 - Saved runs can be browsed with `stroppy reports serve` or exported as self-contained HTML with `stroppy reports export` and `--report-html`; generic metrics, custom results, charts, and full report identity remain readable without JavaScript. ([#203](https://github.com/stroppy-io/stroppy/pull/203))
 - `stroppy reports` lists and filters saved runs, retrieves complete JSON, previews or removes reports, and shows storage health; `--no-save-report` disables history for one run without disabling report output. ([#199](https://github.com/stroppy-io/stroppy/pull/199))
 - TPC-C can spread each VU's transactions across all configured warehouses with `--spread-warehouses`, independently of concurrency. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
@@ -41,6 +42,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 ### Fixed
 
 - A rejected `COMMIT` is now counted as an ended transaction: it reaches `tx_errors_total`, and it no longer leaves the client with a spurious `tx is closed` beside the real error. Previously `tx_errors_total` under-reported exactly the runs worth measuring — a workload with commit failures showed none of them there while `failed_iterations_total` showed all of them. ([#204](https://github.com/stroppy-io/stroppy/pull/204))
+- Rich-report sample links retain selected metrics and log filters, and failed capture cleanup restores the report without overwriting concurrent replacements. ([#209](https://github.com/stroppy-io/stroppy/pull/209))
+- Capture retains larger execution-event bursts, and unfinished manifests omit the finish timestamp instead of showing a year-one date. ([#209](https://github.com/stroppy-io/stroppy/pull/209))
 - JSON and HTML reports can use case-distinct filenames on case-sensitive filesystems, while aliases remain rejected; catalog filter controls inherit the report font correctly. ([#203](https://github.com/stroppy-io/stroppy/pull/203))
 - Listing reports during concurrent saves ignores hidden publication artifacts instead of warning that partial reports are unreadable. ([#203](https://github.com/stroppy-io/stroppy/pull/203))
 - Run-report failure and built-in validation diagnostics redact configured database credentials and decoded exporter headers before saving or JSON output. ([#199](https://github.com/stroppy-io/stroppy/pull/199))

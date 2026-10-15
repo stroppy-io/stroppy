@@ -4,6 +4,9 @@ import (
 	"encoding/base64"
 	"html/template"
 	"io"
+	"net/url"
+
+	"github.com/stroppy-io/stroppy/v6/pkg/report"
 
 	_ "embed"
 )
@@ -33,15 +36,25 @@ func jsonDownload(data string) template.URL {
 // Render writes a self-contained, script-free HTML report. Original JSON remains
 // available without decoding and re-encoding workload-owned or unknown fields.
 func Render(output io.Writer, data []byte, id string) error {
+	return RenderCapture(output, data, id, ".", nil)
+}
+
+// RenderCapture includes bounded recording views while retaining complete artifact references.
+func RenderCapture(output io.Writer, data []byte, id, base string, query url.Values) error {
 	p, err := reportPage(data, id)
 	if err != nil {
 		return err
 	}
 
+	if capture, err := report.CaptureFromJSON(data); err == nil && capture != nil {
+		loaded := loadCapture(base, capture, query)
+		p.Capture = &loaded
+	}
+
 	return templates.ExecuteTemplate(output, "report", p)
 }
 
-func renderServed(output io.Writer, data []byte, id, download string) error {
+func renderServed(output io.Writer, data []byte, id, download, base string, query url.Values) error {
 	p, err := reportPage(data, id)
 	if err != nil {
 		return err
@@ -49,6 +62,12 @@ func renderServed(output io.Writer, data []byte, id, download string) error {
 
 	p.Catalog = "/"
 	p.Download = download
+
+	if capture, err := report.CaptureFromJSON(data); err == nil && capture != nil {
+		loaded := loadCapture(base, capture, query)
+		loaded.ArtifactBase = "/reports/" + id + "/artifacts/"
+		p.Capture = &loaded
+	}
 
 	return templates.ExecuteTemplate(output, "report", p)
 }
