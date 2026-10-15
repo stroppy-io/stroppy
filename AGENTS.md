@@ -73,6 +73,19 @@ rebuild needed. Use this during the edit-run loop:
 
 Resolution order for SQL files: **cwd → `~/.stroppy/` → embedded**.
 
+## Comments
+
+A comment earns its place only by saying **why**. The code says what it does, so a
+comment that restates it, describes a field, or explains its own naming is noise —
+and noise rots as the code moves.
+
+Keep the reason a reader cannot recover from the code: why this shape rather than the
+obvious one, why an exception is safe, why a number is what it is. Measured facts
+belong here too — "recovery measured at 0.3–3.8 s" — because they are the argument
+for the code being written that way.
+
+If deleting a comment would change no reader's decision, delete it.
+
 ## Directory Map
 
 | Path | Role |
