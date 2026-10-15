@@ -40,6 +40,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- A rejected `COMMIT` is now counted as an ended transaction: it reaches `tx_errors_total`, and it no longer leaves the client with a spurious `tx is closed` beside the real error. Previously `tx_errors_total` under-reported exactly the runs worth measuring — a workload with commit failures showed none of them there while `failed_iterations_total` showed all of them. ([#204](https://github.com/stroppy-io/stroppy/pull/204))
 - JSON and HTML reports can use case-distinct filenames on case-sensitive filesystems, while aliases remain rejected; catalog filter controls inherit the report font correctly. ([#203](https://github.com/stroppy-io/stroppy/pull/203))
 - Listing reports during concurrent saves ignores hidden publication artifacts instead of warning that partial reports are unreadable. ([#203](https://github.com/stroppy-io/stroppy/pull/203))
 - Run-report failure and built-in validation diagnostics redact configured database credentials and decoded exporter headers before saving or JSON output. ([#199](https://github.com/stroppy-io/stroppy/pull/199))
