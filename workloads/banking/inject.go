@@ -14,21 +14,19 @@ const neverArmed = ^uint64(0)
 // defaultInjectEvery arms the injector on every Nth transfer unless told otherwise.
 const defaultInjectEvery = 25
 
-// The injecting variant fails transactions on purpose, so the invariants are
-// checked against interruptions rather than only against concurrency. It needs a
-// fault injector in the server: Macavity (https://github.com/CrystallineCore/Macavity)
-// hooks the transaction callbacks through supported APIs and injects at
-// before_commit — the moment a banking test cares about, because the client cannot
-// tell from the error alone whether the commit happened.
+// The injecting variant fails transactions on purpose, so the invariants are checked
+// against interruptions rather than only concurrency. It needs a fault injector in the
+// server: Macavity (https://github.com/stroppy-io/Macavity) hooks the transaction
+// callbacks and injects at before_commit — the moment that matters here, because the
+// client cannot tell from the error whether the commit happened.
 //
-// PostgreSQL's own injection points cannot do this: they are compiled out of
-// stock builds, and (measured on 18.6) there is no injection point in the commit
-// path at all — the only dependable core point is mid-UPDATE.
+// PostgreSQL's own injection points cannot: they are compiled out of stock builds, and
+// there is no point in the commit path at all — the only dependable core one is
+// mid-UPDATE.
 const variantInject = "inject"
 
-// errInjectDriverUnsupported rejects the inject variant on a driver where the
-// Macavity extension cannot exist. Recording and noop are allowed so the variant
-// stays testable and describable without a server.
+// errInjectDriverUnsupported rejects the variant where Macavity cannot exist. Recording
+// and noop are allowed so it stays testable without a server.
 var (
 	errUnknownInjectAction     = errors.New("banking/inject: unknown --inject-action")
 	errNegativeInjectEvery     = errors.New("banking/inject: --inject-every must not be negative")
@@ -36,8 +34,7 @@ var (
 		"banking/inject: needs the postgres driver with the Macavity extension available")
 )
 
-// Inject is the fault-injecting variant: postgres only, and it requires the
-// Macavity extension to be installable on the server.
+// Inject is the fault-injecting variant: postgres only.
 var Inject = bench.Test{
 	Name:   "banking/inject",
 	Define: defineInject,
@@ -56,9 +53,7 @@ type injectConfig struct {
 	every      int64
 }
 
-// configureVariant is the seam between the two variants: the plain one does
-// nothing here, the injecting one adds its parameters, its setup step and the
-// handle it fires.
+// configureVariant is the seam between the variants: the plain one does nothing here.
 func (w *workload) configureVariant(d *bench.Def, variant string) error {
 	if variant != variantInject {
 		return nil
@@ -97,29 +92,17 @@ func (w *workload) configureVariant(d *bench.Def, variant string) error {
 		every:      every,
 	}
 
-	// Arming inside the transfer's own transaction is deliberate: with Macavity,
-	// arming in autocommit skips the arming statement's own commit, but arming
-	// inside an explicit transaction does not — that transaction's COMMIT is the
-	// first hit. So occurrence 1 fails exactly the transfer that armed it, which is
-	// the commit this workload wants to interrupt.
-	//
-	// The extension is created in setup rather than opportunistically, and it is
-	// not PUBLIC: connecting as a role that may not execute macavity_arm fails
-	// there with a permission error rather than mid-run.
+	// Arming inside the transfer's own transaction is deliberate: in autocommit the arming
+	// statement's own commit is skipped, but inside an explicit transaction it is the first
+	// hit — so occurrence 1 fails exactly the transfer that armed it.
 	d.Execution.Step("setup_injection", sqlSection{sql: w.sql, name: "setup_injection"}.Run)
 
 	return nil
 }
 
-// maybeInject arms one injected fault inside the transfer's transaction shortly
-// before it commits — once per iteration, never once per attempt.
-//
-// The transfer itself is untouched: what the run then observes is the client's
-// reaction to a failed commit, and whether the invariants survive it. Because the
-// armed event is one-shot, the next attempt of the *same* iteration runs without a
-// fresh one and commits, which is how a retry absorbs the injected failure at all:
-// measured against a real server, re-arming per attempt failed every attempt and no
-// retry could ever recover.
+// maybeInject arms one fault inside the transfer's transaction, once per iteration and
+// never once per attempt: the event is one-shot, so the next attempt runs without one
+// and commits. That is how a retry absorbs an injected failure at all.
 func (w *workload) maybeInject(ctx context.Context, tx *bench.Tx, b *bench.Bench) error {
 	if !w.shouldArm(b.Worker(), b.Iteration()) {
 		return nil
@@ -137,14 +120,8 @@ func (w *workload) maybeInject(ctx context.Context, tx *bench.Tx, b *bench.Bench
 	return nil
 }
 
-// shouldArm decides whether this attempt arms the injector, and remembers when it
-// does. It arms at most once per iteration per worker, which is the property the
-// retry path depends on: the armed event is one-shot, so the second attempt of an
-// iteration that already armed one must run *without* a fresh fault and commit.
-//
-// Measured against a real server with arms recorded per attempt: re-arming inside
-// the retry loop gave 2.76 arms per armed iteration and failed every attempt, so no
-// retry could ever absorb the fault.
+// shouldArm decides whether this attempt arms the injector, at most once per iteration
+// per worker — the property the retry path depends on.
 func (w *workload) shouldArm(worker int, iteration uint64) bool {
 	if w.inject == nil || w.inject.every == 0 {
 		return false

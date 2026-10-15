@@ -1,10 +1,8 @@
-// Package banking provides a built-in bank-transfer invariant workload: every
-// transfer must preserve the total balance and the token multiset, under
-// concurrency and under injected faults.
+// Package banking is a bank-transfer invariant workload: every transfer must preserve
+// the total balance and the token multiset, under concurrency and injected faults.
 //
-// The workload is derived from OrioleDB's bank-account crash test, without the
-// storage engine it was written for: the invariants, the two-row transfer and
-// the fault injection are kept, the engine patch is not.
+// Derived from OrioleDB's bank-account crash test without the storage engine it was
+// written for: the invariants and the fault injection are kept, the patch is not.
 package banking
 
 import (
@@ -19,28 +17,26 @@ import (
 )
 
 const (
-	// initialBalance is the balance every account starts with, so the expected
-	// total is accounts * initialBalance.
+	// initialBalance is what every account starts with, so the expected total is
+	// accounts * initialBalance.
 	initialBalance = 1000
-	// defaultAccounts is the account count when the operator passes no scale.
+	// defaultAccounts is the account count when no scale is given.
 	defaultAccounts = 100
-	// maxTransferAmount bounds a single transfer; it is deliberately small
-	// relative to initialBalance so the sum invariant is the thing under test,
-	// not overdraft handling.
+	// maxTransferAmount is kept small so the sum invariant is what is under test, not
+	// overdraft handling.
 	maxTransferAmount = 10
 )
 
 var errTokenLost = errors.New("banking: token rotation lost to a concurrent transfer")
 
-// Values the workload's defaults and its verify step share, named so a reader — and
-// the magic-number gate — can see what they mean.
+// Defaults and values the verify step shares, named rather than repeated inline.
 const (
 	defaultRetries = 3
 	minAccounts    = 2
 	rngSeed        = 0x5EED
 )
 
-// Errors a caller can match on. Built here and wrapped where they gain detail.
+// Errors a caller can match on, wrapped where they gain detail.
 var (
 	errBalanceMismatch  = errors.New("verify: total balance")
 	errTokenPermutation = errors.New("verify: tokens are not the permutation")
@@ -65,21 +61,19 @@ type workload struct {
 	total     bench.QueryHandle
 	tokens    bench.QueryHandle
 
-	// inject is nil for the plain variant and set by the fault-injecting one.
+	// inject is nil for the plain variant, set by the injecting one.
 	inject *injectConfig
 
-	// injectArmedFor records, per worker, the iteration the injector was last armed
-	// for. A retry must not arm a second time: the event is one-shot, so re-arming
-	// inside the retry loop would fail every attempt of that iteration and no retry
-	// could absorb the fault.
+	// injectArmedFor records, per worker, the iteration the injector was last armed for.
+	// A retry must not arm again: the event is one-shot, so re-arming inside the retry
+	// loop would fail every attempt of that iteration and no retry could absorb it.
 	injectArmedFor []uint64
 
-	// driverType is the declared driver's kind, kept so a variant can refuse a
-	// driver it cannot work with.
+	// driverType is the declared driver's kind, kept so a variant can refuse one.
 	driverType bench.DriverTypeName
 
-	// randoms is per worker, so a worker's transfers are deterministic and two
-	// workers do not share a stream.
+	// randoms is per worker, so a worker's transfers are deterministic and two workers
+	// do not share a stream.
 	randoms []*rand.Rand
 }
 
@@ -233,30 +227,22 @@ func (w *workload) moveBalances(ctx context.Context, tx *bench.Tx, from, to, amo
 	return nil
 }
 
-// tokenWitness reports whether this driver can carry the second witness: the
-// UNIQUE token that makes a lost or duplicated transfer detectable even when the
-// balances happen to sum right.
+// tokenWitness reports whether this driver can carry the UNIQUE token, which makes a
+// lost or duplicated transfer detectable even when the balances happen to sum right.
 //
-// Picodata cannot, for reasons that are the engine's own rules: unique indexes are
-// only allowed on sharding-key columns, so a constraint on the token is not
-// expressible; transactions are single-bucket `DO $$ … END $$` blocks, and the two
-// rows a transfer moves money between are two sharding keys, so nothing makes the
-// swap atomic. There the run checks the total balance only, and says so in its
-// report data.
+// Picodata cannot: unique indexes are only allowed on sharding-key columns, and its
+// single-bucket transactions cannot make a two-row swap atomic. There the run checks
+// the total balance only, and says so in its report data.
 func (w *workload) tokenWitness() bool { return w.driverType != bench.DriverPicodata }
 
-// retryOptions is what makes a transfer retryable, including for the two failures
-// that classify as unknown — the default policy fails closed on those.
+// retryOptions makes a transfer retryable for the two failures that classify as
+// unknown, on which the default policy fails closed: the conflict this workload
+// detects itself, and the fault injector's error.
 //
-// One is the conflict this workload detects itself: a conditional write that no
-// longer matches means a concurrent transfer reached the row first, which is
-// exactly the contention a retry is for. The other is the fault injector's error.
-//
-// Retrying is safe because the transaction is the unit of work: a failed attempt
-// leaves nothing behind, and even a repeat of a transfer that did commit cannot
-// break an invariant, because a transfer moves a fixed amount between two
-// accounts and conserves the total — applying it twice is indistinguishable from
-// two transfers.
+// Retrying is safe because the transaction is the unit of work — a failed attempt
+// leaves nothing behind, and even a repeat of a transfer that did commit is
+// indistinguishable from two transfers, since it moves a fixed amount and conserves
+// the total.
 func (w *workload) retryOptions() bench.RetryOptions {
 	actions := bench.DefaultErrorActions()
 	actions[driver.ErrorKindUnknown] = bench.ErrorActionRetry
@@ -268,8 +254,8 @@ func (w *workload) retryOptions() bench.RetryOptions {
 	}
 }
 
-// tokenMove is one conditional token write: the row, the value it should end up
-// holding, and the value it must still hold for the write to apply.
+// tokenMove is one conditional token write: the row, its target value, and the value
+// it must still hold for the write to apply.
 type tokenMove struct {
 	id       int64
 	token    int64
@@ -282,15 +268,12 @@ type balanceMove struct {
 	delta int64
 }
 
-// swapMoves is the exchange between two accounts, as three conditional writes.
+// swapMoves is the exchange between two accounts as three conditional writes.
 //
-// It takes three rather than two because the UNIQUE constraint is immediate and
-// both rows would otherwise want to hold a token at once: the first row parks its
-// token in a sentinel, the negative of its own id — outside 1..accounts, and
-// unique to that row, so no two rows can ever hold the same sentinel — and picks
-// the other's token up last. Each write is conditional on the value read, which is
-// what makes a concurrent transfer a detected conflict instead of a silent
-// overwrite.
+// Three rather than two because the UNIQUE constraint is immediate and both rows would
+// otherwise want a token at once: the first parks its token in a sentinel — the
+// negative of its own id, outside 1..accounts and unique to that row — and picks the
+// other's up last.
 func swapMoves(from, to, fromToken, toToken int64) []tokenMove {
 	sentinel := -from
 
@@ -301,15 +284,11 @@ func swapMoves(from, to, fromToken, toToken int64) []tokenMove {
 	}
 }
 
-// balanceMoves is the money side of the same transfer: equal and opposite, so the
-// total is untouched by construction.
+// balanceMoves is the money side: equal and opposite, so the total is untouched.
 func balanceMoves(from, to, amount int64) []balanceMove {
 	return []balanceMove{{id: from, delta: -amount}, {id: to, delta: amount}}
 }
 
-// readToken reads one account's token inside the transaction, using the
-// single-column form: a test can then distinguish the transfer's initial read of
-// both columns from the confirmation read that follows its write.
 func (w *workload) readToken(ctx context.Context, tx *bench.Tx, id int64) (int64, error) {
 	row, err := tx.QueryRow(ctx, w.read.Text, map[string]any{"id": id})
 	if err != nil {
@@ -324,7 +303,6 @@ func (w *workload) readToken(ctx context.Context, tx *bench.Tx, id int64) (int64
 	return token, nil
 }
 
-// confirmToken reads the token back after a write, through the narrow query.
 func (w *workload) confirmToken(ctx context.Context, tx *bench.Tx, id int64) (int64, error) {
 	row, err := tx.QueryRow(ctx, w.tokenOnly.Text, map[string]any{"id": id})
 	if err != nil {
@@ -339,14 +317,12 @@ func (w *workload) confirmToken(ctx context.Context, tx *bench.Tx, id int64) (in
 	return token, nil
 }
 
-// rotateToken moves a token conditionally on the value that was read, then
-// confirms the move within the same transaction.
+// rotateToken writes a token conditionally on the value read, then confirms it.
 //
-// Exec exposes no row count, so a conditional update that matched nothing looks
-// exactly like one that matched: the confirmation read is what tells the two
-// apart. A read sees the transaction's own writes, so a token that is not the one
-// we just wrote means a concurrent transfer got there first — which is a conflict
-// for the retry policy, not a failure of the run.
+// Exec exposes no row count, so a conditional update that matched nothing looks like
+// one that matched; the confirmation read is what tells them apart. A read sees the
+// transaction's own writes, so a different token means a concurrent transfer won — a
+// conflict for the retry policy, not a failure of the run.
 func (w *workload) rotateToken(ctx context.Context, tx *bench.Tx, id, token, expected int64) error {
 	if err := tx.Exec(ctx, w.rotate.Text, map[string]any{
 		"id": id, "token": token, "expected": expected,
@@ -366,13 +342,10 @@ func (w *workload) rotateToken(ctx context.Context, tx *bench.Tx, id, token, exp
 	return nil
 }
 
-// verifyAttempts and verifyDelay bound how long the invariant check waits for a
-// server that is not answering yet.
-//
-// The crash variant leaves the cluster reinitializing: measured against a real
-// server, recovery took 0.3–3.8 s and the cluster was ready for only 12–58 ms
-// before the next crash, so a check that gave up on the first refusal could never
-// report on the invariants after a crash — which is the whole point of that variant.
+// verifyAttempts and verifyDelay bound how long the check waits for a server that is
+// not answering yet: the crash variant leaves the cluster reinitializing (measured
+// recovery 0.3-3.8 s), and a check that gave up on the first refusal could never
+// report on the invariants after a crash.
 const (
 	verifyAttempts = 12
 	verifyDelay    = 500 * time.Millisecond
@@ -385,9 +358,8 @@ func (w *workload) verify(ctx context.Context, b *bench.Bench) error {
 	})
 }
 
-// retryCheck runs check until it succeeds or the attempts are spent, returning the
-// last error. A genuine invariant violation is not swallowed: it is reported after
-// the wait, unchanged.
+// retryCheck runs check until it succeeds or the attempts are spent. A genuine
+// violation is not swallowed: it is reported after the wait, unchanged.
 func retryCheck(ctx context.Context, attempts int, delay time.Duration, check func() error) error {
 	var last error
 
@@ -412,9 +384,9 @@ func retryCheck(ctx context.Context, attempts int, delay time.Duration, check fu
 	return last
 }
 
-// checkInvariants asserts both invariants: the money is conserved and the tokens
-// are still a permutation of 1..accounts. A lost or duplicated transfer breaks the
-// second even when the first happens to hold.
+// checkInvariants asserts the money is conserved and the tokens are still a
+// permutation — a lost or duplicated transfer breaks the second even when the first
+// happens to hold.
 func (w *workload) checkInvariants(ctx context.Context, b *bench.Bench) error {
 	total, err := b.QueryValue[int64](ctx, w.total.Text, nil)
 	if err != nil {
@@ -425,8 +397,7 @@ func (w *workload) checkInvariants(ctx context.Context, b *bench.Bench) error {
 		return fmt.Errorf("%w is %d, want %d", errBalanceMismatch, total, want)
 	}
 
-	// Without the witness there is nothing more to check, and the weaker guarantee
-	// must be visible where a run's output is read rather than only in this file.
+	// The weaker guarantee has to be visible where a run's output is read, not only here.
 	if !w.tokenWitness() {
 		b.AddReportData("token_witness",
 			"unavailable on this driver: unique indexes are limited to sharding-key "+
@@ -461,9 +432,9 @@ func (w *workload) checkInvariants(ctx context.Context, b *bench.Bench) error {
 		return err
 	}
 
-	// No token repeats, and they span exactly 1..accounts: together with the row
-	// count that is the permutation, and it is a stronger witness than a distinct
-	// count — a duplicate paired with a loss still shows up here as a repeat.
+	// No token repeats and they span exactly 1..accounts: with the row count that is the
+	// permutation, and a stronger witness than a distinct count — a duplicate paired with
+	// a loss still shows up as a repeat.
 	if rows != w.accounts || repeated != 0 || lowest != 1 || highest != w.accounts {
 		return fmt.Errorf(
 			"%w 1..%d (rows %d, repeated %d, min %d, max %d)",
