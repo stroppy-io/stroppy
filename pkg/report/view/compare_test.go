@@ -129,6 +129,44 @@ func comparisonExportLink(t *testing.T, page string, query url.Values) string {
 	return export
 }
 
+func TestComparisonTimelineUsesRecordedBounds(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name, first, second, minimum, maximum string
+	}{
+		{"positive", "100", "120", "100", "120"},
+		{"negative", "-120", "-100", "-120", "-100"},
+		{"constant", "100", "100", "100", "100"},
+		{"empty", "", "", "0", "0"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			group := comparisonTimeline{}
+			if tc.first != "" {
+				group.Series = []comparisonLine{
+					{Samples: []timelinePoint{{Time: "0", Value: tc.first}}},
+					{Samples: []timelinePoint{{Time: "1", Value: tc.second}}},
+				}
+			}
+
+			projectComparisonTimeline(&group)
+
+			if group.Minimum != tc.minimum || group.Maximum != tc.maximum {
+				t.Fatalf("bounds include unrecorded values: %s..%s", group.Minimum, group.Maximum)
+			}
+
+			if tc.first != "" && tc.first != tc.second {
+				if group.Series[0].Samples[0].Y != timelineBottom ||
+					group.Series[1].Samples[0].Y != timelineBottom-timelineHeight {
+					t.Fatal("recorded variation does not span plot")
+				}
+			}
+		})
+	}
+}
+
 func TestComparisonTimelineKeepsClockAndSequenceGaps(t *testing.T) {
 	t.Parallel()
 

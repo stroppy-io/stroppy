@@ -372,7 +372,7 @@ func linePattern(i int) string {
 }
 
 func projectComparisonTimeline(group *comparisonTimeline) {
-	last, low, high := 0.0, 0.0, 0.0
+	last, low, high := 0.0, math.Inf(1), math.Inf(-1)
 
 	for lineIndex := range group.Series {
 		line := &group.Series[lineIndex]
@@ -389,8 +389,13 @@ func projectComparisonTimeline(group *comparisonTimeline) {
 		last = 1
 	}
 
-	if high == low {
-		high = low + 1
+	if math.IsInf(low, 1) {
+		low, high = 0, 0
+	}
+
+	span := high - low
+	if span == 0 {
+		span = 1
 	}
 
 	group.Elapsed = previewNumber(json.Number(compact(last)))
@@ -417,7 +422,7 @@ func projectComparisonTimeline(group *comparisonTimeline) {
 			}
 
 			previous, previousTime = point.Sequence, x
-			point.X, point.Y = timelineLeft+x/last*timelineWidth, timelineBottom-(y-low)/(high-low)*timelineHeight
+			point.X, point.Y = timelineLeft+x/last*timelineWidth, timelineBottom-(y-low)/span*timelineHeight
 			segment = append(segment, fmt.Sprintf("%.2f,%.2f", point.X, point.Y))
 		}
 
