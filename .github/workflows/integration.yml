@@ -115,6 +115,9 @@ jobs:
           tail -50 /tmp/tidb.log
           exit 1
 
+      # Ports bind to loopback: CockroachDB runs --insecure, which means passwordless root,
+      # and publishing that on every interface of a shared runner is not worth the risk.
+      #
       # CockroachDB and YugabyteDB cannot be services: a service passes `options` to
       # docker create *before* the image, and CockroachDB's image entrypoint requires a
       # mode argument, so it dies with "mode unset". Both start here, where the command
@@ -127,9 +130,9 @@ jobs:
       # hence the longer wait than CockroachDB's.
       - name: Start CockroachDB and YugabyteDB
         run: |
-          docker run -d --name crdb -p 26257:26257 \
+          docker run -d --name crdb -p 127.0.0.1:26257:26257 \
             cockroachdb/cockroach:latest start-single-node --insecure
-          docker run -d --name yb -p 5433:5433 \
+          docker run -d --name yb -p 127.0.0.1:5433:5433 \
             yugabytedb/yugabyte:latest bin/yugabyted start --background=false
 
           ready=0
