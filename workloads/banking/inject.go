@@ -8,21 +8,18 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
-// neverArmed marks a worker that has not armed the injector yet.
 const neverArmed = ^uint64(0)
 
-// defaultInjectEvery arms the injector on every Nth transfer unless told otherwise.
 const defaultInjectEvery = 25
 
 // The injecting variant fails transactions on purpose, so the invariants are checked
 // against interruptions rather than only concurrency. It needs a fault injector in the
-// server: Macavity (https://github.com/stroppy-io/Macavity) hooks the transaction
-// callbacks and injects at before_commit — the moment that matters here, because the
-// client cannot tell from the error whether the commit happened.
+// server: Macavity (https://github.com/stroppy-io/Macavity) injects at before_commit —
+// the moment that matters here, because the client cannot tell from the error whether
+// the commit happened.
 //
 // PostgreSQL's own injection points cannot: they are compiled out of stock builds, and
-// there is no point in the commit path at all — the only dependable core one is
-// mid-UPDATE.
+// there is no point in the commit path at all.
 const variantInject = "inject"
 
 // errInjectDriverUnsupported rejects the variant where Macavity cannot exist. Recording
@@ -34,7 +31,6 @@ var (
 		"banking/inject: needs the postgres driver with the Macavity extension available")
 )
 
-// Inject is the fault-injecting variant: postgres only.
 var Inject = bench.Test{
 	Name:   "banking/inject",
 	Define: defineInject,

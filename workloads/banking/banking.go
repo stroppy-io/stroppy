@@ -19,8 +19,7 @@ import (
 const (
 	// initialBalance is what every account starts with, so the expected total is
 	// accounts * initialBalance.
-	initialBalance = 1000
-	// defaultAccounts is the account count when no scale is given.
+	initialBalance  = 1000
 	defaultAccounts = 100
 	// maxTransferAmount is kept small so the sum invariant is what is under test, not
 	// overdraft handling.
@@ -29,21 +28,17 @@ const (
 
 var errTokenLost = errors.New("banking: token rotation lost to a concurrent transfer")
 
-// Defaults and values the verify step shares, named rather than repeated inline.
 const (
 	defaultRetries = 3
 	minAccounts    = 2
 	rngSeed        = 0x5EED
 )
 
-// Errors a caller can match on, wrapped where they gain detail.
 var (
 	errBalanceMismatch  = errors.New("verify: total balance")
 	errTokenPermutation = errors.New("verify: tokens are not the permutation")
 )
 
-// Test is the portable variant: no fault injection, works on any supported
-// driver.
 var Test = bench.Test{Name: "banking", Define: define, Source: publication("Test")}
 
 func init() { bench.Register(Test) }
@@ -61,7 +56,6 @@ type workload struct {
 	total     bench.QueryHandle
 	tokens    bench.QueryHandle
 
-	// inject is nil for the plain variant, set by the injecting one.
 	inject *injectConfig
 
 	// injectArmedFor records, per worker, the iteration the injector was last armed for.
@@ -69,7 +63,6 @@ type workload struct {
 	// loop would fail every attempt of that iteration and no retry could absorb it.
 	injectArmedFor []uint64
 
-	// driverType is the declared driver's kind, kept so a variant can refuse one.
 	driverType bench.DriverTypeName
 
 	// randoms is per worker, so a worker's transfers are deterministic and two workers
@@ -160,8 +153,6 @@ func (w *workload) load(ctx context.Context, b *bench.Bench) error {
 	return nil
 }
 
-// transfer moves an amount between two accounts and rotates their tokens.
-//
 // The token is the second witness of the transfer: it is UNIQUE, so the swap
 // cannot be lost quietly, and it is moved *conditionally* on the value that was
 // read, which turns a concurrent transfer into a detected conflict rather than a
@@ -215,8 +206,8 @@ func (w *workload) transfer(ctx context.Context, b *bench.Bench) error {
 	})
 }
 
-// moveBalances is the reduced transfer: the two relative updates, without the token
-// swap that needs either a transaction or a unique constraint to be meaningful.
+// moveBalances is the reduced transfer: two relative updates, because the token swap
+// needs either a transaction or a unique constraint to mean anything.
 func (w *workload) moveBalances(ctx context.Context, tx *bench.Tx, from, to, amount int64) error {
 	for _, move := range balanceMoves(from, to, amount) {
 		if err := tx.Exec(ctx, w.move.Text, map[string]any{"id": move.id, "delta": move.delta}); err != nil {
@@ -232,7 +223,7 @@ func (w *workload) moveBalances(ctx context.Context, tx *bench.Tx, from, to, amo
 //
 // Picodata cannot: unique indexes are only allowed on sharding-key columns, and its
 // single-bucket transactions cannot make a two-row swap atomic. There the run checks
-// the total balance only, and says so in its report data.
+// the balance only, and the report data says so.
 func (w *workload) tokenWitness() bool { return w.driverType != bench.DriverPicodata }
 
 // retryOptions makes a transfer retryable for the two failures that classify as
@@ -254,8 +245,6 @@ func (w *workload) retryOptions() bench.RetryOptions {
 	}
 }
 
-// tokenMove is one conditional token write: the row, its target value, and the value
-// it must still hold for the write to apply.
 type tokenMove struct {
 	id       int64
 	token    int64
@@ -343,15 +332,14 @@ func (w *workload) rotateToken(ctx context.Context, tx *bench.Tx, id, token, exp
 }
 
 // verifyAttempts and verifyDelay bound how long the check waits for a server that is
-// not answering yet: the crash variant leaves the cluster reinitializing (measured
-// recovery 0.3-3.8 s), and a check that gave up on the first refusal could never
-// report on the invariants after a crash.
+// not answering yet: the crash variant leaves the cluster reinitializing, measured at
+// 0.3-3.8 s, so a check that gave up on the first refusal could never report on the
+// invariants after a crash.
 const (
 	verifyAttempts = 12
 	verifyDelay    = 500 * time.Millisecond
 )
 
-// verify asserts both invariants, waiting out a server that is still recovering.
 func (w *workload) verify(ctx context.Context, b *bench.Bench) error {
 	return retryCheck(ctx, verifyAttempts, verifyDelay, func() error {
 		return w.checkInvariants(ctx, b)
