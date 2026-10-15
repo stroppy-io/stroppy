@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- `stroppy reports` lists and filters saved runs, retrieves complete JSON, previews or removes reports, and shows storage health; `--no-save-report` disables history for one run without disabling report output. ([#199](https://github.com/stroppy-io/stroppy/pull/199))
 - TPC-C can spread each VU's transactions across all configured warehouses with `--spread-warehouses`, independently of concurrency. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
 - TPC-C supports optional `--warmup` traffic before measurement, using existing `step=warmup` and `step=workload` metric labels. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
 - `stroppy build`, `stroppy remove`, and `stroppy export` accept `--source-root PATH` (or `STROPPY_SOURCE_ROOT`) to compile local artifacts against a Stroppy source tree instead of the pinned SDK module, and every build states which SDK the activated runtime uses, including the effective module version when a workload pins a newer one. ([#191](https://github.com/stroppy-io/stroppy/pull/191))
@@ -39,6 +40,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 ### Fixed
 
 - A rejected `COMMIT` is now counted as an ended transaction: it reaches `tx_errors_total`, and it no longer leaves the client with a spurious `tx is closed` beside the real error. Previously `tx_errors_total` under-reported exactly the runs worth measuring — a workload with commit failures showed none of them there while `failed_iterations_total` showed all of them. ([#204](https://github.com/stroppy-io/stroppy/pull/204))
+- Run-report failure and built-in validation diagnostics redact configured database credentials and decoded exporter headers before saving or JSON output. ([#199](https://github.com/stroppy-io/stroppy/pull/199))
+- Report-history commands handle empty cleanup selections, show their own help in standalone workloads, bound oversized-report inspection, and reject files replaced after selection; saving also works without filesystem hard-link support. ([#199](https://github.com/stroppy-io/stroppy/pull/199))
 - TPC-C pacing waits stop on cancellation, think once after nonfatal failures, and preserve successful transactions when post-transaction thinking is interrupted. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
 - TPC-C reports count successful measured completions separately from failures and drain, with phase and outcome labels on existing latency metrics. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
 - TPC-C transaction history IDs continue above existing data across sequential runs instead of colliding when a dataset is reused. ([#195](https://github.com/stroppy-io/stroppy/pull/195))

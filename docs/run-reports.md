@@ -14,17 +14,99 @@ stroppy run tpcc/tx -d pg --report-file result.json
 # Both destinations
 stroppy run simple -d noop --report-format json --report-file result.json
 
+# Keep JSON output without saving history
+stroppy run tpcb/tx -d pg --no-save-report --report-format json
+
 # Disable report construction
 stroppy run simple -d noop --no-report
 ```
 
 `--report-format` currently accepts `json`. `--report-file` publishes the file
 atomically. A requested output failure returns a nonzero exit status. Every
-constructed report is also saved under `~/.stroppy/reports/`; `--no-report`
-disables both report construction and automatic history. History failures warn
+constructed report is also saved under `~/.stroppy/reports/`; `--no-save-report`
+disables only automatic history, while `--no-report` disables both report
+construction and history. History failures warn
 on stderr without failing the run. When a run itself fails after reporting starts,
 Stroppy still writes the requested report with `status: "failed"` or
 `status: "canceled"`, then returns the run error.
+
+## Saved report history
+
+The installed and standalone CLIs expose the same history commands:
+
+```bash
+stroppy reports list
+stroppy reports list --workload tpcc/tx --driver pg --status completed --limit 10
+stroppy reports list --since 2026-10-01 --until 2026-10-14 -o json
+stroppy reports get 2026-10-13T09-15-00Z-tpcc-tx > result.json
+stroppy reports status -o json
+
+# Removal and cleanup preview by default; --yes authorizes deletion.
+stroppy reports remove 2026-10-13T09-15-00Z-tpcc-tx
+stroppy reports remove 2026-10-13T09-15-00Z-tpcc-tx --yes
+stroppy reports prune --older-than 720h
+stroppy reports prune --older-than 720h --workload tpcc/tx --yes
+```
+
+History IDs are filenames without `.json`: UTC run start at second precision,
+normalized lowercase workload name, and an optional collision suffix (`-2`,
+`-3`, and so on). These IDs are separate from the report's `id` and `run_id`,
+which may be user-supplied and reused. Existing history files keep their IDs;
+there is no migration. `get` returns the stored JSON unchanged, including unknown
+fields and workload payloads. Files are published only after their contents are
+written, so concurrent readers do not see partly written reports. On filesystems
+without hard links, publication uses a reserved filename and atomic rename.
+Interrupted publication can leave hidden `.report-*` or `.publish-*` artifacts;
+read commands ignore them and later saves use a different collision suffix.
+
+`list` defaults to the newest 20 reports. `--limit 0` returns all results;
+`--reverse` orders oldest first. Ordering uses `started_at`, then history ID,
+never filesystem modification time. Filters run before sorting and limiting:
+
+- `--workload` matches exact names, including custom workloads.
+- `--driver` matches any named driver's type; `pg` and `pico` are aliases for
+  `postgres` and `picodata`.
+- `--status` accepts `completed`, `completed_with_errors`, `failed`, or `canceled`.
+- `--since` includes the boundary; `--until` excludes it. Both accept RFC3339
+  timestamps or `YYYY-MM-DD` at midnight UTC, and compare run start times.
+- Repeated or comma-separated values within one filter match any value; different
+  filters must all match. For example, `--status failed,canceled --driver pg`.
+
+Human listings show history ID, start time, workload, named drivers, status, and
+native workload TPS where available. TPS is the `workload` step's native rate,
+including its drain window, not TPC-C tpmC; warmup rates are not added. Missing TPS
+is shown as `-`. JSON listings contain common metadata only; use `get` and tools
+such as `jq` for full report inspection. `-o human|json` also applies to storage
+status and removal previews/results. Diagnostics go to stderr, not JSON stdout.
+
+`status` reports location, existence, healthy/unreadable counts, and bytes in
+regular candidate report files. A missing history directory is empty and is not
+created by read commands. Malformed or unreadable files produce warnings without
+blocking healthy reports. Metadata inspection is bounded to 32 MiB per report;
+larger entries warn and are skipped by list/status/prune, while `get` still
+retrieves them in full. Cleanup skips unreadable entries because their start
+time cannot be trusted; an explicitly named corrupt or oversized regular report
+can still be removed. Symlinks and arbitrary paths are rejected. Explicit batch removal
+validates all targets before deleting any, pins the selected directory and file
+identities, and rejects replacements. Filesystem errors during deletion can
+still leave a partially removed batch and return a nonzero exit status. If a
+replacement is detected after staging, it is retained rather than deleted at the reported
+`.remove-*` recovery location.
+
+`prune` requires a positive Go duration such as `720h` (30 days). It selects run
+starts strictly older than that age and accepts the same workload, driver,
+status, and time filters. There is no automatic retention or background cleanup.
+A preview is a snapshot, not a reservation; inspect again before authorizing a
+later deletion if other processes are changing history.
+
+Reports belong to the local user. Back up or copy `~/.stroppy/reports/` to retain
+history; `get ID > file.json` exports one complete report. Run history does not
+store driver URLs, authentication fields, or OTLP headers. Authored parameters,
+metadata, and payloads must not contain credentials. `stroppy baseline` retains
+its separate schema and `~/.stroppy/baselines/` history; these commands neither
+list nor remove baseline reports.
+
+## Report envelope
 
 Common fields include report schema and identity, Stroppy version, timestamps,
 host runtime facts, driver types, effective scenario and parameter values,
@@ -34,7 +116,13 @@ named driver identities, per-step `executions` policy settings, and `measurement
 windows including actual drain. The `scenario` field is a convenience view of the
 first measured step. Optional `build_digest` identifies cached generated-runtime
 or exported runs; direct installed built-in runs omit it. Driver URLs,
-authentication fields, and OTLP headers are never included.
+authentication fields, and OTLP headers are not included as configuration.
+Configured connection strings and credential values are also redacted from
+report failure and diagnostic messages before truncation. Built-in TPC-H/TPC-DS
+validation diagnostics use the same boundary; custom contributors can call
+`snapshot.Diagnostic(message)` for diagnostic fields inside their payloads.
+This does not scrub arbitrary authored parameters, metadata, or opaque workload payloads, and does
+not rewrite existing reports.
 
 Counters and gauges contain aggregate totals plus dimensioned series. Histograms
 contain count, sum, average, fixed bounds, bucket counts, p50/p90/p95/p99, and

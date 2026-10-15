@@ -200,7 +200,13 @@ type validationTotals struct {
 	Error   int `json:"error"`
 }
 
-func (w *workload) validationContribution(bench.ReportContext) (bench.ReportContribution, error) {
+func (w *workload) validationContribution(snapshot bench.ReportContext) (bench.ReportContribution, error) {
+	w.validation.Reason = snapshot.Diagnostic(w.validation.Reason)
+	for i := range w.validation.Queries {
+		query := &w.validation.Queries[i]
+		query.Error = snapshot.Diagnostic(query.Error)
+	}
+
 	if w.validation.Status == "" {
 		return bench.ReportContribution{
 			Status: report.WorkloadReportSkipped, Reason: "answer validation was not selected",

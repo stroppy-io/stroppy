@@ -32,6 +32,7 @@ const (
 	flagReportFormat = "--report-format"
 	flagReportFile   = "--report-file"
 	flagNoReport     = "--no-report"
+	flagNoSaveReport = "--no-save-report"
 )
 
 const (
@@ -143,6 +144,7 @@ Run reports:
   --report-format json    Write one versioned JSON report to stdout.
   --report-file PATH      Write the same JSON document to a file.
   --no-report             Disable report construction and output.
+  --no-save-report        Do not save history; report output remains available.
                           Logs, diagnostics, and human summaries remain on stderr.
 
 Signals:
@@ -687,6 +689,7 @@ func printWorkloadHelp(cmd *cobra.Command, description *bench.Description) error
 	output.WriteString("      --report-format json Write JSON report to stdout\n")
 	output.WriteString("      --report-file PATH   Write JSON report to file\n")
 	output.WriteString("      --no-report          Disable report construction\n")
+	output.WriteString("      --no-save-report     Disable automatic report history\n")
 	output.WriteString("  -h, --help               Show this help\n")
 	output.WriteString("\nBoolean parameters require an explicit value: --flag=true or --flag=false.\n")
 
@@ -846,8 +849,10 @@ func runGoWorkload(
 	var outputErr error
 
 	if runReport != nil {
-		if _, err := report.Save(runReport); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: save report history: %v\n", err)
+		if !output.noSave {
+			if _, err := report.Save(runReport); err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: save report history: %v\n", err)
+			}
 		}
 
 		if output.requested() {
@@ -1183,6 +1188,7 @@ type reportOutput struct {
 	format   string
 	file     string
 	disabled bool
+	noSave   bool
 }
 
 func (o reportOutput) requested() bool { return o.format != "" || o.file != "" }
@@ -1354,8 +1360,13 @@ func parseHelpFlag(args []string, i int, parsed *runArgs) (int, error) {
 
 func parseReportFlags(args []string, i int, parsed *runArgs) (int, error) {
 	arg := args[i]
-	if arg == flagNoReport {
+	switch arg {
+	case flagNoReport:
 		parsed.report.disabled = true
+
+		return 1, nil
+	case flagNoSaveReport:
+		parsed.report.noSave = true
 
 		return 1, nil
 	}

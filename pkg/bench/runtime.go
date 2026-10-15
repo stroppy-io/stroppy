@@ -157,6 +157,8 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 
 			slices.Sort(names)
 
+			root.reportRedactor = reportRedactor(configurations, options.Metrics)
+
 			for _, name := range names {
 				value := configurations[name]
 
@@ -247,7 +249,7 @@ func finishRun(
 				if renderErr := definition.renderer(root.summaryWriter, runReport.WorkloadReports[index].Data); renderErr != nil {
 					item := &runReport.WorkloadReports[index]
 					item.Status = report.WorkloadReportError
-					item.Reason = boundReportError(renderErr)
+					item.Reason = boundReportError(renderErr, root.reportRedactor)
 				}
 			}
 		}

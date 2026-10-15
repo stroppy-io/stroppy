@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
@@ -35,6 +36,12 @@ type ReportContext struct {
 	Steps        []report.Step
 	Measurements map[string]float64
 	Status       report.Status
+	redactor     *strings.Replacer
+}
+
+// Diagnostic formats a report diagnostic without configured credentials.
+func (c ReportContext) Diagnostic(message string) string {
+	return boundReportText(message, c.redactor)
 }
 
 // ReportContribution is one workload-owned report result.
@@ -251,7 +258,7 @@ func finalizeRunReport(
 	}
 
 	if runErr != nil {
-		run.Failure = &report.Failure{Phase: phase, Reason: boundReportError(runErr)}
+		run.Failure = &report.Failure{Phase: phase, Reason: boundReportError(runErr, root.reportRedactor)}
 	}
 
 	run.WorkloadReports = buildWorkloadReports(definitions, func() ReportContext {
@@ -261,11 +268,16 @@ func finalizeRunReport(
 			Steps:        slices.Clone(run.Steps),
 			Measurements: maps.Clone(run.Measurements),
 			Status:       run.Status,
+			redactor:     root.reportRedactor,
 		}
-	})
+	}, root.reportRedactor)
 }
 
-func buildWorkloadReports(definitions []reportDefinition, snapshot func() ReportContext) []report.WorkloadReport {
+func buildWorkloadReports(
+	definitions []reportDefinition,
+	snapshot func() ReportContext,
+	redactor *strings.Replacer,
+) []report.WorkloadReport {
 	out := make([]report.WorkloadReport, 0, len(definitions))
 	for _, definition := range definitions {
 		item := report.WorkloadReport{
@@ -281,7 +293,7 @@ func buildWorkloadReports(definitions []reportDefinition, snapshot func() Report
 		contribution, err := definition.contributor(snapshot())
 		if err != nil {
 			item.Status = report.WorkloadReportError
-			item.Reason = boundReportError(err)
+			item.Reason = boundReportError(err, redactor)
 			out = append(out, item)
 
 			continue
@@ -293,11 +305,15 @@ func buildWorkloadReports(definitions []reportDefinition, snapshot func() Report
 		}
 
 		item.Reason = contribution.Reason
+		if redactor != nil {
+			item.Reason = redactor.Replace(item.Reason)
+		}
+
 		if contribution.Data != nil {
 			encoded, marshalErr := json.Marshal(contribution.Data)
 			if marshalErr != nil {
 				item.Status = report.WorkloadReportError
-				item.Reason = boundReportError(fmt.Errorf("marshal report data: %w", marshalErr))
+				item.Reason = boundReportError(fmt.Errorf("marshal report data: %w", marshalErr), redactor)
 			} else {
 				item.Data = encoded
 			}
@@ -324,10 +340,23 @@ func reportErrors(summary errorSummary) report.ErrorSummary {
 	return out
 }
 
-func boundReportError(err error) string {
+func boundReportError(err error, redactor *strings.Replacer) string {
+	message := err.Error()
+	if parseError, ok := errors.AsType[*pgconn.ParseConfigError](err); ok {
+		message = strings.ReplaceAll(message, parseError.Error(), "cannot parse database connection string")
+	}
+
+	return boundReportText(message, redactor)
+}
+
+func boundReportText(message string, redactor *strings.Replacer) string {
 	const maxBytes = 2048
 
-	message := strings.ToValidUTF8(err.Error(), "?")
+	if redactor != nil {
+		message = redactor.Replace(message)
+	}
+
+	message = strings.ToValidUTF8(message, "?")
 	if len(message) <= maxBytes {
 		return message
 	}
