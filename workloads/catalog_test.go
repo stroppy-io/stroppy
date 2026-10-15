@@ -14,6 +14,7 @@ func TestCatalog(t *testing.T) {
 	}
 
 	expected := []workloads.Preset{
+		workloads.PresetBanking,
 		workloads.PresetTPCB,
 		workloads.PresetTPCC,
 		workloads.PresetTPCDS,

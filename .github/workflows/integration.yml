@@ -100,3 +100,64 @@ jobs:
           path: build/stroppy
           if-no-files-found: error
           retention-days: 7
+  # The injecting variant is the only part of the suite that needs a C extension inside
+  # the server, so it gets its own job. Macavity is built here from the audited fork with
+  # the same make target the workload's README documents — never fetched prebuilt, since
+  # the extension is a .so that has to match the server it loads into. The check that
+  # matters is the workload's own `verify` step: it runs with faults injected at commit,
+  # and fails the job if the invariants did not hold.
+  banking-inject:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install PostgreSQL's build headers
+        run: |
+          # The runner already carries PGDG's postgresql-common, so Ubuntu's
+          # postgresql-server-dev-all cannot coexist with it (it pins postgresql-common
+          # to the distro version). Install the headers matching the server that is
+          # already here, from the same repository — which is what this extension needs
+          # in any case, since it compiles against the ABI it will load into.
+          sudo apt-get install -y curl ca-certificates build-essential
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsS -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] http://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          # `pg_config --major` only exists from PostgreSQL 18, so the major version is
+          # derived from --version, with a fallback to the installed server directories.
+          major=$(pg_config --version 2>/dev/null | sed -E 's/^[^0-9]*([0-9]+).*/\1/')
+          [ -n "$major" ] || major=$(ls /usr/lib/postgresql 2>/dev/null | sort -V | tail -1)
+          sudo apt-get install -y "postgresql-server-dev-${major}"
+
+      - name: Build and install Macavity from the audited fork
+        run: make macavity-install
+
+      - name: Start the cluster and create the extension
+        run: |
+          # The PGDG packages may be installed without a cluster; create one if the
+          # service has nothing to start. Same version derivation as above, because
+          # `pg_config --major` needs PostgreSQL 18.
+          major=$(pg_config --version | sed -E 's/^[^0-9]*([0-9]+).*/\1/')
+          sudo service postgresql start || sudo pg_createcluster "$major" main --start
+          pg_isready -h 127.0.0.1 -p 5432
+          sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+          sudo -u postgres psql -c "CREATE EXTENSION macavity;"
+          sudo -u postgres psql -c "SELECT point FROM macavity_points();"
+
+      - name: Run the injecting variant with faults at commit
+        run: |
+          make build
+          ./build/stroppy run banking/inject -d pg \
+            -D url='postgres://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable' \
+            --executor constant-vus --vus 4 --duration 10s --accounts 50 \
+            --inject-action error --inject-every 5

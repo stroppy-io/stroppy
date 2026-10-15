@@ -375,9 +375,16 @@ func (w *workload) setUnlogged(ctx context.Context, b *bench.Bench, mode string)
 func (w *workload) analyze(ctx context.Context, b *bench.Bench) func() error {
 	return func() error {
 		switch w.driver {
-		case bench.DriverPostgres:
+		case bench.DriverPostgres, bench.DriverYugabyte:
 			return b.Exec(ctx, "ANALYZE", nil)
-		case bench.DriverMySQL:
+		case bench.DriverCRDB:
+			// CockroachDB rejects a bare ANALYZE and takes one table at a time.
+			for _, table := range tpcdsTables {
+				if err := b.Exec(ctx, "ANALYZE "+table, nil); err != nil {
+					return fmt.Errorf("analyze %s: %w", table, err)
+				}
+			}
+		case bench.DriverMySQL, bench.DriverTiDB:
 			for _, table := range tpcdsTables {
 				if err := b.Exec(ctx, "ANALYZE TABLE "+table, nil); err != nil {
 					return fmt.Errorf("analyze %s: %w", table, err)
