@@ -423,16 +423,22 @@ func (t *Tx) Commit(ctx context.Context) error {
 		return errTransactionClosed
 	}
 
-	committed := true
-
 	if t.tx != nil {
 		if err := t.tx.Commit(t.b.operationContext(ctx)); err != nil {
+			// A rejected COMMIT still ends the transaction, so record the end before
+			// returning: marking it done keeps the deferred cleanup from rolling back
+			// an already-closed transaction — which surfaced to the client as a
+			// spurious "tx is closed" beside the real error — and recording the end
+			// puts the failure in the tx metrics, where it was previously invisible.
+			t.b.root.txMetrics.record(t.b.vu, "commit", t.name, t.iso)
+			t.recordEnd("commit", false)
+
 			return err
 		}
 	}
 
 	t.b.root.txMetrics.record(t.b.vu, "commit", t.name, t.iso)
-	t.recordEnd("commit", committed)
+	t.recordEnd("commit", true)
 
 	return nil
 }
@@ -446,6 +452,10 @@ func (t *Tx) Rollback(ctx context.Context) error {
 
 	if t.tx != nil {
 		if err := t.tx.Rollback(t.b.operationContext(ctx)); err != nil {
+			// Same reason as Commit: a rejected rollback still ends the transaction.
+			t.b.root.txMetrics.record(t.b.vu, "rollback", t.name, t.iso)
+			t.recordEnd("rollback", false)
+
 			return err
 		}
 	}
