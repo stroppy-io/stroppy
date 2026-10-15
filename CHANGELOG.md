@@ -41,6 +41,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- A rejected `COMMIT` is now counted as an ended transaction: it reaches `tx_errors_total`, and it no longer leaves the client with a spurious `tx is closed` beside the real error. Previously `tx_errors_total` under-reported exactly the runs worth measuring — a workload with commit failures showed none of them there while `failed_iterations_total` showed all of them. ([#204](https://github.com/stroppy-io/stroppy/pull/204))
 - Rich-report sample links retain selected metrics and log filters, and failed capture cleanup restores the report without overwriting concurrent replacements. ([#209](https://github.com/stroppy-io/stroppy/pull/209))
 - Capture retains larger execution-event bursts, and unfinished manifests omit the finish timestamp instead of showing a year-one date. ([#209](https://github.com/stroppy-io/stroppy/pull/209))
 - JSON and HTML reports can use case-distinct filenames on case-sensitive filesystems, while aliases remain rejected; catalog filter controls inherit the report font correctly. ([#203](https://github.com/stroppy-io/stroppy/pull/203))
