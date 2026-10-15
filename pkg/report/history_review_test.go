@@ -37,6 +37,31 @@ func TestHistoryOversizedEntryDoesNotBlockHealthyReports(t *testing.T) {
 	}
 }
 
+func TestHistoryIgnoresPublicationArtifacts(t *testing.T) {
+	t.Parallel()
+	history := &History{Directory: t.TempDir()}
+
+	id := saveHistoryRun(t, history, historyRun("healthy", time.Now().UTC()))
+	if err := os.Mkdir(filepath.Join(history.Directory, ".publish-"+id+".json"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	interrupted := filepath.Join(history.Directory, ".report-interrupted.json")
+	if err := os.WriteFile(interrupted, []byte("partial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	entries, problems, err := history.List(HistoryQuery{})
+	if err != nil || len(entries) != 1 || entries[0].ID != id || len(problems) != 0 {
+		t.Fatalf("publication artifacts exposed: %v, %v, %v", entries, problems, err)
+	}
+
+	status, err := history.Status()
+	if err != nil || status.Reports != 1 || status.Unreadable != 0 || status.SizeBytes != entries[0].SizeBytes {
+		t.Fatalf("publication artifacts counted: %+v, %v", status, err)
+	}
+}
+
 func TestHistoryRemovalRejectsReplacement(t *testing.T) {
 	t.Parallel()
 	history := &History{Directory: t.TempDir()}

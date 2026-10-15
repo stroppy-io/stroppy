@@ -1,0 +1,387 @@
+{{define "node"}}{{if .Title}}
+<details class="nested">
+<summary>{{.Title}}
+</summary>{{template "node-body" .}}
+</details>
+{{else}}{{template "node-body" .}}{{end}}{{end}}
+{{define "node-body"}}
+{{if .Fields}}
+<dl class="fields">
+{{range .Fields}}
+<div>
+<dt>{{.Name}}
+</dt>
+<dd>{{template "node" .Value}}
+</dd>
+</div>
+{{end}}
+</dl>
+{{else if .Columns}}
+<div class="table-scroll">
+<table>
+<thead>
+<tr>
+{{range .Columns}}
+<th>{{.}}
+</th>
+{{end}}
+</tr>
+</thead>
+<tbody>
+{{range .Rows}}
+<tr>
+{{range .}}
+<td>{{template "node" .}}
+</td>
+{{end}}
+</tr>
+{{end}}
+</tbody>
+</table>
+</div>
+{{else if .Items}}
+<ol class="items">
+{{range .Items}}
+<li>{{template "node" .}}
+</li>
+{{end}}
+</ol>
+{{else if .Summary}}
+<span class="empty">{{.Summary}}
+</span>
+{{else}}
+<span class="value">{{.Text}}
+</span>
+{{end}}
+{{end}}
+{{define "chart"}}{{if .Bars}}
+<figure class="chart">
+<figcaption>
+<h3>{{.Title}}
+</h3>
+<p>{{.Scope}} · {{.Unit}}
+{{if .HiddenZeroBuckets}} · {{.HiddenZeroBuckets}} empty buckets omitted; all buckets retained in exact data{{end}}</p>
+</figcaption>
+<div class="chart-scroll">
+<svg viewBox="0 0 720 {{.Height}}" role="img" aria-label="{{.Title}}">
+<text class="axis-label" x="190" y="17">0</text>
+<text class="axis-label" x="610" y="17" text-anchor="end">{{.Max}} {{.Unit}}
+</text>
+{{range .Bars}}
+<g class="bar" tabindex="0" aria-label="{{.Tip}}">
+<title>{{.Tip}}
+</title>
+<rect class="bar-hit" x="0" y="{{.Y}}" width="720" height="28"/>
+<text x="178" y="{{.Y}}" dy="17" text-anchor="end">{{.Label}}
+</text>
+<rect class="bar-track" x="{{.X}}" y="{{.Y}}" width="420" height="20"/>
+<rect class="bar-fill" x="{{.X}}" y="{{.Y}}" width="{{.Width}}" height="20" rx="4"/>
+<rect class="bar-texture" x="{{.X}}" y="{{.Y}}" width="{{.Width}}" height="20" fill="url(#chart-texture)"/>
+<text class="bar-tooltip" x="{{.X}}" y="{{.Y}}" dy="-7">{{.Tip}}
+</text>
+<text class="bar-value" x="625" y="{{.Y}}" dy="15">{{.Value}}
+</text>
+</g>
+{{end}}
+</svg>
+</div>
+<details class="chart-table">
+<summary>Values</summary>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>{{.Unit}}
+</th>
+</tr>
+</thead>
+<tbody>
+{{range .Bars}}
+<tr>
+<td>{{.Tip}}
+</td>
+<td class="numeric">{{.Value}}
+</td>
+</tr>
+{{end}}
+</tbody>
+</table>
+</details>
+</figure>
+{{end}}{{end}}
+{{define "catalog"}}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Report catalog · Stroppy</title>
+<style>{{style}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" aria-hidden="true" class="texture-definition"><defs><pattern id="chart-texture" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="currentColor" stroke-width="1"/></pattern></defs></svg>
+<div class="shell">
+<header class="masthead">
+<a class="brand" href="/">stroppy<span>/ reports</span>
+</a>
+<span class="subtitle">Local · read only</span>
+</header>
+<main>
+<section class="overview">
+<p class="eyebrow">REPORT HISTORY</p>
+<h1>Your benchmark runs</h1>
+<p class="subtitle">{{.Total}} matching reports · newest first unless selected otherwise</p>
+<form class="filters" method="get" action="/">
+<label>Since (inclusive)<input name="since" value="{{.Query.Get "since"}}" placeholder="2026-10-01">
+</label>
+<label>Until (exclusive)<input name="until" value="{{.Query.Get "until"}}" placeholder="2026-10-14">
+</label>
+<label>Workload<input name="workload" value="{{.Query.Get "workload"}}" placeholder="All workloads">
+</label>
+<label>Driver<input name="driver" value="{{.Query.Get "driver"}}" placeholder="All drivers">
+</label>
+<label>Status<select name="status">
+<option value="">All statuses</option>
+{{range statuses}}
+<option value="{{.}}" {{if eq . ($.Query.Get "status")}}selected{{end}}>{{.}}
+</option>
+{{end}}
+</select>
+</label>
+<label>Order<select name="order">
+<option value="newest">Newest first</option>
+<option value="oldest" {{if eq (.Query.Get "order") "oldest"}}selected{{end}}>Oldest first</option>
+</select>
+</label>
+<button type="submit">Filter</button>
+<a href="/">Reset</a>
+</form>
+</section>
+{{if .Problems}}
+<details class="notice">
+<summary>{{len .Problems}} unreadable entries</summary>
+{{range .Problems}}
+<p>{{.ID}}: {{.Error}}
+</p>
+{{end}}
+</details>
+{{end}}
+<div class="panel table-scroll">
+<table class="catalog">
+<thead>
+<tr>
+<th>Workload / identity</th>
+<th>Started (UTC)</th>
+<th>Driver</th>
+<th>Status</th>
+<th>Workload TPS</th>
+</tr>
+</thead>
+<tbody>
+{{range .Entries}}
+<tr>
+<td>
+<a class="workload" href="/reports/{{.ID}}">{{.Workload}}
+</a>
+<span class="history-id">{{.ID}}
+</span>
+</td>
+<td>{{.StartedAt.UTC.Format "2006-01-02 15:04:05"}}
+</td>
+<td>{{if .Drivers}}{{range .Drivers}}<span class="driver-role">{{.Name}}={{.Type}}</span>{{end}}{{else}}{{.Driver}}{{end}}
+</td>
+<td>
+<span class="status status-{{.Status}}">{{.Status}}
+</span>
+</td>
+<td class="numeric">
+{{if .TPS}}{{.TPS}}{{else}}—{{end}}
+</td>
+</tr>
+{{else}}
+<tr>
+<td colspan="5" class="catalog-empty">No matching reports. Run a workload to save its first report.</td>
+</tr>
+{{end}}
+</tbody>
+</table>
+</div>
+<nav class="pagination">
+{{if .Previous}}
+<a href="{{.Previous}}">Previous</a>
+{{else}}
+<span>
+</span>
+{{end}}{{if .Next}}
+<a href="{{.Next}}">Next</a>
+{{end}}
+</nav>
+</main>
+<footer>Stroppy · local report catalog<span>Filters and navigation work without JavaScript.</span>
+</footer>
+</div>
+</body>
+</html>
+{{end}}
+{{define "report"}}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{{.Title}} · Stroppy report</title>
+<style>{{style}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" aria-hidden="true" class="texture-definition"><defs><pattern id="chart-texture" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="currentColor" stroke-width="1"/></pattern></defs></svg>
+<div class="shell">
+<header class="masthead">
+<a class="brand" href="{{if .Catalog}}{{.Catalog}}{{else}}#overview{{end}}">stroppy<span>/ reports</span>
+</a>
+<div class="actions">
+{{if .Catalog}}
+<a href="{{.Catalog}}">Catalog</a>
+{{end}}
+<a class="button" href="{{if .Download}}{{.Download}}{{else}}{{download .Original}}{{end}}" download="report.json">Download JSON</a>
+</div>
+</header>
+<main>
+<section class="overview" id="overview">
+<p class="eyebrow">RUN REPORT</p>
+<div class="title-row">
+<h1>{{.Title}}
+</h1>
+<span class="status status-{{.Status}}">{{.Status}}
+</span>
+</div>
+<p class="subtitle">{{.Started}} <span>·</span> {{.Driver}}
+</p>
+{{if .Warning}}
+<p class="notice">{{.Warning}}
+</p>
+{{end}}
+<details class="provenance">
+<summary>
+<span>Identity &amp; configuration</span>
+<small>{{.ID}}
+</small>
+</summary>
+<div class="details-body">{{template "node" .Identity}}
+</div>
+</details>
+{{if .Headlines}}
+<div class="headline-row">
+{{range .Headlines}}
+<div>
+<span>{{.Name}}
+</span>
+<strong>{{.Value.Text}}
+</strong>
+</div>
+{{end}}
+</div>
+<p class="scope-note">Workload-step native measurements, including actual drain. Not an audited benchmark score.</p>
+{{end}}
+</section>
+<nav class="section-nav" aria-label="Report sections">
+<a href="#execution">Execution</a>
+<a href="#metrics">Metrics <span>{{len .Metrics}}
+</span>
+</a>
+<a href="#results">Results <span>{{len .Payloads}}
+</span>
+</a>
+<a href="#errors">Errors</a>
+<a href="#data">Complete data</a>
+</nav>
+<section class="section" id="execution">
+<div class="section-heading">
+<h2>Execution</h2>
+<p>Step outcomes and measured wall-clock windows.</p>
+</div>{{template "chart" .StepChart}}
+<details class="panel">
+<summary>All step data</summary>
+<div class="details-body">{{template "node" .Steps}}
+</div>
+</details>
+</section>
+<section class="section" id="metrics">
+<div class="section-heading">
+<h2>Metrics</h2>
+<p>Expand any row for charts, dimensions, and exact values.</p>
+</div>
+<p class="metric-note">Summary values follow recorded aggregates. ≈ marks rounded values; separate series remain available below.</p>
+{{range .MetricGroups}}
+<div class="metric-group {{if .Distribution}}metric-distributions{{else}}metric-scalars{{end}}">
+<div class="metric-group-heading"><h3>{{.Name}} <span>{{len .Metrics}}</span></h3></div>
+<div class="metric-columns" aria-hidden="true"><span>Metric</span><span>Series</span><span>{{if .Distribution}}Count{{else}}Value{{end}}</span>{{if .Distribution}}<span>Average</span><span>p99</span>{{else}}<span></span><span></span>{{end}}</div>
+<div class="metric-list">
+{{range .Metrics}}
+<details class="metric">
+<summary>
+<span class="metric-identity"><span class="metric-label">{{.Label}}</span><code>{{.Name}}</code></span>
+<span class="metric-series">{{.Series}}</span>
+{{range .Stats}}<span class="metric-stat" title="Exact {{.Label}}: {{.Exact}} {{.Unit}}"><span class="stat-label">{{.Label}}</span><b>{{.Text}}</b>{{if .Unit}}<small>{{.Unit}}</small>{{end}}</span>{{end}}
+</summary>
+<div class="details-body">
+<p class="metric-scope">{{.Type}}{{if .Unit}} · {{.Unit}}{{end}} · {{.Series}} recorded series. Aggregate previews are not a time-series measurement.</p>
+<details class="metric-data"><summary>Complete metric data · exact values &amp; dimensions</summary>{{template "node" .Data}}</details>
+{{range .Charts}}<details class="series-chart"><summary><span>{{.Title}}</span><small>{{.Scope}}</small></summary>{{template "chart" .}}</details>{{end}}
+</div>
+</details>
+{{end}}
+</div>
+</div>
+{{else}}
+<p class="empty">No metrics recorded.</p>
+{{end}}
+</section>
+<section class="section" id="results">
+<div class="section-heading">
+<h2>Workload results</h2>
+<p>Versioned workload-owned data, rendered without a workload-specific contract.</p>
+</div>
+{{range .Payloads}}
+<details class="payload panel" open>
+<summary>
+<span class="metric-name">{{.Kind}}
+</span>
+<span class="metric-type">schema {{.Schema}} · {{.Status}}
+</span>
+</summary>
+<div class="details-body">
+{{range .Charts}}{{template "chart" .}}{{end}}{{template "node" .Data}}
+</div>
+</details>
+{{else}}
+<p class="empty">No workload results attached.</p>
+{{end}}
+</section>
+<section class="section" id="errors">
+<div class="section-heading">
+<h2>Errors &amp; retries</h2>
+<p>Terminal outcomes and bounded diagnostic groups.</p>
+</div>
+<div class="panel details-body">{{template "node" .Errors}}
+{{if .Failure.Summary}}<h3>Failure</h3>{{template "node" .Failure}}{{else if .Failure.Text}}<h3>Failure</h3>{{template "node" .Failure}}{{end}}
+</div>
+</section>
+<section class="section" id="data">
+<div class="section-heading">
+<h2>Complete original data</h2>
+<p>Every field retained, including unfamiliar schemas and custom values.</p>
+</div>
+<details class="panel">
+<summary>Original JSON · exact stored document</summary>
+<pre>{{.Original}}
+</pre>
+</details>
+</section>
+</main>
+</div>
+</body>
+</html>
+{{end}}

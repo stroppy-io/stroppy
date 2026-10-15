@@ -31,7 +31,7 @@ func newReportsCommand() *cobra.Command {
 	command.SetHelpFunc(command.HelpFunc())
 	command.AddCommand(
 		newReportsListCommand(), newReportsGetCommand(), newReportsRemoveCommand(),
-		newReportsPruneCommand(), newReportsStatusCommand(),
+		newReportsPruneCommand(), newReportsStatusCommand(), newReportsExportCommand(), newReportsServeCommand(),
 	)
 
 	return command

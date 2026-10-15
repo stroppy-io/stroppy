@@ -301,7 +301,7 @@ func moduleArchiveFile(path string) bool {
 		return true
 	}
 
-	for _, prefix := range []string{"third_party/", "workloads/"} {
+	for _, prefix := range []string{"third_party/", "workloads/", "pkg/report/view/"} {
 		if strings.HasPrefix(filepath.ToSlash(path), prefix) {
 			return true
 		}

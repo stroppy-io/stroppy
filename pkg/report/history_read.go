@@ -176,7 +176,7 @@ func (h *History) scan() ([]HistoryEntry, HistoryStatus, error) {
 	}
 
 	for _, file := range files {
-		if !strings.HasSuffix(file.Name(), ".json") {
+		if strings.HasPrefix(file.Name(), ".") || !strings.HasSuffix(file.Name(), ".json") {
 			continue
 		}
 
@@ -487,16 +487,18 @@ func historyMetadata(id string, data []byte) (HistoryEntry, error) {
 	entry.ID = id
 
 	entry.TPS = nil
-	for _, series := range envelope.Metrics.TPS.Series {
-		if step, ok := series.Attributes["step"].(string); ok && step == "workload" {
-			entry.TPS = series.Total
+	matches := 0
 
-			break
+	for _, series := range envelope.Metrics.TPS.Series {
+		if step, ok := series.Attributes["step"].(string); ok && step == "workload" &&
+			len(series.Attributes) == 1 && series.Total != nil {
+			entry.TPS = series.Total
+			matches++
 		}
 	}
 
-	if len(envelope.Metrics.TPS.Series) == 0 {
-		entry.TPS = envelope.Metrics.TPS.Total
+	if matches != 1 {
+		entry.TPS = nil
 	}
 
 	return entry, nil

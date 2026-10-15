@@ -193,17 +193,19 @@ func TestHistoryConcurrentPublication(t *testing.T) {
 
 	done := make(chan struct{})
 
-	wg.Go(func() {
-		defer close(done)
+	for range 32 {
+		wg.Go(func() {
+			if _, err := history.Save(run); err != nil {
+				t.Errorf("Save: %v", err)
+			}
+		})
+	}
 
-		for range 32 {
-			wg.Go(func() {
-				if _, err := history.Save(run); err != nil {
-					t.Errorf("Save: %v", err)
-				}
-			})
-		}
-	})
+	defer wg.Wait()
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
 
 	for {
 		_, problems, err := history.List(HistoryQuery{})
