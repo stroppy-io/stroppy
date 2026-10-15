@@ -81,6 +81,14 @@ func TestDriverDerivedDefaults(t *testing.T) {
 		{bench.DriverMySQL, bench.IsoRepeatableRead},
 		{bench.DriverPicodata, bench.IsoNone},
 		{bench.DriverYDB, bench.IsoSerializable},
+		// CockroachDB defaults to its native serializable level rather than this
+		// workload's (it accepts read committed too, measured slower).
+		{bench.DriverCRDB, bench.IsoSerializable},
+		// Measured on YSQL: this workload's protocol default — repeatable read, for both
+		// postgres and mysql here — failed a few percent of iterations, at roughly half
+		// the throughput, so YSQL takes read committed.
+		{bench.DriverYugabyte, bench.IsoReadCommitted},
+		{bench.DriverTiDB, bench.IsoRepeatableRead},
 	}
 	for _, tt := range isolationTests {
 		if got := resolveIsolation(tt.driver, ""); got != tt.want {

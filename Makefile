@@ -92,9 +92,13 @@ integration: # Run mandatory tagged PostgreSQL, MySQL, CSV, and OTEL integration
 	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
 	go test -tags=integration -count=1 -timeout=15m ./test/integration
 
-integration-optional: # Run optional Picodata and YDB tagged integration tests
+integration-engines: # Run the borrowed-protocol engines CI provides (CockroachDB, YugabyteDB, TiDB)
 	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
-	go test -tags='integration integration_optional' -count=1 -timeout=30m -run 'TestTpchLoadOn(Picodata|YDB)' ./test/integration
+	go test -tags='integration integration_optional' -count=1 -timeout=30m -run 'TestTpchLoadOn(CockroachDB|Yugabyte|TiDB)' ./test/integration
+
+integration-optional: # Run optional tagged integration tests (Picodata, YDB, CockroachDB, YugabyteDB, TiDB)
+	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
+	go test -tags='integration integration_optional' -count=1 -timeout=30m -run 'TestTpchLoadOn(Picodata|YDB|CockroachDB|Yugabyte|TiDB)' ./test/integration
 
 integration-sf1: # Run the explicit heavy TPC-H SF=1 answer validation
 	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
@@ -299,8 +303,8 @@ tmpfs-psql: # Open psql shell into the tmpfs Postgres container
 
 .PHONY: tmpfs-all-up tmpfs-all-down tmpfs-all-clean
 
-tmpfs-all-up: # Start optional PostgreSQL, MySQL, Picodata, and YDB harness
-	docker compose -f test/compose.tmpfs-all.yml up -d --wait pg-tmpfs-all mysql-tmpfs-all picodata-tmpfs-all ydb-tmpfs-all
+tmpfs-all-up: # Start the optional harness: PostgreSQL, MySQL, Picodata, YDB, CockroachDB, YugabyteDB
+	docker compose -f test/compose.tmpfs-all.yml up -d --wait pg-tmpfs-all mysql-tmpfs-all picodata-tmpfs-all ydb-tmpfs-all crdb-tmpfs-all yb-tmpfs-all
 	docker compose -f test/compose.tmpfs-all.yml up picodata-init
 
 tmpfs-all-down: # Stop + remove all 4 DBs and their volumes

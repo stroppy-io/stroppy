@@ -14,6 +14,7 @@ func TestEmbeddedAssetContract(t *testing.T) {
 		"pg.sql",
 		"crdb.sql",
 		"mysql.sql",
+		"tidb.sql",
 		"pico.sql",
 		"ydb.sql",
 	)
@@ -23,9 +24,11 @@ func TestEmbeddedAssetContract(t *testing.T) {
 		txQueries = append(txQueries, workloadtest.Query{Section: query.section, Name: query.query})
 	}
 
-	for _, dialect := range []string{"pg.sql", "crdb.sql", "mysql.sql", "pico.sql", "ydb.sql"} {
+	for _, dialect := range []string{"pg.sql", "crdb.sql", "mysql.sql", "tidb.sql", "pico.sql", "ydb.sql"} {
 		t.Run(dialect, func(t *testing.T) {
 			queries := txQueries
+			// TiDB has no stored procedures, so its variant carries neither
+			// create_procedures nor the workload_procs call.
 			if dialect == "pg.sql" || dialect == "crdb.sql" || dialect == "mysql.sql" {
 				queries = append(append([]workloadtest.Query(nil), txQueries...), workloadtest.Query{
 					Section: "workload_procs",

@@ -84,3 +84,28 @@ func unsetProcessEnv(t *testing.T, names ...string) {
 		})
 	}
 }
+
+// TestCockroachIsRefusedBeforeAnyWork pins the decision and its timing: TPC-DS cannot
+// run on CockroachDB, because 11 of its 103 query bodies use ROLLUP, CUBE or GROUPING
+// SETS, which CRDB does not implement. Refusing at define time rather than failing
+// those queries mid-run matters because the load comes first — TPC-DS's tables are
+// large, so the alternative spends minutes before saying the same thing.
+func TestCockroachIsRefusedBeforeAnyWork(t *testing.T) {
+	for _, testCase := range []struct {
+		driver bench.DriverTypeName
+		want   bool
+		why    string
+	}{
+		{bench.DriverPostgres, true, "the workload's own dialect"},
+		{bench.DriverMySQL, true, "a shipped dialect"},
+		{bench.DriverPicodata, true, "a shipped dialect"},
+		{bench.DriverYDB, true, "a shipped dialect"},
+		{bench.DriverYugabyte, true, "speaks the postgres protocol"},
+		{bench.DriverTiDB, true, "speaks the mysql protocol"},
+		{bench.DriverCRDB, false, "ROLLUP/CUBE/GROUPING SETS are unimplemented (crdb#46280)"},
+	} {
+		if got := tpcdsSupported(testCase.driver); got != testCase.want {
+			t.Errorf("tpcdsSupported(%s) = %v, want %v — %s", testCase.driver, got, testCase.want, testCase.why)
+		}
+	}
+}

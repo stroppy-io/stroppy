@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math/rand/v2"
 	"strings"
 	"sync/atomic"
@@ -299,6 +300,9 @@ func resolveIsolation(dt bench.DriverTypeName, override bench.TxIsolationName) b
 		return bench.IsoNone
 	case bench.DriverYDB:
 		return bench.IsoSerializable
+	case bench.DriverCRDB:
+		// Its native level: read committed is accepted too, and measured slower.
+		return bench.IsoSerializable
 	default:
 		return bench.IsoReadCommitted
 	}
@@ -322,14 +326,23 @@ func sqlFile(dt bench.DriverTypeName, override string) string {
 		return override
 	}
 
+	// An engine that speaks another protocol may still ship its own asset: prefer it
+	// when the workload embeds one, and fall back to the protocol's otherwise.
+	if stem := bench.DriverDialectStem(dt); stem != "" {
+		if _, err := fs.Stat(files, stem+".sql"); err == nil {
+			return stem + ".sql"
+		}
+	}
+
 	switch dt {
-	case bench.DriverMySQL:
+	case bench.DriverMySQL, bench.DriverTiDB:
 		return "mysql.sql"
 	case bench.DriverPicodata:
 		return "pico.sql"
 	case bench.DriverYDB:
 		return "ydb.sql"
 	default:
+		// postgres, and the engines that speak its protocol.
 		return "pg.sql"
 	}
 }
