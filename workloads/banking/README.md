@@ -108,12 +108,12 @@ What to expect:
   recovering.** It SIGKILLs the backend; the postmaster then terminates every other
   backend and reinitializes — same process, no restart — so the pool loses its
   connections and iterates against `FATAL: the database system is in recovery mode`.
-  Measured on a small cluster: recovery of 0.3–3.8 s, and the cluster was ready for
-  only 12–58 ms before the next crash, so a 10 s run crashed 6–11 times and was
-  usable for about a tenth of a second in total. The invariants still held after
-  every crash (the money and the token permutation both survived, with no sentinel
-  left behind), which is exactly what this variant exists to show. Point it at a
-  disposable database.
+  Measured on a durable server — a 32-core host with PostgreSQL 17 — a 10 s run at
+  `--inject-every 5` attempted **10156** iterations, **10146 of them failed**, only
+  **10** committed, and the run **exits non-zero**. So this action demonstrates that
+  the invariants survive crashes; it is not a test that passes. They did survive:
+  50 rows, sum 50000, and the token permutation intact, read from the server after the
+  run. Point it at a disposable database.
 - **`verify` waits for a server that is not answering yet.** It retries a bounded
   number of times (6 s), because otherwise a crashed run could never report on the
   invariants at all — the first refusal used to abort the step. A genuine violation
