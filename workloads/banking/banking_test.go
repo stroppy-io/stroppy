@@ -139,6 +139,9 @@ func TestDriverDefaults(t *testing.T) {
 	}{
 		{bench.DriverPostgres, "pg.sql"},
 		{bench.DriverMySQL, "mysql.sql"},
+		{bench.DriverTiDB, "mysql.sql"},
+		{bench.DriverCRDB, "pg.sql"},
+		{bench.DriverYugabyte, "pg.sql"},
 		{bench.DriverPicodata, "pico.sql"},
 		{bench.DriverYDB, "ydb.sql"},
 	} {

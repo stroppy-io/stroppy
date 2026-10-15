@@ -24,6 +24,9 @@ const (
 	DriverNoop      DriverTypeName = "noop"
 	DriverCSV       DriverTypeName = "csv"
 	DriverRecording DriverTypeName = "recording"
+	DriverCRDB      DriverTypeName = "crdb"
+	DriverYugabyte  DriverTypeName = "yugabyte"
+	DriverTiDB      DriverTypeName = "tidb"
 )
 
 func ParseDriverType(s string) (config.DriverType, error) {

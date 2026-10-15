@@ -28,7 +28,7 @@ func (s sqlSection) Run(ctx context.Context, b *bench.Bench) error {
 // with the same sections and named queries.
 func sqlFileFor(dt bench.DriverTypeName) string {
 	switch dt {
-	case bench.DriverMySQL:
+	case bench.DriverMySQL, bench.DriverTiDB:
 		return "mysql.sql"
 	case bench.DriverPicodata:
 		return "pico.sql"
