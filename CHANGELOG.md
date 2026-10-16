@@ -40,6 +40,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Clarified that the banking workload's token checks detect partial token swaps, not whether every transfer happened exactly once. ([#213](https://github.com/stroppy-io/stroppy/pull/213))
 - The banking workload on YDB no longer fails during schema creation: its asset used `CREATE UNIQUE INDEX`, which YDB's parser refuses, where YDB requires a unique index to be declared global and synchronous. ([#212](https://github.com/stroppy-io/stroppy/pull/212))
 - A rejected `COMMIT` is now counted as an ended transaction: it reaches `tx_errors_total`, and it no longer leaves the client with a spurious `tx is closed` beside the real error. Previously `tx_errors_total` under-reported exactly the runs worth measuring — a workload with commit failures showed none of them there while `failed_iterations_total` showed all of them. ([#204](https://github.com/stroppy-io/stroppy/pull/204))
 - TPC-C pacing waits stop on cancellation, think once after nonfatal failures, and preserve successful transactions when post-transaction thinking is interrupted. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
