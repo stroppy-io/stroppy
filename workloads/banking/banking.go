@@ -153,10 +153,10 @@ func (w *workload) load(ctx context.Context, b *bench.Bench) error {
 	return nil
 }
 
-// The token is the second witness of the transfer: it is UNIQUE, so the swap
-// cannot be lost quietly, and it is moved *conditionally* on the value that was
-// read, which turns a concurrent transfer into a detected conflict rather than a
-// silent overwrite.
+// The token is the second witness of the transfer: it is UNIQUE, so the swap cannot be
+// half-applied quietly, and it is moved *conditionally* on the value that was read,
+// which turns a concurrent transfer into a detected conflict rather than a silent
+// overwrite.
 func (w *workload) transfer(ctx context.Context, b *bench.Bench) error {
 	random := w.randoms[b.Worker()%len(w.randoms)]
 
@@ -218,8 +218,9 @@ func (w *workload) moveBalances(ctx context.Context, tx *bench.Tx, from, to, amo
 	return nil
 }
 
-// tokenWitness reports whether this driver can carry the UNIQUE token, which makes a
-// lost or duplicated transfer detectable even when the balances happen to sum right.
+// tokenWitness reports whether this driver can carry the UNIQUE token, which turns a
+// half-applied swap into a state the balances alone cannot show — a row parked in the
+// sentinel, or two rows holding one token.
 //
 // Picodata cannot: unique indexes are only allowed on sharding-key columns, and its
 // single-bucket transactions cannot make a two-row swap atomic. There the run checks
@@ -373,8 +374,9 @@ func retryCheck(ctx context.Context, attempts int, delay time.Duration, check fu
 }
 
 // checkInvariants asserts the money is conserved and the tokens are still a
-// permutation — a lost or duplicated transfer breaks the second even when the first
-// happens to hold.
+// permutation. Both are conservation properties, so a whole transfer that is lost or
+// applied twice leaves each of them unchanged: neither invariant proves that every
+// intended transfer happened exactly once. What they catch is a partial one.
 func (w *workload) checkInvariants(ctx context.Context, b *bench.Bench) error {
 	total, err := b.QueryValue[int64](ctx, w.total.Text, nil)
 	if err != nil {
@@ -390,7 +392,7 @@ func (w *workload) checkInvariants(ctx context.Context, b *bench.Bench) error {
 		b.AddReportData("token_witness",
 			"unavailable on this driver: unique indexes are limited to sharding-key "+
 				"columns, and a two-row transfer is cross-shard so it cannot be atomic — "+
-				"the total balance is checked, a lost or duplicated transfer is not detectable")
+				"the total balance is checked; a half-applied transfer leaves no trace")
 
 		return nil
 	}
