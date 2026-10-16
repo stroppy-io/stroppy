@@ -11,7 +11,9 @@ CREATE TABLE bank_account (
 	PRIMARY KEY (id)
 );
 --= create_token_index
-CREATE UNIQUE INDEX bank_account_token_uq ON bank_account (token);
+-- YDB has no CREATE UNIQUE INDEX; a unique index must be declared global and
+-- synchronous. This is the token witness the invariant depends on.
+ALTER TABLE bank_account ADD INDEX bank_account_token_uq GLOBAL UNIQUE SYNC ON (token);
 
 --+ workload_tx_transfer
 --= read_account
