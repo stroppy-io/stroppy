@@ -7,8 +7,8 @@ if the money or the accounts' tokens stop adding up.
 
 Every transfer moves an amount from one account to another and **rotates their
 tokens**. The token is a `UNIQUE` value that swaps between the two rows, so it is
-a second witness of the same transfer: a commit that is lost or applied twice
-breaks the token set even when the balances happen to sum correctly.
+a second witness of the same transfer: a half-applied swap — a row left in the
+sentinel, or two rows holding one token — is a state the balances alone cannot show.
 
 After the workload step, `verify` asserts both invariants:
 
