@@ -374,9 +374,11 @@ func retryCheck(ctx context.Context, attempts int, delay time.Duration, check fu
 }
 
 // checkInvariants asserts the money is conserved and the tokens are still a
-// permutation. Both are conservation properties, so a whole transfer that is lost or
-// applied twice leaves each of them unchanged: neither invariant proves that every
-// intended transfer happened exactly once. What they catch is a partial one.
+// permutation. The balance total catches a one-sided balance update; the token
+// permutation catches a partial token swap, such as a row parked in the sentinel or two
+// rows holding one token. Two cases leave both unchanged: a balanced debit and credit
+// without token rotation, and a whole transfer that is lost or repeated. Neither
+// invariant proves that every intended transfer happened exactly once.
 func (w *workload) checkInvariants(ctx context.Context, b *bench.Bench) error {
 	total, err := b.QueryValue[int64](ctx, w.total.Text, nil)
 	if err != nil {
@@ -392,7 +394,7 @@ func (w *workload) checkInvariants(ctx context.Context, b *bench.Bench) error {
 		b.AddReportData("token_witness",
 			"unavailable on this driver: unique indexes are limited to sharding-key "+
 				"columns, and a two-row transfer is cross-shard so it cannot be atomic — "+
-				"the total balance is checked; a half-applied transfer leaves no trace")
+				"the total balance is checked; a whole transfer that is lost or repeated can leave no trace")
 
 		return nil
 	}
