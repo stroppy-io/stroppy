@@ -224,6 +224,16 @@
     }
   }, true);
   window.addEventListener("pagehide", () => {
-    for (const state of states) { state.observer.disconnect(); state.handle?.destroy(); }
+    for (const state of states) {
+      state.observer.disconnect();
+      try { restore(state); } catch { /* Static SVG remains available. */ }
+    }
+  });
+  window.addEventListener("pageshow", event => {
+    if (!event.persisted) return;
+    for (const state of states) {
+      state.observer.observe(state.figure);
+      state.start();
+    }
   });
 })();

@@ -48,7 +48,7 @@ function setup(source, behavior = "ready", closed = false) {
   const timers = [];
   class Observer {
     constructor(callback) { this.callback = callback; state.observers.push(this); }
-    observe() {}
+    observe() { this.disconnected = false; }
     disconnect() { this.disconnected = true; }
   }
   const chart = {
@@ -139,6 +139,16 @@ test("closed disclosures defer chart creation; theme changes redraw active chart
   state.events.pagehide();
   assert.equal(state.observers[0].disconnected, true);
   assert.equal(state.destroyed, 2);
+  assert.equal(figure.classList.contains("chart-enhanced"), false);
+  assert.equal(figure.target.hidden, true);
+  state.events.pageshow({ persisted: false });
+  assert.equal(state.calls.length, 2);
+  state.events.pageshow({ persisted: true });
+  await settled();
+  assert.equal(state.calls.length, 3);
+  assert.equal(state.observers[0].disconnected, false);
+  assert.equal(figure.classList.contains("chart-enhanced"), true);
+  assert.equal(figure.target.hidden, false);
 });
 
 test("downsampled and invalid clocks never become continuous curves", async () => {

@@ -43,6 +43,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Interactive report charts restore their static view when leaving the page and reinitialize when returning through the browser's back-forward cache. ([#216](https://github.com/stroppy-io/stroppy/pull/216))
 - Comparison timelines scale to recorded values instead of forcing zero into the Y-axis range, making small latency changes easier to see. ([#210](https://github.com/stroppy-io/stroppy/pull/210))
 - Comparison HTML export keeps selected runs and filters, metric navigation targets the right section, and stale or oversized selections no longer block catalog browsing. ([#210](https://github.com/stroppy-io/stroppy/pull/210))
 - A rejected `COMMIT` is now counted as an ended transaction: it reaches `tx_errors_total`, and it no longer leaves the client with a spurious `tx is closed` beside the real error. Previously `tx_errors_total` under-reported exactly the runs worth measuring — a workload with commit failures showed none of them there while `failed_iterations_total` showed all of them. ([#204](https://github.com/stroppy-io/stroppy/pull/204))
