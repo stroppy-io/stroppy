@@ -51,7 +51,7 @@
     return { hooks: {
       init: [plot => {
         tip = document.createElement("div");
-        tip.className = "st-chart-tooltip";
+        tip.className = "st-chart-tooltip report-chart-tooltip";
         tip.hidden = true;
         plot.over.appendChild(tip);
         plot.over.addEventListener("mouseleave", () => { tip.hidden = true; });
@@ -59,6 +59,10 @@
       setCursor: [plot => {
         const index = plot.cursor.idx;
         if (index == null || plot.cursor.left < 0) { tip.hidden = true; return; }
+        if (source.series.every((_, i) => plot.data[i + 1][index] == null)) {
+          tip.hidden = true;
+          return;
+        }
         const x = plot.data[0][index];
         const heading = document.createElement("div");
         heading.className = "st-chart-tooltip-time";
@@ -66,12 +70,15 @@
         const rows = source.series.map((series, i) => {
           const row = document.createElement("div");
           row.className = "st-chart-tooltip-row";
+          const swatch = document.createElement("i");
+          swatch.style.background = getComputedStyle(plot.root).getPropertyValue(`--st-series-${series.color || 1}`).trim();
           const name = document.createElement("span");
           name.textContent = series.title;
           const value = document.createElement("b");
           const recorded = plot.data[i + 1][index];
-          value.textContent = recorded == null ? "—" : `${String(recorded)} ${source.unit}`;
-          row.append(name, value);
+          value.textContent = recorded == null ? "—" : `${format(recorded)} ${source.unit}`;
+          if (recorded != null) value.title = `${String(recorded)} ${source.unit}`;
+          row.append(swatch, name, value);
           return row;
         });
         const events = source.series.flatMap(series => (series.markers || [])

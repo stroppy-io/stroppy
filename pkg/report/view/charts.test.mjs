@@ -25,6 +25,7 @@ class Element {
     };
   }
   append(...nodes) { this.children.push(...nodes); }
+  appendChild(node) { this.children.push(node); return node; }
   replaceChildren(...nodes) { this.children = nodes; }
   setAttribute(name, value) { this.attributes[name] = value; }
   addEventListener(name, callback) { this.listeners[name] = callback; }
@@ -110,6 +111,29 @@ test("elapsed samples align without invented observations or bridged gaps", asyn
   figure.toggle.listeners.click();
   assert.equal(figure.classList.contains("chart-enhanced"), false);
   assert.equal(figure.target.hidden, true);
+});
+
+test("tooltip keeps swatch, label, and formatted value in separate cells", () => {
+  const source = structuredClone(timeline);
+  source.series[0].title = 'tps · recorded gauge · {"step":"workload"}';
+  const { state } = setup(source);
+  const plugin = state.calls[0].config.plugins[0];
+  const over = new Element();
+  over.clientWidth = 400;
+  const plot = { root: new Element(), over, cursor: { idx: 0, left: 40 },
+    data: [[86.001], [1499.012349], [null]] };
+  plugin.hooks.init[0](plot);
+  plugin.hooks.setCursor[0](plot);
+  const tip = over.children[0];
+  const row = tip.children[1];
+  assert.equal(row.children.length, 3);
+  assert.equal(row.children[0].style.background, "#5b8ef0");
+  assert.equal(row.children[1].textContent, source.series[0].title);
+  assert.equal(row.children[2].textContent, "1,499.012 ms");
+  assert.equal(row.children[2].title, "1499.012349 ms");
+  plot.data[1][0] = null;
+  plugin.hooks.setCursor[0](plot);
+  assert.equal(tip.hidden, true);
 });
 
 test("mount failure and timeout retain static view", async () => {

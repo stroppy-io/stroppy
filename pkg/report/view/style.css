@@ -147,9 +147,15 @@ summary::-webkit-details-marker {
 }
 summary:before {
   content:"+";
-  font:16px var(--st-font-mono);
+  font:16px/1 var(--st-font-mono);
   color:var(--muted);
-  flex:0 0 12px
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:12px;
+  height:16px;
+  flex:0 0 12px;
+  align-self:center;
 }
 details[open]>summary:before {
   content:"−"
@@ -511,6 +517,36 @@ td {
   min-width:0;
   width:100%;
   position:relative
+}
+.report-chart-tooltip {
+  min-width:0;
+  max-width:min(520px,100%);
+  white-space:normal
+}
+.report-chart-tooltip .st-chart-tooltip-row {
+  grid-template-columns:10px minmax(0,1fr) auto;
+  align-items:start
+}
+.report-chart-tooltip .st-chart-tooltip-row i {
+  margin-top:7px
+}
+.report-chart-tooltip .st-chart-tooltip-row span {
+  overflow-wrap:anywhere
+}
+.report-chart-tooltip .st-chart-tooltip-row b {
+  text-align:right;
+  white-space:nowrap
+}
+@media(max-width:600px) {
+  .report-chart-tooltip .st-chart-tooltip-row {
+    grid-template-columns:10px minmax(0,1fr)
+  }
+  .report-chart-tooltip .st-chart-tooltip-row b {
+    grid-column:2;
+    text-align:left;
+    white-space:normal;
+    overflow-wrap:anywhere
+  }
 }
 .chart-toggle {
   margin:8px 0;
@@ -894,7 +930,7 @@ footer {
 }
 .timeline-details>summary {
   border-bottom:1px solid var(--line);
-  padding:10px 0;
+  padding:12px 18px;
   font-size:12px;
   flex-wrap:wrap
 }
