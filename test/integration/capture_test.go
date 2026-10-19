@@ -56,7 +56,7 @@ func TestCaptureRealCLIHistoryAndBundle(t *testing.T) {
 	}
 
 	html := invoke("reports", "export", id)
-	if !bytes.Contains(html, []byte("Recorded run evolution")) || bytes.Contains(html, []byte("<script")) {
+	if !bytes.Contains(html, []byte("Recorded run evolution")) || !bytes.Contains(html, []byte(`class="chart-scroll"`)) {
 		t.Fatal("rich report preview unavailable without scripts")
 	}
 

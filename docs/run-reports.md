@@ -50,10 +50,27 @@ stroppy reports serve --listen 127.0.0.1:8080
 ```
 
 The same Go renderer powers run output, saved-report export, and the local server.
-Exported HTML includes its stylesheet, SVG charts, and complete original JSON;
-there are no scripts, CDN assets, external fonts, or frontend runtime requirements.
+Exported HTML includes its stylesheet, SVG charts, complete original JSON, and an
+optional bundled chart-enhancement script. There are no CDN assets, external fonts,
+or frontend build/runtime requirements.
 Open the file directly in a browser. Native expandable sections, numeric tables,
 chart hover/focus details, anchors, and JSON download work without JavaScript.
+
+Catalog, run, capture, and comparison pages share the vendored Stroppy kit 0.1.0
+palette, component styles, mark, Inter text, and Roboto Mono numeric/code fonts.
+Fonts and styles are embedded in each HTML export, including portable bundle
+previews; no network request or runtime asset directory is needed. Theme follows
+the system light/dark preference, with a light print palette. Existing SVG charts
+use the kit series colors while keeping dash patterns, numeric tables, and
+script-free hover/focus. With JavaScript available, kit charts enhance bar plots
+and captured timelines, using numeric elapsed-time axes, straight lines, explicit
+gaps, and phase markers. The SVG stays visible until a successful mount; blocked
+scripts or initialization failures leave it usable. Each enhanced plot has a
+static/interactive switch, numeric tables remain available, and print uses SVG.
+No resampling, smoothing, or new benchmark calculations are introduced.
+The server allows only the exact bundled script by CSP hash. The pinned release
+source, archive checksum, and font/uPlot licenses live under
+`pkg/report/view/kit/`.
 
 The report starts with a compact overview and a collapsed identity/configuration
 section. Expand it to inspect timestamps, report/run IDs, build/runtime identity,

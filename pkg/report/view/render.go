@@ -2,6 +2,7 @@ package view
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"html/template"
 	"io"
 	"net/url"
@@ -21,11 +22,20 @@ var comparisonTemplate string
 var stylesheet string
 
 var templates = template.Must(template.New("report").Funcs(template.FuncMap{
-	"statuses":     func() []string { return []string{"completed", "completed_with_errors", "failed", "canceled"} },
-	"previousPage": func(page int) int { return max(0, page-1) },
-	"nextPage":     func(page int) int { return page + 1 },
-	"style":        embeddedStyle,
-	"download":     jsonDownload,
+	"statuses": func() []string {
+		return []string{"completed", "completed_with_errors", "failed", "canceled"}
+	},
+	"previousPage":          func(page int) int { return max(0, page-1) },
+	"nextPage":              func(page int) int { return page + 1 },
+	"style":                 embeddedStyle,
+	"kitMark":               kitMark,
+	"statusTone":            statusTone,
+	"preview":               func(value string) string { return previewNumber(json.Number(value)) },
+	"download":              jsonDownload,
+	"chartRuntime":          embeddedCharts,
+	"interactiveBars":       interactiveBars,
+	"interactiveTimeline":   interactiveTimeline,
+	"interactiveComparison": interactiveComparison,
 	"selected": func(selection []catalogSelection, id string) bool {
 		for _, item := range selection {
 			if item.ID == id {
@@ -37,8 +47,10 @@ var templates = template.Must(template.New("report").Funcs(template.FuncMap{
 	},
 }).Parse(reportTemplate + comparisonTemplate))
 
+var reportStyles = template.CSS(kitStyle()) //nolint:gosec // inspected embedded styles and fonts, never report data.
+
 func embeddedStyle() template.CSS {
-	return template.CSS(stylesheet) //nolint:gosec // embedded application CSS, not report data.
+	return reportStyles
 }
 
 func jsonDownload(data string) template.URL {
@@ -47,7 +59,7 @@ func jsonDownload(data string) template.URL {
 	return template.URL("data:application/json;base64," + encoded) //nolint:gosec // fixed MIME and base64 alphabet.
 }
 
-// Render writes a self-contained, script-free HTML report. Original JSON remains
+// Render writes self-contained HTML with static charts and optional enhancement. Original JSON remains
 // available without decoding and re-encoding workload-owned or unknown fields.
 func Render(output io.Writer, data []byte, id string) error {
 	return RenderCapture(output, data, id, ".", nil)

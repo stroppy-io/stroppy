@@ -17,12 +17,14 @@ const (
 )
 
 type bar struct {
-	Label string
-	Value string
-	X     float64
-	Y     float64
-	Width float64
-	Tip   string
+	Label    string
+	Value    string
+	X        float64
+	Y        float64
+	Width    float64
+	Tip      string
+	Category string
+	Number   float64
 }
 
 type chart struct {
@@ -73,6 +75,7 @@ func bars(title, scope, unit string, values []chartValue) chart {
 		c.Bars = append(c.Bars, bar{
 			Label: label, Value: value.text, X: chartLabelWidth, Y: float64((i + 1) * chartRowHeight),
 			Width: value.value / maximum * chartPlotWidth, Tip: value.label + ": " + value.text + " " + unit,
+			Category: value.label, Number: value.value,
 		})
 	}
 

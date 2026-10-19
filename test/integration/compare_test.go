@@ -57,7 +57,8 @@ func TestComparisonRealCLIHistoryAndHTML(t *testing.T) {
 	invoke("reports", "compare", first, second, "-o", "html", "--file", path)
 
 	data, err := os.ReadFile(path)
-	if err != nil || !bytes.Contains(data, []byte("Captured metric evolution")) || bytes.Contains(data, []byte("<script")) {
+	if err != nil || !bytes.Contains(data, []byte("Captured metric evolution")) ||
+		!bytes.Contains(data, []byte(`class="chart-scroll"`)) {
 		t.Fatalf("offline comparison unavailable: %v", err)
 	}
 }

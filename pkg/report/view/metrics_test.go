@@ -98,7 +98,7 @@ func TestMetricSummaryRetainsKeysAndRawPrecision(t *testing.T) {
 		}
 	}
 
-	if strings.Contains(output.String(), "<script") {
+	if !strings.Contains(strings.Split(output.String(), "<script>")[0], "≈304.967") {
 		t.Fatal("metric readability requires scripts")
 	}
 }

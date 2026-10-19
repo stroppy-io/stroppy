@@ -1,0 +1,56 @@
+.uplot, .uplot *, .uplot *::before, .uplot *::after {box-sizing: border-box;}.uplot {font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";line-height: 1.5;width: min-content;}.u-title {text-align: center;font-size: 18px;font-weight: bold;}.u-wrap {position: relative;user-select: none;}.u-over, .u-under {position: absolute;}.u-under {overflow: hidden;}.uplot canvas {display: block;position: relative;width: 100%;height: 100%;}.u-axis {position: absolute;}.u-legend {font-size: 14px;margin: auto;text-align: center;}.u-inline {display: block;}.u-inline * {display: inline-block;}.u-inline tr {margin-right: 16px;}.u-legend th {font-weight: 600;}.u-legend th > * {vertical-align: middle;display: inline-block;}.u-legend .u-marker {width: 1em;height: 1em;margin-right: 4px;background-clip: padding-box !important;}.u-inline.u-live th::after {content: ":";vertical-align: middle;}.u-inline:not(.u-live) .u-value {display: none;}.u-series > * {padding: 4px;}.u-series th {cursor: pointer;}.u-legend .u-off > * {opacity: 0.3;}.u-select {background: rgba(0,0,0,0.07);position: absolute;pointer-events: none;}.u-cursor-x, .u-cursor-y {position: absolute;left: 0;top: 0;pointer-events: none;will-change: transform;}.u-hz .u-cursor-x, .u-vt .u-cursor-y {height: 100%;border-right: 1px dashed #607D8B;}.u-hz .u-cursor-y, .u-vt .u-cursor-x {width: 100%;border-bottom: 1px dashed #607D8B;}.u-cursor-pt {position: absolute;top: 0;left: 0;border-radius: 50%;border: 0 solid;pointer-events: none;will-change: transform;/*this has to be !important since we set inline "background" shorthand */background-clip: padding-box !important;}.u-axis.u-off, .u-select.u-off, .u-cursor-x.u-off, .u-cursor-y.u-off, .u-cursor-pt.u-off {display: none;}
+/* The chart of chart.ts on the kit variables. uPlot's own stylesheet
+   (uplot/dist/uPlot.min.css) goes before this one. */
+
+.st-chart {
+  position: relative;
+  margin: 0 0 calc(var(--st-space) * 2);
+  font-family: var(--st-font-sans);
+  color: var(--st-text);
+}
+.st-chart .uplot {
+  font-family: inherit;
+}
+.st-chart .u-cursor-x {
+  border-right: 1px dashed var(--st-muted);
+}
+.st-chart .u-select {
+  background: color-mix(in srgb, var(--st-primary) 15%, transparent);
+}
+.st-chart-legend {
+  margin: var(--st-space) 0 0 calc(var(--st-space) * 7);
+}
+
+/* Tooltip: a raised card next to the cursor, like Grafana's. */
+.st-chart-tooltip {
+  position: absolute;
+  z-index: 10;
+  min-width: 160px;
+  padding: var(--st-space) calc(var(--st-space) * 1.25);
+  border: 1px solid var(--st-line);
+  border-radius: var(--st-radius-md);
+  background: var(--st-raised);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  font-size: var(--st-font-size-sm);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.st-chart-tooltip-time {
+  margin-bottom: calc(var(--st-space) / 2);
+  color: var(--st-muted);
+}
+.st-chart-tooltip-row {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  align-items: center;
+  gap: var(--st-space);
+}
+.st-chart-tooltip-row i {
+  width: 10px;
+  height: 3px;
+  border-radius: 1px;
+}
+.st-chart-tooltip-row b {
+  font-family: var(--st-font-mono);
+  font-weight: var(--st-font-weight-medium);
+}

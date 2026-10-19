@@ -1,0 +1,68 @@
+/* Generated from tokens.json by css.ts — do not edit. */
+:root,
+[data-theme="dark"] {
+  --st-font-sans: Inter, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --st-font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --st-font-size-sm: 12px;
+  --st-font-size-base: 14px;
+  --st-font-size-lg: 16px;
+  --st-font-weight-regular: 400;
+  --st-font-weight-medium: 500;
+  --st-font-weight-bold: 600;
+  --st-line-height: 1.5;
+  --st-space: 8px;
+  --st-radius-sm: 2px;
+  --st-radius-md: 4px;
+  --st-radius-lg: 8px;
+  --st-radius-pill: 999px;
+  --st-mark: #f16a39;
+  color-scheme: dark;
+  --st-canvas: #15171c;
+  --st-panel: #1d2027;
+  --st-raised: #252932;
+  --st-line: #30353f;
+  --st-line-strong: #474d59;
+  --st-text: #e8eaee;
+  --st-muted: #8d95a3;
+  --st-disabled: #5f6673;
+  --st-primary: #5b8ef0;
+  --st-primary-text: #8fb3ff;
+  --st-success: #4fbf86;
+  --st-warning: #e5a93b;
+  --st-error: #e5534b;
+  --st-info: #5b8ef0;
+  --st-series-1: #5b8ef0;
+  --st-series-2: #f16a39;
+  --st-series-3: #4fbf86;
+  --st-series-4: #b083f0;
+  --st-series-5: #e5a93b;
+  --st-series-6: #3fb8c9;
+  --st-series-7: #e86fa4;
+  --st-series-8: #8d95a3;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --st-canvas: #f3f4f6;
+  --st-panel: #ffffff;
+  --st-raised: #e9ebef;
+  --st-line: #d9dde3;
+  --st-line-strong: #b6bcc6;
+  --st-text: #15171c;
+  --st-muted: #5a6270;
+  --st-disabled: #9aa1ad;
+  --st-primary: #3d6fe0;
+  --st-primary-text: #2f5cc4;
+  --st-success: #24955f;
+  --st-warning: #b7791f;
+  --st-error: #c9372c;
+  --st-info: #3d6fe0;
+  --st-series-1: #3d6fe0;
+  --st-series-2: #d9531f;
+  --st-series-3: #24955f;
+  --st-series-4: #8a5ad6;
+  --st-series-5: #b7791f;
+  --st-series-6: #1f8ea0;
+  --st-series-7: #c84a83;
+  --st-series-8: #5a6270;
+}

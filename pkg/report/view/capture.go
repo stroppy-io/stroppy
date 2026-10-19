@@ -86,14 +86,17 @@ type logView struct {
 }
 type (
 	timelinePoint struct {
-		X, Y                float64
-		Time, Value, Nearby string
-		Sequence            uint64
+		X        float64 `json:"x"`
+		Y        float64 `json:"y"`
+		Time     string  `json:"time"`
+		Value    string  `json:"value"`
+		Nearby   string  `json:"nearby"`
+		Sequence uint64  `json:"sequence"`
 	}
 	timelineMarker struct {
-		X       float64
-		Elapsed float64
-		Label   string
+		X       float64 `json:"x"`
+		Elapsed float64 `json:"elapsed"`
+		Label   string  `json:"label"`
 	}
 	timeline struct {
 		Name       string
@@ -108,6 +111,7 @@ type (
 		Minimum    string
 		Elapsed    string
 		Omitted    int
+		Interval   float64
 	}
 )
 
@@ -436,6 +440,8 @@ func timelineName(name, statistic string, metricType any) string {
 }
 
 func projectTimeline(group *timeline, events []any, interval float64) {
+	group.Interval = interval
+
 	last := group.Points[len(group.Points)-1].X
 	if last <= 0 {
 		last = interval

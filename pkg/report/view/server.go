@@ -122,8 +122,8 @@ func Handler(history *report.History) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; "+
-			"img-src data:; form-action 'self'; frame-ancestors 'none'")
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; "+chartPolicy()+"style-src 'unsafe-inline'; "+
+			"img-src data:; font-src data:; form-action 'self'; frame-ancestors 'none'")
 		mux.ServeHTTP(w, r)
 	})
 }

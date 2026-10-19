@@ -56,6 +56,7 @@ type comparisonTimeline struct {
 }
 type comparisonLine struct {
 	Label, Pattern, URL string
+	Series              int
 	Samples             []timelinePoint
 	Markers             []timelineMarker
 	Segments            []string
@@ -351,7 +352,7 @@ func comparisonTimelines(
 			}
 
 			line := comparisonLine{
-				Label: fmt.Sprintf("Run %d · sampling %g s", i+1, src.interval), Pattern: linePattern(i),
+				Label: fmt.Sprintf("Run %d · sampling %g s", i+1, src.interval), Pattern: linePattern(i), Series: i + 1,
 				Samples: plot.Points, Omitted: plot.Omitted,
 				Interval: src.interval, URL: "/reports/" + result.Runs[i].ID + "#captured-logs",
 			}

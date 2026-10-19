@@ -106,7 +106,7 @@ func TestCaptureHTTPFiltersArtifactsAndPortableBundle(t *testing.T) {
 
 	page := get(prefix+"?level=warn&step=workload&text=failed&from=0&to=2&metric=custom", http.StatusOK)
 	if !bytes.Contains(page, []byte("workload failed")) || bytes.Contains(page, []byte("warmup failed")) ||
-		!bytes.Contains(page, []byte("custom · cumulative total")) || bytes.Contains(page, []byte("<script")) {
+		!bytes.Contains(page, []byte("custom · cumulative total")) || !bytes.Contains(page, []byte(`data-chart=`)) {
 		t.Fatal("rich report filters or custom metric projection failed")
 	}
 

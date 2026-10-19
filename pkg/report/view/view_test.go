@@ -29,7 +29,7 @@ const fixture = `{
 "workers":[{"name":"alpha","count":5},{"name":"beta","count":9}],
 "note":"</script><script>alert(1)</script>"}}]}`
 
-func TestRenderIsCompleteOfflineAndScriptFree(t *testing.T) {
+func TestRenderIsCompleteOfflineWithStaticFallback(t *testing.T) {
 	t.Parallel()
 
 	var output bytes.Buffer
@@ -53,6 +53,8 @@ func TestRenderIsCompleteOfflineAndScriptFree(t *testing.T) {
 			switch n.Data {
 			case "script":
 				scripts++
+
+				checkChartScript(t, n)
 			case "svg":
 				charts++
 			case "details":
@@ -76,7 +78,7 @@ func TestRenderIsCompleteOfflineAndScriptFree(t *testing.T) {
 	}
 	visit(document)
 
-	if scripts != 0 || charts < 2 || details < 5 {
+	if scripts != 1 || charts < 2 || details < 5 {
 		t.Fatalf("scripts=%d charts=%d details=%d", scripts, charts, details)
 	}
 

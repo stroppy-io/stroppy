@@ -31,6 +31,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
+- Report catalogs, run views, and comparisons use Stroppy kit 0.1.0 styles, embedded fonts, and optional interactive charts while keeping offline exports, static SVG fallbacks, and JavaScript-free controls.
 - Parallel workloads spend less time contending on metric updates while retaining the same public counters, histogram buckets, gauges, and sampled trace exemplars. ([#189](https://github.com/stroppy-io/stroppy/pull/189))
 - Repeated SQL queries avoid allocating cache keys after warmup, and combining absent errors no longer allocates. ([#189](https://github.com/stroppy-io/stroppy/pull/189))
 - `stroppy build PATH` accepts a standalone project root by checking its conventional `workload/` package when the root is not importable. ([#188](https://github.com/stroppy-io/stroppy/pull/188))

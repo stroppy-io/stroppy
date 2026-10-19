@@ -65,7 +65,7 @@ func TestReportComparisonCLISharedValuesAndExport(t *testing.T) {
 
 	data, err := os.ReadFile(path)
 	if err != nil || !strings.Contains(string(data), "Selected benchmark runs") ||
-		strings.Contains(string(data), "<script") {
+		!strings.Contains(string(data), `class="chart-scroll"`) {
 		t.Fatal("offline export unavailable")
 	}
 

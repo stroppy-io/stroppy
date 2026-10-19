@@ -44,8 +44,8 @@ func TestReportWebCLI(t *testing.T) {
 	}
 	id := entries[0].ID
 	html := invoke("reports", "export", id)
-	if !bytes.Contains(html, []byte("<!doctype html>")) || bytes.Contains(html, []byte("<script")) {
-		t.Fatal("script-free HTML export unavailable")
+	if !bytes.Contains(html, []byte("<!doctype html>")) || !bytes.Contains(html, []byte(`class="chart-scroll"`)) {
+		t.Fatal("static HTML fallback unavailable")
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
