@@ -73,23 +73,34 @@ func (w *workload) load(ctx context.Context, b *bench.Bench) error {
 }
 
 func (w *workload) work(ctx context.Context, b *bench.Bench) error {
-	count, err := b.QueryValue[int64](ctx, "SELECT COUNT(*) FROM stroppy_demo", nil)
+	countRow, err := b.QueryRow(ctx, "SELECT COUNT(*) FROM stroppy_demo", nil)
 	if err != nil {
 		return err
 	}
 
-	if count != demoRows {
+	count, err := countRow.At[int64](0)
+	if err != nil {
+		return err
+	}
+
+	// Noop returns padded stub rows rather than the loaded dataset.
+	if b.DriverTypeName() != bench.DriverNoop && count != demoRows {
 		return fmt.Errorf("%w: expected %d, got %v", errRowCount, demoRows, count)
 	}
 
 	for range 3 {
 		id := int64(1 + w.workers[b.Worker()].IntN(demoRows))
 
-		label, err := b.QueryValue[string](
+		row, err := b.QueryRow(
 			ctx,
 			"SELECT label FROM stroppy_demo WHERE id = :id",
 			map[string]any{"id": id},
 		)
+		if err != nil {
+			return err
+		}
+
+		label, err := row.At[string](0)
 		if err != nil {
 			return err
 		}
