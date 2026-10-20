@@ -22,6 +22,28 @@ const (
 	version    = "v6.0.0-test"
 )
 
+var buildCache string
+
+func TestMain(m *testing.M) {
+	var err error
+
+	buildCache, err = os.MkdirTemp("", "stroppy-modulecompat-build-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	code := m.Run()
+
+	if err := os.RemoveAll(buildCache); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+
+		code = 1
+	}
+
+	os.Exit(code)
+}
+
 func TestExternalModuleResolvesV6Release(t *testing.T) {
 	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
@@ -36,12 +58,13 @@ func TestExternalModuleResolvesV6Release(t *testing.T) {
 	proxyURL := (&url.URL{Scheme: "file", Path: proxyDir}).String()
 	moduleCache := filepath.Join(t.TempDir(), "modcache")
 	t.Cleanup(func() { makeWritable(t, moduleCache) })
+
 	buildEnv := append(os.Environ(),
 		"GOPROXY="+proxyURL+",https://proxy.golang.org,direct",
 		"GONOSUMDB="+modulePath,
 		"GOWORK=off",
 		"GOMODCACHE="+moduleCache,
-		"GOCACHE="+filepath.Join(t.TempDir(), "gocache"),
+		"GOCACHE="+buildCache,
 	)
 
 	runCommand(t, consumerDir, buildEnv, "go", "test", "-mod=mod", "-race", "./...")
@@ -82,8 +105,9 @@ func TestPublishedProjectsCompileAsExternalModules(t *testing.T) {
 	proxyURL := (&url.URL{Scheme: "file", Path: proxyDir}).String()
 	moduleCache := filepath.Join(t.TempDir(), "modcache")
 	t.Cleanup(func() { makeWritable(t, moduleCache) })
+
 	env := append(os.Environ(), "GOPROXY="+proxyURL+",https://proxy.golang.org,direct", "GONOSUMDB="+modulePath,
-		"GOWORK=off", "GOMODCACHE="+moduleCache, "GOCACHE="+filepath.Join(t.TempDir(), "gocache"))
+		"GOWORK=off", "GOMODCACHE="+moduleCache, "GOCACHE="+buildCache)
 
 	descriptions, err := bench.DescribeAll()
 	if err != nil {

@@ -63,7 +63,7 @@ func TestSampleWorkloadsServeTheDocumentedContract(t *testing.T) {
 		"GONOSUMDB="+modulePath,
 		"GOWORK=off",
 		"GOMODCACHE="+moduleCache,
-		"GOCACHE="+filepath.Join(t.TempDir(), "gocache"),
+		"GOCACHE="+buildCache,
 		"HOME="+t.TempDir(),
 	)
 
