@@ -28,6 +28,14 @@ func init() {
 			return NewDriver(ctx, opts)
 		},
 	)
+
+	// TiDB speaks the mysql wire, so it shares this implementation too.
+	driver.RegisterDriver(
+		config.DriverTypeTiDB,
+		func(ctx context.Context, opts driver.Options) (driver.Driver, error) {
+			return NewDriver(ctx, opts)
+		},
+	)
 }
 
 type Driver struct {

@@ -29,10 +29,20 @@ const (
 	defaultPicoAllURL  = "postgres://admin:T0psecret@localhost:1331/admin"
 	defaultYDBAllURL   = "grpc://localhost:2136/local"
 
-	envPGAllURL    = "STROPPY_PG_URL"
-	envMySQLAllURL = "STROPPY_MYSQL_URL"
-	envPicoAllURL  = "STROPPY_PICO_URL"
-	envYDBAllURL   = "STROPPY_YDB_URL"
+	// Engines that speak another's protocol, each on the port its own single-node
+	// default uses: CockroachDB's insecure listener, YugabyteDB's YSQL, TiDB's
+	// mysql-wire endpoint.
+	defaultCRDBAllURL     = "postgres://root@localhost:26257/defaultdb?sslmode=disable"
+	defaultYugabyteAllURL = "postgres://yugabyte@localhost:5435/yugabyte?sslmode=disable"
+	defaultTiDBAllURL     = "root:@tcp(localhost:4000)/test?parseTime=true&multiStatements=true"
+
+	envPGAllURL       = "STROPPY_PG_URL"
+	envMySQLAllURL    = "STROPPY_MYSQL_URL"
+	envPicoAllURL     = "STROPPY_PICO_URL"
+	envYDBAllURL      = "STROPPY_YDB_URL"
+	envCRDBAllURL     = "STROPPY_CRDB_URL"
+	envYugabyteAllURL = "STROPPY_YUGABYTE_URL"
+	envTiDBAllURL     = "STROPPY_TIDB_URL"
 )
 
 // Known tables to drop when resetting non-pg dialects (which lack
@@ -59,19 +69,51 @@ func AllKnownTables() []string {
 // and returns a pgx pool scoped to the test.
 func NewPG(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	url := envOr(envPGAllURL, defaultPGAllURL)
 
-	ctx := context.Background()
+	return newPGPool(t, "postgres", envPGAllURL, defaultPGAllURL)
+}
+
+// newPGPool builds a pool for one of the postgres-wire engines, failing the test
+// when it is unreachable: the integration harness is expected to be running.
+func newPGPool(t *testing.T, engine, envKey, defaultURL string) *pgxpool.Pool {
+	t.Helper()
+
+	url := envOr(envKey, defaultURL)
+
+	// Bounded, like newSQLDB's ping: pgxpool.New does not itself wait for a
+	// connection, so an endpoint that stops answering would hang the test rather
+	// than fail it.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	pool, err := pgxpool.New(ctx, url)
 	if err != nil {
-		t.Fatalf("pgxpool.New(%q): %v", url, err)
+		t.Fatalf("%s: pgxpool.New(%q): %v", engine, url, err)
 	}
+
 	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
-		t.Fatalf("pg.Ping: %v (is the documented integration harness running?)", err)
+		t.Fatalf("%s: ping: %v (is the documented integration harness running?)", engine, err)
 	}
+
 	t.Cleanup(pool.Close)
+
 	return pool
+}
+
+// NewCRDB connects to CockroachDB, which speaks the postgres wire.
+func NewCRDB(t *testing.T) *pgxpool.Pool {
+	t.Helper()
+
+	return newPGPool(t, "cockroachdb", envCRDBAllURL, defaultCRDBAllURL)
+}
+
+// NewYugabyte connects to YugabyteDB's YSQL endpoint, which speaks the postgres
+// wire.
+func NewYugabyte(t *testing.T) *pgxpool.Pool {
+	t.Helper()
+
+	return newPGPool(t, "yugabytedb", envYugabyteAllURL, defaultYugabyteAllURL)
 }
 
 // NewMySQL connects to the baseline harness's MySQL instance (port 3307) and returns
@@ -79,20 +121,40 @@ func NewPG(t *testing.T) *pgxpool.Pool {
 // reset via ResetMySQL.
 func NewMySQL(t *testing.T) *sql.DB {
 	t.Helper()
-	url := envOr(envMySQLAllURL, defaultMySQLAllURL)
+
+	return newSQLDB(t, "mysql", envMySQLAllURL, defaultMySQLAllURL)
+}
+
+// NewTiDB connects to TiDB, which speaks the mysql wire.
+func NewTiDB(t *testing.T) *sql.DB {
+	t.Helper()
+
+	return newSQLDB(t, "tidb", envTiDBAllURL, defaultTiDBAllURL)
+}
+
+// newSQLDB opens a database/sql connection for one of the mysql-wire engines.
+func newSQLDB(t *testing.T, engine, envKey, defaultURL string) *sql.DB {
+	t.Helper()
+
+	url := envOr(envKey, defaultURL)
 
 	db, err := sql.Open("mysql", url)
 	if err != nil {
-		t.Fatalf("sql.Open(mysql, %q): %v", url, err)
+		t.Fatalf("%s: sql.Open(%q): %v", engine, url, err)
 	}
+
 	db.SetConnMaxLifetime(time.Minute)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	if err := db.PingContext(ctx); err != nil {
 		db.Close()
-		t.Fatalf("mysql.Ping: %v (is the documented integration harness running?)", err)
+		t.Fatalf("%s: ping: %v (is the documented integration harness running?)", engine, err)
 	}
+
 	t.Cleanup(func() { _ = db.Close() })
+
 	return db
 }
 
