@@ -88,6 +88,7 @@ type RunRequest struct {
 	Metrics       *bench.MetricsConfig
 	ReportOptions bench.ReportOptions
 	NoReport      bool
+	Capture       *bench.CaptureOptions
 }
 
 // NewCatalog creates an application over an explicit catalog without global registration.
@@ -159,6 +160,7 @@ func (a *Application) Run(ctx context.Context, request *RunRequest) (*report.Run
 			Logger:  request.Logger,
 			Metrics: metrics,
 			Report:  reportOptions,
+			Capture: request.Capture,
 		},
 	)
 }

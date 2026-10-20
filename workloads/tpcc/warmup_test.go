@@ -1,11 +1,13 @@
 package tpcc
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -17,18 +19,49 @@ import (
 const historyMaxSQL = "SELECT COALESCE(MAX(h_id), 0) FROM history"
 
 func TestWarmupAndRepeatedRunHistory(t *testing.T) {
+	pg, err := files.ReadFile("pg.sql")
+	require.NoError(t, err)
+
+	const workers = 2
+
+	test := bench.Test{Name: "tpcc-phase-history", Define: func(d *bench.Def) error {
+		d.Drivers.Declare("default", bench.DriverConfig{Kind: bench.DriverPostgres})
+
+		w := &workload{
+			variant: "procs", sql: bench.ParseSQL(string(pg)), iso: bench.IsoReadCommitted,
+			warehouses: 1, warehouseStart: 1, wIDMax: 1, retryAttempts: 3,
+			vuStates: make([]*vuState, workers),
+		}
+		w.m = w.initMetrics(&d.Metrics)
+		action := func(ctx context.Context, b *bench.Bench) error {
+			if err := w.initializeHistory(ctx, b); err != nil {
+				return err
+			}
+
+			vs := w.vuState(uint64(b.Worker()+1), 1, 1)
+			index := int(b.Iteration() % uint64(len(txNames)))
+
+			return w.runPaced(ctx, b, vs, txNames[index], func() error {
+				return w.iterateProcs(ctx, b, vs, index)
+			})
+		}
+
+		for _, phase := range []string{"warmup", "workload"} {
+			if phase == "workload" {
+				w.measureStart = time.Now()
+			}
+
+			d.Execution.Step(phase, action, bench.SharedIterations(workers, int64(workers*len(txNames))))
+		}
+
+		return d.Execution.Err()
+	}}
 	last := int64(30_000_000)
 
 	for run := range 2 {
 		recorder := &record.Recorder{}
 		recorder.Reply(historyMaxSQL, record.Response{Rows: [][]any{{last}}})
-		result, err := testkit.Record(t.Context(), Procs, recorder, bench.RunOptions{
-			Drivers: map[string]bench.DriverConfig{"": {Kind: bench.DriverPostgres}},
-			Params: bench.ParamInputs{CLI: map[string]string{
-				"executor": "constant-vus", "vus": "2", "duration": "30ms", "warmup": "30ms",
-			}},
-			Steps: []string{"warmup", "workload"},
-		})
+		result, err := testkit.Record(t.Context(), test, recorder, bench.RunOptions{})
 		require.NoError(t, err)
 		require.Zero(t, result.Errors.FailedIterations)
 
@@ -85,6 +118,73 @@ func TestWarmupAndRepeatedRunHistory(t *testing.T) {
 
 		require.True(t, sawWarmup, "no transaction metric was labeled step=warmup (run %d)", run)
 		require.True(t, sawWorkload, "no transaction metric was labeled step=workload (run %d)", run)
+	}
+}
+
+func TestTimedWarmupMetricsMatchRecordedTransactions(t *testing.T) {
+	pg, err := files.ReadFile("pg.sql")
+	require.NoError(t, err)
+
+	sql := bench.ParseSQL(string(pg))
+	queries := map[string]string{}
+
+	for _, name := range txNames {
+		query, ok := sql.Query("workload_procs", name)
+		require.True(t, ok)
+
+		queries[query] = name
+	}
+
+	recorder := &record.Recorder{}
+	recorder.Reply(historyMaxSQL, record.Response{Rows: [][]any{{int64(30_000_000)}}})
+	result, err := testkit.Record(t.Context(), Procs, recorder, bench.RunOptions{
+		Drivers: map[string]bench.DriverConfig{"": {Kind: bench.DriverPostgres}},
+		Params: bench.ParamInputs{CLI: map[string]string{
+			"executor": "constant-vus", "vus": "2", "duration": "30ms", "warmup": "30ms",
+		}},
+		Steps: []string{"warmup", "workload"},
+	})
+	require.NoError(t, err)
+	require.Zero(t, result.Errors.FailedIterations)
+
+	expected := map[string]map[string]uint64{}
+
+	for _, operation := range recorder.Operations() {
+		name, ok := queries[operation.SQL]
+		if !ok || operation.Kind != "query" {
+			continue
+		}
+
+		if expected[name] == nil {
+			expected[name] = map[string]uint64{}
+		}
+
+		expected[name][operation.Scope.Step]++
+	}
+
+	for _, phase := range []string{"warmup", "workload"} {
+		var recorded uint64
+		for _, counts := range expected {
+			recorded += counts[phase]
+		}
+
+		require.Positive(t, recorded, "no transactions recorded in %s", phase)
+	}
+
+	for _, name := range txNames {
+		actual := map[string]uint64{}
+
+		for _, point := range result.Metrics["tpcc_"+name+"_duration"].Series {
+			require.NotNil(t, point.Count)
+			step, ok := point.Attributes["step"].(string)
+			require.True(t, ok)
+
+			actual[step] += *point.Count
+		}
+
+		for _, phase := range []string{"warmup", "workload"} {
+			require.Equal(t, expected[name][phase], actual[phase], "%s / %s", name, phase)
+		}
 	}
 }
 

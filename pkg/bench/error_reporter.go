@@ -149,7 +149,15 @@ func (r *errorReporter) record(
 	}
 
 	if first {
-		r.lg.Warn(
+		log := r.lg
+		if vu != nil {
+			log = log.With(zap.String("step", vu.stepTag), zap.Int("worker", vu.worker))
+			if vu.root != nil && vu.root.capture != nil {
+				vu.root.capture.writer.Event("error", vu.stepTag, string(group.kind), 0, 0, 0)
+			}
+		}
+
+		log.Warn(
 			"nonfatal error; continuing",
 			zap.String("operation", group.operation),
 			zap.String("error_class", string(group.kind)),

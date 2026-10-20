@@ -1,0 +1,432 @@
+{{define "node"}}{{if .Title}}
+<details class="nested">
+<summary>{{.Title}}
+</summary>{{template "node-body" .}}
+</details>
+{{else}}{{template "node-body" .}}{{end}}{{end}}
+{{define "node-body"}}
+{{if .Fields}}
+<dl class="fields">
+{{range .Fields}}
+<div>
+<dt>{{.Name}}
+</dt>
+<dd>{{template "node" .Value}}
+</dd>
+</div>
+{{end}}
+</dl>
+{{else if .Columns}}
+<div class="table-scroll">
+<table>
+<thead>
+<tr>
+{{range .Columns}}
+<th>{{.}}
+</th>
+{{end}}
+</tr>
+</thead>
+<tbody>
+{{range .Rows}}
+<tr>
+{{range .}}
+<td>{{template "node" .}}
+</td>
+{{end}}
+</tr>
+{{end}}
+</tbody>
+</table>
+</div>
+{{else if .Items}}
+<ol class="items">
+{{range .Items}}
+<li>{{template "node" .}}
+</li>
+{{end}}
+</ol>
+{{else if .Summary}}
+<span class="empty">{{.Summary}}
+</span>
+{{else}}
+<span class="value">{{.Text}}
+</span>
+{{end}}
+{{end}}
+{{define "chart"}}{{if .Bars}}
+<figure class="chart" data-chart="{{interactiveBars .}}">
+<figcaption>
+<h3>{{.Title}}
+</h3>
+<p>{{.Scope}} · {{.Unit}}
+{{if .HiddenZeroBuckets}} · {{.HiddenZeroBuckets}} empty buckets omitted; all buckets retained in exact data{{end}}</p>
+</figcaption>
+{{if .Legend}}<div class="chart-legend">{{range .Legend}}<span data-series="{{.Series}}"><i></i>{{.Label}}</span>{{end}}</div>{{end}}
+<div class="chart-scroll">
+{{if .Vertical}}
+<svg viewBox="0 0 720 320" role="img" aria-label="{{.Title}}">
+<text class="axis-label" x="70" y="53" text-anchor="end">{{.Max}}</text>
+<text class="axis-label" x="70" y="263" text-anchor="end">0</text>
+<line class="timeline-marker" x1="80" x2="680" y1="260" y2="260"/>
+{{range .Categories}}<text x="{{.X}}" y="287" text-anchor="middle">{{.Label}}</text>{{end}}
+{{range .Bars}}<g class="bar" data-series="{{.Series}}" tabindex="0" aria-label="{{.Tip}}"><title>{{.Tip}}</title><rect class="bar-fill" x="{{.X}}" y="{{.Y}}" width="{{.Width}}" height="{{.Height}}" rx="2"/><text class="bar-tooltip" x="{{.X}}" y="{{.Y}}" dy="-7">{{.Tip}}</text></g>{{end}}
+</svg>
+{{else}}
+<svg viewBox="0 0 720 {{.Height}}" role="img" aria-label="{{.Title}}">
+<text class="axis-label" x="190" y="17">0</text>
+<text class="axis-label" x="610" y="17" text-anchor="end">{{.Max}} {{.Unit}}
+</text>
+{{range .Bars}}
+<g class="bar" {{if .Series}}data-series="{{.Series}}"{{end}} tabindex="0" aria-label="{{.Tip}}">
+<title>{{.Tip}}
+</title>
+<rect class="bar-hit" x="0" y="{{.Y}}" width="720" height="28"/>
+<text x="178" y="{{.Y}}" dy="17" text-anchor="end">{{.Label}}
+</text>
+<rect class="bar-track" x="{{.X}}" y="{{.Y}}" width="420" height="20"/>
+<rect class="bar-fill" x="{{.X}}" y="{{.Y}}" width="{{.Width}}" height="20" rx="4"/>
+<rect class="bar-texture" x="{{.X}}" y="{{.Y}}" width="{{.Width}}" height="20" fill="url(#chart-texture)"/>
+<text class="bar-tooltip" x="{{.X}}" y="{{.Y}}" dy="-7">{{.Tip}}
+</text>
+<text class="bar-value" x="625" y="{{.Y}}" dy="15">{{.Value}}
+</text>
+</g>
+{{end}}
+</svg>
+{{end}}
+</div>
+<details class="chart-table">
+<summary>Values</summary>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>{{.Unit}}
+</th>
+</tr>
+</thead>
+<tbody>
+{{range .Bars}}
+<tr>
+<td>{{.Tip}}
+</td>
+<td class="numeric">{{.Value}}
+</td>
+</tr>
+{{end}}
+</tbody>
+</table>
+</details>
+</figure>
+{{end}}{{end}}
+{{define "chart-scripts"}}<script>{{chartRuntime}}</script>{{end}}
+{{define "catalog"}}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Report catalog · Stroppy</title>
+<style>{{style}}
+</style>
+</head>
+<body class="st-doc">
+<svg width="0" height="0" aria-hidden="true" class="texture-definition"><defs><pattern id="chart-texture" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="currentColor" stroke-width="1"/></pattern></defs></svg>
+<div class="shell">
+<header class="masthead">
+<a class="brand" href="/">{{kitMark}}stroppy<span>/ reports</span>
+</a>
+<span class="subtitle">Local · read only</span>
+</header>
+<main>
+<section class="overview">
+<p class="eyebrow">REPORT HISTORY</p>
+<h1>Your benchmark runs</h1>
+<p class="subtitle">{{.Total}} matching reports · newest first unless selected otherwise</p>
+<form id="catalog-selection" class="filters" method="get" action="/">
+{{range .Selection}}{{if not .OnPage}}<input type="hidden" name="id" value="{{.ID}}">{{end}}{{end}}
+<label>Since (inclusive)<input name="since" value="{{.Query.Get "since"}}" placeholder="2026-10-01">
+</label>
+<label>Until (exclusive)<input name="until" value="{{.Query.Get "until"}}" placeholder="2026-10-14">
+</label>
+<label>Workload<select name="workload">
+<option value="">All workloads</option>
+{{range .Workloads}}<option value="{{.}}" {{if eq . ($.Query.Get "workload")}}selected{{end}}>{{.}}</option>{{end}}
+</select></label>
+<label>Driver<select name="driver">
+<option value="">All drivers</option>
+{{range .Drivers}}<option value="{{.}}" {{if eq . ($.Query.Get "driver")}}selected{{end}}>{{.}}</option>{{end}}
+</select></label>
+<label>Status<select name="status">
+<option value="">All statuses</option>
+{{range statuses}}
+<option value="{{.}}" {{if eq . ($.Query.Get "status")}}selected{{end}}>{{.}}
+</option>
+{{end}}
+</select>
+</label>
+<label>Order<select name="order">
+<option value="newest">Newest first</option>
+<option value="oldest" {{if eq (.Query.Get "order") "oldest"}}selected{{end}}>Oldest first</option>
+</select>
+</label>
+<label class="filter-toggle"><input type="checkbox" name="metrics" value="complete" {{if eq (.Query.Get "metrics") "complete"}}checked{{end}}>Complete metric capture</label>
+<label class="filter-toggle"><input type="checkbox" name="logs" value="complete" {{if eq (.Query.Get "logs") "complete"}}checked{{end}}>Complete log capture</label>
+<button type="submit">Filter / keep selection</button><button class="st-button" data-variant="primary" type="submit" formaction="/compare">Compare selected</button>
+<a href="/">Reset</a>
+</form>
+</section>
+{{if .SelectionProblems}}<div class="notice">{{range .SelectionProblems}}<p>{{.}}</p>{{end}}</div>{{end}}
+{{if .Problems}}
+<details class="notice">
+<summary>{{len .Problems}} unreadable entries</summary>
+{{range .Problems}}
+<p>{{.ID}}: {{.Error}}
+</p>
+{{end}}
+</details>
+{{end}}
+<div class="panel table-scroll">
+<table class="catalog">
+<thead>
+<tr>
+<th>Select</th><th>Workload / identity</th>
+<th>Started (UTC)</th>
+<th>Driver</th>
+<th>Status</th>
+<th>Workload TPS</th>
+<th>Capture</th>
+</tr>
+</thead>
+<tbody>
+{{range .Entries}}
+<tr>
+<td><input type="checkbox" form="catalog-selection" name="id" value="{{.ID}}" aria-label="Select {{.ID}}" {{if selected $.Selection .ID}}checked{{end}}></td>
+<td>
+<a class="workload" href="/reports/{{.ID}}">{{.Workload}}
+</a>
+<span class="history-id">{{.ID}}
+</span>
+</td>
+<td>{{.StartedAt.UTC.Format "2006-01-02 15:04:05"}}
+</td>
+<td>{{if .Drivers}}{{range .Drivers}}<span class="driver-role">{{.Name}}={{.Type}}</span>{{end}}{{else}}{{.Driver}}{{end}}
+</td>
+<td>
+<span class="status st-tag status-{{.Status}}" data-tone="{{statusTone .Status}}">{{.Status}}
+</span>
+</td>
+<td class="numeric">
+{{if .TPS}}{{.TPS}}{{else}}—{{end}}
+</td><td>{{if .CaptureState}}{{.CaptureState}}{{else}}—{{end}}</td>
+</tr>
+{{else}}
+<tr>
+<td colspan="7" class="catalog-empty">No matching reports. Run a workload to save its first report.</td>
+</tr>
+{{end}}
+</tbody>
+</table>
+</div>
+<nav class="pagination">
+{{if .Previous}}<button form="catalog-selection" name="page" value="{{previousPage .Page}}">Previous</button>{{else}}<span></span>{{end}}
+{{if .Next}}<button form="catalog-selection" name="page" value="{{nextPage .Page}}">Next</button>{{end}}
+</nav>
+{{if .Selection}}<details class="panel"><summary>{{len .Selection}} selected reports</summary><div class="details-body">{{range .Selection}}<p>{{.ID}}</p>{{end}}</div></details>{{end}}
+</main>
+<footer>Stroppy · local report catalog<span>Filters and navigation work without JavaScript.</span>
+</footer>
+</div>
+</body>
+</html>
+{{end}}
+{{define "report"}}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{{.Title}} · Stroppy report</title>
+<style>{{style}}
+</style>
+</head>
+<body class="st-doc">
+<svg width="0" height="0" aria-hidden="true" class="texture-definition"><defs><pattern id="chart-texture" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="currentColor" stroke-width="1"/></pattern></defs></svg>
+<div class="shell">
+<header class="masthead">
+<a class="brand" href="{{if .Catalog}}{{.Catalog}}{{else}}#overview{{end}}">{{kitMark}}stroppy<span>/ reports</span>
+</a>
+<div class="actions">
+{{if .Catalog}}
+<a href="{{.Catalog}}">Catalog</a>
+{{end}}
+<a class="st-button" href="{{if .Download}}{{.Download}}{{else}}{{download .Original}}{{end}}" download="report.json">Download JSON</a>
+</div>
+</header>
+<main>
+<section class="overview" id="overview">
+<p class="eyebrow">RUN REPORT</p>
+<div class="title-row">
+<h1>{{.Title}}
+</h1>
+<span class="status st-tag status-{{.Status}}" data-tone="{{statusTone .Status}}">{{.Status}}
+</span>
+</div>
+<p class="subtitle">{{.Started}} <span>·</span> {{.Driver}}
+</p>
+{{if .Warning}}
+<p class="notice">{{.Warning}}
+</p>
+{{end}}
+<details class="provenance">
+<summary>
+<span>Identity &amp; configuration</span>
+<small>{{.ID}}
+</small>
+</summary>
+<div class="details-body">{{template "node" .Identity}}
+</div>
+</details>
+{{if .Headlines}}
+<div class="headline-row st-grid">
+{{range .Headlines}}
+<div class="st-stat">
+<span>{{.Name}}
+</span>
+<strong title="Exact: {{.Value.Text}}">{{preview .Value.Text}}
+</strong>
+</div>
+{{end}}
+</div>
+<p class="scope-note">Workload-step native measurements, including actual drain. Not an audited benchmark score.</p>
+{{end}}
+</section>
+<nav class="section-nav" aria-label="Report sections">
+<a href="#execution">Execution</a>
+{{if .Capture}}<a href="#capture">Recording</a>{{if .Capture.LogsEnabled}}<a href="#captured-logs">Logs</a>{{end}}{{end}}
+<a href="#metrics">Metrics <span>{{len .Metrics}}
+</span>
+</a>
+<a href="#results">Results <span>{{len .Payloads}}
+</span>
+</a>
+<a href="#errors">Errors</a>
+<a href="#data">Complete data</a>
+</nav>
+<section class="section" id="execution">
+<div class="section-heading">
+<h2>Execution</h2>
+<p>Step outcomes and measured wall-clock windows.</p>
+</div>{{template "chart" .StepChart}}
+<details class="panel">
+<summary>All step data</summary>
+<div class="details-body">{{template "node" .Steps}}
+</div>
+</details>
+</section>
+<section class="section" id="metrics">
+<div class="section-heading">
+<h2>Metrics</h2>
+<p>Expand any row for charts, dimensions, and exact values.</p>
+</div>
+<p class="metric-note">Summary values follow recorded aggregates. ≈ marks rounded values; separate series remain available below.</p>
+{{range .MetricGroups}}
+<div class="metric-group {{if .Distribution}}metric-distributions{{else}}metric-scalars{{end}}">
+<div class="metric-group-heading"><h3>{{.Name}} <span>{{len .Metrics}}</span></h3></div>
+<div class="metric-columns" aria-hidden="true"><span>Metric</span><span>Series</span><span>{{if .Distribution}}Count{{else}}Value{{end}}</span>{{if .Distribution}}<span>Average</span><span>p99</span>{{else}}<span></span><span></span>{{end}}</div>
+<div class="metric-list">
+{{range .Metrics}}
+<details class="metric">
+<summary>
+<span class="metric-identity"><span class="metric-label">{{.Label}}</span><code>{{.Name}}</code></span>
+<span class="metric-series">{{.Series}}</span>
+{{range .Stats}}<span class="metric-stat" title="Exact {{.Label}}: {{.Exact}} {{.Unit}}"><span class="stat-label">{{.Label}}</span><b>{{.Text}}</b>{{if .Unit}}<small>{{.Unit}}</small>{{end}}</span>{{end}}
+</summary>
+<div class="details-body">
+<p class="metric-scope">{{.Type}}{{if .Unit}} · {{.Unit}}{{end}} · {{.Series}} recorded series. Aggregate previews are not a time-series measurement.</p>
+<details class="metric-data"><summary>Complete metric data · exact values &amp; dimensions</summary>{{template "node" .Data}}</details>
+{{range .Charts}}<details class="series-chart"><summary><span>{{.Title}}</span><small>{{.Scope}}</small></summary>{{template "chart" .}}</details>{{end}}
+</div>
+</details>
+{{end}}
+</div>
+</div>
+{{else}}
+<p class="empty">No metrics recorded.</p>
+{{end}}
+</section>
+{{if .Capture}}<section class="section" id="capture">
+<div class="section-heading"><h2>Recorded run evolution</h2><p>Capture state: {{.Capture.State}}</p></div>
+{{if not .Capture.Complete}}<p class="notice">Recording is {{.Capture.State}}. Gaps, lost records, or unfinished writes may exist; inspect capture accounting below.</p>{{end}}
+{{if .Capture.Notice}}<p class="notice">{{.Capture.Notice}}</p>{{end}}
+<details class="panel"><summary>Capture identity, settings, gaps &amp; limits</summary><div class="details-body">{{template "node" .Capture.Manifest}}</div></details>
+<div class="actions">{{if .Catalog}}<a href="/reports/{{.ID}}/bundle">Download complete bundle</a>{{end}}{{if .Capture.ArtifactBase}}<a href="{{.Capture.ArtifactBase}}manifest.json" download>Capture manifest</a>{{if .Capture.MetricsEnabled}}<a href="{{.Capture.ArtifactBase}}metrics.jsonl" download>Metric samples</a>{{end}}{{if .Capture.LogsEnabled}}<a href="{{.Capture.ArtifactBase}}logs.jsonl" download>Logs</a>{{end}}{{if .Capture.EventsEnabled}}<a href="{{.Capture.ArtifactBase}}events.jsonl" download>Events</a>{{end}}{{end}}</div>
+{{if .Catalog}}<form class="filters" method="get"><label>Metric<input name="metric" value="{{.Capture.Query.Get "metric"}}" list="capture-metrics" placeholder="Native rates"><datalist id="capture-metrics">{{range .Capture.MetricNames}}<option value="{{.}}">{{end}}</datalist></label><label>Log level<input name="level" value="{{.Capture.Query.Get "level"}}" placeholder="info"></label><label>Step<input name="step" value="{{.Capture.Query.Get "step"}}" placeholder="workload"></label><label>Elapsed from<input name="from" value="{{.Capture.Query.Get "from"}}"></label><label>Elapsed to<input name="to" value="{{.Capture.Query.Get "to"}}"></label><label>Log text<input name="text" value="{{.Capture.Query.Get "text"}}"></label><button>Apply</button></form>{{else}}<p class="scope-note">Bounded offline preview. Complete recording streams remain in the portable bundle.</p>{{end}}
+{{range .Capture.Timeline}}<details class="timeline-details" open><summary><span>{{.Name}}</span><small>{{.Scope}}</small></summary><figure class="chart timeline-chart" data-chart="{{interactiveTimeline .}}"><figcaption><h3>{{.Name}}</h3><p>{{.Scope}} · {{.Unit}} · {{.Semantics}}</p>{{if .Omitted}}<p class="timeline-notice">{{.Omitted}} intermediate samples omitted from this bounded plot; full stream remains available.</p>{{end}}</figcaption>
+<div class="chart-scroll"><svg viewBox="0 0 720 230" role="img" aria-label="{{.Name}} timeline"><text x="102" y="35" text-anchor="end">{{.Maximum}}</text><text x="102" y="183" text-anchor="end">{{.Minimum}}</text><text x="110" y="210">0 seconds</text><text x="650" y="210" text-anchor="end">{{.Elapsed}} seconds</text>{{range .Markers}}<g><title>{{.Label}}</title><line class="timeline-marker" x1="{{.X}}" x2="{{.X}}" y1="28" y2="180"/></g>{{end}}{{range .Segments}}<polyline class="timeline-line" points="{{.}}"/>{{end}}{{range .Points}}<g class="timeline-point" tabindex="0" aria-label="{{.Time}} seconds: {{.Value}}"><title>{{.Time}} seconds: {{.Value}}</title><circle class="timeline-hit" cx="{{.X}}" cy="{{.Y}}" r="12"/><line class="timeline-crosshair" x1="{{.X}}" x2="{{.X}}" y1="28" y2="180"/><circle class="timeline-dot" cx="{{.X}}" cy="{{.Y}}" r="4"/><text class="timeline-tooltip" x="{{.X}}" y="{{.Y}}" dy="-14">{{.Time}} s · {{.Value}}</text></g>{{end}}</svg></div>
+<details><summary>Numeric samples</summary><table><thead><tr><th>Elapsed seconds</th><th>Recorded value</th></tr></thead><tbody>{{range .Points}}<tr><td>{{if $.Catalog}}<a href="{{.Nearby}}">{{.Time}}</a>{{else}}{{.Time}}{{end}}</td><td>{{.Value}}</td></tr>{{end}}</tbody></table></details></figure></details>{{else}}<p class="empty">No selected timeline with at least two numeric samples.</p>{{end}}
+<p class="timeline-summary">Vertical markers indicate execution boundaries and recorded errors; hover markers or expand events for exact phase labels. Lines break across missing samples.</p><details class="panel"><summary>Execution phase events</summary><div class="details-body">{{template "node" .Capture.Events}}</div></details>
+<h3 id="captured-logs">Captured logs</h3>
+<p class="scope-note">Showing {{len .Capture.Logs}} matching records in this bounded preview, up to 100 per page. Expand a record for its full message and structured fields.</p>
+<div class="panel captured-log-list" role="region" aria-label="Captured log records" tabindex="0">
+{{range .Capture.Logs}}
+<details class="captured-log">
+<summary><span class="log-elapsed">{{.Elapsed}} s</span><span class="log-level">{{.Level}}</span><span class="log-message">{{.Message}}</span></summary>
+<div class="details-body">
+<dl class="fields"><div><dt>Timestamp</dt><dd>{{.Time}}</dd></div><div><dt>Logger</dt><dd>{{if .Logger}}{{.Logger}}{{else}}—{{end}}</dd></div><div><dt>Message</dt><dd class="log-full-message">{{.Message}}</dd></div></dl>
+{{template "node" .Fields}}
+</div>
+</details>
+{{else}}<p class="catalog-empty">No matching captured logs.</p>{{end}}
+</div>
+{{if .Catalog}}<nav class="pagination">{{if .Capture.Previous}}<a href="{{.Capture.Previous}}">Previous logs</a>{{end}}{{if .Capture.Next}}<a href="{{.Capture.Next}}">Next logs</a>{{end}}</nav>{{end}}
+</section>{{end}}
+<section class="section" id="results">
+<div class="section-heading">
+<h2>Workload results</h2>
+<p>Versioned workload-owned data, rendered without a workload-specific contract.</p>
+</div>
+{{range .Payloads}}
+<details class="payload panel" open>
+<summary>
+<span class="metric-name">{{.Kind}}
+</span>
+<span class="metric-type">schema {{.Schema}} · {{.Status}}
+</span>
+</summary>
+<div class="details-body">
+{{range .Charts}}{{template "chart" .}}{{end}}{{template "node" .Data}}
+</div>
+</details>
+{{else}}
+<p class="empty">No workload results attached.</p>
+{{end}}
+</section>
+<section class="section" id="errors">
+<div class="section-heading">
+<h2>Errors &amp; retries</h2>
+<p>Terminal outcomes and bounded diagnostic groups.</p>
+</div>
+<div class="panel details-body">{{template "node" .Errors}}
+{{if .Failure.Summary}}<h3>Failure</h3>{{template "node" .Failure}}{{else if .Failure.Text}}<h3>Failure</h3>{{template "node" .Failure}}{{end}}
+</div>
+</section>
+<section class="section" id="data">
+<div class="section-heading">
+<h2>Complete original data</h2>
+<p>Every field retained, including unfamiliar schemas and custom values.</p>
+</div>
+<details class="panel">
+<summary>Original JSON · exact stored document</summary>
+<pre>{{.Original}}
+</pre>
+</details>
+</section>
+</main>
+</div>
+{{template "chart-scripts" .}}
+</body>
+</html>
+{{end}}

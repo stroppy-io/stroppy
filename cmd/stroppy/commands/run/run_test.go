@@ -229,6 +229,27 @@ func TestParseRunArgs(t *testing.T) {
 			wantReport: reportOutput{disabled: true},
 		},
 		{
+			name:       "history disabled independently",
+			args:       []string{"simple", "--no-save-report", "--report-format", "json"},
+			wantScript: "simple",
+			wantReport: reportOutput{noSave: true, format: "json"},
+		},
+		{
+			name:       "HTML report output",
+			args:       []string{"simple", "--report-html=result.html", "--no-save-report"},
+			wantScript: "simple", wantReport: reportOutput{html: "result.html", noSave: true},
+		},
+		{
+			name:    "HTML conflicts with disabled report",
+			args:    []string{"simple", "--report-html", "result.html", "--no-report"},
+			wantErr: errReportDisabledOutput,
+		},
+		{
+			name:    "JSON and HTML output collision",
+			args:    []string{"simple", "--report-html", "result.json", "--report-file", "./result.json"},
+			wantErr: errReportOutputCollision,
+		},
+		{
 			name:    "unsupported report format",
 			args:    []string{"simple", "--report-format", "yaml"},
 			wantErr: errInvalidReportFormat,

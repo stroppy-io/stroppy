@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -37,8 +38,10 @@ type rootState struct {
 
 	stepFilter *stepFilterState
 
-	reportMu   sync.Mutex
-	reportData map[string]string
+	reportMu       sync.Mutex
+	reportData     map[string]string
+	reportRedactor *strings.Replacer
+	capture        *runCapture
 }
 
 func newrootState(

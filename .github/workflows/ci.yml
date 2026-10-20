@@ -26,6 +26,9 @@ jobs:
           version: v2.14.0
           args: --config .golangci.yml
 
+      - name: Run chart adapter tests
+        run: node --test pkg/report/view/charts.test.mjs
+
       - name: Run tests
         run: make tests TEST_FLAGS=-short
 

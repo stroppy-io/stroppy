@@ -1,0 +1,577 @@
+/* Plain HTML in the Stroppy look: text, headings, links, lists, tables, code.
+   Needs tokens.css (and fonts.css for the typefaces). Applies inside an
+   element with class "st-doc" — a report puts it on <body> — so it never
+   restyles a page that only wanted the variables. */
+
+.st-doc {
+  margin: 0;
+  background: var(--st-canvas);
+  color: var(--st-text);
+  font-family: var(--st-font-sans);
+  font-size: var(--st-font-size-base);
+  line-height: var(--st-line-height);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-doc *,
+.st-doc *::before,
+.st-doc *::after {
+  box-sizing: border-box;
+}
+
+/* Headings: tight, medium weight; the page title is the only large one. */
+.st-doc :where(h1, h2, h3, h4) {
+  margin: calc(var(--st-space) * 3) 0 var(--st-space);
+  font-weight: var(--st-font-weight-medium);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.st-doc h1 {
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+.st-doc h2 {
+  font-size: 20px;
+}
+.st-doc h3 {
+  font-size: 16px;
+}
+.st-doc h4 {
+  font-size: var(--st-font-size-base);
+  color: var(--st-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.st-doc :where(p, ul, ol, dl, blockquote, pre, table, figure) {
+  margin: 0 0 calc(var(--st-space) * 2);
+}
+.st-doc :where(ul, ol) {
+  padding-left: calc(var(--st-space) * 2.5);
+}
+.st-doc li + li {
+  margin-top: calc(var(--st-space) / 2);
+}
+
+.st-doc small,
+.st-doc figcaption {
+  font-size: var(--st-font-size-sm);
+  color: var(--st-muted);
+}
+
+.st-doc a {
+  color: var(--st-primary-text);
+  text-decoration: none;
+}
+.st-doc a:hover {
+  text-decoration: underline;
+}
+
+.st-doc hr {
+  border: 0;
+  border-top: 1px solid var(--st-line);
+  margin: calc(var(--st-space) * 3) 0;
+}
+
+.st-doc blockquote {
+  padding: var(--st-space) calc(var(--st-space) * 2);
+  border-left: 3px solid var(--st-primary);
+  background: var(--st-panel);
+  border-radius: 0 var(--st-radius-md) var(--st-radius-md) 0;
+  color: var(--st-muted);
+}
+
+/* Code: inline on a raised chip, blocks on a panel. */
+.st-doc :where(code, kbd, samp, pre) {
+  font-family: var(--st-font-mono);
+  font-size: 0.92em;
+  color: var(--st-text);
+}
+.st-doc :not(pre) > code,
+.st-doc kbd {
+  padding: 1px 5px;
+  border-radius: var(--st-radius-sm);
+  background: var(--st-raised);
+}
+.st-doc kbd {
+  border: 1px solid var(--st-line);
+  border-bottom-width: 2px;
+}
+.st-doc pre {
+  padding: calc(var(--st-space) * 1.5) calc(var(--st-space) * 2);
+  overflow-x: auto;
+  background: var(--st-panel);
+  border: 1px solid var(--st-line);
+  border-radius: var(--st-radius-md);
+  line-height: 1.6;
+}
+
+/* Tables: thin rules, numbers right-aligned by the author (td.num). */
+.st-doc table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--st-panel);
+  border: 1px solid var(--st-line);
+  border-radius: var(--st-radius-md);
+}
+.st-doc :where(th, td) {
+  padding: var(--st-space) calc(var(--st-space) * 1.5);
+  text-align: left;
+  border-bottom: 1px solid var(--st-line);
+  vertical-align: top;
+}
+.st-doc th {
+  font-weight: var(--st-font-weight-medium);
+  color: var(--st-muted);
+  background: var(--st-raised);
+  font-size: var(--st-font-size-sm);
+}
+.st-doc tr:last-child > td {
+  border-bottom: 0;
+}
+.st-doc :where(td, th).num {
+  text-align: right;
+  font-family: var(--st-font-mono);
+}
+
+.st-doc :where(img, svg) {
+  max-width: 100%;
+}
+
+@media print {
+  .st-doc {
+    background: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Meaning and colour. Everything below is opt-in markup on the same tokens:
+   data-tone for what a piece means, a handful of st-* classes for shapes a
+   report keeps repeating. No JavaScript.
+   ------------------------------------------------------------------------ */
+
+/* Tone: data-tone="success | warning | error | info | primary | muted | mark"
+   on any element sets --st-tone; text-level elements take it as colour, the
+   shapes below use it for border, tint and dot. */
+.st-doc [data-tone="success"] {
+  --st-tone: var(--st-success);
+}
+.st-doc [data-tone="warning"] {
+  --st-tone: var(--st-warning);
+}
+.st-doc [data-tone="error"] {
+  --st-tone: var(--st-error);
+}
+.st-doc [data-tone="info"] {
+  --st-tone: var(--st-info);
+}
+.st-doc [data-tone="primary"] {
+  --st-tone: var(--st-primary-text);
+}
+.st-doc [data-tone="muted"] {
+  --st-tone: var(--st-muted);
+}
+.st-doc [data-tone="mark"] {
+  --st-tone: var(--st-mark);
+}
+.st-doc
+  :is(span, strong, b, em, i, small, a, p, li, td, th, dd, dt, h1, h2, h3, h4, div)[data-tone] {
+  color: var(--st-tone);
+}
+
+/* Series: data-series="1".."8" colours a legend entry, a dot, a bar. */
+.st-doc [data-series="1"] {
+  --st-tone: var(--st-series-1);
+}
+.st-doc [data-series="2"] {
+  --st-tone: var(--st-series-2);
+}
+.st-doc [data-series="3"] {
+  --st-tone: var(--st-series-3);
+}
+.st-doc [data-series="4"] {
+  --st-tone: var(--st-series-4);
+}
+.st-doc [data-series="5"] {
+  --st-tone: var(--st-series-5);
+}
+.st-doc [data-series="6"] {
+  --st-tone: var(--st-series-6);
+}
+.st-doc [data-series="7"] {
+  --st-tone: var(--st-series-7);
+}
+.st-doc [data-series="8"] {
+  --st-tone: var(--st-series-8);
+}
+
+/* A coloured surface from the tone: tinted fill, a firmer border. */
+.st-doc .st-tag,
+.st-doc aside,
+.st-doc .st-callout {
+  --st-tone-bg: color-mix(in srgb, var(--st-tone, var(--st-muted)) 14%, transparent);
+  --st-tone-line: color-mix(in srgb, var(--st-tone, var(--st-muted)) 45%, transparent);
+}
+
+/* Tag: a label in a pill — engine, scenario, status. */
+.st-doc .st-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--st-space) / 2);
+  padding: 1px calc(var(--st-space) * 0.875);
+  border: 1px solid var(--st-tone-line);
+  border-radius: var(--st-radius-pill);
+  background: var(--st-tone-bg);
+  color: var(--st-tone, var(--st-text));
+  font-size: var(--st-font-size-sm);
+  font-weight: var(--st-font-weight-medium);
+  line-height: 1.6;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.st-doc .st-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--st-space) * 0.75);
+  margin: 0 0 calc(var(--st-space) * 2);
+}
+
+/* Dot: a status light; data-pulse for something still running. */
+.st-doc .st-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--st-tone, var(--st-muted));
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.st-doc .st-dot[data-pulse] {
+  animation: st-pulse 1.6s ease-in-out infinite;
+}
+@keyframes st-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--st-tone, var(--st-muted)) 60%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--st-tone, var(--st-muted)) 0%, transparent);
+  }
+}
+
+/* Callout: <aside> (or .st-callout) — a note the reader must not miss; info
+   unless it says otherwise. A first <strong> is its title. */
+.st-doc :is(aside, .st-callout) {
+  --st-tone: var(--st-info);
+  margin: 0 0 calc(var(--st-space) * 2);
+  padding: calc(var(--st-space) * 1.5) calc(var(--st-space) * 2);
+  border: 1px solid var(--st-tone-line);
+  border-left: 3px solid var(--st-tone);
+  border-radius: var(--st-radius-md);
+  background: var(--st-tone-bg);
+  color: var(--st-text);
+}
+.st-doc :is(aside, .st-callout)[data-tone="success"] {
+  --st-tone: var(--st-success);
+}
+.st-doc :is(aside, .st-callout)[data-tone="warning"] {
+  --st-tone: var(--st-warning);
+}
+.st-doc :is(aside, .st-callout)[data-tone="error"] {
+  --st-tone: var(--st-error);
+}
+.st-doc :is(aside, .st-callout)[data-tone="muted"] {
+  --st-tone: var(--st-muted);
+}
+.st-doc :is(aside, .st-callout) > strong:first-child {
+  display: block;
+  margin-bottom: calc(var(--st-space) / 2);
+  color: var(--st-tone);
+}
+.st-doc :is(aside, .st-callout) > :last-child {
+  margin-bottom: 0;
+}
+
+/* Emphasis: <mark> picks out a phrase in the primary colour. */
+.st-doc mark {
+  padding: 0 3px;
+  border-radius: var(--st-radius-sm);
+  background: color-mix(in srgb, var(--st-primary) 22%, transparent);
+  color: inherit;
+}
+.st-doc abbr[title] {
+  text-decoration: underline dotted var(--st-muted);
+  cursor: help;
+}
+.st-doc ::selection {
+  background: color-mix(in srgb, var(--st-primary) 35%, transparent);
+}
+
+/* Panel: a bordered block; its <header> is a title row. */
+.st-doc .st-panel {
+  margin: 0 0 calc(var(--st-space) * 2);
+  border: 1px solid var(--st-line);
+  border-radius: var(--st-radius-md);
+  background: var(--st-panel);
+  overflow: hidden;
+}
+.st-doc .st-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--st-space);
+  padding: calc(var(--st-space) * 1.25) calc(var(--st-space) * 2);
+  border-bottom: 1px solid var(--st-line);
+  font-weight: var(--st-font-weight-medium);
+}
+.st-doc .st-panel > header small {
+  font-weight: var(--st-font-weight-regular);
+}
+.st-doc .st-panel > :not(header) {
+  margin: calc(var(--st-space) * 2);
+}
+.st-doc .st-panel > table {
+  margin: 0;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+}
+
+/* Layout: a responsive grid of equal columns, a wrapping row. */
+.st-doc .st-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: calc(var(--st-space) * 1.5);
+  margin: 0 0 calc(var(--st-space) * 2);
+}
+.st-doc .st-grid > * {
+  margin: 0;
+}
+.st-doc .st-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--st-space);
+}
+
+/* Stat: one number with its label and a note — the headline of a run. */
+.st-doc .st-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: calc(var(--st-space) * 1.5) calc(var(--st-space) * 2);
+  border: 1px solid var(--st-line);
+  border-radius: var(--st-radius-md);
+  background: var(--st-panel);
+}
+.st-doc .st-stat > span:first-child {
+  color: var(--st-muted);
+  font-size: var(--st-font-size-sm);
+}
+.st-doc .st-stat > strong {
+  font-family: var(--st-font-mono);
+  font-size: 26px;
+  font-weight: var(--st-font-weight-medium);
+  line-height: 1.2;
+  color: var(--st-tone, var(--st-text));
+}
+.st-doc .st-stat > strong small {
+  margin-left: 4px;
+  font-family: var(--st-font-sans);
+  font-size: var(--st-font-size-sm);
+  color: var(--st-muted);
+}
+
+/* Key–value: a bare <dl> reads as two columns. */
+.st-doc dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: calc(var(--st-space) * 0.75) calc(var(--st-space) * 3);
+}
+.st-doc dt {
+  color: var(--st-muted);
+}
+.st-doc dd {
+  margin: 0;
+}
+
+/* Tables: a tinted row for what stands out, an inline bar for a share. */
+.st-doc tr[data-tone] > td {
+  background: color-mix(in srgb, var(--st-tone) 10%, transparent);
+}
+.st-doc table.st-compact :where(th, td) {
+  padding: calc(var(--st-space) / 2) var(--st-space);
+}
+.st-doc .st-bar {
+  display: inline-block;
+  position: relative;
+  width: 100%;
+  min-width: 60px;
+  height: 6px;
+  border-radius: var(--st-radius-pill);
+  background: var(--st-raised);
+  overflow: hidden;
+  vertical-align: middle;
+}
+.st-doc .st-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--value, 0%);
+  border-radius: inherit;
+  background: var(--st-tone, var(--st-primary));
+}
+
+/* Progress and meter: a thin track in our colours, not the browser's. */
+.st-doc :is(progress, meter) {
+  display: block;
+  width: 100%;
+  min-width: 60px;
+  height: 6px;
+  border: 0;
+  border-radius: var(--st-radius-pill);
+  background: var(--st-raised);
+  overflow: hidden;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.st-doc progress::-webkit-progress-bar {
+  background: var(--st-raised);
+}
+.st-doc progress::-webkit-progress-value {
+  background: var(--st-tone, var(--st-primary));
+}
+.st-doc progress::-moz-progress-bar {
+  background: var(--st-tone, var(--st-primary));
+}
+.st-doc meter::-webkit-meter-bar {
+  background: var(--st-raised);
+  border: 0;
+}
+.st-doc meter::-webkit-meter-optimum-value {
+  background: var(--st-success);
+}
+.st-doc meter:-moz-meter-optimum::-moz-meter-bar {
+  background: var(--st-success);
+}
+.st-doc meter::-webkit-meter-suboptimum-value {
+  background: var(--st-warning);
+}
+.st-doc meter:-moz-meter-sub-optimum::-moz-meter-bar {
+  background: var(--st-warning);
+}
+.st-doc meter::-webkit-meter-even-less-good-value {
+  background: var(--st-error);
+}
+.st-doc meter:-moz-meter-sub-sub-optimum::-moz-meter-bar {
+  background: var(--st-error);
+}
+
+.st-doc .st-panel > :is(progress, meter) {
+  width: calc(100% - var(--st-space) * 4);
+}
+
+/* Button: a link or button that is an action ("Open in Stroppy Cloud"). */
+.st-doc .st-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--st-space);
+  padding: calc(var(--st-space) * 0.75) calc(var(--st-space) * 2);
+  border: 1px solid var(--st-line-strong);
+  border-radius: var(--st-radius-md);
+  background: var(--st-raised);
+  color: var(--st-text);
+  font: inherit;
+  font-weight: var(--st-font-weight-medium);
+  text-decoration: none;
+  cursor: pointer;
+}
+.st-doc .st-button:hover {
+  text-decoration: none;
+  border-color: var(--st-muted);
+}
+.st-doc .st-button[data-variant="primary"] {
+  border-color: transparent;
+  background: var(--st-primary);
+  color: #fff;
+}
+.st-doc .st-button[data-variant="primary"]:hover {
+  background: color-mix(in srgb, var(--st-primary) 88%, #000);
+}
+.st-doc .st-button[data-variant="text"] {
+  border-color: transparent;
+  background: none;
+  color: var(--st-primary-text);
+}
+
+/* Navigation: <nav> links as pills; aria-current marks where you are. */
+.st-doc nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--st-space) / 2);
+  margin: 0 0 calc(var(--st-space) * 2);
+}
+.st-doc nav a {
+  padding: calc(var(--st-space) / 2) calc(var(--st-space) * 1.25);
+  border: 1px solid var(--st-line);
+  border-radius: var(--st-radius-pill);
+  color: var(--st-muted);
+  font-size: var(--st-font-size-sm);
+}
+.st-doc nav a:hover {
+  text-decoration: none;
+  color: var(--st-text);
+}
+.st-doc nav a[aria-current] {
+  border-color: var(--st-primary);
+  color: var(--st-primary-text);
+}
+
+/* Disclosure: <details> for what most readers skip — configs, raw logs. */
+.st-doc details {
+  margin: 0 0 calc(var(--st-space) * 2);
+  border: 1px solid var(--st-line);
+  border-radius: var(--st-radius-md);
+  background: var(--st-panel);
+}
+.st-doc summary {
+  padding: var(--st-space) calc(var(--st-space) * 2);
+  cursor: pointer;
+  font-weight: var(--st-font-weight-medium);
+}
+.st-doc details[open] > summary {
+  border-bottom: 1px solid var(--st-line);
+}
+.st-doc details > :not(summary) {
+  margin: calc(var(--st-space) * 1.5) calc(var(--st-space) * 2);
+}
+
+/* Legend: series entries with their colour. */
+.st-doc .st-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--st-space) * 0.5) calc(var(--st-space) * 2);
+  padding: 0;
+  list-style: none;
+  font-size: var(--st-font-size-sm);
+  color: var(--st-muted);
+}
+.st-doc .st-legend > li {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--st-space) * 0.75);
+  margin: 0;
+}
+.st-doc .st-legend > li::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--st-tone, var(--st-muted));
+}
+
+.st-doc :focus-visible {
+  outline: 2px solid var(--st-primary);
+  outline-offset: 2px;
+}

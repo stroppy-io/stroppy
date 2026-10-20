@@ -1,0 +1,18 @@
+<!-- The Stroppy mark. Rays and band take --st-mark, the cylinder --st-muted
+     (secondary text, so the orange carries the mark and a name beside it reads
+     brighter); without the kit variables it falls back to the text colour. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <g fill="var(--st-mark, #f16a39)">
+    <path d="M32 24.5 42 29.5 36 29 30.5 26.5Z"/>
+    <path d="M44 18 48.5 18.5 50 27 46.8 23Z"/>
+    <path d="M62 18 65.5 18 65 27 62.5 24Z"/>
+    <path d="M80.5 18 84 18.5 78 28 77 24Z"/>
+    <path d="M95.5 24 96 27 86 30 91 26Z"/>
+    <path d="M31 81 C37 76.5 49 74 64 74 C79 74 91 77.2 97 81.5 L97 85.2 C90 89.6 78 92 64 92 C49 92 37 88.7 31 84.5Z"/>
+  </g>
+  <g fill="var(--st-muted, currentColor)">
+    <path d="M31 42 C34 37.5 47 34 63.5 34 C80 34 92 37.5 97 42.5 C93 47 80 50.5 64 50.5 C48 50.5 36 47.3 31 42Z"/>
+    <path d="M30.5 49 C40 54.3 51 57.2 64 57.2 C78 57.2 89 54.3 97.5 49 L97.5 66.7 C93 72 80 75.1 64 75.1 C48 75.1 35 72 30.5 66.7Z"/>
+    <path d="M31 86.5 C39 91 50 93.1 64 93.1 C78 93.1 90 90.8 97 86.5 L97 100.8 C97 106.3 82.5 110.8 64 110.8 C45.5 110.8 31 106.3 31 100.8Z"/>
+  </g>
+</svg>

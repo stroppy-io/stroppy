@@ -12,6 +12,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- Saved runs can be compared with `stroppy reports compare` or catalog selection, with shared numeric deltas, configuration differences, script-free comparison HTML, and aligned captured metric timelines. ([#210](https://github.com/stroppy-io/stroppy/pull/210))
+- Runs can optionally record timestamped metrics and structured logs with independent `--capture-metrics` and `--capture-logs` flags; rich reports show timelines, phase events, and searchable, expandable logs, and `reports artifact` / `reports bundle` retrieve complete recordings with report-owned cleanup. ([#209](https://github.com/stroppy-io/stroppy/pull/209))
+- Saved runs can be browsed with `stroppy reports serve` or exported as self-contained HTML with `stroppy reports export` and `--report-html`; generic metrics, custom results, charts, and full report identity remain readable without JavaScript. ([#203](https://github.com/stroppy-io/stroppy/pull/203))
+- `stroppy reports` lists and filters saved runs, retrieves complete JSON, previews or removes reports, and shows storage health; `--no-save-report` disables history for one run without disabling report output. ([#199](https://github.com/stroppy-io/stroppy/pull/199))
 - `banking` moves money between bank accounts and fails the run when the invariant breaks: the total balance must stay `accounts * 1000`, and each account's unique token must remain a permutation of `1..accounts` — a second witness that catches a transfer lost or duplicated even when the balances happen to sum right. Tokens move conditionally on the value that was read, so a concurrent transfer is a conflict the retry policy absorbs rather than a silent overwrite. ([#205](https://github.com/stroppy-io/stroppy/pull/205))
 - `crdb`, `yugabyte` and `tidb` are driver names of their own: each speaks another's protocol (postgres, postgres, mysql) but selects its own SQL asset and transaction defaults, so `-d crdb` replaces the `--sql-file crdb.sql` that was documented and could never work — that flag takes a filesystem path, not an embedded asset. TPC-H could not run on CockroachDB at all before, and now ships the `crdb.sql` it needed. ([#206](https://github.com/stroppy-io/stroppy/pull/206))
 - TPC-C can spread each VU's transactions across all configured warehouses with `--spread-warehouses`, independently of concurrency. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
@@ -29,6 +33,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
+- Report catalogs, run views, and comparisons use Stroppy kit 0.1.0 styles, embedded fonts, and optional interactive charts while keeping offline exports, static SVG fallbacks, and JavaScript-free controls. ([#216](https://github.com/stroppy-io/stroppy/pull/216))
 - Parallel workloads spend less time contending on metric updates while retaining the same public counters, histogram buckets, gauges, and sampled trace exemplars. ([#189](https://github.com/stroppy-io/stroppy/pull/189))
 - Repeated SQL queries avoid allocating cache keys after warmup, and combining absent errors no longer allocates. ([#189](https://github.com/stroppy-io/stroppy/pull/189))
 - `stroppy build PATH` accepts a standalone project root by checking its conventional `workload/` package when the root is not importable. ([#188](https://github.com/stroppy-io/stroppy/pull/188))
@@ -40,9 +45,18 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Interactive report charts restore their static view when leaving the page and reinitialize when returning through the browser's back-forward cache. ([#216](https://github.com/stroppy-io/stroppy/pull/216))
+- Comparison timelines scale to recorded values instead of forcing zero into the Y-axis range, making small latency changes easier to see. ([#210](https://github.com/stroppy-io/stroppy/pull/210))
+- Comparison HTML export keeps selected runs and filters, metric navigation targets the right section, and stale or oversized selections no longer block catalog browsing. ([#210](https://github.com/stroppy-io/stroppy/pull/210))
 - Clarified that the banking workload's token checks detect partial token swaps, not whether every transfer happened exactly once. ([#213](https://github.com/stroppy-io/stroppy/pull/213))
 - The banking workload on YDB no longer fails during schema creation: its asset used `CREATE UNIQUE INDEX`, which YDB's parser refuses, where YDB requires a unique index to be declared global and synchronous. ([#212](https://github.com/stroppy-io/stroppy/pull/212))
 - A rejected `COMMIT` is now counted as an ended transaction: it reaches `tx_errors_total`, and it no longer leaves the client with a spurious `tx is closed` beside the real error. Previously `tx_errors_total` under-reported exactly the runs worth measuring — a workload with commit failures showed none of them there while `failed_iterations_total` showed all of them. ([#204](https://github.com/stroppy-io/stroppy/pull/204))
+- Rich-report sample links retain selected metrics and log filters, and failed capture cleanup restores the report without overwriting concurrent replacements. ([#209](https://github.com/stroppy-io/stroppy/pull/209))
+- Capture retains larger execution-event bursts, and unfinished manifests omit the finish timestamp instead of showing a year-one date. ([#209](https://github.com/stroppy-io/stroppy/pull/209))
+- JSON and HTML reports can use case-distinct filenames on case-sensitive filesystems, while aliases remain rejected; catalog filter controls inherit the report font correctly. ([#203](https://github.com/stroppy-io/stroppy/pull/203))
+- Listing reports during concurrent saves ignores hidden publication artifacts instead of warning that partial reports are unreadable. ([#203](https://github.com/stroppy-io/stroppy/pull/203))
+- Run-report failure and built-in validation diagnostics redact configured database credentials and decoded exporter headers before saving or JSON output. ([#199](https://github.com/stroppy-io/stroppy/pull/199))
+- Report-history commands handle empty cleanup selections, show their own help in standalone workloads, bound oversized-report inspection, and reject files replaced after selection; saving also works without filesystem hard-link support. ([#199](https://github.com/stroppy-io/stroppy/pull/199))
 - TPC-C pacing waits stop on cancellation, think once after nonfatal failures, and preserve successful transactions when post-transaction thinking is interrupted. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
 - TPC-C reports count successful measured completions separately from failures and drain, with phase and outcome labels on existing latency metrics. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
 - TPC-C transaction history IDs continue above existing data across sequential runs instead of colliding when a dataset is reused. ([#195](https://github.com/stroppy-io/stroppy/pull/195))

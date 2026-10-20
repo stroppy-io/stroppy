@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -22,6 +23,7 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 	"github.com/stroppy-io/stroppy/v6/pkg/report"
+	"github.com/stroppy-io/stroppy/v6/pkg/report/view"
 )
 
 const (
@@ -31,7 +33,9 @@ const (
 	flagDriverOpt    = "--driver-opt"
 	flagReportFormat = "--report-format"
 	flagReportFile   = "--report-file"
+	flagReportHTML   = "--report-html"
 	flagNoReport     = "--no-report"
+	flagNoSaveReport = "--no-save-report"
 )
 
 const (
@@ -65,6 +69,7 @@ var (
 	errInvalidConfigLogMode  = errors.New("invalid config log mode")
 	errInvalidReportFormat   = errors.New("report format must be json")
 	errReportDisabledOutput  = errors.New("--no-report cannot be combined with report output options")
+	errReportOutputCollision = errors.New("JSON and HTML report paths must differ")
 )
 
 var Cmd = NewCommand(bench.RegisteredCatalog(), "")
@@ -142,7 +147,14 @@ Config file flags:
 Run reports:
   --report-format json    Write one versioned JSON report to stdout.
   --report-file PATH      Write the same JSON document to a file.
+  --report-html PATH      Write a self-contained HTML report.
   --no-report             Disable report construction and output.
+  --no-save-report        Do not save history; report output remains available.
+  --capture-logs          Record run-owned structured logs.
+  --capture-metrics       Record timestamped cumulative metrics and gauges.
+  --capture-interval D    Metric sampling interval (default 1s).
+  --capture-dir PATH      Persistent capture root (UUID subdirectory per run).
+  --capture-max-bytes N   Per-stream byte budget (default 67108864).
                           Logs, diagnostics, and human summaries remain on stderr.
 
 Signals:
@@ -686,7 +698,14 @@ func printWorkloadHelp(cmd *cobra.Command, description *bench.Description) error
 	output.WriteString("      --no-steps NAMES     Skip named steps\n")
 	output.WriteString("      --report-format json Write JSON report to stdout\n")
 	output.WriteString("      --report-file PATH   Write JSON report to file\n")
+	output.WriteString("      --report-html PATH   Write standalone HTML report\n")
 	output.WriteString("      --no-report          Disable report construction\n")
+	output.WriteString("      --no-save-report     Disable automatic report history\n")
+	output.WriteString("      --capture-logs       Record structured run logs\n")
+	output.WriteString("      --capture-metrics    Record metric samples\n")
+	output.WriteString("      --capture-interval D Sampling interval (default 1s)\n")
+	output.WriteString("      --capture-dir PATH  Persistent recording root\n")
+	output.WriteString("      --capture-max-bytes N Per-stream byte budget\n")
 	output.WriteString("  -h, --help               Show this help\n")
 	output.WriteString("\nBoolean parameters require an explicit value: --flag=true or --flag=false.\n")
 
@@ -799,6 +818,8 @@ func executeSQLGoRoute(scriptArg, sqlArg string) (name, body, file string, ok bo
 }
 
 // runGoWorkload adapts command inputs to the public execution boundary.
+//
+//nolint:gocritic,nestif // output options and independent reporting destinations share one lifecycle.
 func runGoWorkload(
 	cmd *cobra.Command,
 	catalog *bench.Catalog,
@@ -828,6 +849,11 @@ func runGoWorkload(
 		options = &reportConfig
 	}
 
+	captureOptions, err := output.captureOptions()
+	if err != nil {
+		return err
+	}
+
 	runReport, runErr := bench.RunCatalog(
 		cmd.Context(),
 		catalog,
@@ -840,19 +866,32 @@ func runGoWorkload(
 			Logger:  bench.LoggerFromBackend(logger.Global()),
 			Metrics: metrics,
 			Report:  options,
+			Capture: captureOptions,
 		},
 	)
 
 	var outputErr error
 
 	if runReport != nil {
-		if _, err := report.Save(runReport); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: save report history: %v\n", err)
+		if runReport.Capture != nil && runReport.Capture.State != "complete" {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: capture %s; inspect manifest at %s\n",
+				runReport.Capture.State, runReport.Capture.Directory)
+		}
+
+		retained := output.noSave
+		if !output.noSave {
+			if _, err := report.Save(runReport); err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: save report history: %v\n", err)
+			} else {
+				retained = true
+			}
 		}
 
 		if output.requested() {
 			outputErr = writeRunReport(cmd.OutOrStdout(), output, runReport)
 		}
+
+		output.cleanupCapture(cmd.ErrOrStderr(), runReport, retained)
 	}
 
 	if runErr != nil {
@@ -876,6 +915,7 @@ func reportOptions(cmd *cobra.Command, cfg *config.RunConfig) bench.ReportOption
 	return options
 }
 
+//nolint:gocritic // independent destination options are copied for output publication.
 func writeRunReport(stdout io.Writer, output reportOutput, runReport *report.Run) error {
 	data, err := json.MarshalIndent(runReport, "", "  ")
 	if err != nil {
@@ -884,19 +924,43 @@ func writeRunReport(stdout io.Writer, output reportOutput, runReport *report.Run
 
 	data = append(data, '\n')
 
+	if output.file != "" && output.html != "" {
+		same, err := report.SameOutput(output.file, output.html)
+		if err != nil {
+			return err
+		}
+
+		if same {
+			return errReportOutputCollision
+		}
+	}
+
+	var outputErr error
+
 	if output.format == "json" {
 		if _, err := stdout.Write(data); err != nil {
-			return fmt.Errorf("write run report to stdout: %w", err)
+			outputErr = fmt.Errorf("write run report to stdout: %w", err)
 		}
 	}
 
 	if output.file != "" {
-		if err := writeReportFile(output.file, data); err != nil {
-			return err
+		same, err := report.OutputOverwritesCapture(output.file, ".", runReport.Capture)
+		if err == nil && same {
+			err = errReportOutputCollision
 		}
+
+		if err == nil {
+			err = writeReportFile(output.file, data)
+		}
+
+		outputErr = errors.Join(outputErr, err)
 	}
 
-	return nil
+	if output.html != "" {
+		outputErr = errors.Join(outputErr, view.WriteFile(output.html, data, runReport.ID))
+	}
+
+	return outputErr
 }
 
 func writeReportFile(path string, data []byte) (retErr error) {
@@ -1180,12 +1244,19 @@ func poolSQLConfig(pool *config.PoolConfig) *config.SQLConfig {
 }
 
 type reportOutput struct {
-	format   string
-	file     string
-	disabled bool
+	format           string
+	file             string
+	html             string
+	disabled         bool
+	noSave           bool
+	captureLogs      bool
+	captureMetrics   bool
+	captureDirectory string
+	captureInterval  time.Duration
+	captureMaxBytes  int64
 }
 
-func (o reportOutput) requested() bool { return o.format != "" || o.file != "" }
+func (o *reportOutput) requested() bool { return o.format != "" || o.file != "" || o.html != "" }
 
 // runArgs holds the result of parseRunArgs.
 type runArgs struct {
@@ -1231,6 +1302,7 @@ func parseRunArgs(args []string) (runArgs, error) {
 	parsers := []flagParser{
 		parseHelpFlag,
 		parseReportFlags,
+		parseCaptureFlags,
 		parseStepsFlag,
 		parseFileFlag,
 		parseDriverFlags,
@@ -1250,6 +1322,21 @@ func parseRunArgs(args []string) (runArgs, error) {
 
 	if parsed.report.disabled && parsed.report.requested() {
 		return runArgs{}, errReportDisabledOutput
+	}
+
+	if parsed.report.file != "" && parsed.report.html != "" {
+		same, err := report.SameOutput(parsed.report.file, parsed.report.html)
+		if err != nil {
+			return runArgs{}, err
+		}
+
+		if same {
+			return runArgs{}, errReportOutputCollision
+		}
+	}
+
+	if _, err := parsed.report.captureOptions(); err != nil {
+		return runArgs{}, err
 	}
 
 	return parsed, nil
@@ -1354,8 +1441,13 @@ func parseHelpFlag(args []string, i int, parsed *runArgs) (int, error) {
 
 func parseReportFlags(args []string, i int, parsed *runArgs) (int, error) {
 	arg := args[i]
-	if arg == flagNoReport {
+	switch arg {
+	case flagNoReport:
 		parsed.report.disabled = true
+
+		return 1, nil
+	case flagNoSaveReport:
+		parsed.report.noSave = true
 
 		return 1, nil
 	}
@@ -1363,6 +1455,7 @@ func parseReportFlags(args []string, i int, parsed *runArgs) (int, error) {
 	for flag, destination := range map[string]*string{
 		flagReportFormat: &parsed.report.format,
 		flagReportFile:   &parsed.report.file,
+		flagReportHTML:   &parsed.report.html,
 	} {
 		if arg == flag {
 			value, err := nextFlagValue(args, i)
@@ -1370,8 +1463,8 @@ func parseReportFlags(args []string, i int, parsed *runArgs) (int, error) {
 				return 0, err
 			}
 
-			if flag == flagReportFormat && value != "json" {
-				return 0, fmt.Errorf("%w, got %q", errInvalidReportFormat, value)
+			if err := validateReportFlagValue(flag, value); err != nil {
+				return 0, err
 			}
 
 			*destination = value
@@ -1380,12 +1473,8 @@ func parseReportFlags(args []string, i int, parsed *runArgs) (int, error) {
 		}
 
 		if value, ok := strings.CutPrefix(arg, flag+"="); ok {
-			if value == "" {
-				return 0, fmt.Errorf("%s: %w", flag, errFlagRequiresValue)
-			}
-
-			if flag == flagReportFormat && value != "json" {
-				return 0, fmt.Errorf("%w, got %q", errInvalidReportFormat, value)
+			if err := validateReportFlagValue(flag, value); err != nil {
+				return 0, err
 			}
 
 			*destination = value
@@ -1395,6 +1484,18 @@ func parseReportFlags(args []string, i int, parsed *runArgs) (int, error) {
 	}
 
 	return 0, nil
+}
+
+func validateReportFlagValue(flag, value string) error {
+	if value == "" {
+		return fmt.Errorf("%s: %w", flag, errFlagRequiresValue)
+	}
+
+	if flag == flagReportFormat && value != "json" {
+		return fmt.Errorf("%w, got %q", errInvalidReportFormat, value)
+	}
+
+	return nil
 }
 
 func parseTypedParamFlag(args []string, i int, parsed *runArgs) (int, error) {
