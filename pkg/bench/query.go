@@ -433,7 +433,7 @@ func (t *Tx) Commit(ctx context.Context) error {
 			t.b.root.txMetrics.record(t.b.vu, "commit", t.name, t.iso)
 			t.recordEnd("commit", false)
 
-			return err
+			return &commitError{err: err}
 		}
 	}
 

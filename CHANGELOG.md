@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Transaction retries no longer repeat non-idempotent writes after an ambiguous commit failure; rejected serialization and deadlock commits can still retry.
 - Release container images build with the Go 1.27 toolchain required by Stroppy.
 
 ## [6.2.0] - 2026-10-20
