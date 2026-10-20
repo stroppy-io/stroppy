@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Fixed
+
+- Release container images build with the Go 1.27 toolchain required by Stroppy.
+
 ## [6.2.0] - 2026-10-20
 
 ### Added

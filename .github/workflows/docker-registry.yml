@@ -4,6 +4,15 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version to embed and publish from the selected ref
+        required: true
+        type: string
+
+env:
+  IMAGE_VERSION: ${{ inputs.version || github.ref_name }}
 
 jobs:
   docker-build-and-push:
@@ -14,6 +23,13 @@ jobs:
       id-token: write # optional, but good for provenance / OIDC
 
     steps:
+      - name: Validate version
+        run: |
+          if [[ ! "$IMAGE_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "invalid release version: $IMAGE_VERSION"
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v7
 
@@ -39,18 +55,18 @@ jobs:
           push: true
           file: Dockerfile
           build-args: |
-            VERSION=${{ github.ref_name }}
+            VERSION=${{ env.IMAGE_VERSION }}
           platforms: linux/amd64
           tags: |
-            ghcr.io/${{ steps.lowercase.outputs.lowercase }}:${{ github.ref_name }}.${{ github.run_number }}
+            ghcr.io/${{ steps.lowercase.outputs.lowercase }}:${{ env.IMAGE_VERSION }}.${{ github.run_number }}
             ghcr.io/${{ steps.lowercase.outputs.lowercase }}:latest
 
       # Guard: the pushed image's binary must report the pushed tag, not the
       # Docker ARG fallback. Running it also confirms the pushed image is sound.
       - name: Verify image version
         run: |
-          expected="${{ github.ref_name }}"
-          image="ghcr.io/${{ steps.lowercase.outputs.lowercase }}:${{ github.ref_name }}.${{ github.run_number }}"
+          expected="${{ env.IMAGE_VERSION }}"
+          image="ghcr.io/${{ steps.lowercase.outputs.lowercase }}:${{ env.IMAGE_VERSION }}.${{ github.run_number }}"
           actual="$(docker run --rm "${image}" version --json | jq -r '.stroppy')"
           echo "expected=${expected}"
           echo "actual=${actual}"
