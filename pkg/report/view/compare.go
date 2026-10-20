@@ -117,7 +117,7 @@ func comparisonMetrics(result *compare.Result) []comparisonMetric {
 
 	for rowIndex := range result.Metrics {
 		row := &result.Metrics[rowIndex]
-		key := stringJSON([]any{row.Name, row.Type, row.Unit, row.Scope, row.Attributes})
+		key := comparisonGroupKey(row)
 
 		index := slices.IndexFunc(groups, func(g comparisonMetric) bool { return g.Key == key })
 		if index < 0 {
@@ -139,7 +139,8 @@ func comparisonMetrics(result *compare.Result) []comparisonMetric {
 				v, err := cell.Value.Float64()
 				if err == nil {
 					values = append(values, chartValue{
-						label: fmt.Sprintf("Run %d · %s", i+1, result.Runs[i].Workload), value: v, text: shown.Value,
+						label: fmt.Sprintf("Run %d · %s", i+1, result.Runs[i].Workload),
+						value: v, text: shown.Value, series: i + 1, category: row.Statistic,
 					})
 				}
 			}
@@ -148,9 +149,10 @@ func comparisonMetrics(result *compare.Result) []comparisonMetric {
 		}
 
 		groups[index].Rows = append(groups[index].Rows, projected)
-		if comparisonScalarPlot(row) {
+		if comparisonDedicatedPlot(row) {
 			c := bars(row.Name+" · "+projected.Statistic, row.Scope+" "+stringJSON(row.Attributes), row.ValueUnit, values)
 			c.Max = previewNumber(json.Number(c.Max))
+			c.Legend = comparisonLegend(result)
 
 			if len(c.Bars) > 0 {
 				groups[index].Charts = append(groups[index].Charts, c)
@@ -159,7 +161,12 @@ func comparisonMetrics(result *compare.Result) []comparisonMetric {
 	}
 
 	for i := range groups {
-		groups[i].Charts = append(groups[i].Charts, comparisonBucketCharts(result, &groups[i])...)
+		group := &groups[i]
+		if summary := histogramSummaryChart(result, group); len(summary.Bars) > 0 {
+			group.Charts = append([]chart{summary}, group.Charts...)
+		}
+
+		group.Charts = append(group.Charts, comparisonBucketCharts(result, group)...)
 	}
 
 	return groups
@@ -230,7 +237,7 @@ func comparisonBucketCharts(result *compare.Result, group *comparisonMetric) []c
 	for rowIndex := range result.Metrics {
 		row := &result.Metrics[rowIndex]
 
-		key := stringJSON([]any{row.Name, row.Type, row.Unit, row.Scope, row.Attributes})
+		key := comparisonGroupKey(row)
 		if key != group.Key || !strings.HasPrefix(row.Statistic, "bucket:") {
 			continue
 		}
@@ -250,6 +257,7 @@ func comparisonBucketCharts(result *compare.Result, group *comparisonMetric) []c
 
 			layouts[layout] = append(layouts[layout], chartValue{
 				label: fmt.Sprintf("Run %d · %s", i+1, label), value: value, text: string(*cell.Value),
+				series: i + 1, category: label,
 			})
 		}
 	}
@@ -267,6 +275,7 @@ func comparisonBucketCharts(result *compare.Result, group *comparisonMetric) []c
 		c := bars(group.Name+" · bucket counts",
 			"Identical bucket boundaries "+layout+" "+group.Unit+"; non-cumulative counts", "observations", layouts[layout])
 		if len(c.Bars) > 0 {
+			c.Legend = comparisonLegend(result)
 			charts = append(charts, c)
 		}
 	}

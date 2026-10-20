@@ -29,6 +29,8 @@ type catalogPage struct {
 	Selection         []catalogSelection
 	SelectionProblems []string
 	Page              int
+	Workloads         []string
+	Drivers           []string
 }
 
 // Handler serves a read-only history catalog, HTML reports, and original JSON.
@@ -143,6 +145,19 @@ func serveCatalog(w http.ResponseWriter, r *http.Request, history *report.Histor
 		return
 	}
 
+	all := entries
+	if len(query.Workloads) > 0 || len(query.Drivers) > 0 || len(query.Statuses) > 0 ||
+		!query.Since.IsZero() || !query.Until.IsZero() {
+		all, _, err = history.List(report.HistoryQuery{})
+		if err != nil {
+			reportHTTPError(w, err)
+
+			return
+		}
+	}
+	workloads, drivers := catalogOptions(all, r.URL.Query())
+	entries = filterCatalogCapture(history, entries, r.URL.Query())
+
 	index, err := strconv.Atoi(r.URL.Query().Get("page"))
 	if r.URL.Query().Get("page") == "" {
 		index = 0
@@ -159,7 +174,10 @@ func serveCatalog(w http.ResponseWriter, r *http.Request, history *report.Histor
 	start := index * catalogPageSize
 	end := min(start+catalogPageSize, len(entries))
 
-	page := catalogPage{Entries: entries[start:end], Problems: problems, Query: r.URL.Query(), Total: len(entries)}
+	page := catalogPage{
+		Entries: entries[start:end], Problems: problems, Query: r.URL.Query(), Total: len(entries),
+		Workloads: workloads, Drivers: drivers,
+	}
 	prepareCatalogSelection(&page, history)
 
 	if index > 0 {

@@ -330,8 +330,11 @@ are not averaged across series. Recorded aggregate percentiles are comparable on
 in their unambiguous scope. Per-series `bucket_p50/p90/p95/p99` estimates use linear
 interpolation within a finite bucket, explicitly marked approximate; quantiles in
 an unbounded first/overflow bucket are unavailable. Histograms retain count, sum,
-average, and original buckets for inspection. Unknown metric types and report
-schemas remain inspectable without guessed numeric comparisons. Workload-owned
+average, and original buckets for inspection. Comparison plots combine average,
+median/p50, p90, p95, and p99 on one same-unit axis, with adjacent run bars.
+Count and sum plots remain separate. Run colors stay consistent across charts,
+including static fallbacks, and missing values keep their run slot without
+becoming zero bars. Unknown metric types and report schemas remain inspectable without guessed numeric comparisons. Workload-owned
 results receive generic structural differences, not inferred units or adapters.
 
 Configuration/result differences include parameters and sources, named drivers,

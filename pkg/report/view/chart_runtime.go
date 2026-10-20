@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"html/template"
+	"slices"
 	"strings"
 
 	_ "embed"
@@ -67,18 +68,23 @@ type interactiveChart struct {
 }
 
 type interactiveSeries struct {
-	Title    string           `json:"title"`
-	Color    int              `json:"color"`
-	Pattern  string           `json:"pattern,omitempty"`
-	Points   []timelinePoint  `json:"points,omitempty"`
-	Values   []float64        `json:"values,omitempty"`
-	Markers  []timelineMarker `json:"markers,omitempty"`
-	Interval float64          `json:"interval,omitempty"`
-	Omitted  int              `json:"omitted,omitempty"`
+	Title     string           `json:"title"`
+	Color     int              `json:"color"`
+	Pattern   string           `json:"pattern,omitempty"`
+	Points    []timelinePoint  `json:"points,omitempty"`
+	Values    []float64        `json:"values,omitempty"`
+	BarValues []*float64       `json:"bar_values,omitempty"`
+	Markers   []timelineMarker `json:"markers,omitempty"`
+	Interval  float64          `json:"interval,omitempty"`
+	Omitted   int              `json:"omitted,omitempty"`
 }
 
 //nolint:gocritic // templates pass chart values, not addressable Go expressions.
 func interactiveBars(c chart) string {
+	if len(c.Legend) > 0 {
+		return interactiveRunBars(&c)
+	}
+
 	data := interactiveChart{Kind: "bars", Unit: c.Unit}
 
 	series := interactiveSeries{Title: c.Title, Color: 1}
@@ -88,6 +94,39 @@ func interactiveBars(c chart) string {
 	}
 
 	data.Series = []interactiveSeries{series}
+
+	return chartJSON(data)
+}
+
+func interactiveRunBars(c *chart) string {
+	data := interactiveChart{Kind: "grouped-bars", Unit: c.Unit}
+	for _, category := range c.Categories {
+		data.Labels = append(data.Labels, category.Label)
+	}
+
+	if !c.Vertical {
+		for _, bar := range c.Bars {
+			if !slices.Contains(data.Labels, bar.Category) {
+				data.Labels = append(data.Labels, bar.Category)
+			}
+		}
+	}
+
+	for _, entry := range c.Legend {
+		series := interactiveSeries{Title: entry.Label, Color: entry.Series, BarValues: make([]*float64, len(data.Labels))}
+
+		for i := range c.Bars {
+			bar := &c.Bars[i]
+			if bar.Series != entry.Series {
+				continue
+			}
+
+			category := slices.Index(data.Labels, bar.Category)
+			series.BarValues[category] = &bar.Number
+		}
+
+		data.Series = append(data.Series, series)
+	}
 
 	return chartJSON(data)
 }

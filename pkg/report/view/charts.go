@@ -25,6 +25,8 @@ type bar struct {
 	Tip      string
 	Category string
 	Number   float64
+	Series   int
+	Height   float64
 }
 
 type chart struct {
@@ -35,12 +37,27 @@ type chart struct {
 	Height            int
 	Max               string
 	HiddenZeroBuckets int
+	Vertical          bool
+	Categories        []chartCategory
+	Legend            []chartLegend
+}
+
+type chartCategory struct {
+	Label string
+	X     float64
+}
+
+type chartLegend struct {
+	Label  string
+	Series int
 }
 
 type chartValue struct {
-	label string
-	value float64
-	text  string
+	label    string
+	value    float64
+	text     string
+	series   int
+	category string
 }
 
 func bars(title, scope, unit string, values []chartValue) chart {
@@ -72,10 +89,15 @@ func bars(title, scope, unit string, values []chartValue) chart {
 			label = string([]rune(label)[:shortChartLabelRunes]) + "…"
 		}
 
+		category := value.category
+		if category == "" {
+			category = value.label
+		}
+
 		c.Bars = append(c.Bars, bar{
 			Label: label, Value: value.text, X: chartLabelWidth, Y: float64((i + 1) * chartRowHeight),
 			Width: value.value / maximum * chartPlotWidth, Tip: value.label + ": " + value.text + " " + unit,
-			Category: value.label, Number: value.value,
+			Category: category, Number: value.value, Series: value.series,
 		})
 	}
 

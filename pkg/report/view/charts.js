@@ -8,7 +8,24 @@
   const states = new Set();
   const theme = window.matchMedia("(prefers-color-scheme: light)");
 
+  const isBars = source => source.kind === "bars" || source.kind === "grouped-bars";
+
   function model(source) {
+    if (source.kind === "grouped-bars") {
+      if (!source.labels.length || source.labels.length > 16) throw new Error("dense categories retain static chart");
+      const runs = source.series.length;
+      const x = source.labels.flatMap((_, category) => source.series.map((_, run) =>
+        category + (run - (runs - 1) / 2) * 0.75 / runs));
+      const tables = source.series.map((series, run) => {
+        if (series.bar_values.length !== source.labels.length) throw new Error("invalid grouped bars");
+        return x.map((_, index) => {
+          const value = series.bar_values[Math.floor(index / runs)];
+          if (value != null && !Number.isFinite(value)) throw new Error("invalid grouped value");
+          return index % runs === run ? value : null;
+        });
+      });
+      return { data: [x, ...tables], series: source.series.map(series => ({ title: series.title, unit: source.unit, points: [] })) };
+    }
     if (source.kind === "bars") {
       if (source.labels.length > 16) throw new Error("dense categories retain static chart");
       const values = source.series[0].values;
@@ -66,7 +83,7 @@
         const x = plot.data[0][index];
         const heading = document.createElement("div");
         heading.className = "st-chart-tooltip-time";
-        heading.textContent = source.kind === "bars" ? source.labels[x] : `${format(x)} seconds elapsed`;
+        heading.textContent = isBars(source) ? source.labels[Math.round(x)] : `${format(x)} seconds elapsed`;
         const rows = source.series.map((series, i) => {
           const row = document.createElement("div");
           row.className = "st-chart-tooltip-row";
@@ -75,9 +92,8 @@
           const name = document.createElement("span");
           name.textContent = series.title;
           const value = document.createElement("b");
-          const recorded = plot.data[i + 1][index];
-          value.textContent = recorded == null ? "—" : `${format(recorded)} ${source.unit}`;
-          if (recorded != null) value.title = `${String(recorded)} ${source.unit}`;
+          const recorded = source.kind === "grouped-bars" ? series.bar_values[Math.round(x)] : plot.data[i + 1][index];
+          value.textContent = recorded == null ? "—" : `${format(recorded)} ${source.unit}`;          if (recorded != null) value.title = `${String(recorded)} ${source.unit}`;
           row.append(swatch, name, value);
           return row;
         });
@@ -137,23 +153,25 @@
     const ready = new Promise(resolve => { drawn = resolve; });
     const aligned = model(source);
     state.handle = StroppyChart.mount(target, aligned.series, {
-      height: source.kind === "bars" ? 300 : 240,
+      height: isBars(source) ? 300 : 240,
       unit: source.unit,
       data: aligned.data,
       configure(options, Plot) {
         options.scales.x = { time: false };
-        options.axes[0].values = (_, ticks) => ticks.map(value => source.kind === "bars" ?
+        options.axes[0].values = (_, ticks) => ticks.map(value => isBars(source) ?
           (source.labels[value] || "") : `${format(value)} s`);
         options.axes[1].values = (_, ticks) => ticks.map(format);
-        if (source.kind === "bars") {
+        if (isBars(source)) {
           options.scales.x.range = () => [-0.5, source.labels.length - 0.5];
           options.scales.y = { range: (_, min, max) => [0, Math.max(1, max * 1.05)] };
           options.axes[0].splits = () => source.labels.map((_, i) => i);
-          options.axes[0].size = 72;
-          options.axes[0].values = (_, ticks) => ticks.map(value => {
+          options.axes[0].size = 48;          options.axes[0].values = (_, ticks) => ticks.map(value => {
             const label = source.labels[value] || "";
-            return label.length > 18 ? `${label.slice(0, 16)}…` : label;
-          });
+            const width = target.clientWidth || 600;
+            const limit = Math.max(3, Math.min(18, Math.floor((width - 56) / source.labels.length / 7)));
+            if (label === "Median / p50" && limit < label.length) return "p50";
+            if (label === "Average" && limit < label.length) return "Avg";
+            return label.length > limit ? `${label.slice(0, limit - 1)}…` : label;          });
         }
         options.series.slice(1).forEach((series, i) => {
           const original = source.series[i];
@@ -161,7 +179,7 @@
           Object.assign(series, { stroke: color, fill: null, paths: Plot.paths.linear(), spanGaps: false,
             width: 2, dash: original.pattern === "none" ? [] : (original.pattern || "").split(" ").filter(Boolean).map(Number),
             points: { show: true, size: 6, fill: color, stroke: color } });
-          if (source.kind === "bars") Object.assign(series, {
+          if (isBars(source)) Object.assign(series, {
             fill: color, paths: Plot.paths.bars({ size: [0.6, 60] }), points: { show: false }
           });
         });

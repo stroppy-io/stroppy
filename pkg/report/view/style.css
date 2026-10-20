@@ -664,6 +664,17 @@ footer {
   font-size:12px;
   width:125px
 }
+.filters .filter-toggle {
+  flex-direction:row;
+  align-items:center;
+  gap:8px;
+  min-height:34px;
+  color:var(--ink)
+}
+.filters .filter-toggle input {
+  width:auto;
+  margin:0
+}
 .catalog td {
   padding:16px 12px
 }
@@ -856,8 +867,29 @@ footer {
   color:var(--muted);
   margin-top:5px
 }
-.timeline-legend {
+.chart-legend~.chart-interactive .st-chart-legend {
+  display:none
+}
+.chart-legend {
   display:flex;
+  flex-wrap:wrap;
+  gap:8px 20px;
+  margin:10px 0 16px;
+  font-size:12px;
+  color:var(--muted)
+}
+.chart-legend>span {
+  display:inline-flex;
+  align-items:center;
+  gap:8px
+}
+.chart-legend i {
+  width:10px;
+  height:10px;
+  border-radius:2px;
+  background:var(--st-tone)
+}
+.timeline-legend {  display:flex;
   flex-wrap:wrap;
   gap:18px;
   margin:12px 0

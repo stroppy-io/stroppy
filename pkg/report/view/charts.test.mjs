@@ -136,6 +136,25 @@ test("tooltip keeps swatch, label, and formatted value in separate cells", () =>
   assert.equal(tip.hidden, true);
 });
 
+test("grouped statistics retain adjacent run slots and stable colors", () => {
+  const source = { kind: "grouped-bars", unit: "ms", labels: ["Average", "p50", "p99"], series: [
+    { title: "Run 1", color: 1, bar_values: [10, 8, null] },
+    { title: "Run 2", color: 2, bar_values: [20, 16, 100] }
+  ] };
+  const { state } = setup(source);
+  const call = state.calls[0];
+  assert.equal(call.options.data.length, 3);
+  assert.equal(call.options.data[1][0], 10);
+  assert.equal(call.options.data[1][1], null);
+  assert.equal(call.options.data[2][1], 20);
+  assert.equal(call.options.data[1][4], null);
+  assert.equal(call.options.data[2][5], 100);
+  assert.ok(call.options.data[0][0] < 0 && call.options.data[0][1] > 0);
+  assert.equal(call.config.series[1].paths, "bars");
+  assert.equal(call.config.series[2].paths, "bars");
+  assert.equal(call.config.scales.y.range(null, 10, 100)[0], 0);
+});
+
 test("mount failure and timeout retain static view", async () => {
   for (const behavior of ["throw", "pending"]) {
     const { figure, state, timers } = setup(timeline, behavior);

@@ -62,13 +62,23 @@
 <p>{{.Scope}} · {{.Unit}}
 {{if .HiddenZeroBuckets}} · {{.HiddenZeroBuckets}} empty buckets omitted; all buckets retained in exact data{{end}}</p>
 </figcaption>
+{{if .Legend}}<div class="chart-legend">{{range .Legend}}<span data-series="{{.Series}}"><i></i>{{.Label}}</span>{{end}}</div>{{end}}
 <div class="chart-scroll">
+{{if .Vertical}}
+<svg viewBox="0 0 720 320" role="img" aria-label="{{.Title}}">
+<text class="axis-label" x="70" y="53" text-anchor="end">{{.Max}}</text>
+<text class="axis-label" x="70" y="263" text-anchor="end">0</text>
+<line class="timeline-marker" x1="80" x2="680" y1="260" y2="260"/>
+{{range .Categories}}<text x="{{.X}}" y="287" text-anchor="middle">{{.Label}}</text>{{end}}
+{{range .Bars}}<g class="bar" data-series="{{.Series}}" tabindex="0" aria-label="{{.Tip}}"><title>{{.Tip}}</title><rect class="bar-fill" x="{{.X}}" y="{{.Y}}" width="{{.Width}}" height="{{.Height}}" rx="2"/><text class="bar-tooltip" x="{{.X}}" y="{{.Y}}" dy="-7">{{.Tip}}</text></g>{{end}}
+</svg>
+{{else}}
 <svg viewBox="0 0 720 {{.Height}}" role="img" aria-label="{{.Title}}">
 <text class="axis-label" x="190" y="17">0</text>
 <text class="axis-label" x="610" y="17" text-anchor="end">{{.Max}} {{.Unit}}
 </text>
 {{range .Bars}}
-<g class="bar" tabindex="0" aria-label="{{.Tip}}">
+<g class="bar" {{if .Series}}data-series="{{.Series}}"{{end}} tabindex="0" aria-label="{{.Tip}}">
 <title>{{.Tip}}
 </title>
 <rect class="bar-hit" x="0" y="{{.Y}}" width="720" height="28"/>
@@ -84,6 +94,7 @@
 </g>
 {{end}}
 </svg>
+{{end}}
 </div>
 <details class="chart-table">
 <summary>Values</summary>
@@ -139,10 +150,14 @@
 </label>
 <label>Until (exclusive)<input name="until" value="{{.Query.Get "until"}}" placeholder="2026-10-14">
 </label>
-<label>Workload<input name="workload" value="{{.Query.Get "workload"}}" placeholder="All workloads">
-</label>
-<label>Driver<input name="driver" value="{{.Query.Get "driver"}}" placeholder="All drivers">
-</label>
+<label>Workload<select name="workload">
+<option value="">All workloads</option>
+{{range .Workloads}}<option value="{{.}}" {{if eq . ($.Query.Get "workload")}}selected{{end}}>{{.}}</option>{{end}}
+</select></label>
+<label>Driver<select name="driver">
+<option value="">All drivers</option>
+{{range .Drivers}}<option value="{{.}}" {{if eq . ($.Query.Get "driver")}}selected{{end}}>{{.}}</option>{{end}}
+</select></label>
 <label>Status<select name="status">
 <option value="">All statuses</option>
 {{range statuses}}
@@ -156,8 +171,9 @@
 <option value="oldest" {{if eq (.Query.Get "order") "oldest"}}selected{{end}}>Oldest first</option>
 </select>
 </label>
-<button type="submit">Filter / keep selection</button>
-<button class="st-button" data-variant="primary" type="submit" formaction="/compare">Compare selected</button>
+<label class="filter-toggle"><input type="checkbox" name="metrics" value="complete" {{if eq (.Query.Get "metrics") "complete"}}checked{{end}}>Complete metric capture</label>
+<label class="filter-toggle"><input type="checkbox" name="logs" value="complete" {{if eq (.Query.Get "logs") "complete"}}checked{{end}}>Complete log capture</label>
+<button type="submit">Filter / keep selection</button><button class="st-button" data-variant="primary" type="submit" formaction="/compare">Compare selected</button>
 <a href="/">Reset</a>
 </form>
 </section>
