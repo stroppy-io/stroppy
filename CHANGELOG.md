@@ -10,13 +10,15 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+## [6.2.0] - 2026-10-20
+
 ### Added
 
 - Saved runs can be compared with `stroppy reports compare` or catalog selection, with shared numeric deltas, configuration differences, script-free comparison HTML, and aligned captured metric timelines. ([#210](https://github.com/stroppy-io/stroppy/pull/210))
 - Runs can optionally record timestamped metrics and structured logs with independent `--capture-metrics` and `--capture-logs` flags; rich reports show timelines, phase events, and searchable, expandable logs, and `reports artifact` / `reports bundle` retrieve complete recordings with report-owned cleanup. ([#209](https://github.com/stroppy-io/stroppy/pull/209))
 - Saved runs can be browsed with `stroppy reports serve` or exported as self-contained HTML with `stroppy reports export` and `--report-html`; generic metrics, custom results, charts, and full report identity remain readable without JavaScript. ([#203](https://github.com/stroppy-io/stroppy/pull/203))
 - `stroppy reports` lists and filters saved runs, retrieves complete JSON, previews or removes reports, and shows storage health; `--no-save-report` disables history for one run without disabling report output. ([#199](https://github.com/stroppy-io/stroppy/pull/199))
-- `banking` moves money between bank accounts and fails the run when the invariant breaks: the total balance must stay `accounts * 1000`, and each account's unique token must remain a permutation of `1..accounts` — a second witness that catches a transfer lost or duplicated even when the balances happen to sum right. Tokens move conditionally on the value that was read, so a concurrent transfer is a conflict the retry policy absorbs rather than a silent overwrite. ([#205](https://github.com/stroppy-io/stroppy/pull/205))
+- `banking` moves money between accounts and checks that total balances and the token permutation are preserved; token checks detect partial swaps, not whole transfers that are lost or repeated, and are unavailable on Picodata. An optional `banking/inject` variant exercises PostgreSQL commit failures through Macavity. See the verification limitation below. ([#205](https://github.com/stroppy-io/stroppy/pull/205))
 - `crdb`, `yugabyte` and `tidb` are driver names of their own: each speaks another's protocol (postgres, postgres, mysql) but selects its own SQL asset and transaction defaults, so `-d crdb` replaces the `--sql-file crdb.sql` that was documented and could never work — that flag takes a filesystem path, not an embedded asset. TPC-H could not run on CockroachDB at all before, and now ships the `crdb.sql` it needed. ([#206](https://github.com/stroppy-io/stroppy/pull/206))
 - TPC-C can spread each VU's transactions across all configured warehouses with `--spread-warehouses`, independently of concurrency. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
 - TPC-C supports optional `--warmup` traffic before measurement, using existing `step=warmup` and `step=workload` metric labels. ([#195](https://github.com/stroppy-io/stroppy/pull/195))
@@ -66,6 +68,19 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 - Source ejection rejects trailing-slash symlink targets, preserves concurrently replaced directories, and relocates published self-imports without changing query data; starters reject reserved names before writing, and testkit runs honor supplied inputs while keeping every database declaration offline. ([#188](https://github.com/stroppy-io/stroppy/pull/188))
 - Programmatic PostgreSQL workloads work with logging disabled, and successful runs still export explicit zero error and retry counters. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
 - Named databases default to native insertion, nested database facades count one logical operation, framework metric-name collisions fail before actions, concurrent logs are serialized, and row-generator panics propagate after workers and resources are cleaned up. ([#187](https://github.com/stroppy-io/stroppy/pull/187))
+
+### Migration from 6.1.x
+
+- Go imports now use `github.com/stroppy-io/stroppy/v6`; source builds require Go 1.27. Released binaries do not require a local Go installation for built-in workloads.
+- Custom Go workloads must migrate from the former `Workload` lifecycle API to `bench.Test` definitions and immediate execution steps. See [the workload authoring API](docs/workload-authoring-api.md).
+- Replace `-e key=value` and the config `env` map with typed workload/run flags, projected process environment variables, and the config `params` / `run` fields. Timed runs must explicitly select `--executor constant-vus`; `DURATION` alone no longer selects it.
+- Version 6.2.0 includes these source and configuration incompatibilities; existing custom workloads and saved configurations may need migration.
+
+### Known issues
+
+- Banking verification can retry away an observed invariant violation if a later check succeeds; do not treat a successful banking run as conclusive corruption-test evidence until this is fixed. ([#217](https://github.com/stroppy-io/stroppy/issues/217))
+- TPC-DS selects the wrong baked dialect on TiDB, and generated query streams reject TiDB/YugabyteDB engine names. Use the established MySQL/PostgreSQL driver names for these TPC-DS runs until dialect mapping is corrected. ([#218](https://github.com/stroppy-io/stroppy/issues/218))
+- `tpcc/procs -d tidb` is not rejected before setup and can panic on missing procedure queries; use `tpcc/tx -d tidb` instead. ([#219](https://github.com/stroppy-io/stroppy/issues/219))
 
 ## [6.1.1] - 2026-09-28
 
