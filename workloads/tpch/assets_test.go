@@ -7,7 +7,7 @@ import (
 )
 
 func TestEmbeddedAssetContract(t *testing.T) {
-	dialects := []string{"pg.sql", "mysql.sql", "pico.sql", "ydb.sql"}
+	dialects := []string{"pg.sql", "crdb.sql", "mysql.sql", "pico.sql", "ydb.sql"}
 	workloadtest.Files(
 		t,
 		files,
@@ -16,6 +16,7 @@ func TestEmbeddedAssetContract(t *testing.T) {
 
 	sections := map[string][]string{
 		"pg.sql":    {"drop_schema", "create_schema", "set_unlogged", "create_indexes", "set_logged", "analyze"},
+		"crdb.sql":  {"drop_schema", "create_schema", "set_unlogged", "create_indexes", "set_logged", "analyze"},
 		"mysql.sql": {"drop_schema", "create_schema", "create_indexes", "analyze"},
 		"pico.sql":  {"drop_schema", "create_schema", "create_indexes"},
 		"ydb.sql":   {"drop_schema", "create_schema", "create_schema_column", "create_indexes"},

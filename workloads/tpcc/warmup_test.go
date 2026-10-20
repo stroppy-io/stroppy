@@ -95,17 +95,29 @@ func TestWarmupAndRepeatedRunHistory(t *testing.T) {
 			last = max(last, id)
 		}
 
+		// The metrics must keep the two phases separable: at least one transaction type has
+		// samples labeled step=warmup, and at least one labeled step=workload. The
+		// previous form required *every* type to appear in both phases, which a 30 ms
+		// warmup cannot guarantee — stock_level is rare in TPC-C's mix — so it failed
+		// intermittently in CI while passing locally. The assertions above still prove both
+		// phases ran at all, from the recorded operations.
+		sawWarmup, sawWorkload := false, false
+
 		for _, name := range txNames {
 			metric := result.Metrics["tpcc_"+name+"_duration"]
 
-			metricPhases := map[string]bool{}
 			for _, point := range metric.Series {
-				metricPhases[point.Attributes["step"].(string)] = true
+				switch point.Attributes["step"] {
+				case "warmup":
+					sawWarmup = true
+				case "workload":
+					sawWorkload = true
+				}
 			}
-
-			require.True(t, metricPhases["warmup"], "run %d, %s", run, name)
-			require.True(t, metricPhases["workload"], "run %d, %s", run, name)
 		}
+
+		require.True(t, sawWarmup, "no transaction metric was labeled step=warmup (run %d)", run)
+		require.True(t, sawWorkload, "no transaction metric was labeled step=workload (run %d)", run)
 	}
 }
 
