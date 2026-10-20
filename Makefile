@@ -63,15 +63,42 @@ linter_fix: # Start linter with possible fixes (NEVER run casually — rewrites 
 tests: # Run tests with coverage; pass TEST_FLAGS=-short for the CI-sized suite
 	go test -race $(TEST_FLAGS) ./... -coverprofile=coverage.out
 
+# Macavity is the fault injector banking/inject depends on. It is built here from the
+# stroppy-io fork at the commit this repository audited (865b9b42b24c, identical to
+# upstream), never fetched prebuilt: the extension is a .so that has to match the
+# server's ABI, so it is compiled against the headers of the server it will load into.
+# Every use of MACAVITY_DIR is quoted: the build directory can sit under a path with
+# spaces, and an unquoted `rm -rf` on a split path is not a risk worth taking.
+MACAVITY_REPO   ?= https://github.com/stroppy-io/Macavity
+MACAVITY_COMMIT ?= 865b9b42b24c
+MACAVITY_DIR    ?= $(BUILD_TARGET_DIR)/macavity
+
+.PHONY: macavity macavity-install
+macavity: # Build Macavity (the fault injector banking/inject needs) from the audited fork commit
+	@rm -rf "$(MACAVITY_DIR)"
+	@git clone --quiet "$(MACAVITY_REPO)" "$(MACAVITY_DIR)"
+	@git -C "$(MACAVITY_DIR)" checkout --quiet $(MACAVITY_COMMIT)
+	$(MAKE) -C "$(MACAVITY_DIR)" USE_PGXS=1 with_llvm=no
+	@echo
+	@echo "Built $(MACAVITY_DIR)/macavity.so. Install it into the server with:"
+	@echo "  sudo make -C $(MACAVITY_DIR) USE_PGXS=1 with_llvm=no install"
+
+macavity-install: macavity # Build Macavity and install it into the local server's extension directory
+	sudo $(MAKE) -C "$(MACAVITY_DIR)" USE_PGXS=1 with_llvm=no install
+
 .PHONY: integration integration-optional integration-sf1
 
 integration: # Run mandatory tagged PostgreSQL, MySQL, CSV, and OTEL integration tests
 	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
 	go test -tags=integration -count=1 -timeout=15m ./test/integration
 
-integration-optional: # Run optional Picodata and YDB tagged integration tests
+integration-engines: # Run the borrowed-protocol engines CI provides (CockroachDB, YugabyteDB, TiDB)
 	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
-	go test -tags='integration integration_optional' -count=1 -timeout=30m -run 'TestTpchLoadOn(Picodata|YDB)' ./test/integration
+	go test -tags='integration integration_optional' -count=1 -timeout=30m -run 'TestTpchLoadOn(CockroachDB|Yugabyte|TiDB)' ./test/integration
+
+integration-optional: # Run optional tagged integration tests (Picodata, YDB, CockroachDB, YugabyteDB, TiDB)
+	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
+	go test -tags='integration integration_optional' -count=1 -timeout=30m -run 'TestTpchLoadOn(Picodata|YDB|CockroachDB|Yugabyte|TiDB)' ./test/integration
 
 integration-sf1: # Run the explicit heavy TPC-H SF=1 answer validation
 	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
@@ -276,8 +303,8 @@ tmpfs-psql: # Open psql shell into the tmpfs Postgres container
 
 .PHONY: tmpfs-all-up tmpfs-all-down tmpfs-all-clean
 
-tmpfs-all-up: # Start optional PostgreSQL, MySQL, Picodata, and YDB harness
-	docker compose -f test/compose.tmpfs-all.yml up -d --wait pg-tmpfs-all mysql-tmpfs-all picodata-tmpfs-all ydb-tmpfs-all
+tmpfs-all-up: # Start the optional harness: PostgreSQL, MySQL, Picodata, YDB, CockroachDB, YugabyteDB
+	docker compose -f test/compose.tmpfs-all.yml up -d --wait pg-tmpfs-all mysql-tmpfs-all picodata-tmpfs-all ydb-tmpfs-all crdb-tmpfs-all yb-tmpfs-all
 	docker compose -f test/compose.tmpfs-all.yml up picodata-init
 
 tmpfs-all-down: # Stop + remove all 4 DBs and their volumes

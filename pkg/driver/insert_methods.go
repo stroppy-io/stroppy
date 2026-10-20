@@ -35,6 +35,25 @@ var insertMethodsByDriver = map[config.DriverType][]InsertMethod{
 		InsertPlainBulk,
 		InsertNative,
 	},
+	// TiDB speaks the mysql wire, so it carries the same methods.
+	config.DriverTypeTiDB: {
+		InsertPlainQuery,
+		InsertPlainBulk,
+		InsertNative,
+	},
+	// CockroachDB and YugabyteDB speak the postgres wire.
+	config.DriverTypeCRDB: {
+		InsertPlainQuery,
+		InsertPlainBulk,
+		InsertColumnar,
+		InsertNative,
+	},
+	config.DriverTypeYugabyte: {
+		InsertPlainQuery,
+		InsertPlainBulk,
+		InsertColumnar,
+		InsertNative,
+	},
 	config.DriverTypePicodata: {
 		InsertPlainQuery,
 		InsertPlainBulk,

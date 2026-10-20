@@ -214,3 +214,31 @@ func TestDefaultInsertMethodInputValidation(t *testing.T) {
 	require.NoError(t, cli.ApplyOverride("defaultInsertMethod", "native"))
 	require.Error(t, cli.ApplyOverride("insertMethod", "plain_bulk"))
 }
+
+// TestDriverPresetAliasesResolve holds the two name tables together:
+// bench.ParseDriverType accepts "postgres" and "picodata", so those spellings must
+// also resolve here. They did not, and a user following the documentation met
+// "unknown driver" for a driver the CLI knows — with an error listing only short
+// names they had no reason to guess.
+func TestDriverPresetAliasesResolve(t *testing.T) {
+	for alias, canonical := range map[string]string{"postgres": "pg", "picodata": "pico"} {
+		fromAlias, err := runner.LookupDriverPreset(alias)
+		require.NoErrorf(t, err, "LookupDriverPreset(%q)", alias)
+
+		fromCanonical, err := runner.LookupDriverPreset(canonical)
+		require.NoErrorf(t, err, "LookupDriverPreset(%q)", canonical)
+
+		require.Equalf(t, fromCanonical, fromAlias,
+			"%q must resolve to the same preset as %q", alias, canonical)
+	}
+
+	// The canonical spellings keep working, and case does not matter — matching the
+	// lowercase the lookup already applied.
+	for _, name := range []string{"pg", "PG", "pico", "Picodata", "postgres", "mysql", "ydb"} {
+		require.NoErrorf(t, func() error {
+			_, err := runner.LookupDriverPreset(name)
+
+			return err
+		}(), "LookupDriverPreset(%q)", name)
+	}
+}

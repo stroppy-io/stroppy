@@ -19,6 +19,9 @@ const (
 	PresetTPCB  Preset = "tpcb"
 	PresetTPCDS Preset = "tpcds"
 	PresetTPCH  Preset = "tpch"
+
+	// PresetBanking carries the bank-transfer invariant workload's SQL.
+	PresetBanking Preset = "banking"
 )
 
 // ErrUnknownPreset is returned when an unknown preset name is requested.
