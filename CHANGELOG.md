@@ -13,6 +13,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 ### Fixed
 
 - Release container images build with the Go 1.27 toolchain required by Stroppy.
+- Container images include pg-noop, so `stroppy baseline` works without internet access or runtime downloads.
 
 ## [6.2.0] - 2026-10-20
 
