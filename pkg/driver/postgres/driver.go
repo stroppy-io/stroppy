@@ -19,12 +19,21 @@ import (
 const dbConnectionTimeout = 5 * time.Second
 
 func init() {
-	driver.RegisterDriver(
+	// CockroachDB and YugabyteDB speak the postgres wire, so they share this
+	// implementation: nothing below branches on the kind. What differs per engine —
+	// the SQL asset and the transaction defaults — is the workload's business.
+	for _, kind := range []config.DriverType{
 		config.DriverTypePostgres,
-		func(ctx context.Context, opts driver.Options) (driver.Driver, error) {
-			return NewDriver(ctx, opts)
-		},
-	)
+		config.DriverTypeCRDB,
+		config.DriverTypeYugabyte,
+	} {
+		driver.RegisterDriver(
+			kind,
+			func(ctx context.Context, opts driver.Options) (driver.Driver, error) {
+				return NewDriver(ctx, opts)
+			},
+		)
+	}
 }
 
 type Executor interface {

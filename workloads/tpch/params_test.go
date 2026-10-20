@@ -12,7 +12,13 @@ func TestSQLFileDefaults(t *testing.T) {
 		want   string
 	}{
 		{bench.DriverPostgres, "pg.sql"},
+		// TPC-H cannot run on CockroachDB without this: its pg.sql ends with a bare
+		// ANALYZE, which CockroachDB rejects.
+		{bench.DriverCRDB, "crdb.sql"},
+		// YugabyteDB accepts the postgres asset unmodified, and ships none of its own.
+		{bench.DriverYugabyte, "pg.sql"},
 		{bench.DriverMySQL, "mysql.sql"},
+		{bench.DriverTiDB, "mysql.sql"},
 		{bench.DriverPicodata, "pico.sql"},
 		{bench.DriverYDB, "ydb.sql"},
 	}
