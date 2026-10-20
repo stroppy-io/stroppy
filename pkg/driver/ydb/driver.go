@@ -10,12 +10,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	ydbsdk "github.com/ydb-platform/ydb-go-sdk/v3"
 	ydbconfig "github.com/ydb-platform/ydb-go-sdk/v3/config"
 	ycauth "github.com/ydb-platform/ydb-go-yc"
 	yc "github.com/ydb-platform/ydb-go-yc-metadata"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/common/logger"
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
@@ -61,6 +63,14 @@ func NewDriver(
 	ctx context.Context,
 	opts driver.Options,
 ) (*Driver, error) {
+	return newDriver(ctx, opts, func() ydbsdk.Option { return yc.WithCredentials() })
+}
+
+func newDriver(
+	ctx context.Context,
+	opts driver.Options,
+	metadataCredentials func() ydbsdk.Option,
+) (*Driver, error) {
 	lg := opts.Logger
 	if lg == nil {
 		lg = logger.Global().Named("ydb")
@@ -94,22 +104,25 @@ func NewDriver(
 	if primaryErr != nil {
 		// Explicit credentials define the caller's identity. A TLS, transport,
 		// or authorization failure must not switch to the VM service account.
-		if cfg.GetServiceAccountKeyFile() != "" || cfg.GetAuthToken() != "" ||
-			cfg.GetAuthUser() != "" || cfg.GetAuthPassword() != "" {
+		if ctx.Err() != nil || !canFallbackToMetadata(cfg, primaryErr) {
 			return nil, primaryErr
 		}
 
 		lg.Warn("primary auth failed, retrying with Yandex Cloud metadata service",
 			zap.Error(primaryErr))
 
-		ycOpts := []ydbsdk.Option{yc.WithCredentials(), yc.WithInternalCA()}
+		ycOpts := []ydbsdk.Option{metadataCredentials(), yc.WithInternalCA()}
 		fallbackOpts := make([]ydbsdk.Option, 0, len(connOpts)+len(ycOpts))
 		fallbackOpts = append(fallbackOpts, connOpts...)
 		fallbackOpts = append(fallbackOpts, ycOpts...)
 
 		var fallbackErr error
 
-		db, nativeDB, fallbackErr = tryConnect(ctx, lg, cfg, sqlCfg, fallbackOpts, 0)
+		fallbackCtx, cancelFallback := context.WithTimeout(ctx, primaryConnectTimeout)
+		db, nativeDB, fallbackErr = tryConnect(fallbackCtx, lg, cfg, sqlCfg, fallbackOpts, primaryConnectTimeout)
+
+		cancelFallback()
+
 		if fallbackErr != nil {
 			return nil, errors.Join(primaryErr, fmt.Errorf("yc metadata fallback: %w", fallbackErr))
 		}
@@ -131,6 +144,18 @@ func NewDriver(
 		bulkSize:     bulkSize,
 		queryTimeout: opts.QueryTimeout,
 	}, nil
+}
+
+func canFallbackToMetadata(cfg *config.DriverConfig, err error) bool {
+	endpoint, _ := url.Parse(cfg.URL)
+	if cfg.GetServiceAccountKeyFile() != "" || cfg.GetAuthToken() != "" ||
+		cfg.GetAuthUser() != "" || cfg.GetAuthPassword() != "" ||
+		(endpoint != nil && endpoint.User != nil) {
+		return false
+	}
+
+	return ydbsdk.IsTransportError(err, codes.Unauthenticated, codes.PermissionDenied) ||
+		ydbsdk.IsOperationError(err, Ydb.StatusIds_UNAUTHORIZED)
 }
 
 func tryConnect(
