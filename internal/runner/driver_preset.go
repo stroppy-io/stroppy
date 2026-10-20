@@ -91,11 +91,52 @@ var driverPresets = map[string]DriverPreset{
 		DefaultInsertMethod: insertPlainBulk,
 		PoolKind:            "",
 	},
+	// An engine that speaks another's protocol gets its own preset, so the protocol
+	// it borrows does not hide which server is meant — the ports differ, and so does
+	// the default database.
+	"crdb": {
+		DriverType:          "crdb",
+		URL:                 postgresURL("root", "", "localhost:26257") + "/defaultdb?sslmode=disable",
+		DefaultInsertMethod: "native",
+		PoolKind:            driverPostgres,
+	},
+	"yugabyte": {
+		DriverType:          "yugabyte",
+		URL:                 postgresURL("yugabyte", "", "localhost:5433") + "/yugabyte?sslmode=disable",
+		DefaultInsertMethod: "native",
+		PoolKind:            driverPostgres,
+	},
+	"tidb": {
+		DriverType: "tidb",
+		URL: "root:@tcp(localhost:4000)/test" +
+			"?charset=utf8mb4&parseTime=True&loc=Local",
+		DefaultInsertMethod: insertPlainBulk,
+		PoolKind:            "sql",
+	},
+}
+
+// driverPresetAliases maps the longer spellings of a driver name onto the preset
+// that serves them.
+//
+// bench.ParseDriverType accepts "postgres" and "picodata", so those names survive
+// parsing and then failed here with "unknown driver", listing only short names a
+// user following the documentation had no reason to know.
+var driverPresetAliases = map[string]string{
+	"postgres":    "pg",
+	"picodata":    "pico",
+	"cockroach":   "crdb",
+	"cockroachdb": "crdb",
+	"ysql":        "yugabyte",
+	"yb":          "yugabyte",
 }
 
 // LookupDriverPreset returns a preset by short name, or an error if not found.
 func LookupDriverPreset(name string) (DriverPreset, error) {
 	name = strings.ToLower(name)
+
+	if canonical, ok := driverPresetAliases[name]; ok {
+		name = canonical
+	}
 
 	preset, ok := driverPresets[name]
 	if !ok {

@@ -29,6 +29,13 @@ const (
 	DriverTypeNoop        DriverType = 5
 	DriverTypeCSV         DriverType = 6
 	DriverTypeRecording   DriverType = 7
+
+	// Engines that speak another driver's protocol but are their own product:
+	// CockroachDB and YugabyteDB speak the postgres wire, TiDB the mysql one. They
+	// are separate kinds because each selects its own SQL asset and defaults.
+	DriverTypeCRDB     DriverType = 8
+	DriverTypeYugabyte DriverType = 9
+	DriverTypeTiDB     DriverType = 10
 )
 
 var driverTypeNames = map[DriverType]string{
@@ -40,6 +47,9 @@ var driverTypeNames = map[DriverType]string{
 	DriverTypeNoop:        "noop",
 	DriverTypeCSV:         "csv",
 	DriverTypeRecording:   "recording",
+	DriverTypeCRDB:        "crdb",
+	DriverTypeYugabyte:    "yugabyte",
+	DriverTypeTiDB:        "tidb",
 }
 
 func (d DriverType) String() string {
@@ -61,6 +71,9 @@ func DriverTypeValues() []DriverType {
 		DriverTypeNoop,
 		DriverTypeCSV,
 		DriverTypeRecording,
+		DriverTypeCRDB,
+		DriverTypeYugabyte,
+		DriverTypeTiDB,
 	}
 }
 

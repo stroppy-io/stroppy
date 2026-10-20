@@ -95,7 +95,25 @@ go test -tags=integration -count=1 -run TestTpcbWorkloadEndToEnd ./test/integrat
 make tmpfs-down
 ```
 
+### TiDB SQL
+
+TiDB speaks the mysql protocol, but it has no stored procedures, so it gets its own
+variant — `tidb.sql`: the mysql asset without the `DROP PROCEDURE`, the
+`create_procedures` section and the `workload_procs` call. `-d tidb` selects it.
+
+Measured: without it, `tpcb/tx` on TiDB fails at the **first** statement of
+`mysql.sql` with `Error 8108 (HY000): Unsupported type *resolve.NodeW`, because that
+`DROP PROCEDURE` runs during setup even for the raw-transaction variant. The procedure
+variant (`tpcb/procs`) is therefore not available on TiDB, and the workload's
+required-query check reports that rather than failing somewhere mid-run.
+
 ### CockroachDB SQL
 
-Use `--sql-file crdb.sql` with the PostgreSQL driver for CockroachDB.
-This variant analyzes each workload table explicitly and supports both tx and procs.
+Run with the `crdb` driver — `-d crdb` — and the workload selects its CockroachDB
+asset itself. TPC-B ships one because CockroachDB rejects a bare `ANALYZE`: the
+variant names each table explicitly and supports both tx and procs.
+
+Note that `--sql-file` takes a **filesystem path**, not the name of an embedded
+asset, so it cannot select a shipped variant — earlier versions of this file said
+`--sql-file crdb.sql`, which fails with `open crdb.sql: no such file or directory`.
+Use `-d crdb`, or extract the asset yourself and pass its path.

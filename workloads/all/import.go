@@ -2,6 +2,7 @@
 package all
 
 import (
+	_ "github.com/stroppy-io/stroppy/v6/workloads/banking"
 	_ "github.com/stroppy-io/stroppy/v6/workloads/baseline"
 	_ "github.com/stroppy-io/stroppy/v6/workloads/execute_sql"
 	_ "github.com/stroppy-io/stroppy/v6/workloads/simple"
