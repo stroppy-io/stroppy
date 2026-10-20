@@ -155,6 +155,7 @@ func serveCatalog(w http.ResponseWriter, r *http.Request, history *report.Histor
 			return
 		}
 	}
+
 	workloads, drivers := catalogOptions(all, r.URL.Query())
 	entries = filterCatalogCapture(history, entries, r.URL.Query())
 
