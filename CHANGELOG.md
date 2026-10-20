@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- The `simple` workload completes clean iterations with the noop driver while retaining row-count validation for real databases. ([#223](https://github.com/stroppy-io/stroppy/pull/223))
 - Release container images build with the Go 1.27 toolchain required by Stroppy.
 
 ## [6.2.0] - 2026-10-20

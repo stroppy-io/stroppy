@@ -957,7 +957,7 @@ func TestJSONReportStdoutAndFile(t *testing.T) {
 	require.Equal(t, "run", stdoutReport["kind"])
 	require.Equal(t, "simple", stdoutReport["workload"])
 	require.Equal(t, "noop", stdoutReport["driver"])
-	require.Equal(t, "completed_with_errors", stdoutReport["status"])
+	require.Equal(t, "completed", stdoutReport["status"])
 
 	params := objectField(t, stdoutReport, "parameters")
 	runParams := objectField(t, params, "run")
