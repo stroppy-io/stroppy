@@ -61,6 +61,10 @@ func TestClassifyError(t *testing.T) {
 		want driver.ErrorKind
 	}{
 		{name: "retryable", err: ydbretry.RetryableError(errors.New("transient")), want: driver.ErrorKindTransient},
+		{
+			name: "transport aborted", err: ydbsdk.TransportError(status.Error(codes.Aborted, "transaction aborted")),
+			want: driver.ErrorKindSerialization,
+		},
 		{name: "unsupported insert", err: ErrUnsupportedInsertMethod, want: driver.ErrorKindUnsupported},
 		{name: "unsupported type", err: ErrUnsupportedType, want: driver.ErrorKindUnsupported},
 		{name: "other", err: errors.New("boom"), want: driver.ErrorKindUnknown},
@@ -111,6 +115,10 @@ func TestClassifyJoinedTransportError(t *testing.T) {
 		err  error
 		want driver.ErrorFacts
 	}{
+		{
+			"aborted", ydbsdk.TransportError(status.Error(codes.Aborted, "transaction aborted")),
+			driver.ErrorFacts{Kind: driver.ErrorKindSerialization},
+		},
 		{
 			"overload", ydbsdk.TransportError(status.Error(codes.ResourceExhausted, "ResourceExhausted")),
 			driver.ErrorFacts{Kind: driver.ErrorKindTransient, Backoff: true},
