@@ -1,18 +1,13 @@
 package tpcc
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
-// TestProcsRefusesEnginesWithoutProcedures pins the guard that #219 found incomplete.
-//
-// The variant runs stored procedures, so it can only work where the dialect asset
-// defines workload_procs. The guard used to name two engines and let a third through:
-// tpcc/procs -d tidb was accepted, loaded data, and then panicked on the first
-// missing-procedure query. Naming engines by hand is what made that possible, so the
-// list is now a predicate with a test rather than a condition inline in define.
+// TestProcsRefusesEnginesWithoutProcedures pins the predicate the guard uses.
 func TestProcsRefusesEnginesWithoutProcedures(t *testing.T) {
 	for _, tc := range []struct {
 		driver bench.DriverTypeName
@@ -35,38 +30,63 @@ func TestProcsRefusesEnginesWithoutProcedures(t *testing.T) {
 	}
 }
 
-// TestProcsRefusalMatchesTheAssets is the part that would have caught #219 before it
-// shipped: every dialect asset that does not define workload_procs must be refused.
-// A new engine whose asset omits the procedures fails here rather than panicking
-// after a load, without anyone having to remember to extend a list.
+// TestProcsRefusalMatchesTheAssets protects against a new dialect slipping past the
+// guard. It asks sqlFile which asset a driver actually resolves to rather than naming
+// files here: naming them by hand is what let a procedure-free tidb.sql ship while the
+// guard listed two other engines.
+//
+// An engine that later ships its own procedure-free asset is read by this test, and
+// fails unless procsDriverSupported agrees.
 func TestProcsRefusalMatchesTheAssets(t *testing.T) {
-	assets := []struct {
-		driver bench.DriverTypeName
-		name   string
-	}{
-		{bench.DriverPostgres, "pg.sql"},
-		{bench.DriverMySQL, "mysql.sql"},
-		{bench.DriverCRDB, "crdb.sql"},
-		{bench.DriverYugabyte, "pg.sql"},
-		{bench.DriverYDB, "ydb.sql"},
-		{bench.DriverPicodata, "pico.sql"},
-		{bench.DriverTiDB, "tidb.sql"},
-	}
-
-	for _, a := range assets {
-		content, err := files.ReadFile(a.name)
-		if err != nil {
-			t.Fatalf("%s: %v", a.name, err)
+	for _, dt := range []bench.DriverTypeName{
+		bench.DriverPostgres,
+		bench.DriverMySQL,
+		bench.DriverCRDB,
+		bench.DriverYugabyte,
+		bench.DriverYDB,
+		bench.DriverPicodata,
+		bench.DriverTiDB,
+	} {
+		name := sqlFile(dt, "")
+		if name == "" {
+			t.Fatalf("sqlFile(%s) returned no asset", dt)
 		}
 
-		sql := bench.ParseSQL(string(content))
+		content, err := files.ReadFile(name)
+		if err != nil {
+			t.Fatalf("sqlFile(%s) = %q, which is not embedded: %v", dt, name, err)
+		}
 
-		_, hasProcs := sql.Query("workload_procs", "new_order")
-		if want := procsDriverSupported(a.driver); hasProcs != want {
+		_, hasProcs := bench.ParseSQL(string(content)).Query("workload_procs", "new_order")
+		if want := procsDriverSupported(dt); hasProcs != want {
 			t.Errorf(
-				"%s defines workload_procs = %v but procsDriverSupported(%s) = %v",
-				a.name, hasProcs, a.driver, want,
+				"%s (resolved for %s) defines workload_procs = %v but procsDriverSupported = %v",
+				name, dt, hasProcs, want,
 			)
 		}
+	}
+}
+
+// TestProcsRefusedAtDefinition is #219's acceptance condition: the guard must stop the
+// definition itself, not merely be a function returning the right answer. Removing the
+// check from define leaves the predicate tests above green, so this is the test that
+// covers the bug as reported.
+func TestProcsRefusedAtDefinition(t *testing.T) {
+	catalog, err := bench.NewCatalog(Tx, Procs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	drivers := map[string]bench.DriverConfig{"": {Kind: bench.DriverTiDB}}
+	inputs := bench.ParamInputs{CLI: map[string]string{}}
+
+	if _, err := catalog.Resolve("tpcc/procs", inputs, drivers); !errors.Is(err, errProcsDriverUnsupported) {
+		t.Fatalf("define tpcc/procs on tidb = %v, want errProcsDriverUnsupported", err)
+	}
+
+	// The tx variant must still define there: #219 is about the procedures variant, and
+	// tidb.sql exists precisely so that tx works.
+	if _, err := catalog.Resolve("tpcc/tx", inputs, drivers); err != nil {
+		t.Fatalf("define tpcc/tx on tidb = %v, want no error", err)
 	}
 }
