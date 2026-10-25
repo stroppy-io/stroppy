@@ -20,6 +20,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 - `tpcc/procs` now refuses TiDB and the other engines without stored procedures, instead of loading data and then panicking on the first missing procedure. ([#227](https://github.com/stroppy-io/stroppy/pull/227))
 - Banking verification now fails on the evidence it has: a broken invariant is reported at once instead of being retried until a later read happens to look healthy, and a failure the database can explain is reported without waiting it out — only a server that could not answer yet is retried. ([#226](https://github.com/stroppy-io/stroppy/pull/226))
 - Release container images build with the Go 1.27 toolchain required by Stroppy.
+- Container images include pg-noop, so `stroppy baseline` works without internet access or runtime downloads. ([#222](https://github.com/stroppy-io/stroppy/pull/222))
 - YDB connection failures no longer hang on metadata authentication: only authentication failures without explicit credentials retry, and both connection attempts have bounded deadlines. ([#221](https://github.com/stroppy-io/stroppy/pull/221))
 
 ## [6.2.0] - 2026-10-20
