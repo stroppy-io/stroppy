@@ -97,3 +97,21 @@ func TestALoadOnlyRunIsNotRefusedForAStreamItNeverGenerates(t *testing.T) {
 		}
 	}
 }
+
+// TestTheDefinitionGeneratesWithTheEnginesDialect closes the gap the unit test leaves:
+// asserting `dsqgenDialect` says nothing about whether the generator is called with it.
+// YugabyteDB speaks postgres under a name dsqgen does not know, so a call site that
+// passed the kind straight through would fail here — which is #218's actual shape.
+func TestTheDefinitionGeneratesWithTheEnginesDialect(t *testing.T) {
+	catalog, err := bench.NewCatalog(Test)
+	if err != nil {
+		t.Fatalf("NewCatalog: %v", err)
+	}
+
+	if _, err := catalog.ResolveRun(Test.Name, bench.RunOptions{
+		Params:  bench.ParamInputs{CLI: map[string]string{"query-stream": "0"}},
+		Drivers: map[string]bench.DriverConfig{"default": {Kind: bench.DriverYugabyte}},
+	}); err != nil {
+		t.Fatalf("yugabyte definition with a generated stream: error = %v, want a generated set", err)
+	}
+}

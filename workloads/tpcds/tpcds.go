@@ -119,12 +119,7 @@ func define(d *bench.Def) error {
 	}
 
 	if streamsWanted {
-		if _, err := generateStream(
-			dsqgenDialect(w.driver),
-			w.scaleFactor,
-			w.seed,
-			max(w.genStream, 0),
-		); err != nil {
+		if _, err := w.streamQueries(max(w.genStream, 0)); err != nil {
 			return err
 		}
 	}
@@ -301,7 +296,17 @@ func (w *workload) resolveQueries(b *bench.Bench) ([]namedQuery, error) {
 		streamIdx = w.genStream
 	}
 
-	return generateStream(dsqgenDialect(w.driver), w.scaleFactor, w.seed, streamIdx)
+	return w.streamQueries(streamIdx)
+}
+
+// streamQueries renders one query stream for this workload's dialect.
+//
+// The definition-time preflight and the workload step both need it, and each of them
+// remembering the mapping is how #218 happened: the dialect was translated at one call
+// site and the kind itself passed at the other, so a run that reached only the second
+// failed on a dialect dsqgen has never heard of.
+func (w *workload) streamQueries(stream int) ([]namedQuery, error) {
+	return generateStream(dsqgenDialect(w.driver), w.scaleFactor, w.seed, stream)
 }
 
 // dsqgenDialect maps a driver kind to the dialect name dsqgen knows. The borrowed
