@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Banking verification now fails as soon as it observes a broken invariant, instead of retrying until a later read happens to look healthy. ([#226](https://github.com/stroppy-io/stroppy/pull/226))
 - Release container images build with the Go 1.27 toolchain required by Stroppy.
 
 ## [6.2.0] - 2026-10-20
