@@ -10,9 +10,13 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- A workload that runs its own retry loop can ask `bench.RetryPolicy.Retries` whether the database's own classification makes an error worth another attempt, instead of keeping its own list of retryable failures. ([#226](https://github.com/stroppy-io/stroppy/pull/226))
+
 ### Fixed
 
-- Banking verification now fails as soon as it observes a broken invariant, instead of retrying until a later read happens to look healthy. ([#226](https://github.com/stroppy-io/stroppy/pull/226))
+- Banking verification now fails on the evidence it has: a broken invariant is reported at once instead of being retried until a later read happens to look healthy, and a failure the database can explain is reported without waiting it out — only a server that could not answer yet is retried. ([#226](https://github.com/stroppy-io/stroppy/pull/226))
 - Release container images build with the Go 1.27 toolchain required by Stroppy.
 
 ## [6.2.0] - 2026-10-20
