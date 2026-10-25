@@ -109,12 +109,16 @@ func define(d *bench.Def) error {
 	// The mysql generator skips q51 and q97 and generateStream rejects a skipped set,
 	// and the postgres streams carry ROLLUP and window functions that pico.sql
 	// documents as unsupported. Those engines run the baked set only, and saying so at
-	// definition is the difference between a refusal and a load followed by a failure.
-	if (w.throughput || w.genStream >= 0) && !generatedStreamsSupported(w.driver) {
+	// definition is the difference between a refusal and a load followed by a failure —
+	// but only where a stream is wanted at all: a run that excludes the workload step
+	// never generates one, and loading data on those engines stays legitimate.
+	streamsWanted := (w.throughput || w.genStream >= 0) && d.Execution.Enabled("workload")
+
+	if streamsWanted && !generatedStreamsSupported(w.driver) {
 		return errGeneratedStreamsUnsupported
 	}
 
-	if (w.throughput || w.genStream >= 0) && d.Execution.Enabled("workload") {
+	if streamsWanted {
 		if _, err := generateStream(
 			dsqgenDialect(w.driver),
 			w.scaleFactor,

@@ -1,6 +1,7 @@
 package tpcds
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
@@ -64,6 +65,35 @@ func TestGeneratedStreamsAreRefusedWhereTheGeneratorCannot(t *testing.T) {
 	} {
 		if got := generatedStreamsSupported(tc.driver); got != tc.want {
 			t.Errorf("generatedStreamsSupported(%s) = %v, want %v", tc.driver, got, tc.want)
+		}
+	}
+}
+
+// TestALoadOnlyRunIsNotRefusedForAStreamItNeverGenerates pins the guard to what it
+// guards. The refusal exists because the generator cannot render those engines' streams,
+// so a run that excludes the workload step reaches no generator and must be allowed to
+// load — refusing it answered a question nobody asked.
+func TestALoadOnlyRunIsNotRefusedForAStreamItNeverGenerates(t *testing.T) {
+	catalog, err := bench.NewCatalog(Test)
+	if err != nil {
+		t.Fatalf("NewCatalog: %v", err)
+	}
+
+	for _, driver := range []bench.DriverTypeName{bench.DriverTiDB, bench.DriverPicodata} {
+		options := func(noSteps []string) bench.RunOptions {
+			return bench.RunOptions{
+				Params:  bench.ParamInputs{CLI: map[string]string{"streams": "2"}},
+				Drivers: map[string]bench.DriverConfig{"default": {Kind: driver}},
+				NoSteps: noSteps,
+			}
+		}
+
+		if _, err := catalog.ResolveRun(Test.Name, options(nil)); !errors.Is(err, errGeneratedStreamsUnsupported) {
+			t.Errorf("%s with the workload step: error = %v, want the stream refusal", driver, err)
+		}
+
+		if _, err := catalog.ResolveRun(Test.Name, options([]string{"workload"})); err != nil {
+			t.Errorf("%s without the workload step: error = %v, want a loadable definition", driver, err)
 		}
 	}
 }
