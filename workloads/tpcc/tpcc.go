@@ -24,7 +24,7 @@ var txNames = []string{"new_order", "payment", "order_status", "delivery", "stoc
 var (
 	errWarmupExecutor           = errors.New("tpcc: warmup requires constant-vus executor")
 	errHistoryExhausted         = errors.New("history ID space exhausted")
-	errProcsDriverUnsupported   = errors.New("tpcc/procs only supports postgres and mysql; use tpcc/tx for picodata/ydb")
+	errProcsDriverUnsupported   = errors.New("tpcc/procs needs stored procedures; use tpcc/tx for this driver")
 	errDistrictNotFound         = errors.New("new_order: district not found")
 	errNewOrderCustomerMissing  = errors.New("new_order: customer not found")
 	errNewOrderWarehouseMissing = errors.New("new_order: warehouse not found")
@@ -97,6 +97,22 @@ func init()                          { bench.Register(Tx); bench.Register(Procs)
 func defineTx(d *bench.Def) error    { return define(d, "tx") }
 func defineProcs(d *bench.Def) error { return define(d, "procs") }
 
+// procsDriverSupported reports whether the asset this driver resolves to carries
+// stored procedures. Only the engines whose own dialect omits them are refused; the
+// borrowing engines, and the recording and noop drivers used in tests, resolve to
+// pg.sql and can describe the variant even though they never run it.
+//
+// TiDB was missing from this check and was accepted, then panicked on the first
+// missing-procedure query after the load had already run.
+func procsDriverSupported(dt bench.DriverTypeName) bool {
+	switch dt {
+	case bench.DriverPicodata, bench.DriverYDB, bench.DriverTiDB:
+		return false
+	default:
+		return true
+	}
+}
+
 //nolint:funlen // workload options and ordered phases stay visible.
 func define(d *bench.Def, variant string) error {
 	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
@@ -142,7 +158,7 @@ func define(d *bench.Def, variant string) error {
 	w.driverType = db.Kind()
 
 	w.iso = resolveIsolation(w.driverType, bench.TxIsolationName(iso))
-	if variant == "procs" && (w.driverType == bench.DriverPicodata || w.driverType == bench.DriverYDB) {
+	if variant == "procs" && !procsDriverSupported(w.driverType) {
 		return errProcsDriverUnsupported
 	}
 

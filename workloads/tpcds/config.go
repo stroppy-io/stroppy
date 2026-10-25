@@ -22,7 +22,7 @@ var tpcdsTables = [24]string{
 // parameters take precedence over driver defaults.
 func dialectFiles(dt bench.DriverTypeName, schemaOverride, queryOverride string) (schema, queries string) {
 	switch dt {
-	case bench.DriverMySQL:
+	case bench.DriverMySQL, bench.DriverTiDB:
 		schema, queries = "schema.mysql.sql", "mysql.sql"
 	case bench.DriverPicodata:
 		schema, queries = "schema.pico.sql", "pico.sql"
