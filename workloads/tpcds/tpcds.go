@@ -110,7 +110,7 @@ func define(d *bench.Def) error {
 
 	if (w.throughput || w.genStream >= 0) && d.Execution.Enabled("workload") {
 		if _, err := generateStream(
-			string(w.driver),
+			dsqgenDialect(w.driver),
 			w.scaleFactor,
 			w.seed,
 			max(w.genStream, 0),
@@ -277,7 +277,19 @@ func (w *workload) resolveQueries(b *bench.Bench) ([]namedQuery, error) {
 		streamIdx = w.genStream
 	}
 
-	return generateStream(string(w.driver), w.scaleFactor, w.seed, streamIdx)
+	return generateStream(dsqgenDialect(w.driver), w.scaleFactor, w.seed, streamIdx)
+}
+
+// dsqgenDialect maps a driver kind to the dialect name dsqgen knows. The borrowed
+// engines speak one of the two protocols, and passing the kind itself — "tidb",
+// "yugabyte" — fails at define time because dsqgen has no such dialect. #218.
+func dsqgenDialect(dt bench.DriverTypeName) string {
+	switch dt {
+	case bench.DriverMySQL, bench.DriverTiDB:
+		return "mysql"
+	default:
+		return "postgres"
+	}
 }
 
 // generateStream renders one TPC-DS query stream in process.
