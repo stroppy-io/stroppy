@@ -347,8 +347,17 @@ func (w *workload) verify(ctx context.Context, b *bench.Bench) error {
 	})
 }
 
-// retryCheck runs check until it succeeds or the attempts are spent. A genuine
-// violation is not swallowed: it is reported after the wait, unchanged.
+// isInvariantViolation reports whether err is evidence the check observed — a read
+// that succeeded and found the data wrong — rather than a server that could not
+// answer yet. The two are not interchangeable: retrying the first lets a later read
+// erase a failure the run had already proven.
+func isInvariantViolation(err error) bool {
+	return errors.Is(err, errBalanceMismatch) || errors.Is(err, errTokenPermutation)
+}
+
+// retryCheck runs check until it succeeds, the attempts are spent, or the check
+// reports a violation. Only an unanswered server is retryable: the crash variant
+// leaves the cluster reinitializing, so a refusal there means try again.
 func retryCheck(ctx context.Context, attempts int, delay time.Duration, check func() error) error {
 	var last error
 
@@ -362,6 +371,10 @@ func retryCheck(ctx context.Context, attempts int, delay time.Duration, check fu
 		}
 
 		if err := check(); err != nil {
+			if isInvariantViolation(err) {
+				return err
+			}
+
 			last = err
 
 			continue

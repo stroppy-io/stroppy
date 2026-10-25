@@ -2,6 +2,7 @@ package banking
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"strings"
@@ -283,20 +284,46 @@ func TestVerifyWaitsOutARecoveringServer(t *testing.T) {
 		t.Errorf("checked %d time(s), want 3", attempts)
 	}
 
-	// A violation is reported after the attempts are spent, not swallowed.
-	violation := errors.New("verify: total balance is 49999, want 50000")
+	// A violation is reported at once, not after the attempts are spent: a read that
+	// succeeded and showed broken data is evidence, and retrying it would let a later
+	// read erase the failure.
 	calls := 0
 
 	err = retryCheck(t.Context(), 4, 0, func() error {
 		calls++
 
-		return violation
+		return fmt.Errorf("%w is 49999, want 50000", errBalanceMismatch)
 	})
-	if !errors.Is(err, violation) {
+	if !errors.Is(err, errBalanceMismatch) {
 		t.Errorf("retryCheck = %v, want the violation reported", err)
 	}
 
-	if calls != 4 {
-		t.Errorf("checked %d time(s), want 4", calls)
+	if calls != 1 {
+		t.Errorf("checked %d time(s), want 1 — a violation is not retried", calls)
+	}
+}
+
+// TestVerifyKeepsAViolationItHasSeen is the case the retry used to erase: a check
+// that observes a violation and then, on a later attempt, sees healthy data. The
+// run must fail: the first read proved the invariant was broken at that moment, and
+// a subsequent read cannot unprove it.
+func TestVerifyKeepsAViolationItHasSeen(t *testing.T) {
+	calls := 0
+
+	err := retryCheck(t.Context(), 5, 0, func() error {
+		calls++
+
+		if calls == 1 {
+			return fmt.Errorf("%w: tokens are not the permutation", errTokenPermutation)
+		}
+
+		return nil
+	})
+	if !errors.Is(err, errTokenPermutation) {
+		t.Fatalf("retryCheck = %v, want the violation it saw on the first attempt", err)
+	}
+
+	if calls != 1 {
+		t.Errorf("checked %d time(s), want 1", calls)
 	}
 }
