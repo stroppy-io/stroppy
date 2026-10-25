@@ -342,7 +342,11 @@ const (
 )
 
 func (w *workload) verify(ctx context.Context, b *bench.Bench) error {
-	return retryCheck(ctx, verifyAttempts, verifyDelay, func() error {
+	return retryCheck(ctx, b.TxRetryPolicy(bench.RetryOptions{
+		MaxAttempts: verifyAttempts,
+		Idempotent:  true,
+		Actions:     waitingActions(),
+	}), verifyDelay, func() error {
 		return w.checkInvariants(ctx, b)
 	})
 }
@@ -355,32 +359,49 @@ func isInvariantViolation(err error) bool {
 	return errors.Is(err, errBalanceMismatch) || errors.Is(err, errTokenPermutation)
 }
 
-// retryCheck runs check until it succeeds, the attempts are spent, or the check
-// reports a violation. Only an unanswered server is retryable: the crash variant
-// leaves the cluster reinitializing, so a refusal there means try again.
-func retryCheck(ctx context.Context, attempts int, delay time.Duration, check func() error) error {
+// waitingActions retries what a cluster left reinitializing can refuse with: the
+// driver sees a server that did not answer, which it can only classify as unknown or
+// a timeout, and giving up on the first refusal would leave the crash variant unable
+// to report on the invariants at all.
+//
+// The defaults carry every other kind, so a failure the driver can name — an
+// unsupported request, a canceled context — ends the run instead of being waited out.
+func waitingActions() bench.ErrorActionMap {
+	actions := bench.DefaultErrorActions()
+	actions[driver.ErrorKindUnknown] = bench.ErrorActionRetry
+	actions[driver.ErrorKindTimeout] = bench.ErrorActionRetry
+
+	return actions
+}
+
+// retryCheck replays check until it succeeds or the policy stops the retries. The
+// policy holds the driver's own classification, so a failure that will not answer
+// differently next time is reported at once rather than after the attempts are spent.
+func retryCheck(ctx context.Context, policy bench.RetryPolicy, delay time.Duration, check func() error) error {
 	var last error
 
-	for attempt := range attempts {
+	for attempt := range max(policy.MaxAttempts, 1) {
 		if attempt > 0 && delay > 0 {
 			select {
 			case <-ctx.Done():
-				return last
+				return ctx.Err()
 			case <-time.After(delay):
 			}
 		}
 
-		if err := check(); err != nil {
-			if isInvariantViolation(err) {
-				return err
-			}
-
-			last = err
-
-			continue
+		err := check()
+		if err == nil {
+			return nil
 		}
 
-		return nil
+		// Evidence outranks the policy: a violation classifies unknown, exactly as an
+		// unanswered server does, and the retries that suit the second would let a later
+		// read erase the first.
+		if isInvariantViolation(err) || !policy.Retries(err) {
+			return err
+		}
+
+		last = err
 	}
 
 	return last
