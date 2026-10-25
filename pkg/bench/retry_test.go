@@ -292,6 +292,31 @@ func TestRetryWithPolicyConditionalIdempotency(t *testing.T) {
 	}
 }
 
+func TestRetriesAnswersForOneError(t *testing.T) {
+	t.Parallel()
+
+	conflict := errors.New("conflict")
+	classify := func(err error) driver.ErrorFacts {
+		if errors.Is(err, conflict) {
+			return driver.ErrorFacts{Kind: driver.ErrorKindSerialization}
+		}
+
+		return driver.DefaultErrorFacts(err)
+	}
+
+	policy := newTxRetryPolicy(classify, TxRetryPolicyOptions{MaxAttempts: 3})
+
+	if !policy.Retries(conflict) {
+		t.Fatal("Retries(conflict) = false, want the classified kind's default action")
+	}
+
+	// The default map fails closed: a workload that asks has to get a no for what the
+	// driver could not name, or its own loop retries the failures the policy would not.
+	if policy.Retries(errors.New("unclassified")) {
+		t.Fatal("Retries(unclassified) = true, want false")
+	}
+}
+
 func TestRetryWithPolicyCancellationDuringBackoff(t *testing.T) {
 	t.Parallel()
 
