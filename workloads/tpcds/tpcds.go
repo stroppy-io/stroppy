@@ -20,11 +20,12 @@ var (
 	// blocker, one an asset could fix; the queries cannot be.
 	errCockroachUnsupported = errors.New("[tpcds] CockroachDB does not implement ROLLUP/CUBE/GROUPING SETS " +
 		"(crdb#46280), which 11 of the 103 queries use, so TPC-DS is not supported there")
-	errScaleFactorMustBePositive = errors.New("SCALE_FACTOR must be positive")
-	errUnknownDialect            = errors.New("dsqgen: unknown dialect")
-	errIncompleteQuerySet        = errors.New("tpcds: generated query set is incomplete")
-	errYdbBakedOnly              = errors.New("[tpcds] ydb supports the baked query set (power test) only; " +
-		"STREAMS>1 and QUERY_STREAM need the in-process generator, which does not target YQL yet")
+	errScaleFactorMustBePositive   = errors.New("SCALE_FACTOR must be positive")
+	errUnknownDialect              = errors.New("dsqgen: unknown dialect")
+	errIncompleteQuerySet          = errors.New("tpcds: generated query set is incomplete")
+	errGeneratedStreamsUnsupported = errors.New("[tpcds] this driver runs the baked query set (power test) only; " +
+		"STREAMS>1 and QUERY_STREAM need the in-process generator, which renders a complete " +
+		"99-query set for postgres and mysql only")
 )
 
 type workload struct {
@@ -104,8 +105,13 @@ func define(d *bench.Def) error {
 	w.useUnlogged = w.useUnlogged && w.driver == bench.DriverPostgres
 
 	w.throughput = w.streams > 1
-	if w.driver == bench.DriverYDB && (w.throughput || w.genStream >= 0) {
-		return errYdbBakedOnly
+	// Only drivers whose generator renders the full 99-query set can build a stream.
+	// The mysql generator skips q51 and q97 and generateStream rejects a skipped set,
+	// and the postgres streams carry ROLLUP and window functions that pico.sql
+	// documents as unsupported. Those engines run the baked set only, and saying so at
+	// definition is the difference between a refusal and a load followed by a failure.
+	if (w.throughput || w.genStream >= 0) && !generatedStreamsSupported(w.driver) {
+		return errGeneratedStreamsUnsupported
 	}
 
 	if (w.throughput || w.genStream >= 0) && d.Execution.Enabled("workload") {
@@ -221,6 +227,20 @@ func (w *workload) validate(ctx context.Context, b *bench.Bench) error {
 	)
 
 	return nil
+}
+
+// generatedStreamsSupported reports whether dsqgen can render a complete query stream
+// for this driver. TiDB is excluded despite speaking mysql: the mysql generator skips
+// q51 and q97, and generateStream refuses a set with skips in it. Picodata is excluded
+// because the postgres streams carry ROLLUP and window functions its asset documents
+// as unsupported.
+func generatedStreamsSupported(dt bench.DriverTypeName) bool {
+	switch dt {
+	case bench.DriverPostgres, bench.DriverMySQL, bench.DriverYugabyte:
+		return true
+	default:
+		return false
+	}
 }
 
 func (w *workload) work(ctx context.Context, b *bench.Bench) error {
