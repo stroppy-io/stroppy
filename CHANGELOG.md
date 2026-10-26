@@ -16,6 +16,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- The `simple` workload completes clean iterations with the noop driver while retaining row-count validation for real databases. ([#223](https://github.com/stroppy-io/stroppy/pull/223))
 - Transaction retries no longer repeat non-idempotent writes after an ambiguous commit failure; rejected serialization and deadlock commits, including YDB operation and gRPC aborts, can still retry. ([#220](https://github.com/stroppy-io/stroppy/pull/220))
 - TPC-DS resolves TiDB and YugabyteDB to the SQL dialects they speak: `-d tidb` reads the MySQL assets, and generated query streams no longer fail at define time. ([#228](https://github.com/stroppy-io/stroppy/pull/228))
 - `tpcc/procs` now refuses TiDB and the other engines without stored procedures, instead of loading data and then panicking on the first missing procedure. ([#227](https://github.com/stroppy-io/stroppy/pull/227))
