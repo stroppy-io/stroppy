@@ -16,6 +16,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Transaction retries no longer repeat non-idempotent writes after an ambiguous commit failure; rejected serialization and deadlock commits, including YDB operation and gRPC aborts, can still retry. ([#220](https://github.com/stroppy-io/stroppy/pull/220))
 - TPC-DS resolves TiDB and YugabyteDB to the SQL dialects they speak: `-d tidb` reads the MySQL assets, and generated query streams no longer fail at define time. ([#228](https://github.com/stroppy-io/stroppy/pull/228))
 - `tpcc/procs` now refuses TiDB and the other engines without stored procedures, instead of loading data and then panicking on the first missing procedure. ([#227](https://github.com/stroppy-io/stroppy/pull/227))
 - Banking verification now fails on the evidence it has: a broken invariant is reported at once instead of being retried until a later read happens to look healthy, and a failure the database can explain is reported without waiting it out — only a server that could not answer yet is retried. ([#226](https://github.com/stroppy-io/stroppy/pull/226))
