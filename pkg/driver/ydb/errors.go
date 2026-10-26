@@ -3,7 +3,10 @@ package ydb
 import (
 	"errors"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	ydbsdk "github.com/ydb-platform/ydb-go-sdk/v3"
 	ydbretry "github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"google.golang.org/grpc/codes"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
@@ -19,6 +22,10 @@ func (*Driver) ClassifyError(err error) driver.ErrorFacts {
 	mode := ydbretry.Check(err)
 	switch {
 	case mode.MustRetry(false):
+		if ydbsdk.IsOperationError(err, Ydb.StatusIds_ABORTED) || ydbsdk.IsTransportError(err, codes.Aborted) {
+			return driver.ErrorFacts{Kind: driver.ErrorKindSerialization, Backoff: mode.MustBackoff()}
+		}
+
 		return driver.ErrorFacts{Kind: driver.ErrorKindTransient, Backoff: mode.MustBackoff()}
 	case mode.MustRetry(true):
 		return driver.ErrorFacts{

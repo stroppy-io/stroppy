@@ -1,13 +1,17 @@
 package banking
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 	"github.com/stroppy-io/stroppy/v6/workloads/internal/workloadtest"
 )
@@ -260,13 +264,20 @@ func mustInt64(t *testing.T, value any, name string) int64 {
 	return number
 }
 
+// verifyPolicy mirrors the policy verify builds, without a bench whose driver it
+// would take the classifier from; a nil classifier leaves errors unknown, as a driver
+// that could not interpret them would.
+func verifyPolicy(attempts int, classify func(error) driver.ErrorFacts) bench.RetryPolicy {
+	return bench.RetryPolicy{MaxAttempts: attempts, Actions: waitingActions(), Classify: classify}
+}
+
 // TestVerifyWaitsOutARecoveringServer pins the behavior the crash variant needs:
 // the check must not give up on the first refusal, because that variant leaves the
 // cluster reinitializing, and must still report a real violation.
 func TestVerifyWaitsOutARecoveringServer(t *testing.T) {
 	attempts := 0
 
-	err := retryCheck(t.Context(), 5, 0, func() error {
+	err := retryCheck(t.Context(), verifyPolicy(5, nil), 0, func() error {
 		attempts++
 
 		if attempts < 3 {
@@ -283,20 +294,93 @@ func TestVerifyWaitsOutARecoveringServer(t *testing.T) {
 		t.Errorf("checked %d time(s), want 3", attempts)
 	}
 
-	// A violation is reported after the attempts are spent, not swallowed.
-	violation := errors.New("verify: total balance is 49999, want 50000")
+	// A violation is reported at once, not after the attempts are spent: a read that
+	// succeeded and showed broken data is evidence, and retrying it would let a later
+	// read erase the failure.
 	calls := 0
 
-	err = retryCheck(t.Context(), 4, 0, func() error {
+	err = retryCheck(t.Context(), verifyPolicy(4, nil), 0, func() error {
 		calls++
 
-		return violation
+		return fmt.Errorf("%w is 49999, want 50000", errBalanceMismatch)
 	})
-	if !errors.Is(err, violation) {
+	if !errors.Is(err, errBalanceMismatch) {
 		t.Errorf("retryCheck = %v, want the violation reported", err)
 	}
 
-	if calls != 4 {
-		t.Errorf("checked %d time(s), want 4", calls)
+	if calls != 1 {
+		t.Errorf("checked %d time(s), want 1 — a violation is not retried", calls)
+	}
+}
+
+// TestVerifyKeepsAViolationItHasSeen is the case the retry used to erase: a check
+// that observes a violation and then, on a later attempt, sees healthy data. The
+// run must fail: the first read proved the invariant was broken at that moment, and
+// a subsequent read cannot unprove it.
+func TestVerifyKeepsAViolationItHasSeen(t *testing.T) {
+	calls := 0
+
+	err := retryCheck(t.Context(), verifyPolicy(5, nil), 0, func() error {
+		calls++
+
+		if calls == 1 {
+			return fmt.Errorf("%w: tokens are not the permutation", errTokenPermutation)
+		}
+
+		return nil
+	})
+	if !errors.Is(err, errTokenPermutation) {
+		t.Fatalf("retryCheck = %v, want the violation it saw on the first attempt", err)
+	}
+
+	if calls != 1 {
+		t.Errorf("checked %d time(s), want 1", calls)
+	}
+}
+
+// TestVerifyReportsANamedFailureAtOnce is the shape the hand-written violation list
+// could not reach: a failure that is not a violation, and that no further attempt can
+// answer differently, because the driver said what it was.
+func TestVerifyReportsANamedFailureAtOnce(t *testing.T) {
+	calls := 0
+
+	refused := errors.New("query is not supported by this driver")
+
+	err := retryCheck(t.Context(), verifyPolicy(5, func(error) driver.ErrorFacts {
+		return driver.ErrorFacts{Kind: driver.ErrorKindUnsupported}
+	}), 0, func() error {
+		calls++
+
+		return refused
+	})
+	if !errors.Is(err, refused) {
+		t.Fatalf("retryCheck = %v, want the failure the driver named", err)
+	}
+
+	if calls != 1 {
+		t.Errorf("checked %d time(s), want 1 — a named failure is not waited out", calls)
+	}
+}
+
+// TestVerifyReportsACanceledRun covers the way out of the wait: attempts are the
+// bound, but a canceled context ends it at once instead of being read as a check that
+// never got an answer.
+func TestVerifyReportsACanceledRun(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	calls := 0
+
+	err := retryCheck(ctx, verifyPolicy(5, nil), time.Hour, func() error {
+		calls++
+
+		return errors.New("no answer")
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("retryCheck = %v, want %v", err, context.Canceled)
+	}
+
+	if calls != 1 {
+		t.Errorf("checked %d time(s), want 1", calls)
 	}
 }

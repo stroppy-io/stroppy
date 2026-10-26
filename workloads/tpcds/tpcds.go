@@ -20,11 +20,12 @@ var (
 	// blocker, one an asset could fix; the queries cannot be.
 	errCockroachUnsupported = errors.New("[tpcds] CockroachDB does not implement ROLLUP/CUBE/GROUPING SETS " +
 		"(crdb#46280), which 11 of the 103 queries use, so TPC-DS is not supported there")
-	errScaleFactorMustBePositive = errors.New("SCALE_FACTOR must be positive")
-	errUnknownDialect            = errors.New("dsqgen: unknown dialect")
-	errIncompleteQuerySet        = errors.New("tpcds: generated query set is incomplete")
-	errYdbBakedOnly              = errors.New("[tpcds] ydb supports the baked query set (power test) only; " +
-		"STREAMS>1 and QUERY_STREAM need the in-process generator, which does not target YQL yet")
+	errScaleFactorMustBePositive   = errors.New("SCALE_FACTOR must be positive")
+	errUnknownDialect              = errors.New("dsqgen: unknown dialect")
+	errIncompleteQuerySet          = errors.New("tpcds: generated query set is incomplete")
+	errGeneratedStreamsUnsupported = errors.New("[tpcds] this driver runs the baked query set (power test) only; " +
+		"STREAMS>1 and QUERY_STREAM need the in-process generator, which renders a complete " +
+		"99-query set for postgres and mysql only")
 )
 
 type workload struct {
@@ -104,17 +105,21 @@ func define(d *bench.Def) error {
 	w.useUnlogged = w.useUnlogged && w.driver == bench.DriverPostgres
 
 	w.throughput = w.streams > 1
-	if w.driver == bench.DriverYDB && (w.throughput || w.genStream >= 0) {
-		return errYdbBakedOnly
+	// Only drivers whose generator renders the full 99-query set can build a stream.
+	// The mysql generator skips q51 and q97 and generateStream rejects a skipped set,
+	// and the postgres streams carry ROLLUP and window functions that pico.sql
+	// documents as unsupported. Those engines run the baked set only, and saying so at
+	// definition is the difference between a refusal and a load followed by a failure —
+	// but only where a stream is wanted at all: a run that excludes the workload step
+	// never generates one, and loading data on those engines stays legitimate.
+	streamsWanted := (w.throughput || w.genStream >= 0) && d.Execution.Enabled("workload")
+
+	if streamsWanted && !generatedStreamsSupported(w.driver) {
+		return errGeneratedStreamsUnsupported
 	}
 
-	if (w.throughput || w.genStream >= 0) && d.Execution.Enabled("workload") {
-		if _, err := generateStream(
-			string(w.driver),
-			w.scaleFactor,
-			w.seed,
-			max(w.genStream, 0),
-		); err != nil {
+	if streamsWanted {
+		if _, err := w.streamQueries(max(w.genStream, 0)); err != nil {
 			return err
 		}
 	}
@@ -223,6 +228,20 @@ func (w *workload) validate(ctx context.Context, b *bench.Bench) error {
 	return nil
 }
 
+// generatedStreamsSupported reports whether dsqgen can render a complete query stream
+// for this driver. TiDB is excluded despite speaking mysql: the mysql generator skips
+// q51 and q97, and generateStream refuses a set with skips in it. Picodata is excluded
+// because the postgres streams carry ROLLUP and window functions its asset documents
+// as unsupported.
+func generatedStreamsSupported(dt bench.DriverTypeName) bool {
+	switch dt {
+	case bench.DriverPostgres, bench.DriverMySQL, bench.DriverYugabyte:
+		return true
+	default:
+		return false
+	}
+}
+
 func (w *workload) work(ctx context.Context, b *bench.Bench) error {
 	queries, err := w.resolveQueries(b)
 	if err != nil {
@@ -277,7 +296,29 @@ func (w *workload) resolveQueries(b *bench.Bench) ([]namedQuery, error) {
 		streamIdx = w.genStream
 	}
 
-	return generateStream(string(w.driver), w.scaleFactor, w.seed, streamIdx)
+	return w.streamQueries(streamIdx)
+}
+
+// streamQueries renders one query stream for this workload's dialect.
+//
+// The definition-time preflight and the workload step both need it, and each of them
+// remembering the mapping is how #218 happened: the dialect was translated at one call
+// site and the kind itself passed at the other, so a run that reached only the second
+// failed on a dialect dsqgen has never heard of.
+func (w *workload) streamQueries(stream int) ([]namedQuery, error) {
+	return generateStream(dsqgenDialect(w.driver), w.scaleFactor, w.seed, stream)
+}
+
+// dsqgenDialect maps a driver kind to the dialect name dsqgen knows. The borrowed
+// engines speak one of the two protocols, and passing the kind itself — "tidb",
+// "yugabyte" — fails at define time because dsqgen has no such dialect. #218.
+func dsqgenDialect(dt bench.DriverTypeName) string {
+	switch dt {
+	case bench.DriverMySQL, bench.DriverTiDB:
+		return "mysql"
+	default:
+		return "postgres"
+	}
 }
 
 // generateStream renders one TPC-DS query stream in process.

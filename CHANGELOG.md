@@ -10,10 +10,20 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- A workload that runs its own retry loop can ask `bench.RetryPolicy.Retries` whether the database's own classification makes an error worth another attempt, instead of keeping its own list of retryable failures. ([#226](https://github.com/stroppy-io/stroppy/pull/226))
+
 ### Fixed
 
 - The `simple` workload completes clean iterations with the noop driver while retaining row-count validation for real databases. ([#223](https://github.com/stroppy-io/stroppy/pull/223))
+- Transaction retries no longer repeat non-idempotent writes after an ambiguous commit failure; rejected serialization and deadlock commits, including YDB operation and gRPC aborts, can still retry. ([#220](https://github.com/stroppy-io/stroppy/pull/220))
+- TPC-DS resolves TiDB and YugabyteDB to the SQL dialects they speak: `-d tidb` reads the MySQL assets, and generated query streams no longer fail at define time. ([#228](https://github.com/stroppy-io/stroppy/pull/228))
+- `tpcc/procs` now refuses TiDB and the other engines without stored procedures, instead of loading data and then panicking on the first missing procedure. ([#227](https://github.com/stroppy-io/stroppy/pull/227))
+- Banking verification now fails on the evidence it has: a broken invariant is reported at once instead of being retried until a later read happens to look healthy, and a failure the database can explain is reported without waiting it out — only a server that could not answer yet is retried. ([#226](https://github.com/stroppy-io/stroppy/pull/226))
 - Release container images build with the Go 1.27 toolchain required by Stroppy.
+- Container images include pg-noop, so `stroppy baseline` works without internet access or runtime downloads. ([#222](https://github.com/stroppy-io/stroppy/pull/222))
+- YDB connection failures no longer hang on metadata authentication: only authentication failures without explicit credentials retry, and both connection attempts have bounded deadlines. ([#221](https://github.com/stroppy-io/stroppy/pull/221))
 
 ## [6.2.0] - 2026-10-20
 
@@ -83,7 +93,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Known issues
 
-- Banking verification can retry away an observed invariant violation if a later check succeeds; do not treat a successful banking run as conclusive corruption-test evidence until this is fixed. ([#217](https://github.com/stroppy-io/stroppy/issues/217))
+- Banking verification could retry away an observed invariant violation if a later check succeeded, so a successful banking run was not conclusive corruption-test evidence. Fixed after this release: verification reports a violation the moment it sees one. ([#217](https://github.com/stroppy-io/stroppy/issues/217), [#226](https://github.com/stroppy-io/stroppy/pull/226))
 - TPC-DS selects the wrong baked dialect on TiDB, and generated query streams reject TiDB/YugabyteDB engine names. Use the established MySQL/PostgreSQL driver names for these TPC-DS runs until dialect mapping is corrected. ([#218](https://github.com/stroppy-io/stroppy/issues/218))
 - `tpcc/procs -d tidb` is not rejected before setup and can panic on missing procedure queries; use `tpcc/tx -d tidb` instead. ([#219](https://github.com/stroppy-io/stroppy/issues/219))
 

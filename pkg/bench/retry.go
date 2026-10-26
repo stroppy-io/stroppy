@@ -147,8 +147,27 @@ func applyRetryDecision(
 	}
 }
 
+type commitError struct{ err error }
+
+func (e *commitError) Error() string { return e.err.Error() }
+func (e *commitError) Unwrap() error { return e.err }
+
+// Retries reports whether the policy would make another attempt after err. A
+// workload that runs its own loop asks this rather than re-deriving a verdict the
+// driver already gave.
+func (p RetryPolicy) Retries(err error) bool {
+	return p.decision(err).Action == ErrorActionRetry
+}
+
 func (p RetryPolicy) decision(err error) RetryDecision {
 	facts := classifyError(err, p.Classify)
+
+	// Only serialization and deadlock prove that COMMIT did not apply the writes.
+	// Other commit failures may have lost the acknowledgement after applying them.
+	if _, commitFailed := errors.AsType[*commitError](err); commitFailed &&
+		facts.Kind != driver.ErrorKindSerialization && facts.Kind != driver.ErrorKindDeadlock {
+		facts.RequiresIdempotency = true
+	}
 
 	action := p.Actions.action(facts.Kind)
 	if action == ErrorActionRetry && facts.RequiresIdempotency && !p.idempotent {
