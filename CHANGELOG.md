@@ -10,6 +10,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+## [6.2.1] - 2026-10-26
+
 ### Added
 
 - A workload that runs its own retry loop can ask `bench.RetryPolicy.Retries` whether the database's own classification makes an error worth another attempt, instead of keeping its own list of retryable failures. ([#226](https://github.com/stroppy-io/stroppy/pull/226))
