@@ -15,7 +15,7 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-RUN VERSION=${VERSION} make build
+RUN VERSION=${VERSION} make build-pgnoop
 
 FROM alpine:3.22 AS runner
 

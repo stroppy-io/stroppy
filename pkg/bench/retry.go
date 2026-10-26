@@ -152,6 +152,13 @@ type commitError struct{ err error }
 func (e *commitError) Error() string { return e.err.Error() }
 func (e *commitError) Unwrap() error { return e.err }
 
+// Retries reports whether the policy would make another attempt after err. A
+// workload that runs its own loop asks this rather than re-deriving a verdict the
+// driver already gave.
+func (p RetryPolicy) Retries(err error) bool {
+	return p.decision(err).Action == ErrorActionRetry
+}
+
 func (p RetryPolicy) decision(err error) RetryDecision {
 	facts := classifyError(err, p.Classify)
 
