@@ -110,6 +110,23 @@ func TestProcsSupported(t *testing.T) {
 	}
 }
 
+func TestProcsUnsupportedDriverGuidance(t *testing.T) {
+	catalog, err := bench.NewCatalog(Tx, Procs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = catalog.Resolve("tpcb/procs", bench.ParamInputs{},
+		map[string]bench.DriverConfig{"": {Kind: bench.DriverCSV}})
+	if !errors.Is(err, errProcsDriverUnsupported) {
+		t.Fatalf("error=%v, want unsupported procedures", err)
+	}
+
+	if !strings.Contains(err.Error(), "drivers with transaction support") {
+		t.Fatalf("unqualified transaction recommendation: %v", err)
+	}
+}
+
 // TestProcsNoopEndToEnd runs the full tpcb/procs lifecycle (schema, procedures,
 // load, indexes, FKs, analyze, one proc iteration) against the noop driver,
 // proving registration, procs section resolution, and the iterate path without

@@ -25,8 +25,10 @@ import (
 
 var (
 	errAccountNotFound        = errors.New("tpc-b: account not found")
-	errProcsDriverUnsupported = errors.New("tpcb/procs needs stored procedures; use tpcb/tx for this driver")
-	errProcsMissingQuery      = errors.New("tpc-b/procs: missing query")
+	errProcsDriverUnsupported = errors.New(
+		"tpcb/procs needs stored procedures; use tpcb/tx only for drivers with transaction support",
+	)
+	errProcsMissingQuery = errors.New("tpc-b/procs: missing query")
 )
 
 // requiredTxQueries are the named transaction queries the measured iteration
