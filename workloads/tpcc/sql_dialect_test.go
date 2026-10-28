@@ -1,6 +1,7 @@
 package tpcc
 
 import (
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -22,6 +23,28 @@ func TestEmbeddedDialectIgnoresLocalSQL(t *testing.T) {
 
 	if !strings.Contains(strings.Join(sql.Section("create_procedures"), "\n"), "WHILE loop_counter") {
 		t.Fatal("selected SQL lacks the CRDB 24.1 procedure")
+	}
+}
+
+func TestProcsRejectsProcedureFreeDialect(t *testing.T) {
+	catalog, err := bench.NewCatalog(Tx, Procs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, dialect := range []string{"tidb", "pico", "ydb", "ydb_no_indexes"} {
+		t.Run(dialect, func(t *testing.T) {
+			inputs := bench.ParamInputs{CLI: map[string]string{"sql-dialect": dialect}}
+
+			drivers := map[string]bench.DriverConfig{"": {Kind: bench.DriverMySQL}}
+			if _, err := catalog.Resolve("tpcc/procs", inputs, drivers); !errors.Is(err, errProcsDriverUnsupported) {
+				t.Fatalf("error=%v, want unsupported procedures", err)
+			}
+
+			if _, err := catalog.Resolve("tpcc/tx", inputs, drivers); err != nil {
+				t.Fatalf("transaction variant rejected dialect: %v", err)
+			}
+		})
 	}
 }
 

@@ -166,9 +166,6 @@ func define(d *bench.Def, variant string) error {
 	w.driverType = db.Kind()
 
 	w.iso = resolveIsolation(w.driverType, bench.TxIsolationName(iso))
-	if variant == "procs" && !procsDriverSupported(w.driverType) {
-		return errProcsDriverUnsupported
-	}
 
 	var err error
 
@@ -183,6 +180,10 @@ func define(d *bench.Def, variant string) error {
 
 	if err != nil {
 		return err
+	}
+
+	if variant == "procs" && !w.procsSupported() {
+		return errProcsDriverUnsupported
 	}
 
 	w.isPicodata = w.driverType == bench.DriverPicodata
