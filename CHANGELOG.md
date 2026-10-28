@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
-- YDB connections allow 30 seconds for authentication, discovery, and readiness on managed endpoints, while metadata fallback remains bounded to 3 seconds.
+- YDB connections allow 30 seconds for authentication, discovery, and readiness on managed endpoints, while metadata fallback remains bounded to 3 seconds. ([#237](https://github.com/stroppy-io/stroppy/pull/237))
 
 ## [6.2.1] - 2026-10-26
 
