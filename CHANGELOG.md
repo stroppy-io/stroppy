@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Fixed
+
+- The README MySQL quick-start command uses the connection-string format accepted by the driver.
+
 ## [6.2.1] - 2026-10-26
 
 ### Added
