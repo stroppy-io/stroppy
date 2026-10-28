@@ -69,6 +69,15 @@ func resolveIsolation(dt bench.DriverTypeName, override bench.TxIsolationName) b
 	}
 }
 
+func loadEmbeddedSQL(dialect string) (*bench.SQL, error) {
+	data, err := files.ReadFile(dialect + ".sql")
+	if err != nil {
+		return nil, err
+	}
+
+	return bench.ParseSQL(string(data)), nil
+}
+
 func sqlFile(dt bench.DriverTypeName, override string) string {
 	if override != "" {
 		return override

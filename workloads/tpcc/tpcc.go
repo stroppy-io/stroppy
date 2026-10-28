@@ -25,6 +25,7 @@ var (
 	errWarmupExecutor           = errors.New("tpcc: warmup requires constant-vus executor")
 	errHistoryExhausted         = errors.New("history ID space exhausted")
 	errProcsDriverUnsupported   = errors.New("tpcc/procs needs stored procedures; use tpcc/tx for this driver")
+	errSQLSelectorsConflict     = errors.New("tpcc: sql-dialect and sql-file cannot be combined")
 	errDistrictNotFound         = errors.New("new_order: district not found")
 	errNewOrderCustomerMissing  = errors.New("new_order: customer not found")
 	errNewOrderWarehouseMissing = errors.New("new_order: warehouse not found")
@@ -152,6 +153,13 @@ func define(d *bench.Def, variant string) error {
 	w.pgUnlogged, _ = d.Param.Bool("pg-unlogged", false, "Use unlogged tables while loading.")
 	iso, _ := d.Param.String("tx-isolation", "", "Transaction isolation override.")
 	w.sqlFile, _ = d.Param.String("sql-file", "", "SQL dialect file override.")
+
+	dialect, _ := d.Param.String("sql-dialect", "", "Built-in SQL dialect; empty selects by driver.",
+		bench.OneOf("", "pg", "mysql", "pico", "ydb", "ydb_no_indexes", "tidb", "crdb", "crdb24"))
+	if dialect != "" && w.sqlFile != "" {
+		return errSQLSelectorsConflict
+	}
+
 	w.loadWorkers, _ = d.Param.Int("load-workers", 1, "Workers used to load each table.")
 	w.loadWorkers = max(w.loadWorkers, 1)
 	db := d.Drivers.Declare("default", bench.DriverConfig{})
@@ -163,9 +171,13 @@ func define(d *bench.Def, variant string) error {
 	}
 
 	var err error
-	if w.sqlFile != "" {
+
+	switch {
+	case w.sqlFile != "":
 		w.sql, err = d.Queries.Override(w.sqlFile)
-	} else {
+	case dialect != "":
+		w.sql, err = loadEmbeddedSQL(dialect)
+	default:
 		w.sql, err = d.Queries.Load(files, sqlFile(w.driverType, ""))
 	}
 

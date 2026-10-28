@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Fixed
+
+- TPC-C can select built-in dialects with `--sql-dialect`, including `crdb24` for CockroachDB 24.1 procedures, without copying SQL files to disk.
+
 ## [6.2.1] - 2026-10-26
 
 ### Added
