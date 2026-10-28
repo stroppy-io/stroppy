@@ -26,7 +26,11 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver/queries"
 )
 
-const primaryConnectTimeout = 3 * time.Second
+const (
+	// Managed endpoints may need IAM token issuance and discovery before the first ping.
+	primaryConnectTimeout  = 30 * time.Second
+	metadataConnectTimeout = 3 * time.Second
+)
 
 var ErrUnsupportedInsertMethod = errors.New("unsupported insert method for ydb driver")
 
@@ -118,8 +122,8 @@ func newDriver(
 
 		var fallbackErr error
 
-		fallbackCtx, cancelFallback := context.WithTimeout(ctx, primaryConnectTimeout)
-		db, nativeDB, fallbackErr = tryConnect(fallbackCtx, lg, cfg, sqlCfg, fallbackOpts, primaryConnectTimeout)
+		fallbackCtx, cancelFallback := context.WithTimeout(ctx, metadataConnectTimeout)
+		db, nativeDB, fallbackErr = tryConnect(fallbackCtx, lg, cfg, sqlCfg, fallbackOpts, metadataConnectTimeout)
 
 		cancelFallback()
 

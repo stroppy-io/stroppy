@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Fixed
+
+- YDB connections allow 30 seconds for authentication, discovery, and readiness on managed endpoints, while metadata fallback remains bounded to 3 seconds.
+
 ## [6.2.1] - 2026-10-26
 
 ### Added
