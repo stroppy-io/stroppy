@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
-- CockroachDB and YugabyteDB retain their pool and PostgreSQL settings, TiDB retains its pool settings, and CLI pool overrides use the selected driver's actual backend.
+- CockroachDB and YugabyteDB retain their pool and PostgreSQL settings, TiDB retains its pool settings, and CLI pool overrides use the selected driver's actual backend. ([#236](https://github.com/stroppy-io/stroppy/pull/236))
 
 ## [6.2.1] - 2026-10-26
 
