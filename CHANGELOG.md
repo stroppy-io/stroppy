@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Fixed
+
+- Insert results and `insert_rows_total` count rows actually drained by successful loaders, rather than source estimates for variable-size tables such as TPC-H lineitem.
+
 ## [6.2.1] - 2026-10-26
 
 ### Added
