@@ -116,6 +116,15 @@ func NewDriver(
 	return d, nil
 }
 
+func (d *Driver) PoolMaxConns() int {
+	cfg := d.pool.Config()
+	if cfg == nil {
+		return 0
+	}
+
+	return int(cfg.MaxConns)
+}
+
 func (d *Driver) Begin(ctx context.Context, isolation config.TxIsolationLevel) (driver.Tx, error) {
 	if isolation == config.TxIsolationLevelConnectionOnly {
 		conn, err := d.pool.Acquire(ctx)

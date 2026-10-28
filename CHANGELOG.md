@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- Runs warn once per step and database when worker concurrency exceeds the driver's effective connection-pool limit, making possible client-side queueing visible without resizing the pool.
+
 ## [6.2.1] - 2026-10-26
 
 ### Added

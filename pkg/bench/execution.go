@@ -54,6 +54,7 @@ type Execution struct {
 	databaseMu   sync.Mutex
 	measurements map[string]float64
 	phase        string
+	workers      int
 	reporting    bool
 	policies     map[string]report.Execution
 	failurePhase string
@@ -158,6 +159,7 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 
 	started := time.Now()
 	e.phase = name
+	e.workers = opts.policy.workers
 
 	before := e.root.errorReporter.snapshot().terminalErrors
 	if e.root.capture != nil {
