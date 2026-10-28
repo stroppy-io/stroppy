@@ -52,7 +52,9 @@ func TestProcsSharesTxParams(t *testing.T) {
 // create_procedures + workload_procs/tpcb_transaction contract the procs
 // variant executes.
 func TestProcsResolvesProcSection(t *testing.T) {
-	for _, dt := range []bench.DriverTypeName{bench.DriverPostgres, bench.DriverMySQL} {
+	for _, dt := range []bench.DriverTypeName{
+		bench.DriverPostgres, bench.DriverMySQL, bench.DriverCRDB, bench.DriverYugabyte,
+	} {
 		sql := mustLoadSQL(dt, "")
 
 		if got := sql.Section("create_procedures"); len(got) == 0 {
@@ -93,6 +95,9 @@ func TestProcsSupported(t *testing.T) {
 	}{
 		{bench.DriverPostgres, true},
 		{bench.DriverMySQL, true},
+		{bench.DriverCRDB, true},
+		{bench.DriverYugabyte, true},
+		{bench.DriverTiDB, false},
 		{bench.DriverNoop, true},
 		{bench.DriverPicodata, false},
 		{bench.DriverYDB, false},

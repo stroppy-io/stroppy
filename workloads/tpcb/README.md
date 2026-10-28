@@ -9,7 +9,7 @@ transaction.
 - `tpcb/tx` runs the DML statements in one client-side transaction and supports
   PostgreSQL, MySQL, Picodata, and YDB.
 - `tpcb/procs` calls `tpcb_transaction` once per iteration and supports
-  PostgreSQL and MySQL.
+  PostgreSQL, MySQL, CockroachDB, and YugabyteDB.
 
 ## Run it
 

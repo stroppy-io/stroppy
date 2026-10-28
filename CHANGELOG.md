@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Fixed
+
+- `tpcb/procs` accepts CockroachDB and YugabyteDB while continuing to reject engines without stored procedures.
+
 ## [6.2.1] - 2026-10-26
 
 ### Added
