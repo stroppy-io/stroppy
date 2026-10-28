@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
-- `tpcb/procs` accepts CockroachDB and YugabyteDB while continuing to reject engines without stored procedures.
+- `tpcb/procs` accepts CockroachDB and YugabyteDB while continuing to reject engines without stored procedures. ([#239](https://github.com/stroppy-io/stroppy/pull/239))
 
 ## [6.2.1] - 2026-10-26
 
