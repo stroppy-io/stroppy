@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
-- The README MySQL quick-start command uses the connection-string format accepted by the driver.
+- The README MySQL quick-start command uses the connection-string format accepted by the driver. ([#240](https://github.com/stroppy-io/stroppy/pull/240))
 
 ## [6.2.1] - 2026-10-26
 
