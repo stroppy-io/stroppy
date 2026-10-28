@@ -1003,6 +1003,7 @@ func writeReportFile(path string, data []byte) (retErr error) {
 // name ("noop"). Retained -D entries undergo strict decoding before their
 // nested driver fields merge with config-file values.
 func buildDriverConfig(idx string, cfg *runner.DriverCLIConfig) (*config.DriverConfig, error) {
+	// Validate original keys before collapsing pool aliases so duplicate options still fail.
 	overrides, err := cfg.DecodeOverrides()
 	if err != nil {
 		return nil, invalidConfig(fmt.Errorf("driver %s: %w", idx, err))
@@ -1053,6 +1054,13 @@ func buildDriverConfig(idx string, cfg *runner.DriverCLIConfig) (*config.DriverC
 	}
 
 	if overrides != nil {
+		cli := &runner.DriverCLIConfig{Overrides: driverPoolOverrides(dc.DriverType.String(), cfg.Overrides)}
+
+		overrides, err = cli.DecodeOverrides()
+		if err != nil {
+			return nil, invalidConfig(fmt.Errorf("driver %s: %w", idx, err))
+		}
+
 		if err := applyDriverRunConfigExtras(idx, dc, overrides); err != nil {
 			return nil, invalidConfig(err)
 		}
@@ -1801,15 +1809,33 @@ func applyDriverOpt(configs runner.DriverCLIConfigs, idx, key, value string) err
 		configs[idx] = cfg
 	}
 
-	if err := cfg.ApplyOverride(key, value); err != nil {
-		return err
+	return cfg.ApplyOverride(key, value)
+}
+
+func driverPoolOverrides(driverType string, overrides []runner.DriverOverride) []runner.DriverOverride {
+	mapped := make([]runner.DriverOverride, 0, len(overrides))
+	for _, override := range overrides {
+		if specificKey := poolSpecificDriverOverride(driverType, override.Key); specificKey != "" {
+			override.Key = specificKey
+		}
+
+		found := false
+
+		for index := range mapped {
+			if mapped[index].Key == override.Key {
+				mapped[index] = override
+				found = true
+
+				break
+			}
+		}
+
+		if !found {
+			mapped = append(mapped, override)
+		}
 	}
 
-	if specificKey := poolSpecificDriverOverride(cfg.DriverType, key); specificKey != "" {
-		return cfg.ApplyOverride(specificKey, value)
-	}
-
-	return nil
+	return mapped
 }
 
 func poolSpecificDriverOverride(driverType, key string) string {

@@ -14,7 +14,7 @@ import (
 
 func TestPGXDriverPoolConfiguration(t *testing.T) {
 	for _, kind := range []string{"postgres", "picodata", "crdb", "yugabyte"} {
-		for _, source := range []string{"pool", "postgres", "cli"} {
+		for _, source := range []string{"pool", "postgres", "postgres_only", "cli"} {
 			t.Run(kind+"/"+source, func(t *testing.T) {
 				mode := "exec"
 				maxConnections := int32(9)
@@ -43,6 +43,11 @@ func TestPGXDriverPoolConfiguration(t *testing.T) {
 					wantMax = overrideMax
 				}
 
+				if source == "postgres_only" {
+					file.Pool = nil
+					file.Postgres.MinConns = &minConnections
+				}
+
 				configs, err := runner.DriverCLIConfigsFromFile(map[string]*config.DriverRunConfig{"": file})
 				require.NoError(t, err)
 
@@ -62,6 +67,55 @@ func TestPGXDriverPoolConfiguration(t *testing.T) {
 				require.Equal(t, wantMax, parsed.MaxConns)
 				require.Equal(t, minConnections, parsed.MinConns)
 			})
+		}
+	}
+}
+
+func TestDriverPoolOverridesUseFinalDriver(t *testing.T) {
+	for _, kind := range []string{"postgres", "picodata", "crdb", "yugabyte", "mysql", "tidb", "ydb"} {
+		specific, field := "postgres", "maxConns"
+		if kind == "mysql" || kind == "tidb" || kind == "ydb" {
+			specific, field = "sql", "maxOpenConns"
+		}
+
+		for _, poolLast := range []bool{false, true} {
+			for _, driverLast := range []bool{false, true} {
+				t.Run(kind+map[bool]string{false: "/specific_last", true: "/pool_last"}[poolLast]+
+					map[bool]string{false: "/driver_first", true: "/driver_last"}[driverLast], func(t *testing.T) {
+					configs := runner.DriverCLIConfigs{}
+					if !driverLast {
+						require.NoError(t, applyDriverOpt(configs, "", "driverType", kind))
+					}
+
+					overrides := []runner.DriverOverride{
+						{Key: "pool." + field, Value: "5"},
+						{Key: specific + "." + field, Value: "7"},
+					}
+					want := int32(7)
+
+					if poolLast {
+						overrides[0], overrides[1] = overrides[1], overrides[0]
+						want = 5
+					}
+
+					for _, override := range overrides {
+						require.NoError(t, applyDriverOpt(configs, "", override.Key, override.Value))
+					}
+
+					if driverLast {
+						require.NoError(t, applyDriverOpt(configs, "", "driverType", kind))
+					}
+
+					cfg, err := buildDriverConfig("", configs[""])
+					require.NoError(t, err)
+
+					if specific == "postgres" {
+						require.Equal(t, want, cfg.Postgres.GetMaxConns())
+					} else {
+						require.Equal(t, want, cfg.SQL.GetMaxOpenConns())
+					}
+				})
+			}
 		}
 	}
 }
