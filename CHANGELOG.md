@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Fixed
+
+- CockroachDB and YugabyteDB retain their pool and PostgreSQL settings, TiDB retains its pool settings, and CLI pool overrides use the selected driver's actual backend.
+
 ## [6.2.1] - 2026-10-26
 
 ### Added
