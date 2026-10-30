@@ -19,6 +19,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 ### Fixed
 
 - TPC-C can select built-in dialects with `--sql-dialect`, including `crdb24` for CockroachDB 24.1 procedures, without copying SQL files to disk. ([#241](https://github.com/stroppy-io/stroppy/pull/241))
+- The README MySQL quick-start command uses the connection-string format accepted by the driver. ([#240](https://github.com/stroppy-io/stroppy/pull/240))
 
 ## [6.2.1] - 2026-10-26
 

@@ -72,7 +72,7 @@ Use `-d` to select a driver preset and `-D` to override driver options:
 
 ```bash
 stroppy run tpcc/tx -d pg
-stroppy run tpcc/tx -d mysql -D url=mysql://root:pass@localhost:3306/bench
+stroppy run tpcc/tx -d mysql -D 'url=root:pass@tcp(localhost:3306)/bench'
 stroppy run tpcc/tx -d pico
 stroppy run simple -d noop                  # framework/runner overhead only
 ```
