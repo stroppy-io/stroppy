@@ -23,6 +23,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 - `tpcb/procs` accepts CockroachDB and YugabyteDB while continuing to reject engines without stored procedures. ([#239](https://github.com/stroppy-io/stroppy/pull/239))
 - Insert results and `insert_rows_total` count rows actually drained by successful loaders, rather than source estimates for variable-size tables such as TPC-H lineitem. ([#238](https://github.com/stroppy-io/stroppy/pull/238))
 - YDB connections allow 30 seconds for authentication, discovery, and readiness on managed endpoints, while metadata fallback remains bounded to 3 seconds. ([#237](https://github.com/stroppy-io/stroppy/pull/237))
+- CockroachDB and YugabyteDB retain their pool and PostgreSQL settings, TiDB retains its pool settings, and CLI pool overrides use the selected driver's actual backend. ([#236](https://github.com/stroppy-io/stroppy/pull/236))
 
 ## [6.2.1] - 2026-10-26
 
