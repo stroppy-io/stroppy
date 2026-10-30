@@ -243,6 +243,42 @@ func TestPreparedReadFormsAndTransactionAffinity(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestRecordingSessionRejectsOverlappingCursors(t *testing.T) {
+	recorder := &record.Recorder{}
+	test := bench.Test{Name: "cursor", Define: func(d *bench.Def) error {
+		d.Execution.Step("work", func(ctx context.Context, b *bench.Bench) error {
+			s, err := b.Session(ctx)
+			if err != nil {
+				return err
+			}
+
+			p, err := s.Prepare(ctx, bench.QueryHandle{Name: "one", Text: "SELECT 1"})
+			if err != nil {
+				return err
+			}
+
+			rows, err := p.Query(ctx, nil)
+			if err != nil {
+				return err
+			}
+
+			if err := p.Exec(ctx, nil); !errors.Is(err, bench.ErrSessionBusy) {
+				return fmt.Errorf("overlapping cursor: %w", err)
+			}
+
+			if err := rows.Close(); err != nil {
+				return err
+			}
+
+			return p.Exec(ctx, nil)
+		})
+
+		return d.Execution.Err()
+	}}
+	_, err := testkit.Record(t.Context(), test, recorder, bench.RunOptions{})
+	require.NoError(t, err)
+}
+
 func TestWorkerCancellationRollsBackAndCloses(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()

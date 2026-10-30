@@ -36,6 +36,7 @@ type session struct {
 	closed      bool
 	transaction *sessionTransaction
 	statements  []*preparedStatement
+	cursor      *sessionRows
 }
 
 func (s *session) event(ctx context.Context, kind string, statement uint64, name, sql string) {
@@ -52,6 +53,14 @@ func (s *session) check(ctx context.Context, tx *sessionTransaction) error {
 
 	if s.closed {
 		return driver.ErrSessionClosed
+	}
+
+	if s.cursor != nil {
+		return driver.ErrSessionBusy
+	}
+
+	if tx != nil && tx.done {
+		return driver.ErrTransactionClosed
 	}
 
 	if s.transaction != tx {
@@ -86,7 +95,13 @@ func (s *session) query(
 		transaction = tx.id
 	}
 
-	return s.driver.query(context.WithValue(ctx, sessionOperationKey{}, identity), transaction, sql, args)
+	result, err := s.driver.query(context.WithValue(ctx, sessionOperationKey{}, identity), transaction, sql, args)
+	if err == nil && result != nil && result.Rows != nil {
+		s.cursor = &sessionRows{Rows: result.Rows, session: s}
+		result.Rows = s.cursor
+	}
+
+	return result, err
 }
 
 func (s *session) RunQuery(ctx context.Context, sql string, args map[string]any) (*driver.QueryResult, error) {
@@ -138,6 +153,12 @@ func (s *session) Close(ctx context.Context) error {
 		return nil
 	}
 
+	if s.cursor != nil {
+		_ = s.cursor.Rows.Close()
+		s.cursor.closed = true
+		s.cursor = nil
+	}
+
 	if s.transaction != nil {
 		s.transaction.finish(ctx, "rollback")
 	}
@@ -172,11 +193,58 @@ func (p *preparedStatement) Close(ctx context.Context) error {
 	defer s.mu.Unlock()
 
 	if !p.closed {
+		if s.cursor != nil {
+			return driver.ErrSessionBusy
+		}
+
 		p.closed = true
 		s.event(ctx, "statement_close", p.id, p.name, p.sql)
 	}
 
 	return nil
+}
+
+type sessionRows struct {
+	driver.Rows
+	session *session
+	closed  bool
+}
+
+func (r *sessionRows) Next() bool {
+	if r.closed {
+		return false
+	}
+
+	if r.Rows.Next() {
+		return true
+	}
+
+	_ = r.Close()
+
+	return false
+}
+
+func (r *sessionRows) ReadAll(limit int) [][]any {
+	values := r.Rows.ReadAll(limit)
+	_ = r.Close()
+
+	return values
+}
+
+func (r *sessionRows) Close() error {
+	r.session.mu.Lock()
+	defer r.session.mu.Unlock()
+
+	if r.closed {
+		return nil
+	}
+
+	r.closed = true
+	if r.session.cursor == r {
+		r.session.cursor = nil
+	}
+
+	return r.Rows.Close()
 }
 
 type sessionTransaction struct {
@@ -215,6 +283,10 @@ func (t *sessionTransaction) end(ctx context.Context, kind string) error {
 
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+
+	if t.session.cursor != nil {
+		return driver.ErrSessionBusy
 	}
 
 	t.finish(ctx, kind)
