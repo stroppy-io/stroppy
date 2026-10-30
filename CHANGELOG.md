@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- PostgreSQL and MySQL drivers can retain dedicated sessions with explicitly prepared statements reused across transactions; recording captures session and statement lifecycle.
+
 ## [6.2.1] - 2026-10-26
 
 ### Added
