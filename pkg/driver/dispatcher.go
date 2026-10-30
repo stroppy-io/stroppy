@@ -47,6 +47,12 @@ type (
 		Isolation() config.TxIsolationLevel
 	}
 
+	// PoolCapacity is optional so drivers without connection pools need no stub.
+	PoolCapacity interface {
+		// PoolMaxConns returns the effective connection cap; zero means unlimited or unknown.
+		PoolMaxConns() int
+	}
+
 	Driver interface {
 		// Insert runs a typed [InsertRequest] through the driver, streaming
 		// rows from a workload-authored [gen.BatchSource] into the database.

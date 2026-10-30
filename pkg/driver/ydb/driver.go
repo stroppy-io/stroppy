@@ -59,6 +59,8 @@ type Driver struct {
 
 var _ driver.Driver = (*Driver)(nil)
 
+func (d *Driver) PoolMaxConns() int { return d.db.Stats().MaxOpenConnections }
+
 func NewDriver(
 	ctx context.Context,
 	opts driver.Options,

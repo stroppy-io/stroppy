@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/stroppy-io/stroppy/v6/internal/testdriver"
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
@@ -271,6 +273,8 @@ func (e *Execution) database(ctx context.Context, name string) (driver.Driver, *
 	}
 
 	if slot := e.databases[name]; slot != nil {
+		e.warnPoolCapacity(name, slot)
+
 		return slot.drv, slot.cfg, nil
 	}
 
@@ -289,7 +293,9 @@ func (e *Execution) database(ctx context.Context, name string) (driver.Driver, *
 		return nil, nil, err
 	}
 
-	e.databases[name] = &databaseSlot{drv: drv, cfg: cfg}
+	slot := &databaseSlot{drv: drv, cfg: cfg}
+	e.databases[name] = slot
+	e.warnPoolCapacity(name, slot)
 
 	return drv, cfg, nil
 }
@@ -342,8 +348,31 @@ func (b *Bench) ensureDriver(ctx context.Context) error {
 }
 
 type databaseSlot struct {
-	drv driver.Driver
-	cfg *config.DriverConfig
+	drv             driver.Driver
+	cfg             *config.DriverConfig
+	poolWarningStep string
+}
+
+func (e *Execution) warnPoolCapacity(name string, slot *databaseSlot) {
+	pool, ok := slot.drv.(driver.PoolCapacity)
+	if !ok || slot.poolWarningStep == e.phase {
+		return
+	}
+
+	limit := pool.PoolMaxConns()
+	if limit <= 0 || e.workers <= limit {
+		return
+	}
+
+	slot.poolWarningStep = e.phase
+
+	if name == "" {
+		name = "default"
+	}
+
+	e.root.lg.Warn("workers exceed driver pool capacity; connection acquisition may queue on the client",
+		zap.String("database", name), zap.String("driver", slot.cfg.DriverType.String()),
+		zap.String("step", e.phase), zap.Int("workers", e.workers), zap.Int("max_connections", limit))
 }
 
 func defaultDriverConfig() DriverConfig {
