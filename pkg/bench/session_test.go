@@ -83,6 +83,8 @@ func TestWorkerPreparedSessionLifecycle(t *testing.T) {
 	result, err := testkit.Record(t.Context(), test, recorder, bench.RunOptions{})
 	require.NoError(t, err)
 	require.Positive(t, result.Executions["work"].StartupSeconds)
+	require.InDelta(t, 12., *result.Metrics["successful_transactions_total"].Total, 0)
+	require.InDelta(t, 12., *result.Metrics["run_query_operations_total"].Total, 0)
 
 	counts := map[string]int{}
 	for _, op := range recorder.Operations() {

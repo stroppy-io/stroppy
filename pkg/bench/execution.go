@@ -332,7 +332,10 @@ func (e *Execution) execute(
 
 	var wg sync.WaitGroup
 
-	fatal := make(chan error, opts.policy.workers)
+	// An action failure and its resource cleanup failure must both fit before joining.
+	const failuresPerWorker = 2
+
+	fatal := make(chan error, failuresPerWorker*opts.policy.workers)
 
 	panics := make(chan any, opts.policy.workers)
 	for worker := range opts.policy.workers {

@@ -83,6 +83,10 @@ func (e *Execution) initializeWorkers(
 		err = errors.Join(err, failure)
 	}
 
+	if err == nil {
+		err = startup.Err()
+	}
+
 	select {
 	case value := <-panics:
 		for _, worker := range workers {
