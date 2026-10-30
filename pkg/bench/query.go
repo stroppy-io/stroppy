@@ -332,6 +332,7 @@ type Tx struct {
 	start   time.Time
 	queries int
 	done    bool
+	session *Session
 }
 
 func (t *Tx) Exec(ctx context.Context, sql string, args map[string]any) error {
@@ -423,6 +424,12 @@ func (t *Tx) Commit(ctx context.Context) error {
 		return errTransactionClosed
 	}
 
+	if t.session != nil {
+		if err := t.session.closeRows(); err != nil {
+			return &commitError{err: err}
+		}
+	}
+
 	if t.tx != nil {
 		if err := t.tx.Commit(t.b.operationContext(ctx)); err != nil {
 			// A rejected COMMIT still ends the transaction, so record the end before
@@ -448,6 +455,16 @@ var errTransactionClosed = errors.New("transaction already finalized")
 func (t *Tx) Rollback(ctx context.Context) error {
 	if t.done {
 		return errTransactionClosed
+	}
+
+	if t.session != nil {
+		if err := t.session.closeRows(); err != nil {
+			rollbackErr := t.tx.Rollback(t.b.operationContext(ctx))
+			t.b.root.txMetrics.record(t.b.vu, "rollback", t.name, t.iso)
+			t.recordEnd("rollback", false)
+
+			return driver.JoinErrors(err, rollbackErr)
+		}
 	}
 
 	if t.tx != nil {

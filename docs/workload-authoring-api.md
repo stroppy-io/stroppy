@@ -153,6 +153,99 @@ explicit positive timeout. It does not register a future finalizer: early Go
 returns must still reach cleanup, or arrange the call with `defer`. Framework
 resource finalization always runs. Cleanup errors preserve earlier causes.
 
+## Dedicated sessions and prepared statements
+
+`Execution.WorkerStep(name, initialize, options...)` accepts a
+`func(context.Context, *Bench) (bench.Action, error)`. The initializer runs once
+per step-worker and returns the repeated action, whose closure owns ordinary Go
+state. Observation and filtered steps never invoke the initializer.
+
+All initializers must succeed before the iteration/duration budget and native
+throughput window start. Initialization has a 30-second deadline; actions must
+honor their contexts. Initialization failures stop the step and close resources
+already acquired by any worker. Reports record `startup_seconds` separately
+from `measurement_seconds`. Session cleanup runs after drain and before the
+step returns, outside the native measurement window.
+
+```go
+d.Execution.WorkerStep("read", func(ctx context.Context, b *bench.Bench) (bench.Action, error) {
+    session, err := b.Session(ctx)
+    if err != nil {
+        return nil, err
+    }
+    statement, err := session.Prepare(ctx, bench.QueryHandle{
+        Name: "account/read",
+        Text: "SELECT balance FROM account WHERE id = :id",
+    })
+    if err != nil {
+        return nil, err
+    }
+    return func(ctx context.Context, b *bench.Bench) error {
+        return b.LogicalOperation(func() error {
+            return session.BeginTx(ctx, bench.BeginOpts{
+                Name: "read", Isolation: bench.IsoReadCommitted,
+            }, func(tx *bench.Tx) error {
+                _, err := tx.QueryRowPrepared(ctx, statement, map[string]any{"id": int64(1)})
+                return err
+            })
+        })
+    }, nil
+}, bench.SharedIterations(4, 100))
+```
+
+`b.Session(ctx)` retains one physical connection per step-worker/database.
+Repeated calls return the same open session, including calls through newly
+created `b.Database(ref)` facades. `Use(ref)` selects the default database for
+both ordinary operations and session acquisition. Existing `Bench` calls remain
+pooled; acquiring a session does not redirect `b.Exec` or `b.Begin`.
+
+PostgreSQL and MySQL support this contract. Recording captures `session_open`,
+`prepare`, prepared `query`, `statement_close`, and `session_close`, with session,
+statement, query-name, and transaction identities. Other drivers return
+`ErrSessionUnsupported`; there is no ordinary-query fallback. Session support on
+other engines sharing these driver implementations is not independently certified.
+
+A dedicated session holds a pool connection throughout its worker lifetime.
+Known pool limits below the step's worker count fail with `ErrSessionCapacity`;
+acquisition is also bounded by 30 seconds and the caller's earlier deadline.
+Configure enough connections for all participating workers. Pooled operations
+issued while every connection is pinned still need spare pool capacity.
+
+`Session` offers ordinary query/read operations, `Prepare`, same-session `Begin`
+and `BeginTx`, and `Close(ctx)`. `Prepared` offers `Exec`, `Query`, `QueryRow`,
+`QueryValue[T]`, `QueryValues[T]`, `RawRow`, `RawRows`, `Identity`, and `Close(ctx)`.
+Transaction read/execution methods have corresponding `*Prepared` forms taking
+that session's prepared handle. Commit/rollback ends only the transaction;
+prepared handles survive. Transactions cannot use another session's statements.
+Direct session/prepared execution while a transaction is active returns
+`ErrSessionTransaction`; execute through the transaction handle instead. Session
+transactions reject `none` and `conn` isolation rather than inventing a boundary.
+
+Arguments, row ownership, per-statement deadlines, error classification, and
+exactly-once query metrics match ordinary queries. Preparation and close do not
+count as executed queries. One streaming cursor may be open per session; close
+or exhaust it before another operation. Transaction finalization closes remaining
+SDK cursors and preserves their errors. Use `LogicalOperation` for successful
+logical transaction throughput; `BeginTx` itself does not enable retries.
+
+Explicit close is idempotent. Runtime cleanup also closes cursors, rolls back any
+unfinished transaction, closes statements, and releases the connection, including
+partial initialization, failure, cancellation, and panic. Do not defer session
+close inside the initializer: its returned action still needs the session.
+These handles belong to one worker; do not share them between concurrent actions.
+
+A lost connection invalidates the session and its statements with
+`ErrSessionInvalidated`; failed writes are never automatically replayed. Close
+the old session, call `b.Session(ctx)` again, restore any session state, and
+prepare new handles. Timeouts do not necessarily lose a connection: PostgreSQL
+may preserve it, while client-canceled MySQL queries discard it. MySQL's fixed
+server timeout hint is applied when preparing eligible SELECT statements.
+Prepared support does not establish identical wire traffic to another driver or
+workload; compare transport behavior before claiming scheduler-only overhead.
+
+See [`examples/authoring/prepared.go`](../examples/authoring/prepared.go) for a
+complete counter workload with per-worker state, validation, and schema cleanup.
+
 ## Policies and drain
 
 ```go

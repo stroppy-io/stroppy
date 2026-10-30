@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	catalog, err := bench.NewCatalog(authoring.Query, authoring.Accounts, authoring.Mirror)
+	catalog, err := bench.NewCatalog(authoring.Query, authoring.Accounts, authoring.Mirror, authoring.Prepared)
 	if err == nil {
 		var application *stroppy.Application
 
