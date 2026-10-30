@@ -12,8 +12,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
-- Go workloads can initialize worker-local state before measurement and use dedicated sessions with reusable prepared statements, same-session transactions, and automatic cleanup through the public SDK.
-- PostgreSQL and MySQL drivers can retain dedicated sessions with explicitly prepared statements reused across transactions; recording captures session and statement lifecycle.
+- Go workloads can initialize worker-local state before measurement and use dedicated sessions with reusable prepared statements, same-session transactions, and automatic cleanup through the public SDK. ([#243](https://github.com/stroppy-io/stroppy/pull/243))
+- PostgreSQL and MySQL drivers can retain dedicated sessions with explicitly prepared statements reused across transactions; recording captures session and statement lifecycle. ([#243](https://github.com/stroppy-io/stroppy/pull/243))
 
 ## [6.2.1] - 2026-10-26
 
