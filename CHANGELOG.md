@@ -10,10 +10,22 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+## [6.3.0] - 2026-10-30
+
 ### Added
 
 - Go workloads can initialize worker-local state before measurement and use dedicated sessions with reusable prepared statements, same-session transactions, and automatic cleanup through the public SDK. ([#243](https://github.com/stroppy-io/stroppy/pull/243))
 - PostgreSQL and MySQL drivers can retain dedicated sessions with explicitly prepared statements reused across transactions; recording captures session and statement lifecycle. ([#243](https://github.com/stroppy-io/stroppy/pull/243))
+- Runs warn once per step and database when worker concurrency exceeds the driver's effective connection-pool limit, making possible client-side queueing visible without resizing the pool. ([#242](https://github.com/stroppy-io/stroppy/pull/242))
+
+### Fixed
+
+- TPC-C can select built-in dialects with `--sql-dialect`, including `crdb24` for CockroachDB 24.1 procedures, without copying SQL files to disk. ([#241](https://github.com/stroppy-io/stroppy/pull/241))
+- The README MySQL quick-start command uses the connection-string format accepted by the driver. ([#240](https://github.com/stroppy-io/stroppy/pull/240))
+- `tpcb/procs` accepts CockroachDB and YugabyteDB while continuing to reject engines without stored procedures. ([#239](https://github.com/stroppy-io/stroppy/pull/239))
+- Insert results and `insert_rows_total` count rows actually drained by successful loaders, rather than source estimates for variable-size tables such as TPC-H lineitem. ([#238](https://github.com/stroppy-io/stroppy/pull/238))
+- YDB connections allow 30 seconds for authentication, discovery, and readiness on managed endpoints, while metadata fallback remains bounded to 3 seconds. ([#237](https://github.com/stroppy-io/stroppy/pull/237))
+- CockroachDB and YugabyteDB retain their pool and PostgreSQL settings, TiDB retains its pool settings, and CLI pool overrides use the selected driver's actual backend. ([#236](https://github.com/stroppy-io/stroppy/pull/236))
 
 ## [6.2.1] - 2026-10-26
 

@@ -52,7 +52,9 @@ func TestProcsSharesTxParams(t *testing.T) {
 // create_procedures + workload_procs/tpcb_transaction contract the procs
 // variant executes.
 func TestProcsResolvesProcSection(t *testing.T) {
-	for _, dt := range []bench.DriverTypeName{bench.DriverPostgres, bench.DriverMySQL} {
+	for _, dt := range []bench.DriverTypeName{
+		bench.DriverPostgres, bench.DriverMySQL, bench.DriverCRDB, bench.DriverYugabyte,
+	} {
 		sql := mustLoadSQL(dt, "")
 
 		if got := sql.Section("create_procedures"); len(got) == 0 {
@@ -93,6 +95,9 @@ func TestProcsSupported(t *testing.T) {
 	}{
 		{bench.DriverPostgres, true},
 		{bench.DriverMySQL, true},
+		{bench.DriverCRDB, true},
+		{bench.DriverYugabyte, true},
+		{bench.DriverTiDB, false},
 		{bench.DriverNoop, true},
 		{bench.DriverPicodata, false},
 		{bench.DriverYDB, false},
@@ -102,6 +107,23 @@ func TestProcsSupported(t *testing.T) {
 		if got := procsSupported(c.driver); got != c.want {
 			t.Errorf("procsSupported(%s) = %v, want %v", c.driver, got, c.want)
 		}
+	}
+}
+
+func TestProcsUnsupportedDriverGuidance(t *testing.T) {
+	catalog, err := bench.NewCatalog(Tx, Procs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = catalog.Resolve("tpcb/procs", bench.ParamInputs{},
+		map[string]bench.DriverConfig{"": {Kind: bench.DriverCSV}})
+	if !errors.Is(err, errProcsDriverUnsupported) {
+		t.Fatalf("error=%v, want unsupported procedures", err)
+	}
+
+	if !strings.Contains(err.Error(), "drivers with transaction support") {
+		t.Fatalf("unqualified transaction recommendation: %v", err)
 	}
 }
 

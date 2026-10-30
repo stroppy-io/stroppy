@@ -69,6 +69,15 @@ type Driver struct {
 	queryTimeout time.Duration
 }
 
+func (d *Driver) PoolMaxConns() int {
+	cfg := d.pool.Config()
+	if cfg == nil {
+		return 0
+	}
+
+	return int(cfg.MaxConns)
+}
+
 // NewDriver creates a new Picodata driver instance.
 func NewDriver(
 	ctx context.Context,

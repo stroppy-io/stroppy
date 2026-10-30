@@ -178,10 +178,13 @@ make tmpfs-down
 
 ### CockroachDB SQL
 
-Use `--sql-file crdb.sql` with the PostgreSQL driver for CockroachDB.
-For CockroachDB 24.1, select `--sql-file crdb24.sql`; its procedures use
-WHILE loops supported by that version. Both variants retain the expected
-TPC-C rollback and use Cockroach-compatible decimal arithmetic and statistics.
+Use `-d crdb` for CockroachDB; it selects the built-in `crdb.sql`.
+For CockroachDB 24.1, add `--sql-dialect crdb24`; its procedures use
+WHILE loops supported by that version. `--sql-dialect` selects a built-in
+TPC-C asset without consulting local files. `--sql-file` remains an explicit
+filesystem path; the two selectors cannot be combined.
+Both variants retain the expected TPC-C rollback and use Cockroach-compatible
+decimal arithmetic and statistics.
 The cloud compiler selects the variant from the catalog database version.
 These SQL variants ignore `--pg-unlogged`: loading keeps CockroachDB's normal
 durability and does not issue PostgreSQL-only `SET UNLOGGED`/`SET LOGGED` commands.

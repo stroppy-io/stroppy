@@ -1003,6 +1003,7 @@ func writeReportFile(path string, data []byte) (retErr error) {
 // name ("noop"). Retained -D entries undergo strict decoding before their
 // nested driver fields merge with config-file values.
 func buildDriverConfig(idx string, cfg *runner.DriverCLIConfig) (*config.DriverConfig, error) {
+	// Validate original keys before collapsing pool aliases so duplicate options still fail.
 	overrides, err := cfg.DecodeOverrides()
 	if err != nil {
 		return nil, invalidConfig(fmt.Errorf("driver %s: %w", idx, err))
@@ -1053,6 +1054,13 @@ func buildDriverConfig(idx string, cfg *runner.DriverCLIConfig) (*config.DriverC
 	}
 
 	if overrides != nil {
+		cli := &runner.DriverCLIConfig{Overrides: driverPoolOverrides(dc.DriverType.String(), cfg.Overrides)}
+
+		overrides, err = cli.DecodeOverrides()
+		if err != nil {
+			return nil, invalidConfig(fmt.Errorf("driver %s: %w", idx, err))
+		}
+
 		if err := applyDriverRunConfigExtras(idx, dc, overrides); err != nil {
 			return nil, invalidConfig(err)
 		}
@@ -1151,12 +1159,12 @@ func applicableDriverPool(
 	driverType config.DriverType,
 	fileConfig *config.DriverRunConfig,
 ) *config.PoolConfig {
-	if driverType == config.DriverTypePostgres || driverType == config.DriverTypePicodata {
+	if driverUsesPGXPool(driverType) {
 		if fileConfig.SQL != nil {
 			warnIgnoredDriverExtra(
 				idx,
 				"sql",
-				"PostgreSQL and Picodata use pgx pool settings",
+				"selected driver uses pgx pool settings",
 			)
 
 			fileConfig.SQL = nil
@@ -1165,7 +1173,7 @@ func applicableDriverPool(
 		warnIgnoredDriverExtra(
 			idx,
 			"postgres",
-			"only PostgreSQL and Picodata use pgx pool settings",
+			"selected driver does not use pgx pool settings",
 		)
 
 		fileConfig.Postgres = nil
@@ -1184,16 +1192,18 @@ func applicableDriverPool(
 	return fileConfig.Pool
 }
 
-func driverSupportsPool(driverType config.DriverType) bool {
+func driverUsesPGXPool(driverType config.DriverType) bool {
 	switch driverType {
-	case config.DriverTypePostgres,
-		config.DriverTypeMySQL,
-		config.DriverTypePicodata,
-		config.DriverTypeYDB:
+	case config.DriverTypePostgres, config.DriverTypePicodata, config.DriverTypeCRDB, config.DriverTypeYugabyte:
 		return true
 	default:
 		return false
 	}
+}
+
+func driverSupportsPool(driverType config.DriverType) bool {
+	return driverUsesPGXPool(driverType) || driverType == config.DriverTypeMySQL ||
+		driverType == config.DriverTypeTiDB || driverType == config.DriverTypeYDB
 }
 
 func mergePoolDriverSpecific(
@@ -1201,7 +1211,7 @@ func mergePoolDriverSpecific(
 	pool *config.PoolConfig,
 	driverConfig *config.DriverConfig,
 ) {
-	if driverType == config.DriverTypePostgres || driverType == config.DriverTypePicodata {
+	if driverUsesPGXPool(driverType) {
 		postgres := poolPostgresConfig(pool)
 		if specific := driverConfig.Postgres; specific != nil {
 			postgres = runner.MergePostgresConfig(postgres, specific)
@@ -1799,15 +1809,33 @@ func applyDriverOpt(configs runner.DriverCLIConfigs, idx, key, value string) err
 		configs[idx] = cfg
 	}
 
-	if err := cfg.ApplyOverride(key, value); err != nil {
-		return err
+	return cfg.ApplyOverride(key, value)
+}
+
+func driverPoolOverrides(driverType string, overrides []runner.DriverOverride) []runner.DriverOverride {
+	mapped := make([]runner.DriverOverride, 0, len(overrides))
+	for _, override := range overrides {
+		if specificKey := poolSpecificDriverOverride(driverType, override.Key); specificKey != "" {
+			override.Key = specificKey
+		}
+
+		found := false
+
+		for index := range mapped {
+			if mapped[index].Key == override.Key {
+				mapped[index] = override
+				found = true
+
+				break
+			}
+		}
+
+		if !found {
+			mapped = append(mapped, override)
+		}
 	}
 
-	if specificKey := poolSpecificDriverOverride(cfg.DriverType, key); specificKey != "" {
-		return cfg.ApplyOverride(specificKey, value)
-	}
-
-	return nil
+	return mapped
 }
 
 func poolSpecificDriverOverride(driverType, key string) string {
@@ -1817,7 +1845,7 @@ func poolSpecificDriverOverride(driverType, key string) string {
 	}
 
 	switch driverType {
-	case "postgres":
+	case "postgres", "picodata", "crdb", "yugabyte":
 		switch field {
 		case "maxConns", "minConns", "minIdleConns",
 			"maxConnLifetime", "maxConnIdleTime", "traceLogLevel",
@@ -1826,7 +1854,7 @@ func poolSpecificDriverOverride(driverType, key string) string {
 		default:
 			return ""
 		}
-	case "mysql", "picodata", "ydb":
+	case "mysql", "tidb", "ydb":
 		switch field {
 		case "maxOpenConns", "maxIdleConns", "connMaxLifetime", "connMaxIdleTime":
 			return "sql." + field
