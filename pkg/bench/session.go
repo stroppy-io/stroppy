@@ -102,7 +102,10 @@ func (s *Session) Prepare(ctx context.Context, query QueryHandle) (*Prepared, er
 }
 
 func (p *Prepared) Close(ctx context.Context) error {
-	return p.backend.Close(p.b.operationContext(ctx))
+	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), defaultCleanupTimeout)
+	defer cancel()
+
+	return p.backend.Close(p.b.operationContext(cleanup))
 }
 
 func (s *Session) Begin(ctx context.Context, opts BeginOpts) (*Tx, error) {
@@ -165,6 +168,11 @@ func (s *Session) Close(ctx context.Context) error {
 	if s.closed {
 		return nil
 	}
+
+	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), defaultCleanupTimeout)
+	defer cancel()
+
+	ctx = cleanup
 
 	err := s.closeRows()
 	if s.transaction != nil && !s.transaction.done {

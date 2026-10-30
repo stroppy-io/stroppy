@@ -2,6 +2,7 @@ package sqldriver
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -29,6 +30,7 @@ type sessionTestConnection struct {
 	valid                                                                bool
 	args                                                                 []any
 	sql                                                                  string
+	closeErr, commitErr                                                  error
 }
 
 func (c *sessionTestConnection) QueryContext(context.Context, string, ...any) (driver.Rows, error) {
@@ -65,7 +67,7 @@ func (p *sessionTestStatement) QueryContext(_ context.Context, args ...any) (dri
 func (p *sessionTestStatement) Close(context.Context) error {
 	p.connection.statementClosed++
 
-	return nil
+	return p.connection.closeErr
 }
 
 type sessionTestTransaction struct{ *sessionTestConnection }
@@ -73,7 +75,7 @@ type sessionTestTransaction struct{ *sessionTestConnection }
 func (t *sessionTestTransaction) Commit(context.Context) error {
 	t.committed++
 
-	return nil
+	return t.commitErr
 }
 
 func (t *sessionTestTransaction) Rollback(context.Context) error {
@@ -129,6 +131,34 @@ func TestSessionCursorAndTransactionCleanup(t *testing.T) {
 	require.Equal(t, 1, connection.rolledBack)
 	require.Equal(t, 1, connection.statementClosed)
 	require.Equal(t, 1, connection.released)
+}
+
+func TestPreparedCloseFailureRetainsCleanupOwnership(t *testing.T) {
+	failure := errors.New("deallocation failed")
+	connection := &sessionTestConnection{valid: true, closeErr: failure}
+	s := NewSession(connection, func(rows driver.Rows) driver.Rows { return rows }, qmark{}, zap.NewNop(), 0)
+	p, err := s.Prepare(t.Context(), "one", "SELECT 1")
+	require.NoError(t, err)
+	require.ErrorIs(t, p.Close(t.Context()), failure)
+	require.Len(t, s.statements, 1)
+
+	connection.closeErr = nil
+
+	require.NoError(t, p.Close(t.Context()))
+	require.Empty(t, s.statements)
+	require.NoError(t, s.Close(t.Context()))
+	require.Equal(t, 2, connection.statementClosed)
+}
+
+func TestSessionCommitFailureRollsBackBeforeReuse(t *testing.T) {
+	failure := errors.New("commit failed")
+	connection := &sessionTestConnection{valid: true, commitErr: failure}
+	s := NewSession(connection, func(rows driver.Rows) driver.Rows { return rows }, qmark{}, zap.NewNop(), 0)
+	tx, err := s.Begin(t.Context(), config.TxIsolationLevelReadCommitted)
+	require.NoError(t, err)
+	require.ErrorIs(t, tx.Commit(t.Context()), failure)
+	require.Equal(t, 1, connection.rolledBack)
+	require.NoError(t, s.Close(t.Context()))
 }
 
 func TestSessionInvalidatesWithoutReplay(t *testing.T) {

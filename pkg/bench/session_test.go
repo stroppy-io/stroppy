@@ -127,7 +127,11 @@ func TestWorkerInitializationFailureClosesPartialSessions(t *testing.T) {
 				return nil, err
 			}
 
-			return nil, failure
+			return func(context.Context, *bench.Bench) error {
+				actions.Add(1)
+
+				return nil
+			}, failure
 		}, bench.SharedIterations(1, 10))
 
 		return d.Execution.Err()

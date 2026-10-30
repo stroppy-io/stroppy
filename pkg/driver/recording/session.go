@@ -2,6 +2,7 @@ package recording
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
@@ -36,6 +37,7 @@ type session struct {
 	closed      bool
 	transaction *sessionTransaction
 	statements  []*preparedStatement
+	sequence    uint64
 	cursor      *sessionRows
 }
 
@@ -116,7 +118,8 @@ func (s *session) Prepare(ctx context.Context, name, sql string) (driver.Prepare
 		return nil, err
 	}
 
-	p := &preparedStatement{session: s, id: uint64(len(s.statements) + 1), name: name, sql: sql}
+	s.sequence++
+	p := &preparedStatement{session: s, id: s.sequence, name: name, sql: sql}
 	s.statements = append(s.statements, p)
 	s.event(ctx, "prepare", p.id, name, sql)
 
@@ -170,6 +173,7 @@ func (s *session) Close(ctx context.Context) error {
 		}
 	}
 
+	s.statements = nil
 	s.closed = true
 	s.event(ctx, "session_close", 0, "", "")
 
@@ -199,6 +203,7 @@ func (p *preparedStatement) Close(ctx context.Context) error {
 
 		p.closed = true
 		s.event(ctx, "statement_close", p.id, p.name, p.sql)
+		s.statements = slices.DeleteFunc(s.statements, func(statement *preparedStatement) bool { return statement == p })
 	}
 
 	return nil

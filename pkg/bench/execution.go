@@ -191,11 +191,7 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 		workers, err = e.initializeWorkers(ctx, name, &opts)
 		startupSeconds = time.Since(startupStarted).Seconds()
 
-		defer func() {
-			for _, worker := range workers {
-				_ = worker.b.vu.closeSessions(ctx)
-			}
-		}()
+		defer func() { _ = closeStepWorkers(ctx, workers) }()
 	}
 
 	windowStarted := false
@@ -215,9 +211,7 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 		e.root.throughput.stop()
 	}
 
-	for _, worker := range workers {
-		err = errors.Join(err, worker.b.vu.closeSessions(ctx))
-	}
+	err = errors.Join(err, closeStepWorkers(ctx, workers))
 
 	elapsed := time.Since(started)
 
@@ -332,10 +326,8 @@ func (e *Execution) execute(
 
 	var wg sync.WaitGroup
 
-	// An action failure and its resource cleanup failure must both fit before joining.
-	const failuresPerWorker = 2
-
-	fatal := make(chan error, failuresPerWorker*opts.policy.workers)
+	fatal := make(chan error, opts.policy.workers)
+	cleanupFailures := make(chan error, opts.policy.workers)
 
 	panics := make(chan any, opts.policy.workers)
 	for worker := range opts.policy.workers {
@@ -367,7 +359,7 @@ func (e *Execution) execute(
 			vu.metricWriter, _ = vu.ctx.Value(metricWriterContextKey{}).(*metricWriter)
 
 			if initialized == nil {
-				defer cleanupWorker(vu, ctx, fatal, cancel)
+				defer cleanupWorker(vu, ctx, cleanupFailures, cancel)
 			}
 
 			for {
@@ -448,14 +440,7 @@ func (e *Execution) execute(
 	default:
 	}
 
-	close(fatal)
-
-	var failure error
-	for err := range fatal {
-		failure = errors.Join(failure, err)
-	}
-
-	return errors.Join(failure, parent.Err())
+	return workerFailures(parent.Err(), fatal, cleanupFailures)
 }
 
 var errDrainExpired = fmt.Errorf("duration drain expired: %w", context.DeadlineExceeded)

@@ -7,12 +7,51 @@ import (
 	"sync"
 )
 
+func workerFailures(parent error, fatal, cleanup chan error) error {
+	var failure error
+	select {
+	case failure = <-fatal:
+	default:
+	}
+
+	close(cleanup)
+
+	for err := range cleanup {
+		failure = errors.Join(failure, err)
+	}
+
+	return errors.Join(failure, parent)
+}
+
 func cleanupWorker(vu *VU, ctx context.Context, failures chan<- error, cancel context.CancelCauseFunc) {
 	if err := vu.closeSessions(ctx); err != nil {
 		failures <- err
 
 		cancel(err)
 	}
+}
+
+func closeStepWorkers(ctx context.Context, workers []*stepWorker) error {
+	var wg sync.WaitGroup
+
+	failures := make(chan error, len(workers))
+	for _, worker := range workers {
+		wg.Go(func() {
+			if err := worker.b.vu.closeSessions(ctx); err != nil {
+				failures <- err
+			}
+		})
+	}
+
+	wg.Wait()
+	close(failures)
+
+	var err error
+	for failure := range failures {
+		err = errors.Join(err, failure)
+	}
+
+	return err
 }
 
 type stepWorker struct {
@@ -89,9 +128,7 @@ func (e *Execution) initializeWorkers(
 
 	select {
 	case value := <-panics:
-		for _, worker := range workers {
-			_ = worker.b.vu.closeSessions(ctx)
-		}
+		_ = closeStepWorkers(ctx, workers)
 
 		panic(value)
 	default:

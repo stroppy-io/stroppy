@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
@@ -55,7 +56,7 @@ func (c *sessionConnection) Begin(
 		return nil, err
 	}
 
-	return &pgxTxAdapter{tx}, nil
+	return &sessionTransaction{pgxTxAdapter{tx}}, nil
 }
 
 func (c *sessionConnection) Close(context.Context) error {
@@ -64,6 +65,17 @@ func (c *sessionConnection) Close(context.Context) error {
 	return nil
 }
 func (c *sessionConnection) Valid() bool { return !c.conn.Conn().IsClosed() }
+
+type sessionTransaction struct{ pgxTxAdapter }
+
+func (t *sessionTransaction) Rollback(ctx context.Context) error {
+	err := t.pgxTxAdapter.Rollback(ctx)
+	if errors.Is(err, pgx.ErrTxClosed) {
+		return driver.ErrTransactionClosed
+	}
+
+	return err
+}
 
 type preparedStatement struct {
 	conn *pgx.Conn

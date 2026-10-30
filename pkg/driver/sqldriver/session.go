@@ -2,8 +2,10 @@ package sqldriver
 
 import (
 	"context"
+	stdsql "database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -176,6 +178,8 @@ func (s *Session[R]) Close(ctx context.Context) error {
 		}
 	}
 
+	s.statements = nil
+
 	return driver.JoinErrors(err, s.conn.Close(ctx))
 }
 
@@ -227,9 +231,14 @@ func (p *prepared[R]) Close(ctx context.Context) error {
 		return driver.ErrSessionBusy
 	}
 
-	p.closed = true
+	if err := p.statement.Close(ctx); err != nil {
+		return err
+	}
 
-	return p.statement.Close(ctx)
+	p.closed = true
+	s.statements = slices.DeleteFunc(s.statements, func(statement *prepared[R]) bool { return statement == p })
+
+	return nil
 }
 
 type sessionTx[R any] struct {
@@ -288,6 +297,16 @@ func (t *sessionTx[R]) end(ctx context.Context, commit bool) error {
 	var err error
 	if commit {
 		err = t.conn.Commit(ctx)
+		if err != nil && s.conn.Valid() {
+			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+			rollbackErr := t.conn.Rollback(cleanup)
+
+			cancel()
+
+			if !errors.Is(rollbackErr, driver.ErrTransactionClosed) && !errors.Is(rollbackErr, stdsql.ErrTxDone) {
+				err = driver.JoinErrors(err, rollbackErr)
+			}
+		}
 	} else {
 		err = t.conn.Rollback(ctx)
 	}
