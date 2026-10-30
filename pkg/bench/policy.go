@@ -223,11 +223,12 @@ func (s RunSettings) Policy() Policy {
 type (
 	StepOption  interface{ applyStep(options *stepOptions) }
 	stepOptions struct {
-		policy   Policy
-		always   bool
-		cleanup  time.Duration
-		measured bool
-		driver   DriverRef
+		policy     Policy
+		always     bool
+		cleanup    time.Duration
+		measured   bool
+		driver     DriverRef
+		initialize WorkerInit
 	}
 )
 type stepOption func(*stepOptions)

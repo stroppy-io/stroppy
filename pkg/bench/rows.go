@@ -96,6 +96,7 @@ type Rows struct {
 	bench   *Bench
 	closed  bool
 	err     error
+	onClose func()
 }
 
 func (r *Rows) Next() bool {
@@ -123,7 +124,11 @@ func (r *Rows) Err() error {
 func (r *Rows) Close() error {
 	if !r.closed {
 		r.closed = true
+
 		r.err = r.bench.finishQuery(r.result, r.err)
+		if r.onClose != nil {
+			r.onClose()
+		}
 	}
 
 	return r.err
@@ -144,7 +149,12 @@ func (t *Tx) Query(ctx context.Context, sql string, args map[string]any) (*Rows,
 		return nil, t.b.finishQuery(result, err)
 	}
 
-	return newRows(t.b, result), nil
+	rows := newRows(t.b, result)
+	if t.session != nil {
+		t.session.trackRows(rows)
+	}
+
+	return rows, nil
 }
 
 func newRows(b *Bench, result *driver.QueryResult) *Rows {

@@ -16,6 +16,9 @@ import (
 // Action is ordinary work independent of its execution policy.
 type Action func(context.Context, *Bench) error
 
+// WorkerInit creates worker-local state before the measured iteration window.
+type WorkerInit func(context.Context, *Bench) (Action, error)
+
 // StepStatus describes an immediate step outcome.
 type StepStatus string
 
@@ -58,6 +61,16 @@ type Execution struct {
 	policies     map[string]report.Execution
 	failurePhase string
 	filter       *stepFilterState
+}
+
+func (e *Execution) WorkerStep(name string, initialize WorkerInit, options ...StepOption) Result {
+	if initialize == nil {
+		invalid("worker step", inputError("initializer is required"))
+	}
+
+	options = append(options, stepOption(func(opts *stepOptions) { opts.initialize = initialize }))
+
+	return e.Step(name, func(context.Context, *Bench) error { return nil }, options...)
 }
 
 func (e *Execution) Err() error { return e.err }
@@ -166,45 +179,44 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 	}
 
 	measured := opts.measured || opts.policy.mode != "once"
-	if measured {
-		if err := e.root.startThroughput(name, opts.policy.workers); err != nil {
-			e.err = errors.Join(e.err, err)
 
-			return Result{Status: Failed, Err: err}
-		}
+	var (
+		workers        []*stepWorker
+		err            error
+		startupSeconds float64
+	)
+
+	if opts.initialize != nil {
+		startupStarted := time.Now()
+		workers, err = e.initializeWorkers(ctx, name, &opts)
+		startupSeconds = time.Since(startupStarted).Seconds()
+
+		defer func() { _ = closeStepWorkers(ctx, workers) }()
+	}
+
+	windowStarted := false
+
+	if measured && err == nil {
+		err = e.root.startThroughput(name, opts.policy.workers)
+		windowStarted = err == nil
+
 		defer e.root.throughput.stop()
 	}
 
-	err := e.execute(ctx, name, action, &opts)
+	if err == nil {
+		err = e.execute(ctx, name, action, &opts, workers)
+	}
+
 	if measured {
 		e.root.throughput.stop()
 	}
 
+	err = errors.Join(err, closeStepWorkers(ctx, workers))
+
 	elapsed := time.Since(started)
 
-	if measured {
-		window := e.root.throughput.windows[len(e.root.throughput.windows)-1]
-		seconds := window.seconds()
-		e.measurements[name] = seconds
-
-		policyReport := report.Execution{
-			Executor:           opts.policy.mode,
-			Workers:            opts.policy.workers,
-			Iterations:         opts.policy.iterations,
-			DurationSeconds:    opts.policy.duration.Seconds(),
-			DrainUnlimited:     opts.policy.drain.unlimited,
-			MeasurementSeconds: seconds,
-		}
-		if opts.policy.mode == "constant-vus" {
-			if !opts.policy.drain.unlimited {
-				timeout := opts.policy.drain.duration.Seconds()
-				policyReport.DrainTimeoutSeconds = &timeout
-			}
-
-			policyReport.DrainSeconds = max(0, seconds-opts.policy.duration.Seconds())
-		}
-
-		e.policies[name] = policyReport
+	if windowStarted {
+		e.recordPolicy(name, opts.policy, startupSeconds)
 	}
 
 	status := Completed
@@ -232,6 +244,28 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 	return Result{status, err}
 }
 
+func (e *Execution) recordPolicy(name string, policy Policy, startupSeconds float64) {
+	window := e.root.throughput.windows[len(e.root.throughput.windows)-1]
+	seconds := window.seconds()
+	e.measurements[name] = seconds
+
+	value := report.Execution{
+		Executor: policy.mode, Workers: policy.workers, Iterations: policy.iterations,
+		DurationSeconds: policy.duration.Seconds(), DrainUnlimited: policy.drain.unlimited,
+		MeasurementSeconds: seconds, StartupSeconds: startupSeconds,
+	}
+	if policy.mode == "constant-vus" {
+		if !policy.drain.unlimited {
+			timeout := policy.drain.duration.Seconds()
+			value.DrainTimeoutSeconds = &timeout
+		}
+
+		value.DrainSeconds = max(0, seconds-policy.duration.Seconds())
+	}
+
+	e.policies[name] = value
+}
+
 func (e *Execution) bench(vu *VU, name string) *Bench {
 	cfg, err := e.configuration(name).runtime()
 	if err != nil {
@@ -252,7 +286,9 @@ func (e *Execution) bench(vu *VU, name string) *Bench {
 }
 
 //nolint:gocognit,cyclop // worker joining, cancellation causes and budgets share one loop.
-func (e *Execution) execute(parent context.Context, name string, action Action, opts *stepOptions) error {
+func (e *Execution) execute(
+	parent context.Context, name string, action Action, opts *stepOptions, initialized []*stepWorker,
+) error {
 	parent = context.WithValue(parent, metricStepKey{}, name)
 
 	ctx, cancel := context.WithCancelCause(parent)
@@ -291,6 +327,7 @@ func (e *Execution) execute(parent context.Context, name string, action Action, 
 	var wg sync.WaitGroup
 
 	fatal := make(chan error, opts.policy.workers)
+	cleanupFailures := make(chan error, opts.policy.workers)
 
 	panics := make(chan any, opts.policy.workers)
 	for worker := range opts.policy.workers {
@@ -308,18 +345,22 @@ func (e *Execution) execute(parent context.Context, name string, action Action, 
 					}
 				}
 			}()
-			//nolint:gosec // worker is nonnegative and bounded by validated policy.
-			vu := &VU{
-				root:      e.root,
-				ctx:       metricWorkerContext(ctx, worker, opts.policy.workers),
-				vuid:      uint64(worker) + 1,
-				worker:    worker,
-				stepTag:   name,
-				initPhase: opts.policy.mode == "once",
+
+			state := e.newStepWorker(ctx, name, worker, opts)
+			workerAction := action
+
+			if initialized != nil {
+				state = initialized[worker]
+				workerAction = state.action
+				state.b.vu.ctx = metricWorkerContext(ctx, worker, opts.policy.workers)
 			}
+
+			b, vu := state.b, state.b.vu
 			vu.metricWriter, _ = vu.ctx.Value(metricWriterContextKey{}).(*metricWriter)
-			vu.metricStepAttrs = e.root.txMetrics.stepAttributes(name)
-			b := e.bench(vu, opts.driver.name)
+
+			if initialized == nil {
+				defer cleanupWorker(vu, ctx, cleanupFailures, cancel)
+			}
 
 			for {
 				if ctx.Err() != nil {
@@ -337,7 +378,7 @@ func (e *Execution) execute(parent context.Context, name string, action Action, 
 				started := time.Now()
 				vu.logicalSucceeded = false
 
-				err := action(vu.ctx, b)
+				err := workerAction(vu.ctx, b)
 				if err == nil && !vu.logicalSucceeded && errors.Is(context.Cause(ctx), errDrainExpired) {
 					err = errDrainExpired
 				}
@@ -399,13 +440,7 @@ func (e *Execution) execute(parent context.Context, name string, action Action, 
 	default:
 	}
 
-	select {
-	case err := <-fatal:
-		return err
-	default:
-	}
-
-	return parent.Err()
+	return workerFailures(parent.Err(), fatal, cleanupFailures)
 }
 
 var errDrainExpired = fmt.Errorf("duration drain expired: %w", context.DeadlineExceeded)

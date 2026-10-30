@@ -79,6 +79,9 @@ func (d *Driver) query(
 		Scope: record.ContextScope(ctx), Kind: "query", Transaction: transaction,
 		SQL: sql, Arguments: map[string]record.Value{},
 	}
+	if identity, ok := ctx.Value(sessionOperationKey{}).(sessionOperation); ok {
+		operation.Session, operation.Statement, operation.QueryName = identity.session, identity.statement, identity.name
+	}
 
 	for name, value := range args {
 		encoded, err := record.Encode(value)

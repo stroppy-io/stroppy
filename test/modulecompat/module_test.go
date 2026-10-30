@@ -213,7 +213,7 @@ func prepareConsumer(t *testing.T) string {
 		t.Fatal(err)
 	}
 
-	for _, name := range []string{"query.go", "accounts.go", "mirror.go"} {
+	for _, name := range []string{"query.go", "accounts.go", "mirror.go", "prepared.go"} {
 		copyFile(t, filepath.Join("..", "..", "examples", "authoring", name), filepath.Join(examples, name))
 	}
 

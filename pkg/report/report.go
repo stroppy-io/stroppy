@@ -180,5 +180,6 @@ type Execution struct {
 	DrainTimeoutSeconds *float64 `json:"drain_timeout_seconds"`
 	DrainUnlimited      bool     `json:"drain_unlimited,omitempty"`
 	MeasurementSeconds  float64  `json:"measurement_seconds"`
+	StartupSeconds      float64  `json:"startup_seconds,omitempty"`
 	DrainSeconds        float64  `json:"drain_seconds,omitempty"`
 }

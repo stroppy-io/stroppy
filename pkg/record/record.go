@@ -55,6 +55,9 @@ type Operation struct {
 	Sequence    uint64           `json:"sequence"`
 	Kind        string           `json:"kind"`
 	Transaction uint64           `json:"transaction,omitempty"`
+	Session     uint64           `json:"session,omitempty"`
+	Statement   uint64           `json:"statement,omitempty"`
+	QueryName   string           `json:"query_name,omitempty"`
 	SQL         string           `json:"sql,omitempty"`
 	Arguments   map[string]Value `json:"arguments,omitempty"`
 	Isolation   string           `json:"isolation,omitempty"`

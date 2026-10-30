@@ -38,6 +38,18 @@ go run ./examples/authoring/main run example/accounts -d pg \
   --rows 100 --load-workers 2 --iterations 20 --report-format json
 ```
 
+`Prepared` initializes one dedicated session and two prepared statements per
+worker, reuses them across transactions, and validates each counter read before
+commit. It requires PostgreSQL or MySQL, not noop. It creates and drops
+`stroppy_example_prepared`; use a disposable database without that table. Pool
+capacity must cover every worker.
+
+```bash
+go run ./examples/authoring/main run example/prepared -d pg \
+  -D url='postgres://user:password@localhost:5432/scratch' \
+  -D postgres.maxConns=8 --vus 8 --iterations 100
+```
+
 A single-test entrypoint can be smaller:
 
 ```go
