@@ -10,6 +10,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+## [6.3.0] - 2026-10-30
+
 ### Added
 
 - Go workloads can initialize worker-local state before measurement and use dedicated sessions with reusable prepared statements, same-session transactions, and automatic cleanup through the public SDK. ([#243](https://github.com/stroppy-io/stroppy/pull/243))
