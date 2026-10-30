@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"golang.org/x/sync/errgroup"
 
@@ -30,8 +31,8 @@ type BatchFn func(ctx context.Context, chunk Chunk, cur gen.Cursor) error
 
 // RunParallelBatch carves src into `workers` contiguous chunks by entity
 // index, prepares each partition's cursor, and drains
-// them concurrently through fn. It returns the source's total row count
-// (which may differ from Units for fan-out generators).
+// them concurrently through fn. It returns the drained row count after all
+// callbacks succeed; TotalRows may only be an estimate for fan-out generators.
 //
 // batchRows is the per-batch row capacity passed to
 // [gen.BatchSource.Prepare]; each cursor allocates one batch of that
@@ -71,6 +72,8 @@ func RunParallelBatch(
 		cancel()
 	}
 
+	var drained atomic.Int64
+
 	for _, chunk := range chunks {
 		group.Go(func() (err error) {
 			defer func() {
@@ -88,9 +91,12 @@ func RunParallelBatch(
 				return fmt.Errorf("common: worker %d prepare at %d: %w", chunk.Index, chunk.Start, err)
 			}
 
-			if err := fn(workerCtx, chunk, &panicCursor{Cursor: cur, capture: capturePanic}); err != nil {
+			cursor := &panicCursor{Cursor: cur, capture: capturePanic}
+			if err := fn(workerCtx, chunk, cursor); err != nil {
 				return fmt.Errorf("common: worker %d: %w", chunk.Index, err)
 			}
+
+			drained.Add(cursor.rows)
 
 			return nil
 		})
@@ -108,7 +114,7 @@ func RunParallelBatch(
 		return 0, err
 	}
 
-	return totalRows, nil
+	return drained.Load(), nil
 }
 
 var errBatchPanic = errors.New("common: batch worker panicked")
@@ -117,6 +123,7 @@ var errBatchPanic = errors.New("common: batch worker panicked")
 type panicCursor struct {
 	gen.Cursor
 	capture func(any)
+	rows    int64
 }
 
 func (c *panicCursor) Next() (batch *gen.Batch, err error) {
@@ -128,5 +135,10 @@ func (c *panicCursor) Next() (batch *gen.Batch, err error) {
 		}
 	}()
 
-	return c.Cursor.Next()
+	batch, err = c.Cursor.Next()
+	if err == nil && batch != nil {
+		c.rows += int64(batch.Len())
+	}
+
+	return batch, err
 }

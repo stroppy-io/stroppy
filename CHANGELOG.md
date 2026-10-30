@@ -21,6 +21,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 - TPC-C can select built-in dialects with `--sql-dialect`, including `crdb24` for CockroachDB 24.1 procedures, without copying SQL files to disk. ([#241](https://github.com/stroppy-io/stroppy/pull/241))
 - The README MySQL quick-start command uses the connection-string format accepted by the driver. ([#240](https://github.com/stroppy-io/stroppy/pull/240))
 - `tpcb/procs` accepts CockroachDB and YugabyteDB while continuing to reject engines without stored procedures. ([#239](https://github.com/stroppy-io/stroppy/pull/239))
+- Insert results and `insert_rows_total` count rows actually drained by successful loaders, rather than source estimates for variable-size tables such as TPC-H lineitem. ([#238](https://github.com/stroppy-io/stroppy/pull/238))
 
 ## [6.2.1] - 2026-10-26
 

@@ -13,7 +13,7 @@ import (
 //
 // Units is the number of partitionable units (entities); the loader carves
 // [0, Units) into chunks. TotalRows is the number of output rows the source
-// emits in full, used for progress and stats; for a fan-out source it may be
+// emits in full, used for progress estimates; for a fan-out source it may be
 // an estimate (as the legacy contract allows). Prepare returns a [Cursor]
 // positioned at start, bounded to count units.
 //

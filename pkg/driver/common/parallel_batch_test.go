@@ -53,6 +53,47 @@ func simpleSource(totalRows int64) *gen.IndexedSource {
 
 // TestRunParallelBatchRowCount verifies the typed runner drains every
 // row exactly once across workers.
+type estimatedSource struct {
+	gen.BatchSource
+	estimate int64
+}
+
+func (s estimatedSource) TotalRows() int64 { return s.estimate }
+
+func TestRunParallelBatchReturnsDrainedRows(t *testing.T) {
+	t.Parallel()
+
+	for _, estimate := range []int64{0, 9000, 11000} {
+		for _, workers := range []int{1, 4, 7} {
+			t.Run(fmt.Sprintf("estimate=%d/workers=%d", estimate, workers), func(t *testing.T) {
+				t.Parallel()
+
+				rows, err := RunParallelBatch(t.Context(), estimatedSource{
+					BatchSource: simpleSource(10000), estimate: estimate,
+				}, workers, 64, func(_ context.Context, _ Chunk, cursor gen.Cursor) error {
+					for {
+						_, err := cursor.Next()
+						if errors.Is(err, io.EOF) {
+							return nil
+						}
+
+						if err != nil {
+							return err
+						}
+					}
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if rows != 10000 {
+					t.Fatalf("rows=%d, want 10000", rows)
+				}
+			})
+		}
+	}
+}
+
 func TestRunParallelBatchRowCount(t *testing.T) {
 	t.Parallel()
 
