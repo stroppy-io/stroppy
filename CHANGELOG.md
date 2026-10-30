@@ -16,6 +16,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 - PostgreSQL and MySQL drivers can retain dedicated sessions with explicitly prepared statements reused across transactions; recording captures session and statement lifecycle. ([#243](https://github.com/stroppy-io/stroppy/pull/243))
 - Runs warn once per step and database when worker concurrency exceeds the driver's effective connection-pool limit, making possible client-side queueing visible without resizing the pool. ([#242](https://github.com/stroppy-io/stroppy/pull/242))
 
+### Fixed
+
+- TPC-C can select built-in dialects with `--sql-dialect`, including `crdb24` for CockroachDB 24.1 procedures, without copying SQL files to disk. ([#241](https://github.com/stroppy-io/stroppy/pull/241))
+
 ## [6.2.1] - 2026-10-26
 
 ### Added
