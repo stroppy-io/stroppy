@@ -33,12 +33,21 @@ type rejectedDiscovery struct {
 	transportCode codes.Code
 	operationCode Ydb.StatusIds_StatusCode
 	blockFallback bool
+	delay         time.Duration
 }
 
 func (s *rejectedDiscovery) ListEndpoints(
 	ctx context.Context, _ *Ydb_Discovery.ListEndpointsRequest,
 ) (*Ydb_Discovery.ListEndpointsResponse, error) {
 	s.calls.Add(1)
+
+	if s.delay > 0 {
+		select {
+		case <-time.After(s.delay):
+		case <-ctx.Done():
+			return nil, status.FromContextError(ctx.Err()).Err()
+		}
+	}
 
 	md, _ := metadata.FromIncomingContext(ctx)
 	token := strings.Join(md.Get("x-ydb-auth-ticket"), ",")
@@ -90,6 +99,27 @@ func startRejectedDiscovery(t *testing.T, service *rejectedDiscovery) string {
 	return listener.Addr().String()
 }
 
+func TestPrimaryConnectionAllowsSlowDiscovery(t *testing.T) {
+	service := &rejectedDiscovery{delay: 4 * time.Second}
+	address := startRejectedDiscovery(t, service)
+	token := "test-explicit-token"
+
+	ctx, cancel := context.WithTimeout(t.Context(), 8*time.Second)
+	defer cancel()
+
+	_, err := NewDriver(ctx, driver.Options{
+		Config: &config.DriverConfig{URL: "grpc://" + address + "/?database=/test", AuthToken: &token},
+		Logger: zap.NewNop(),
+	})
+	if err == nil || !strings.Contains(err.Error(), "explicit identity rejected") {
+		t.Fatalf("expected delayed discovery response, got %v", err)
+	}
+
+	if service.calls.Load() != 1 || service.token.Load() != token {
+		t.Fatalf("calls=%d token=%v", service.calls.Load(), service.token.Load())
+	}
+}
+
 func TestExplicitTokenDoesNotFallBackToMetadata(t *testing.T) {
 	service := &rejectedDiscovery{}
 	address := startRejectedDiscovery(t, service)
@@ -135,7 +165,7 @@ func TestTransportFailureDoesNotFallBackToMetadata(t *testing.T) {
 				transportCode: tc.code, operationCode: tc.operationCode,
 			})
 
-			ctx, cancel := context.WithTimeout(t.Context(), 2*primaryConnectTimeout)
+			ctx, cancel := context.WithTimeout(t.Context(), 6*time.Second)
 			defer cancel()
 
 			var fallbacks int
@@ -175,7 +205,7 @@ func TestAuthFallbackHasOwnDeadline(t *testing.T) {
 			}
 			address := startRejectedDiscovery(t, service)
 
-			ctx, cancel := context.WithTimeout(t.Context(), 2*primaryConnectTimeout+time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 2*metadataConnectTimeout+time.Second)
 			defer cancel()
 
 			var fallbacks int
@@ -199,7 +229,7 @@ func TestAuthFallbackHasOwnDeadline(t *testing.T) {
 				t.Fatalf("lost primary auth error: %v", err)
 			}
 
-			if elapsed := time.Since(started); elapsed > primaryConnectTimeout+2*time.Second {
+			if elapsed := time.Since(started); elapsed > metadataConnectTimeout+2*time.Second {
 				t.Fatalf("fallback used caller deadline instead of its own: elapsed=%v err=%v", elapsed, err)
 			}
 
@@ -232,7 +262,7 @@ func TestExplicitCredentialsDoNotFallBackToMetadata(t *testing.T) {
 			cfg := tc.credentials
 			cfg.URL = "grpc://" + tc.urlUser + address + "/?database=/test"
 
-			ctx, cancel := context.WithTimeout(t.Context(), 2*primaryConnectTimeout)
+			ctx, cancel := context.WithTimeout(t.Context(), 6*time.Second)
 			defer cancel()
 
 			var fallbacks int
@@ -250,7 +280,7 @@ func TestExplicitCredentialsDoNotFallBackToMetadata(t *testing.T) {
 }
 
 func TestRefusedConnectionDoesNotFallBackToMetadata(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 2*primaryConnectTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), 6*time.Second)
 	defer cancel()
 
 	var fallbacks int

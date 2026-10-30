@@ -22,6 +22,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 - The README MySQL quick-start command uses the connection-string format accepted by the driver. ([#240](https://github.com/stroppy-io/stroppy/pull/240))
 - `tpcb/procs` accepts CockroachDB and YugabyteDB while continuing to reject engines without stored procedures. ([#239](https://github.com/stroppy-io/stroppy/pull/239))
 - Insert results and `insert_rows_total` count rows actually drained by successful loaders, rather than source estimates for variable-size tables such as TPC-H lineitem. ([#238](https://github.com/stroppy-io/stroppy/pull/238))
+- YDB connections allow 30 seconds for authentication, discovery, and readiness on managed endpoints, while metadata fallback remains bounded to 3 seconds. ([#237](https://github.com/stroppy-io/stroppy/pull/237))
 
 ## [6.2.1] - 2026-10-26
 
