@@ -4,7 +4,7 @@
 //   - tpcb/tx runs the five DML steps inline under one client-side transaction
 //     per iteration; supports pg/mysql/picodata/ydb.
 //   - tpcb/procs calls the stored procedure tpcb_transaction (workload_procs
-//     section) as a single server-side round-trip; pg/mysql only.
+//     section) as a single server-side round-trip; pg/mysql/crdb/yugabyte.
 //
 // Both variants share parameter declarations, schema/load lifecycle, retry
 // policy, metrics, and data generation.
@@ -25,8 +25,10 @@ import (
 
 var (
 	errAccountNotFound        = errors.New("tpc-b: account not found")
-	errProcsDriverUnsupported = errors.New("tpcb/procs only supports postgres and mysql; use tpcb/tx for picodata/ydb")
-	errProcsMissingQuery      = errors.New("tpc-b/procs: missing query")
+	errProcsDriverUnsupported = errors.New(
+		"tpcb/procs needs stored procedures; use tpcb/tx only for drivers with transaction support",
+	)
+	errProcsMissingQuery = errors.New("tpc-b/procs: missing query")
 )
 
 // requiredTxQueries are the named transaction queries the measured iteration
@@ -308,13 +310,11 @@ func resolveIsolation(dt bench.DriverTypeName, override bench.TxIsolationName) b
 	}
 }
 
-// procsSupported reports whether the procs variant can run on dt: postgres and
-// mysql carry the create_procedures + workload_procs sections, and noop is
-// allowed for offline overhead runs. Everything else (picodata, ydb, csv, ...)
-// is rejected at setup with errProcsDriverUnsupported.
+// Protocol compatibility alone is insufficient: TiDB has no stored procedures,
+// while CockroachDB supplies its own function and YugabyteDB uses PostgreSQL's.
 func procsSupported(dt bench.DriverTypeName) bool {
 	switch dt {
-	case bench.DriverPostgres, bench.DriverMySQL, bench.DriverNoop:
+	case bench.DriverPostgres, bench.DriverMySQL, bench.DriverCRDB, bench.DriverYugabyte, bench.DriverNoop:
 		return true
 	default:
 		return false
