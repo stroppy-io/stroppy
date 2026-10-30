@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"testing"
@@ -8,8 +9,35 @@ import (
 	"example.com/stroppy-v6-consumer/authoring"
 	"github.com/stroppy-io/stroppy/v6"
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench/testkit"
+	"github.com/stroppy-io/stroppy/v6/pkg/record"
 	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
+
+func TestPreparedSessionCapabilities(t *testing.T) {
+	if _, err := bench.NewCatalog(authoring.Prepared); err != nil { t.Fatal(err) }
+	recorder := &record.Recorder{}
+	test := bench.Test{Name: "prepared-consumer", Define: func(d *bench.Def) error {
+		d.Execution.WorkerStep("work", func(ctx context.Context, b *bench.Bench) (bench.Action, error) {
+			session, err := b.Session(ctx)
+			if err != nil { return nil, err }
+			statement, err := session.Prepare(ctx, bench.QueryHandle{Name: "one", Text: "SELECT 1"})
+			if err != nil { return nil, err }
+			return func(ctx context.Context, b *bench.Bench) error {
+				return session.BeginTx(ctx, bench.BeginOpts{Isolation: bench.IsoReadCommitted}, func(tx *bench.Tx) error {
+					return tx.ExecPrepared(ctx, statement, nil)
+				})
+			}, nil
+		}, bench.SharedIterations(1, 3))
+		return d.Execution.Err()
+	}}
+	if _, err := testkit.Record(t.Context(), test, recorder, bench.RunOptions{}); err != nil { t.Fatal(err) }
+	counts := map[string]int{}
+	for _, operation := range recorder.Operations() { counts[operation.Kind]++ }
+	if counts["prepare"] != 1 || counts["query"] != 3 || counts["statement_close"] != 1 || counts["session_close"] != 1 {
+		t.Fatalf("unexpected prepared lifecycle: %v", counts)
+	}
+}
 
 func TestAuthorCapabilities(t *testing.T) {
 	catalog, err := bench.NewCatalog(authoring.Query, authoring.Accounts, authoring.Mirror)

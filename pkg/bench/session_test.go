@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -285,6 +286,46 @@ func TestWorkerCancellationRollsBackAndCloses(t *testing.T) {
 	require.Equal(t, 1, kinds["rollback"])
 	require.Equal(t, 1, kinds["statement_close"])
 	require.Equal(t, 1, kinds["session_close"])
+}
+
+func TestWorkerPanicClosesPreparedSessions(t *testing.T) {
+	for _, initializePanic := range []bool{true, false} {
+		t.Run(strconv.FormatBool(initializePanic), func(t *testing.T) {
+			recorder := &record.Recorder{}
+			test := bench.Test{Name: "panic", Define: func(d *bench.Def) error {
+				d.Execution.WorkerStep("work", func(ctx context.Context, b *bench.Bench) (bench.Action, error) {
+					s, err := b.Session(ctx)
+					if err != nil {
+						return nil, err
+					}
+
+					if _, err := s.Prepare(ctx, bench.QueryHandle{Name: "one", Text: "SELECT 1"}); err != nil {
+						return nil, err
+					}
+
+					if initializePanic {
+						panic("worker panic")
+					}
+
+					return func(context.Context, *bench.Bench) error { panic("worker panic") }, nil
+				}, bench.SharedIterations(1, 1))
+
+				return d.Execution.Err()
+			}}
+
+			require.PanicsWithValue(t, "worker panic", func() {
+				_, _ = testkit.Record(t.Context(), test, recorder, bench.RunOptions{})
+			})
+
+			counts := map[string]int{}
+			for _, op := range recorder.Operations() {
+				counts[op.Kind]++
+			}
+
+			require.Equal(t, 1, counts["statement_close"])
+			require.Equal(t, 1, counts["session_close"])
+		})
+	}
 }
 
 func TestSessionUnsupportedAndWorkerObservation(t *testing.T) {

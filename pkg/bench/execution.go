@@ -448,13 +448,14 @@ func (e *Execution) execute(
 	default:
 	}
 
-	select {
-	case err := <-fatal:
-		return err
-	default:
+	close(fatal)
+
+	var failure error
+	for err := range fatal {
+		failure = errors.Join(failure, err)
 	}
 
-	return parent.Err()
+	return errors.Join(failure, parent.Err())
 }
 
 var errDrainExpired = fmt.Errorf("duration drain expired: %w", context.DeadlineExceeded)

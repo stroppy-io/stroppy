@@ -79,5 +79,9 @@ func (p *preparedStatement) Close(ctx context.Context) error {
 		return nil
 	}
 
-	return p.conn.Deallocate(ctx, p.name)
+	if err := p.conn.Deallocate(ctx, p.name); err != nil {
+		return driver.JoinErrors(err, p.conn.Close(ctx))
+	}
+
+	return nil
 }
