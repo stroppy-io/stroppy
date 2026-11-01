@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver/queries"
 )
 
@@ -89,6 +91,29 @@ func TestSQLCacheWarmLookupAllocations(t *testing.T) {
 	})
 	if allocations != 0 {
 		t.Fatalf("warm SQL lookup allocations = %v, want 0", allocations)
+	}
+}
+
+func TestRunQueryResultsOwnStats(t *testing.T) {
+	query := &deadlineCaptureQuery{}
+
+	first, err := RunQuery(t.Context(), query, noopWrap, testDialect{}, zap.NewNop(), "SELECT 1", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := RunQuery(t.Context(), query, noopWrap, testDialect{}, zap.NewNop(), "SELECT 2", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if first == second || first.Stats == second.Stats {
+		t.Fatal("queries shared mutable result storage")
+	}
+
+	first.Stats.Rows = 42
+	if second.Stats.Rows != 0 {
+		t.Fatal("mutating one result changed another query's statistics")
 	}
 }
 

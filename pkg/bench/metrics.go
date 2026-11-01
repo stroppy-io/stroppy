@@ -168,7 +168,7 @@ func overflowAttributes(cache *attributeCache) metricAttributes {
 	return *cache.overflow.Load()
 }
 
-func cachedAttributes(cache *attributeCache, key any, tags ...string) metricAttributes {
+func cachedAttributes[K comparable](cache *attributeCache, key K, tags ...string) metricAttributes {
 	if cached, ok := cache.values.Load(key); ok {
 		attrs, valid := cached.(metricAttributes)
 		if valid {
@@ -176,6 +176,11 @@ func cachedAttributes(cache *attributeCache, key any, tags ...string) metricAttr
 		}
 	}
 
+	// Only cache misses need a heap-owned copy of the key.
+	return storeAttributes(cache, key, tags...)
+}
+
+func storeAttributes(cache *attributeCache, key any, tags ...string) metricAttributes {
 	if cache.size.Add(1) > metricCardinalityLimit {
 		cache.size.Add(-1)
 

@@ -49,6 +49,17 @@ func Columns(t reflect.Type) (names []string, indexes []int, err error) {
 }
 
 func Decode[T any](columns []string, values []any) (T, error) {
+	// Restrict direct returns to built-ins so named values retain formatting and ownership rules.
+	if len(values) == 1 {
+		switch any(*new(T)).(type) {
+		case string, bool, int, int8, int16, int32, int64,
+			uint, uint8, uint16, uint32, uint64, float32, float64:
+			if value, ok := values[0].(T); ok {
+				return value, nil
+			}
+		}
+	}
+
 	var out T
 
 	target := reflect.ValueOf(&out).Elem()
@@ -132,9 +143,19 @@ func Assign(dst reflect.Value, value any) error {
 		return nil
 	}
 
-	text := fmt.Sprint(value)
-	if v, ok := value.([]byte); ok {
+	if assignScalar(dst, value) {
+		return nil
+	}
+
+	var text string
+
+	switch v := value.(type) {
+	case string:
+		text = v
+	case []byte:
 		text = string(v)
+	default:
+		text = fmt.Sprint(value)
 	}
 
 	switch dst.Kind() {
@@ -189,6 +210,57 @@ func Assign(dst reflect.Value, value any) error {
 	default:
 		return conversionError("unsupported destination %s", dst.Type())
 	}
+}
+
+// Built-in scalars need no textual round trip when their kinds match.
+// Named source types retain their formatting methods through the text path.
+func assignScalar(dst reflect.Value, value any) bool {
+	switch v := value.(type) {
+	case string:
+		if dst.Kind() == reflect.String {
+			dst.SetString(v)
+
+			return true
+		}
+	case bool:
+		if dst.Kind() == reflect.Bool {
+			dst.SetBool(v)
+
+			return true
+		}
+	case int, int8, int16, int32, int64:
+		if dst.CanInt() {
+			v := reflect.ValueOf(value).Int()
+			if !dst.OverflowInt(v) {
+				dst.SetInt(v)
+
+				return true
+			}
+		}
+	case uint, uint8, uint16, uint32, uint64, uintptr:
+		if dst.CanUint() && dst.Kind() != reflect.Uintptr {
+			v := reflect.ValueOf(value).Uint()
+			if !dst.OverflowUint(v) {
+				dst.SetUint(v)
+
+				return true
+			}
+		}
+	case float32:
+		if dst.Kind() == reflect.Float32 {
+			dst.SetFloat(float64(v))
+
+			return true
+		}
+	case float64:
+		if dst.Kind() == reflect.Float64 {
+			dst.SetFloat(v)
+
+			return true
+		}
+	}
+
+	return false
 }
 
 func Copy(value any) any {

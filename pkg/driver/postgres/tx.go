@@ -41,14 +41,20 @@ func toTxIsoLevel(level config.TxIsolationLevel) pgx.TxIsoLevel {
 }
 
 func newTx(pgxTx pgx.Tx, isolation config.TxIsolationLevel, d *Driver) *sqldriver.Tx[pgx.Rows] {
-	return sqldriver.NewTx(
-		&pgxTxAdapter{pgxTx},
+	wrapped := &struct {
+		sqldriver.Tx[pgx.Rows]
+		adapter pgxTxAdapter
+	}{adapter: pgxTxAdapter{pgxTx}}
+	wrapped.Tx = *sqldriver.NewTx(
+		&wrapped.adapter,
 		NewRows,
 		isolation,
 		PgxDialect{},
 		d.logger,
 		d.queryTimeout,
 	)
+
+	return &wrapped.Tx
 }
 
 // pgxConnAdapter adapts *pgxpool.Conn to sqldriver.QueryContext[pgx.Rows].

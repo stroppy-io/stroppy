@@ -10,6 +10,11 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Changed
+
+- Transaction execution uses less temporary memory, and parallel workers keep database cancellation bookkeeping separate without changing workload APIs, retries, or reported metrics.
+- Typed query results avoid redundant text conversion, PostgreSQL transactions allocate fewer wrappers, and initialized workers start with less temporary memory.
+
 ## [6.3.0] - 2026-10-30
 
 ### Added
