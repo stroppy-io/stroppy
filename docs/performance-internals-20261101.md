@@ -97,6 +97,35 @@ An initial TPC-B observer counted autovacuum as a client session; the corrected
 collector counts only `backend_type='client backend'`. Pilot results are not
 substituted for the repeated matrix.
 
+## Private-LAN replication
+
+The same binaries also run on the second machine against the first machine's
+PostgreSQL over their private LAN. CPU budgets, worker/pool counts, templates,
+isolation, run duration, sampling windows, and reversed-order repetitions match
+the local comparison. No local and LAN cases overlap on the database. Existing
+unrelated services remain running; placement differences include co-location,
+NUMA, IRQ, and network effects, so local/LAN rates are not a pure latency test.
+
+| Workload | Client cores | Main /s | Headroom /s | Paired change | Paired ratio range | Client-bound gate |
+| --- | ---: | ---: | ---: | ---: | --- | --- |
+| TPC-B transactions | 1 | 10,798.42 | 10,742.66 | -0.52% | 0.9923–1.0143 | Pass |
+| TPC-B transactions | 2 | 14,596.23 | 14,466.93 | +0.25% | 0.9845–1.0326 | Inconclusive |
+| TPC-C New-Orders | 1 | 1,381.12 | 1,414.78 | +2.04% | 1.0204–1.0441 | Pass |
+| TPC-C New-Orders | 2 | 1,572.34 | 1,609.68 | +2.38% | 0.9864–1.0260 | Inconclusive |
+
+The fresh eight-core controls reach 41,964 TPC-B transactions/s
+and 3,122 TPC-C committed New-Orders/s. The one-core gate uses
+actual client CPU saturation and the control's rate, not low database CPU alone.
+Two-core cases that miss 90% utilization remain mixed-limit evidence. Every final
+local/LAN case completed with zero terminal errors, retries, deadlocks, or
+observed temporary-data spills. External committed counts reconcile with the
+native transaction/New-Order counters and expected rollbacks over full runs.
+
+There are 52 final real-database runs: 48 paired cases plus four controls.
+The data also retains four completed 32-worker TPC-C calibration cases that did
+not meet the client-saturation requirement, giving 56 independently verified
+non-pilot reports. Failed setup and pilots remain in the external evidence.
+
 ## Framework and pg-noop
 
 The second machine runs the same two binaries. The built-in baseline uses
@@ -140,7 +169,9 @@ completed but DB-contended 32-worker TPC-C cases.
 The external evidence directory `stroppy-main-headroom-bm-20261101` retains raw
 reports, command arrays, two-second samples, failed pilots, SQL counters,
 hardware/settings/affinity checks, source snapshots, binary digests, and
-independent recomputation. The two measured binary SHA256 digests are:
+independent recomputation. Campaign-only PostgreSQL and pg-noop services were
+stopped after collection; templates, evidence, prior datasets, and unrelated
+services were preserved. The two measured binary SHA256 digests are:
 
 - Main: `d352b3384fbfa56978f33621a807fb2267223b7298d70538d8215e44a1843ed7`.
 - Headroom: `ade6fd6d42aac496c59e2779370afbda328d819c4fe91e0cc7fe94b60c7fd608`.
