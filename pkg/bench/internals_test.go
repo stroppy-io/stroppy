@@ -141,8 +141,15 @@ func TestWorkerContextsKeepCancellationCause(t *testing.T) {
 	}}
 
 	go func() {
+		seen := map[<-chan struct{}]bool{}
+
 		for range 4 {
-			<-started
+			worker := <-started
+			if worker.Done() == ctx.Done() || seen[worker.Done()] {
+				t.Error("workers share a cancellation scope")
+			}
+
+			seen[worker.Done()] = true
 		}
 
 		cancel(cause)
