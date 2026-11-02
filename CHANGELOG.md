@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- CLI commands and Go SDK runs can expose loopback-only Go CPU, heap, goroutine, contention, and trace diagnostics through profiling flags, environment variables, or explicit library options.
+
 ## [6.3.0] - 2026-10-30
 
 ### Added

@@ -14,6 +14,7 @@ import (
 	"github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/help"
 	"github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/probe"
 	runcommand "github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/run"
+	"github.com/stroppy-io/stroppy/v6/internal/profilecmd"
 	"github.com/stroppy-io/stroppy/v6/internal/version"
 	"github.com/stroppy-io/stroppy/v6/internal/workloadcatalog"
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
@@ -108,6 +109,8 @@ func NewRoot(options *Options) *cobra.Command {
 			_ = run.RunE(run, []string{"--help"})
 		})
 	}
+
+	profilecmd.Configure(root)
 
 	return root
 }
