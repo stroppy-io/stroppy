@@ -348,13 +348,20 @@ func (e *Execution) execute(
 				}
 			}()
 
-			state := e.newStepWorker(ctx, name, worker, opts)
+			// Driver cancellation callbacks stay local to each worker.
+			workerContext, stopWorker := context.WithCancelCause(ctx)
+			defer stopWorker(nil)
+
+			var state *stepWorker
+
 			workerAction := action
 
-			if initialized != nil {
+			if initialized == nil {
+				state = e.newStepWorker(workerContext, name, worker, opts)
+			} else {
 				state = initialized[worker]
 				workerAction = state.action
-				state.b.vu.ctx = metricWorkerContext(ctx, worker, opts.policy.workers)
+				state.b.vu.ctx = metricWorkerContext(workerContext, worker, opts.policy.workers)
 			}
 
 			b, vu := state.b, state.b.vu
@@ -365,7 +372,7 @@ func (e *Execution) execute(
 			}
 
 			for {
-				if ctx.Err() != nil {
+				if workerContext.Err() != nil {
 					return
 				}
 

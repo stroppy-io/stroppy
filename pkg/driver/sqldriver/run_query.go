@@ -229,10 +229,14 @@ func RunQuery[R any](
 		cancel()
 	}
 
-	return &driver.QueryResult{
-		Stats: &stats.Query{Elapsed: elapsed},
-		Rows:  rows,
-	}, nil
+	result := &struct {
+		driver.QueryResult
+		stats stats.Query
+	}{stats: stats.Query{Elapsed: elapsed}}
+	result.Stats = &result.stats
+	result.Rows = rows
+
+	return &result.QueryResult, nil
 }
 
 // ProcessArgs takes sql which contains ":arg" marks and args map "arg" -> value.
@@ -246,6 +250,10 @@ func RunQuery[R any](
 func ProcessArgs(
 	dialect queries.Dialect, sqlStr string, args map[string]any,
 ) (newSQL string, argsArr []any, err error) {
+	if len(args) == 0 && !strings.Contains(sqlStr, ":") {
+		return sqlStr, nil, nil
+	}
+
 	pq := lookupOrParse(dialect, sqlStr)
 
 	// fill phase: build argsArr from args using cached argOrder
