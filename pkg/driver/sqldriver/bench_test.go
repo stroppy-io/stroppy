@@ -1,6 +1,9 @@
 package sqldriver
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // Benchmark ProcessArgs: the hot path called on every query execution.
 // Uses a realistic multi-arg INSERT to reflect actual load-test workload.
@@ -16,6 +19,25 @@ var benchArgs = map[string]any{
 
 const benchSQL = `INSERT INTO orders (w_id, d_id, o_id, c_id, amount, carrier)
 VALUES (:w_id, :d_id, :o_id, :c_id, :amount, :carrier)`
+
+func BenchmarkProcessArgsNoArguments(b *testing.B) {
+	for _, sql := range []struct{ name, text string }{
+		{"short", "UPDATE accounts SET balance = balance + 1 WHERE id = 1"},
+		{"long", "SELECT '" + strings.Repeat("x", 4096) + "'"},
+		{"cast", "SELECT 1::bigint"},
+	} {
+		b.Run(sql.name, func(b *testing.B) {
+			b.ReportAllocs()
+
+			for b.Loop() {
+				_, _, err := ProcessArgs(testDialect{}, sql.text, nil)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
 
 func BenchmarkProcessArgs(b *testing.B) {
 	dialect := testDialect{}

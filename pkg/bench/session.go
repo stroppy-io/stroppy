@@ -400,6 +400,10 @@ func (p *Prepared) RawRows(ctx context.Context, args map[string]any) ([][]any, e
 }
 
 func (v *VU) closeSessions(ctx context.Context) error {
+	if len(v.sessions) == 0 {
+		return nil
+	}
+
 	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), defaultCleanupTimeout)
 	defer cancel()
 

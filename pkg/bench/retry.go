@@ -79,10 +79,14 @@ type RetryPolicy struct {
 // Retry0 runs a void operation under policy. Error and fatal actions preserve
 // the original error, ignore returns nil, and retry replays fn.
 func Retry0(ctx context.Context, policy RetryPolicy, fn func() error) error {
+	return retryFrom(ctx, policy, fn, 0)
+}
+
+func retryFrom(ctx context.Context, policy RetryPolicy, fn func() error, completedAttempts int) error {
 	var lastErr error
 
 	maxAttempts := max(policy.MaxAttempts, 1)
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
+	for attempt := completedAttempts + 1; attempt <= maxAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -308,15 +312,42 @@ func (b *Bench) Transaction(
 	options TransactionOptions,
 	body func(context.Context, *Tx) error,
 ) error {
-	policy := b.TxRetryPolicy(options.Retry)
+	// Overrides must be snapshotted before the body can mutate them.
+	// Default policy construction can wait until the first failed attempt.
+	var policy RetryPolicy
+	if options.Retry.Actions != nil {
+		policy = b.TxRetryPolicy(options.Retry)
+	}
 
 	return b.LogicalOperation(func() error {
-		return Retry0(ctx, policy, func() error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		run := func() error {
 			return b.BeginTx(
 				ctx,
 				BeginOpts{Name: options.Name, Isolation: options.Isolation},
 				func(tx *Tx) error { return body(ctx, tx) },
 			)
-		})
+		}
+
+		err := run()
+		if err == nil {
+			return nil
+		}
+
+		if options.Retry.Actions == nil {
+			policy = b.TxRetryPolicy(options.Retry)
+		}
+
+		maxAttempts := max(policy.MaxAttempts, 1)
+
+		done, result := applyRetryDecision(ctx, policy, 1, maxAttempts, err, policy.decision(err))
+		if done {
+			return result
+		}
+
+		return retryFrom(ctx, policy, run, 1)
 	})
 }
