@@ -34,6 +34,9 @@ func TestInvalidRunDoesNotActivateProfiling(t *testing.T) {
 	}{
 		{[]string{"run", "--file", path, "--no-steps", "work"}, "--steps and --no-steps are mutually exclusive"},
 		{[]string{"run", "profile-validation", "--", "unsupported"}, "arguments after '--' are not supported"},
+		{[]string{"run", "missing-profile-workload"}, "unknown workload"},
+		{[]string{"run", "profile-validation", "-d", "missing-driver"}, "unknown driver"},
+		{[]string{"run", "profile-validation", "-D", "pool.maxConns=invalid"}, "invalid driver override"},
 	} {
 		t.Run(test.want, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer

@@ -269,10 +269,6 @@ Signals:
 				return invalidConfig(errArgsAfterDash)
 			}
 
-			if err := profilecmd.Activate(cmd); err != nil {
-				return err
-			}
-
 			// Log override decisions when both CLI and file config are present.
 			if fileConfig != nil {
 				lg := logger.Global().Named("run")
@@ -865,6 +861,10 @@ func runGoWorkload(
 
 	captureOptions, err := output.captureOptions()
 	if err != nil {
+		return err
+	}
+
+	if err := profilecmd.Activate(cmd); err != nil {
 		return err
 	}
 

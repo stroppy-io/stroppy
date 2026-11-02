@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"runtime"
+	"runtime/pprof"
+	"runtime/trace"
 	"strings"
 	"sync"
 	"testing"
@@ -48,6 +50,18 @@ func TestHeadDoesNotStartCapture(t *testing.T) {
 			t.Fatalf("HEAD %s: %d, Allow=%q", endpoint, response.Code, response.Header().Get("Allow"))
 		}
 	}
+
+	if err := pprof.StartCPUProfile(io.Discard); err != nil {
+		t.Fatalf("CPU profile active after HEAD requests: %v", err)
+	}
+
+	defer pprof.StopCPUProfile()
+
+	if err := trace.Start(io.Discard); err != nil {
+		t.Fatalf("execution trace active after HEAD requests: %v", err)
+	}
+
+	defer trace.Stop()
 }
 
 func TestRejectInvalidCaptureDuration(t *testing.T) {
