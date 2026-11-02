@@ -18,6 +18,7 @@ import (
 	"github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/probe"
 	runcommand "github.com/stroppy-io/stroppy/v6/cmd/stroppy/commands/run"
 	"github.com/stroppy-io/stroppy/v6/internal/author"
+	"github.com/stroppy-io/stroppy/v6/internal/profilecmd"
 	"github.com/stroppy-io/stroppy/v6/internal/toolchain"
 	"github.com/stroppy-io/stroppy/v6/internal/version"
 	"github.com/stroppy-io/stroppy/v6/internal/workloadcatalog"
@@ -323,6 +324,7 @@ func addManagedCommands(
 		newRemoveCommand(catalog, store),
 	)
 
+	profilecmd.Defer(probeCommand)
 	probeCommand.Args = cobra.ArbitraryArgs
 	probeCommand.DisableFlagParsing = true
 	probeCommand.RunE = managedProbe(catalog, store)
@@ -358,6 +360,10 @@ func managedProbe(catalog *bench.Catalog, store *workloadcatalog.Store) func(*co
 		}
 
 		if len(args) == 0 || strings.HasPrefix(args[0], "-") || builtInName {
+			if err := profilecmd.Activate(command); err != nil {
+				return err
+			}
+
 			builtIn := probe.NewCommand(catalog)
 			builtIn.SetContext(command.Context())
 			builtIn.SetOut(command.OutOrStdout())
@@ -527,9 +533,14 @@ func executeRuntime(
 		return fmt.Errorf("resolve working directory: %w", err)
 	}
 
+	environment, err := profilecmd.Forward(command.Context())
+	if err != nil {
+		return err
+	}
+
 	return store.RunRuntime(command.Context(), version.Resolve(), args, &workloadcatalog.RuntimeProcess{
 		Stdin: command.InOrStdin(), Stdout: command.OutOrStdout(), Stderr: command.ErrOrStderr(),
-		Env: os.Environ(), Dir: workingDirectory,
+		Env: environment, Dir: workingDirectory,
 	})
 }
 
@@ -546,7 +557,12 @@ func executeCustom(
 		return fmt.Errorf("resolve working directory: %w", err)
 	}
 
+	environment, err := profilecmd.Forward(ctx)
+	if err != nil {
+		return err
+	}
+
 	return store.Run(ctx, name, args, &workloadcatalog.Process{
-		Stdin: stdin, Stdout: stdout, Stderr: stderr, Env: os.Environ(), Dir: workingDirectory,
+		Stdin: stdin, Stdout: stdout, Stderr: stderr, Env: environment, Dir: workingDirectory,
 	})
 }

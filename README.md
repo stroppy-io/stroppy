@@ -14,6 +14,7 @@ runtime dependencies.
 - PostgreSQL, MySQL, YDB, Picodata, CSV, and noop drivers
 - Transaction support with configurable isolation levels
 - Go-native load generation and metrics
+- Opt-in [Go profiling](docs/profiling.md) for CLI and SDK runs with `--pprof` or `STROPPY_PPROF`
 
 ## Installation
 

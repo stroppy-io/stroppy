@@ -16,6 +16,7 @@ import (
 	"github.com/stroppy-io/stroppy/v6/internal/testdriver"
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/profiling"
 	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
@@ -40,14 +41,15 @@ func (b *Bench) DriverTypeName() DriverTypeName { return DriverTypeNameOf(b.cfg.
 
 // RunOptions is explicit input for one fresh observation/execution operation.
 type RunOptions struct {
-	Drivers map[string]DriverConfig
-	Params  ParamInputs
-	Steps   []string
-	NoSteps []string
-	Logger  Logger
-	Metrics *MetricsConfig
-	Report  *ReportOptions
-	Capture *CaptureOptions
+	Drivers   map[string]DriverConfig
+	Params    ParamInputs
+	Steps     []string
+	NoSteps   []string
+	Logger    Logger
+	Metrics   *MetricsConfig
+	Report    *ReportOptions
+	Capture   *CaptureOptions
+	Profiling *profiling.Config
 }
 
 // RunTest observes a definition, validates inputs, then executes a fresh replay.
@@ -56,6 +58,12 @@ type RunOptions struct {
 //nolint:gocognit,gocyclo,nestif,cyclop,funlen,gocritic,maintidx // one observed/executed run lifecycle.
 func RunTest(ctx context.Context, test Test, options RunOptions) (result *report.Run, err error) {
 	defer recoverValidation(&err)
+
+	profile, err := profiling.Start(ctx, options.Profiling)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = errors.Join(err, profile.Close()) }()
 
 	if options.Capture != nil && options.Report == nil {
 		return nil, errCaptureNoReport

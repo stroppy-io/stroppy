@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- CLI commands and Go SDK runs can expose loopback-only Go CPU, heap, goroutine, contention, and trace diagnostics through profiling flags, environment variables, or explicit library options. ([#246](https://github.com/stroppy-io/stroppy/pull/246))
+
 ### Changed
 
 - Transaction execution uses less temporary memory, and parallel workers keep database cancellation bookkeeping separate without changing workload APIs, retries, or reported metrics. ([#245](https://github.com/stroppy-io/stroppy/pull/245))

@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
+	"github.com/stroppy-io/stroppy/v6/internal/profilecmd"
 	"github.com/stroppy-io/stroppy/v6/internal/runner"
 	"github.com/stroppy-io/stroppy/v6/internal/version"
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
@@ -156,6 +157,12 @@ Run reports:
   --capture-dir PATH      Persistent capture root (UUID subdirectory per run).
   --capture-max-bytes N   Per-stream byte budget (default 67108864).
                           Logs, diagnostics, and human summaries remain on stderr.
+
+Profiling:
+  --pprof HOST:PORT        Serve Go profiles on a loopback address (env STROPPY_PPROF).
+  --pprof-block-rate N     Block sampling rate in nanoseconds (env STROPPY_PPROF_BLOCK_RATE).
+  --pprof-mutex-fraction N Sample one in N mutex events (env STROPPY_PPROF_MUTEX_FRACTION).
+                          Disabled by default; profiles contain process-wide sensitive data.
 
 Signals:
   SIGINT and SIGTERM cancel the running workload and trigger graceful teardown.
@@ -706,6 +713,9 @@ func printWorkloadHelp(cmd *cobra.Command, description *bench.Description) error
 	output.WriteString("      --capture-interval D Sampling interval (default 1s)\n")
 	output.WriteString("      --capture-dir PATH  Persistent recording root\n")
 	output.WriteString("      --capture-max-bytes N Per-stream byte budget\n")
+	output.WriteString("      --pprof HOST:PORT     Serve process-wide profiles on loopback (env STROPPY_PPROF)\n")
+	output.WriteString("      --pprof-block-rate N  Block sampling rate in nanoseconds\n")
+	output.WriteString("      --pprof-mutex-fraction N Sample one in N mutex events\n")
 	output.WriteString("  -h, --help               Show this help\n")
 	output.WriteString("\nBoolean parameters require an explicit value: --flag=true or --flag=false.\n")
 
@@ -851,6 +861,10 @@ func runGoWorkload(
 
 	captureOptions, err := output.captureOptions()
 	if err != nil {
+		return err
+	}
+
+	if err := profilecmd.Activate(cmd); err != nil {
 		return err
 	}
 

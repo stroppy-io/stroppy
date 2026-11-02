@@ -19,6 +19,7 @@ import (
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/postgres"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/recording"
 	_ "github.com/stroppy-io/stroppy/v6/pkg/driver/ydb"
+	"github.com/stroppy-io/stroppy/v6/pkg/profiling"
 	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
@@ -89,6 +90,7 @@ type RunRequest struct {
 	ReportOptions bench.ReportOptions
 	NoReport      bool
 	Capture       *bench.CaptureOptions
+	Profiling     *profiling.Config
 }
 
 // NewCatalog creates an application over an explicit catalog without global registration.
@@ -153,14 +155,15 @@ func (a *Application) Run(ctx context.Context, request *RunRequest) (*report.Run
 		a.catalog,
 		name,
 		bench.RunOptions{
-			Drivers: request.Drivers,
-			Params:  request.Params,
-			Steps:   request.Steps,
-			NoSteps: request.NoSteps,
-			Logger:  request.Logger,
-			Metrics: metrics,
-			Report:  reportOptions,
-			Capture: request.Capture,
+			Drivers:   request.Drivers,
+			Params:    request.Params,
+			Steps:     request.Steps,
+			NoSteps:   request.NoSteps,
+			Logger:    request.Logger,
+			Metrics:   metrics,
+			Report:    reportOptions,
+			Capture:   request.Capture,
+			Profiling: request.Profiling,
 		},
 	)
 }
