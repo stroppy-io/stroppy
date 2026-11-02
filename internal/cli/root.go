@@ -58,6 +58,7 @@ func NewRoot(options *Options) *cobra.Command {
 		catalogResolver(options.ManagedCatalog),
 	)
 	runcommand.SetBuildDigest(run, options.BuildDigest)
+	profilecmd.Defer(run)
 
 	probeCommand := probe.NewCommand(catalog)
 	root.AddCommand(
@@ -108,6 +109,10 @@ func NewRoot(options *Options) *cobra.Command {
 			run.SetErr(cmd.ErrOrStderr())
 			_ = run.RunE(run, []string{"--help"})
 		})
+	}
+
+	if options.DefaultWorkload != "" || options.RegisteredRun {
+		profilecmd.Defer(root)
 	}
 
 	profilecmd.Configure(root)

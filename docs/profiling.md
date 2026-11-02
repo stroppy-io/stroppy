@@ -104,9 +104,9 @@ CPU profiles, execution traces, and sampling settings are process-wide, includin
 when Stroppy is embedded in another service. Coordinate captures with the host's
 profiling tools; only one CPU capture or execution trace can run at a time.
 
-The listener uses a dedicated HTTP mux. Go's `net/http/pprof` package also registers
-handlers on `http.DefaultServeMux` during import; an embedding host must not expose
-that default mux on an untrusted interface.
+The listener uses a dedicated HTTP mux backed by `runtime/pprof` and
+`runtime/trace`. Importing Stroppy does not register diagnostics on
+`http.DefaultServeMux` or start a listener.
 
 Collect long enough samples and compare unprofiled controls. CPU profiles do not
 measure network wait directly; cumulative function percentages overlap and must

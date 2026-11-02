@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
+	"github.com/stroppy-io/stroppy/v6/internal/profilecmd"
 	"github.com/stroppy-io/stroppy/v6/internal/runner"
 	"github.com/stroppy-io/stroppy/v6/internal/version"
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
@@ -255,6 +256,10 @@ Signals:
 				if handled {
 					return nil
 				}
+			}
+
+			if err := profilecmd.Activate(cmd); err != nil {
+				return err
 			}
 
 			// Mutual exclusion is checked on the merged inputs (CLI over config file),

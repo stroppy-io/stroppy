@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"runtime"
 	"strings"
 	"sync"
@@ -18,6 +19,33 @@ func cleanEnvironment(t *testing.T) {
 
 	for _, name := range []string{"STROPPY_PPROF", "STROPPY_PPROF_BLOCK_RATE", "STROPPY_PPROF_MUTEX_FRACTION"} {
 		t.Setenv(name, "")
+	}
+}
+
+func TestDefaultMuxRemainsPrivate(t *testing.T) {
+	for _, path := range []string{"/debug/pprof/", "/debug/pprof/heap", "/debug/pprof/cmdline"} {
+		response := httptest.NewRecorder()
+		http.DefaultServeMux.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("default mux exposes %s: %d", path, response.Code)
+		}
+	}
+}
+
+func TestRejectInvalidCaptureDuration(t *testing.T) {
+	mux := profileMux()
+
+	for _, endpoint := range []string{"profile", "trace"} {
+		for _, value := range []string{"NaN", "Inf", "-1", "0", "999999999999999999999999"} {
+			response := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodGet, "/debug/pprof/"+endpoint+"?seconds="+value, nil)
+			mux.ServeHTTP(response, request)
+
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("%s seconds=%s: %d", endpoint, value, response.Code)
+			}
+		}
 	}
 }
 

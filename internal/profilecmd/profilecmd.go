@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,12 @@ import (
 )
 
 type sessionKey struct{}
+
+type commandSession struct {
+	session *profiling.Session
+}
+
+const deferredAnnotation = "stroppy.profiling.deferred"
 
 var errFlagValue = errors.New("profiling flag requires a value")
 
@@ -32,6 +39,15 @@ func Configure(root *cobra.Command) {
 	root.PersistentFlags().String("pprof-mutex-fraction", "",
 		"sample one in N mutex events (env STROPPY_PPROF_MUTEX_FRACTION)")
 	wrap(root)
+}
+
+// Defer lets routing commands decide whether this process or a child owns the listener.
+func Defer(command *cobra.Command) {
+	if command.Annotations == nil {
+		command.Annotations = make(map[string]string)
+	}
+
+	command.Annotations[deferredAnnotation] = "true"
 }
 
 func wrap(command *cobra.Command) {
@@ -61,21 +77,47 @@ func profiled(run func(*cobra.Command, []string) error) func(*cobra.Command, []s
 			return run(cmd, args)
 		}
 
-		session, err := profiling.Start(ctx, &selected)
-		if err != nil {
-			return err
+		if _, nested := ctx.Value(sessionKey{}).(*commandSession); nested {
+			return run(cmd, args)
 		}
 
-		defer func() { err = errors.Join(err, session.Close()) }()
+		owner := &commandSession{}
 
-		cmd.SetContext(context.WithValue(ctx, sessionKey{}, session))
+		cmd.SetContext(context.WithValue(ctx, sessionKey{}, owner))
+		defer func() { err = errors.Join(err, owner.session.Close()) }()
 
-		if session.Addr() != "" {
-			fmt.Fprintf(cmd.ErrOrStderr(), "pprof listening on http://%s/debug/pprof/\n", session.Addr())
+		if cmd.Annotations[deferredAnnotation] != "true" {
+			if err := Activate(cmd); err != nil {
+				return err
+			}
 		}
 
 		return run(cmd, args)
 	}
+}
+
+// Activate binds and announces diagnostics only once local execution has been selected.
+func Activate(command *cobra.Command) error {
+	if command.Context() == nil {
+		return nil
+	}
+
+	owner, ok := command.Context().Value(sessionKey{}).(*commandSession)
+	if !ok || owner.session != nil {
+		return nil
+	}
+
+	session, err := profiling.Start(command.Context(), nil)
+	if err != nil {
+		return err
+	}
+
+	owner.session = session
+	if session.Addr() != "" {
+		fmt.Fprintf(command.ErrOrStderr(), "pprof listening on http://%s/debug/pprof/\n", session.Addr())
+	}
+
+	return nil
 }
 
 func isHelp(command *cobra.Command, args []string) bool {
@@ -100,7 +142,20 @@ func resolve(command *cobra.Command, args []string) (profiling.Config, []string,
 	values := make(map[string]string, len(environmentNames))
 	for flag, name := range environmentNames {
 		values[flag] = os.Getenv(name)
+	}
 
+	if _, nested := command.Context().Value(sessionKey{}).(*commandSession); nested {
+		inherited, err := profiling.Resolve(command.Context(), nil)
+		if err != nil {
+			return profiling.Config{}, nil, err
+		}
+
+		values["pprof"] = inherited.Address
+		values["pprof-block-rate"] = strconv.Itoa(inherited.BlockProfileRate)
+		values["pprof-mutex-fraction"] = strconv.Itoa(inherited.MutexProfileFraction)
+	}
+
+	for flag := range environmentNames {
 		selected := command.Flags().Lookup(flag)
 		if selected == nil {
 			selected = command.InheritedFlags().Lookup(flag)
@@ -170,20 +225,31 @@ func filterArgs(args []string, values map[string]string) ([]string, error) {
 	return filtered, nil
 }
 
-// Forward releases the parent's listener before a delegated process binds the same address.
+// Forward passes the selected options to the process that executes a delegated command.
 func Forward(ctx context.Context) ([]string, error) {
 	selected, err := profiling.Resolve(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	if session, ok := ctx.Value(sessionKey{}).(*profiling.Session); ok {
-		if err := session.Close(); err != nil {
+	if owner, ok := ctx.Value(sessionKey{}).(*commandSession); ok {
+		if err := owner.session.Close(); err != nil {
 			return nil, err
 		}
 	}
 
-	return append(os.Environ(),
+	environment := slices.DeleteFunc(os.Environ(), func(value string) bool {
+		name, _, _ := strings.Cut(value, "=")
+		for _, variable := range environmentNames {
+			if name == variable {
+				return true
+			}
+		}
+
+		return false
+	})
+
+	return append(environment,
 		"STROPPY_PPROF="+selected.Address,
 		"STROPPY_PPROF_BLOCK_RATE="+strconv.Itoa(selected.BlockProfileRate),
 		"STROPPY_PPROF_MUTEX_FRACTION="+strconv.Itoa(selected.MutexProfileFraction),

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	"runtime"
 	"strconv"
@@ -145,18 +144,13 @@ func Start(ctx context.Context, config *Config) (*Session, error) {
 	}
 
 	serverContext, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /debug/pprof/", pprof.Index)
-	mux.HandleFunc("GET /debug/pprof/cmdline", pprof.Cmdline)
-	mux.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
-	mux.HandleFunc("GET /debug/pprof/symbol", pprof.Symbol)
-	mux.HandleFunc("GET /debug/pprof/trace", pprof.Trace)
 
 	active := &state{
 		config: selected, listener: listener, cancel: cancel,
 		done: make(chan struct{}), references: 1,
 		server: &http.Server{
-			Handler: mux, ReadHeaderTimeout: shutdownTimeout,
+			Handler: profileMux(), ReadHeaderTimeout: shutdownTimeout,
+			ReadTimeout: shutdownTimeout, IdleTimeout: shutdownTimeout,
 			BaseContext: func(net.Listener) context.Context { return serverContext },
 		},
 	}

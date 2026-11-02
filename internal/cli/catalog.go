@@ -324,6 +324,7 @@ func addManagedCommands(
 		newRemoveCommand(catalog, store),
 	)
 
+	profilecmd.Defer(probeCommand)
 	probeCommand.Args = cobra.ArbitraryArgs
 	probeCommand.DisableFlagParsing = true
 	probeCommand.RunE = managedProbe(catalog, store)
@@ -359,6 +360,10 @@ func managedProbe(catalog *bench.Catalog, store *workloadcatalog.Store) func(*co
 		}
 
 		if len(args) == 0 || strings.HasPrefix(args[0], "-") || builtInName {
+			if err := profilecmd.Activate(command); err != nil {
+				return err
+			}
+
 			builtIn := probe.NewCommand(catalog)
 			builtIn.SetContext(command.Context())
 			builtIn.SetOut(command.OutOrStdout())

@@ -13,6 +13,7 @@ import (
 	"golang.org/x/mod/semver"
 
 	"github.com/stroppy-io/stroppy/v6/internal/author"
+	"github.com/stroppy-io/stroppy/v6/internal/profilecmd"
 	"github.com/stroppy-io/stroppy/v6/internal/toolchain"
 	"github.com/stroppy-io/stroppy/v6/internal/version"
 	"github.com/stroppy-io/stroppy/v6/internal/workloadcatalog"
@@ -118,6 +119,10 @@ func newEjectCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 				return fmt.Errorf("%w: %s", workloadcatalog.ErrNotFound, args[0])
 			}
 
+			if err := profilecmd.Activate(cmd); err != nil {
+				return err
+			}
+
 			published, err := author.Read(test.Source)
 			if err != nil {
 				return fmt.Errorf("workload %q: %w", test.Name, err)
@@ -150,6 +155,7 @@ func newEjectCommand(catalog *bench.Catalog, store *workloadcatalog.Store) *cobr
 			return err
 		},
 	}
+	profilecmd.Defer(command)
 	command.Flags().StringVar(&modulePath, "module", "", "Go module path for the restored project")
 	command.Flags().StringVar(&sdkVersion, "sdk-version", "", "Stroppy release or pseudo-version")
 	command.Flags().BoolVarP(&yes, "yes", "y", false, "allow verified private Go download")
