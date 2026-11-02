@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,6 +67,8 @@ func TestManagedCatalogCommands(t *testing.T) {
 		t.Fatalf("run = %q, %v", output, err)
 	}
 
+	checkManagedProfiling(t, execute)
+
 	output, err = execute("run", "managed/example", "--help")
 	if err != nil || !strings.Contains(output, "stroppy run managed/example") {
 		t.Fatalf("run --help = %q, %v", output, err)
@@ -88,6 +91,27 @@ func TestManagedCatalogCommands(t *testing.T) {
 	if _, err := store.Get("managed/example"); err == nil {
 		t.Fatal("removed entry remains")
 	}
+}
+
+func checkManagedProfiling(t *testing.T, execute func(...string) (string, error)) {
+	t.Helper()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	address := listener.Addr().String()
+	listener.Close()
+	t.Setenv("STROPPY_PPROF", "invalid")
+
+	output, err := execute("run", "managed/example", "-d", "noop", "--iterations", "1",
+		"--no-report", "--pprof", address)
+	if err != nil {
+		t.Fatalf("profiled child: %v\n%s", err, output)
+	}
+
+	t.Setenv("STROPPY_PPROF", "")
 }
 
 // The documented authoring flow runs `stroppy build` from inside the workload
@@ -153,6 +177,9 @@ func createWorkloadProject(t *testing.T, repoRoot, name, marker string) (root, p
 
 import (
     "context"
+    "fmt"
+    "net/http"
+    "os"
     "github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
@@ -162,7 +189,18 @@ var Test = bench.Test{Name: "` + name + `", Define: func(d *bench.Def) error {
     d.Execution.Step("workload", work, settings.Policy())
     return d.Execution.Err()
 }}
-func work(context.Context, *bench.Bench) error { return nil }
+func work(ctx context.Context, _ *bench.Bench) error {
+    address := os.Getenv("STROPPY_PPROF")
+    if address == "" { return nil }
+    request, err := http.NewRequestWithContext(ctx, http.MethodGet,
+        "http://"+address+"/debug/pprof/heap", nil)
+    if err != nil { return err }
+    response, err := http.DefaultClient.Do(request)
+    if err != nil { return err }
+    defer response.Body.Close()
+    if response.StatusCode != http.StatusOK { return fmt.Errorf("heap status: %d", response.StatusCode) }
+    return nil
+}
 func init() { bench.Register(Test) }
 `
 

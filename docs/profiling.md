@@ -93,7 +93,10 @@ the actual address when using port zero. Concurrent sessions with identical
 options share one listener; conflicting configurations fail rather than silently
 profiling the wrong scope. The last close cancels active capture requests and
 stops the listener. The caller owns session closure; context cancellation alone
-does not close a caller-owned session.
+does not close a caller-owned session. A delegated child cannot share an
+independently owned host listener. If that host still occupies an explicit fixed
+port, the child reports a bind error; request `127.0.0.1:0` for an independent
+child listener instead of silently changing the requested port.
 
 ## Security and measurement
 

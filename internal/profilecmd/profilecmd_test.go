@@ -34,6 +34,9 @@ func TestCLIFormsAndPrecedence(t *testing.T) {
 			t.Setenv("STROPPY_PPROF", "invalid")
 
 			errCommand := io.ErrUnexpectedEOF
+
+			var address string
+
 			command := &cobra.Command{Use: "run", DisableFlagParsing: test.manual}
 			command.RunE = func(cmd *cobra.Command, args []string) error {
 				if !slices.Equal(args, test.want) {
@@ -41,8 +44,9 @@ func TestCLIFormsAndPrecedence(t *testing.T) {
 				}
 
 				session := cmd.Context().Value(sessionKey{}).(*commandSession).session
+				address = session.Addr()
 
-				response, err := http.Get("http://" + session.Addr() + "/debug/pprof/heap")
+				response, err := http.Get("http://" + address + "/debug/pprof/heap")
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -70,6 +74,13 @@ func TestCLIFormsAndPrecedence(t *testing.T) {
 			if !strings.Contains(output.String(), "pprof listening on http://127.0.0.1:") {
 				t.Fatalf("diagnostics = %q", output.String())
 			}
+
+			listener, err := net.Listen("tcp", address)
+			if err != nil {
+				t.Fatalf("listener not released after command error: %v", err)
+			}
+
+			listener.Close()
 		})
 	}
 }
@@ -192,6 +203,36 @@ func TestExplicitDisableOverridesEnvironment(t *testing.T) {
 
 	if err := root.ExecuteContext(t.Context()); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestForwardPreservesExplicitAddressOwnedByHost(t *testing.T) {
+	host, err := profiling.Start(t.Context(), &profiling.Config{Address: "127.0.0.1:0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer host.Close()
+
+	config := profiling.Config{Address: host.Addr()}
+
+	environment, err := Forward(profiling.WithConfig(t.Context(), config))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Contains(environment, "STROPPY_PPROF="+host.Addr()) {
+		t.Fatal("explicit port silently replaced")
+	}
+
+	response, err := http.Get("http://" + host.Addr() + "/debug/pprof/heap")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("host listener affected: %d", response.StatusCode)
 	}
 }
 

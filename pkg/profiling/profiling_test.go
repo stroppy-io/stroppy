@@ -23,12 +23,29 @@ func cleanEnvironment(t *testing.T) {
 }
 
 func TestDefaultMuxRemainsPrivate(t *testing.T) {
-	for _, path := range []string{"/debug/pprof/", "/debug/pprof/heap", "/debug/pprof/cmdline"} {
+	for _, path := range []string{
+		"/debug/pprof/", "/debug/pprof/heap", "/debug/pprof/cmdline",
+		"/debug/pprof/profile", "/debug/pprof/trace", "/debug/pprof/symbol",
+	} {
 		response := httptest.NewRecorder()
 		http.DefaultServeMux.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
 
 		if response.Code != http.StatusNotFound {
 			t.Fatalf("default mux exposes %s: %d", path, response.Code)
+		}
+	}
+}
+
+func TestHeadDoesNotStartCapture(t *testing.T) {
+	mux := profileMux()
+
+	for _, endpoint := range []string{"profile", "trace"} {
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodHead, "/debug/pprof/"+endpoint, nil)
+		mux.ServeHTTP(response, request)
+
+		if response.Code != http.StatusMethodNotAllowed || response.Header().Get("Allow") != http.MethodGet {
+			t.Fatalf("HEAD %s: %d, Allow=%q", endpoint, response.Code, response.Header().Get("Allow"))
 		}
 	}
 }

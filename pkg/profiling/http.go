@@ -33,6 +33,14 @@ func profileMux() *http.ServeMux {
 	})
 	mux.HandleFunc("GET /debug/pprof/profile", serveCPU)
 	mux.HandleFunc("GET /debug/pprof/trace", serveTrace)
+
+	for _, path := range []string{"profile", "trace"} {
+		mux.HandleFunc("HEAD /debug/pprof/"+path, func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Allow", http.MethodGet)
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		})
+	}
+
 	mux.HandleFunc("GET /debug/pprof/symbol", serveSymbols)
 
 	return mux

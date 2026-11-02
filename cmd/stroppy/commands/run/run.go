@@ -258,10 +258,6 @@ Signals:
 				}
 			}
 
-			if err := profilecmd.Activate(cmd); err != nil {
-				return err
-			}
-
 			// Mutual exclusion is checked on the merged inputs (CLI over config file),
 			// not just CLI-vs-CLI, so `config steps + CLI --no-steps` (and vice versa)
 			// is rejected the same way.
@@ -271,6 +267,10 @@ Signals:
 
 			if len(parsed.afterDash) > 0 {
 				return invalidConfig(errArgsAfterDash)
+			}
+
+			if err := profilecmd.Activate(cmd); err != nil {
+				return err
 			}
 
 			// Log override decisions when both CLI and file config are present.
