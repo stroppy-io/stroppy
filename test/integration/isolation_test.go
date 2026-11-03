@@ -40,8 +40,12 @@ func TestTransactionIsolationSemantics(t *testing.T) {
 				actual := strings.ReplaceAll(strings.ToLower(preparedScalar(t, result, queryErr).(string)), "-", " ")
 				if backend.kind != config.DriverTypeMySQL {
 					expected := "read committed"
-					if level == config.TxIsolationLevelRepeatableRead { expected = "repeatable read" }
-					if level == config.TxIsolationLevelSerializable { expected = "serializable" }
+					if level == config.TxIsolationLevelRepeatableRead {
+						expected = "repeatable read"
+					}
+					if level == config.TxIsolationLevelSerializable {
+						expected = "serializable"
+					}
 					require.Equal(t, expected, actual)
 				} else {
 					require.Equal(t, "read committed", actual, "transaction overrides must not change session default")
@@ -71,6 +75,65 @@ func TestMySQLDSNIsolationAndPooledTransactions(t *testing.T) {
 		require.Equal(t, "READ-COMMITTED", preparedScalar(t, result, queryErr))
 		require.Equal(t, level, tx.Isolation())
 		require.NoError(t, tx.Commit(t.Context()))
+	}
+}
+
+func TestTransactionIsolationVisibility(t *testing.T) {
+	for _, backend := range preparedBackends() {
+		t.Run(backend.name, func(t *testing.T) {
+			connection := backend.url
+			if backend.kind == config.DriverTypeMySQL {
+				separator := "?"
+				if strings.Contains(connection, "?") {
+					separator = "&"
+				}
+				connection += separator + "transaction_isolation=%27READ-COMMITTED%27"
+			}
+			db := dispatchQueryTimeout(t, backend.kind, connection, 0)
+			exec := func(query string) {
+				result, err := db.RunQuery(t.Context(), query, nil)
+				require.NoError(t, err)
+				require.NoError(t, result.Rows.Close())
+			}
+			exec("DROP TABLE IF EXISTS stroppy_isolation_visibility")
+			exec("CREATE TABLE stroppy_isolation_visibility (id INT PRIMARY KEY, value INT)")
+			defer exec("DROP TABLE stroppy_isolation_visibility")
+			exec("INSERT INTO stroppy_isolation_visibility VALUES (1, 1)")
+			for _, mode := range []string{"pooled", "session"} {
+				t.Run(mode, func(t *testing.T) {
+					begin := db.Begin
+					if mode == "session" {
+						session, err := db.(driver.SessionProvider).OpenSession(t.Context())
+						require.NoError(t, err)
+						defer session.Close(context.Background())
+						begin = func(ctx context.Context, level config.TxIsolationLevel) (driver.Tx, error) {
+							return session.Begin(ctx, level)
+						}
+					}
+					for _, level := range []config.TxIsolationLevel{
+						config.TxIsolationLevelRepeatableRead, config.TxIsolationLevelReadCommitted,
+						config.TxIsolationLevelUnspecified,
+					} {
+						exec("UPDATE stroppy_isolation_visibility SET value = 1 WHERE id = 1")
+						tx, err := begin(t.Context(), level)
+						require.NoError(t, err)
+						read := func() any {
+							result, queryErr := tx.RunQuery(t.Context(),
+								"SELECT value FROM stroppy_isolation_visibility WHERE id = 1", nil)
+							return preparedScalar(t, result, queryErr)
+						}
+						require.EqualValues(t, 1, read())
+						exec("UPDATE stroppy_isolation_visibility SET value = 2 WHERE id = 1")
+						expected := 2
+						if level == config.TxIsolationLevelRepeatableRead {
+							expected = 1
+						}
+						require.EqualValues(t, expected, read(), "applied isolation %v", level)
+						require.NoError(t, tx.Rollback(t.Context()))
+					}
+				})
+			}
+		})
 	}
 }
 

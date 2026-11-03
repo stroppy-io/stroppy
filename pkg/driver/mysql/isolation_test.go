@@ -97,7 +97,38 @@ func TestIsolationConnectorReadsEachPhysicalConnection(t *testing.T) {
 		expected := []driver.TxOptions{{}, {Isolation: driver.IsolationLevel(sql.LevelReadCommitted)}, {}}
 		require.Equal(t, expected, backend.begins)
 		require.Equal(t, 1, backend.queries)
+
+		backend.value = "READ-COMMITTED"
+		conn, err = connector.Connect(t.Context())
+		require.NoError(t, err)
+
+		begin, ok = conn.(driver.ConnBeginTx)
+		require.True(t, ok)
+		_, err = begin.BeginTx(t.Context(), driver.TxOptions{Isolation: driver.IsolationLevel(sql.LevelRepeatableRead)})
+		require.NoError(t, err)
+		require.Equal(t, 2, backend.queries)
+		require.Equal(t, driver.IsolationLevel(sql.LevelRepeatableRead), backend.begins[len(backend.begins)-1].Isolation)
 	}
+}
+
+func TestIsolationConnectorPreservesUnsupportedDefaults(t *testing.T) {
+	t.Parallel()
+
+	backend := &isolationTestConnection{value: "SNAPSHOT"}
+	connector := isolationConnector{isolationTestConnector{connection: backend}}
+	conn, err := connector.Connect(t.Context())
+	require.NoError(t, err)
+	require.False(t, backend.closed)
+
+	begin, ok := conn.(driver.ConnBeginTx)
+	require.True(t, ok)
+	_, err = begin.BeginTx(t.Context(), driver.TxOptions{Isolation: driver.IsolationLevel(sql.LevelReadCommitted)})
+	require.NoError(t, err)
+	require.Equal(t, driver.IsolationLevel(sql.LevelReadCommitted), backend.begins[0].Isolation)
+	backend.queryErr = context.Canceled
+	_, err = begin.BeginTx(t.Context(), driver.TxOptions{Isolation: driver.IsolationLevel(sql.LevelReadCommitted)})
+	require.ErrorIs(t, err, context.Canceled)
+	require.Len(t, backend.begins, 1)
 }
 
 func TestIsolationConnectorClosesFailedInitialization(t *testing.T) {
@@ -189,6 +220,14 @@ func TestIsolationCacheInvalidatesOpaqueSQL(t *testing.T) {
 	}
 }
 
+func (c *isolationTestConnection) PrepareContext(context.Context, string) (driver.Stmt, error) {
+	return isolationTestStatement{}, nil
+}
+
+func (c *isolationTestConnection) Prepare(string) (driver.Stmt, error) {
+	return isolationTestStatement{}, nil
+}
+
 type isolationTestStatement struct{ mysqlStatement }
 
 func (isolationTestStatement) ExecContext(context.Context, []driver.NamedValue) (driver.Result, error) {
@@ -201,12 +240,14 @@ func TestPreparedExecutionInvalidatesIsolationEachTime(t *testing.T) {
 	backend := &isolationTestConnection{value: "REPEATABLE-READ"}
 	conn := &isolationConnection{mysqlConnection: backend, level: sql.LevelRepeatableRead, known: true}
 
-	statement := &isolationStatement{
-		mysqlStatement: isolationTestStatement{}, connection: conn,
-		query: "SET TRANSACTION ISOLATION LEVEL READ COMMITTED",
-	}
+	prepared, err := conn.PrepareContext(t.Context(), "SET TRANSACTION ISOLATION LEVEL READ COMMITTED")
+	require.NoError(t, err)
+
+	statement, ok := prepared.(driver.StmtExecContext)
+	require.True(t, ok)
+
 	for range 2 {
-		_, err := statement.ExecContext(t.Context(), nil)
+		_, err = statement.ExecContext(t.Context(), nil)
 		require.NoError(t, err)
 		require.False(t, conn.known)
 		_, err = conn.BeginTx(t.Context(), driver.TxOptions{Isolation: driver.IsolationLevel(sql.LevelRepeatableRead)})
@@ -223,7 +264,10 @@ func TestPreparedExecutionInvalidatesIsolationEachTime(t *testing.T) {
 func TestIsolationCachePreservesDMLFastPath(t *testing.T) {
 	t.Parallel()
 
-	for _, query := range []string{"SELECT 1", "INSERT INTO t VALUES (1)", "UPDATE t SET value=1", "DELETE FROM t"} {
+	for _, query := range []string{
+		"SELECT 1", "SELECT 'a;b'", `SELECT "a;b"`, "SELECT `a;b` FROM t", "SELECT 'a'';b'",
+		"INSERT INTO t VALUES (1)", "UPDATE t SET value=1", "DELETE FROM t",
+	} {
 		backend := &isolationTestConnection{}
 		conn := &isolationConnection{mysqlConnection: backend, level: sql.LevelRepeatableRead, known: true}
 		_, err := conn.QueryContext(t.Context(), query, nil)

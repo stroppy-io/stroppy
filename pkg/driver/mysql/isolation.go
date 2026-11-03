@@ -46,6 +46,10 @@ func (c isolationConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	}
 
 	level, err := readSessionIsolation(ctx, backend)
+	if errors.Is(err, errIsolationUnsupported) {
+		return &isolationConnection{mysqlConnection: backend}, nil
+	}
+
 	if err != nil {
 		_ = conn.Close()
 
@@ -106,11 +110,13 @@ type isolationConnection struct {
 func (c *isolationConnection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
 	if !c.known && sql.IsolationLevel(opts.Isolation) != sql.LevelDefault {
 		level, err := readSessionIsolation(ctx, c.mysqlConnection)
-		if err != nil {
+		if err != nil && !errors.Is(err, errIsolationUnsupported) {
 			return nil, fmt.Errorf("refresh MySQL session isolation: %w", err)
 		}
 
-		c.level, c.known = level, true
+		if err == nil {
+			c.level, c.known = level, true
+		}
 	} else if c.known && sql.IsolationLevel(opts.Isolation) == c.level {
 		opts.Isolation = driver.IsolationLevel(sql.LevelDefault)
 	}
@@ -132,17 +138,55 @@ func (c *isolationConnection) observe(query string) {
 	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
 
 	fields := strings.Fields(query)
-	if len(fields) == 0 || strings.Contains(query, ";") {
+	if len(fields) == 0 || !singleIsolationStatement(query) {
 		c.known = false
 
 		return
 	}
 
+	// Stored functions and triggers must preserve isolation; their side effects are not visible here.
 	switch strings.ToUpper(fields[0]) {
 	case "SELECT", "INSERT", "UPDATE", "DELETE", "REPLACE", "SHOW":
 	default:
 		c.known = false
 	}
+}
+
+func singleIsolationStatement(query string) bool {
+	// Backslash quoting depends on sql_mode; ambiguity must invalidate the cache.
+	if strings.Contains(query, "\\") {
+		return false
+	}
+
+	var quote byte
+
+	for i := 0; i < len(query); i++ {
+		ch := query[i]
+		if quote != 0 {
+			if ch == quote {
+				if i+1 < len(query) && query[i+1] == quote {
+					i++
+				} else {
+					quote = 0
+				}
+			}
+
+			continue
+		}
+
+		switch ch {
+		case '\'', '"', '`':
+			quote = ch
+		case ';', '#':
+			return false
+		case '/', '-':
+			if i+1 < len(query) && (query[i:i+2] == "/*" || query[i:i+2] == "--") {
+				return false
+			}
+		}
+	}
+
+	return quote == 0
 }
 
 func (c *isolationConnection) ExecContext(
