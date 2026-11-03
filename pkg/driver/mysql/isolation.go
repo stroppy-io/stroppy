@@ -152,15 +152,61 @@ func (c *isolationConnection) QueryContext(
 	return c.mysqlConnection.QueryContext(ctx, query, args)
 }
 
+type mysqlStatement interface {
+	driver.Stmt
+	driver.StmtExecContext
+	driver.StmtQueryContext
+	driver.NamedValueChecker
+}
+
+type isolationStatement struct {
+	mysqlStatement
+	connection *isolationConnection
+	query      string
+}
+
+func (c *isolationConnection) wrapStatement(statement driver.Stmt, query string) (driver.Stmt, error) {
+	backend, ok := statement.(mysqlStatement)
+	if !ok {
+		_ = statement.Close()
+
+		return nil, errIsolationInterfaces
+	}
+
+	return &isolationStatement{mysqlStatement: backend, connection: c, query: query}, nil
+}
+
+func (s *isolationStatement) Exec(args []driver.Value) (driver.Result, error) {
+	s.connection.observe(s.query)
+
+	return s.mysqlStatement.Exec(args)
+}
+
+func (s *isolationStatement) Query(args []driver.Value) (driver.Rows, error) {
+	s.connection.observe(s.query)
+
+	return s.mysqlStatement.Query(args)
+}
+
+func (s *isolationStatement) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
+	s.connection.observe(s.query)
+
+	return s.mysqlStatement.ExecContext(ctx, args)
+}
+
+func (s *isolationStatement) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+	s.connection.observe(s.query)
+
+	return s.mysqlStatement.QueryContext(ctx, args)
+}
+
 func (c *isolationConnection) Prepare(query string) (driver.Stmt, error) {
 	statement, err := c.mysqlConnection.Prepare(query)
 	if err != nil {
 		return nil, err
 	}
 
-	c.observe(query)
-
-	return statement, nil
+	return c.wrapStatement(statement, query)
 }
 
 func (c *isolationConnection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
@@ -169,7 +215,5 @@ func (c *isolationConnection) PrepareContext(ctx context.Context, query string) 
 		return nil, err
 	}
 
-	c.observe(query)
-
-	return statement, nil
+	return c.wrapStatement(statement, query)
 }

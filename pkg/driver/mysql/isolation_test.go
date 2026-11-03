@@ -134,6 +134,37 @@ func TestIsolationCacheInvalidatesOpaqueSQL(t *testing.T) {
 	}
 }
 
+type isolationTestStatement struct{ mysqlStatement }
+
+func (isolationTestStatement) ExecContext(context.Context, []driver.NamedValue) (driver.Result, error) {
+	return driver.RowsAffected(0), nil
+}
+
+func TestPreparedExecutionInvalidatesIsolationEachTime(t *testing.T) {
+	t.Parallel()
+
+	backend := &isolationTestConnection{value: "REPEATABLE-READ"}
+	conn := &isolationConnection{mysqlConnection: backend, level: sql.LevelRepeatableRead, known: true}
+
+	statement := &isolationStatement{
+		mysqlStatement: isolationTestStatement{}, connection: conn,
+		query: "SET TRANSACTION ISOLATION LEVEL READ COMMITTED",
+	}
+	for range 2 {
+		_, err := statement.ExecContext(t.Context(), nil)
+		require.NoError(t, err)
+		require.False(t, conn.known)
+		_, err = conn.BeginTx(t.Context(), driver.TxOptions{Isolation: driver.IsolationLevel(sql.LevelRepeatableRead)})
+		require.NoError(t, err)
+	}
+
+	require.Equal(t, 2, backend.queries)
+
+	for _, opts := range backend.begins {
+		require.Equal(t, driver.IsolationLevel(sql.LevelRepeatableRead), opts.Isolation)
+	}
+}
+
 func TestIsolationCachePreservesDMLFastPath(t *testing.T) {
 	t.Parallel()
 
