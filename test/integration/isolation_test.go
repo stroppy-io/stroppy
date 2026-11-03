@@ -4,14 +4,60 @@ package integration
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"testing"
 
+	gomysql "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
+
+func isolationTestConnection(t *testing.T, backend preparedBackend) string {
+	t.Helper()
+
+	if backend.kind == config.DriverTypeMySQL {
+		parsed, err := gomysql.ParseDSN(backend.url)
+		require.NoError(t, err)
+
+		if parsed.Params == nil {
+			parsed.Params = make(map[string]string)
+		}
+
+		parsed.Params["transaction_isolation"] = "'READ-COMMITTED'"
+
+		return parsed.FormatDSN()
+	}
+
+	if strings.HasPrefix(backend.url, "postgres://") || strings.HasPrefix(backend.url, "postgresql://") {
+		parsed, err := url.Parse(backend.url)
+		require.NoError(t, err)
+
+		parameters := parsed.Query()
+		parameters.Set("default_transaction_isolation", "read committed")
+		parsed.RawQuery = parameters.Encode()
+
+		return parsed.String()
+	}
+
+	return backend.url + " default_transaction_isolation='read committed'"
+}
+
+func TestIsolationTestConnectionPreservesMySQLCredentials(t *testing.T) {
+	for _, dsn := range []string{
+		"user:pass?word@tcp(localhost:3307)/mydb",
+		"user:pass?word@tcp(localhost:3307)/mydb?parseTime=true",
+	} {
+		connection := isolationTestConnection(t, preparedBackend{kind: config.DriverTypeMySQL, url: dsn})
+		parsed, err := gomysql.ParseDSN(connection)
+		require.NoError(t, err)
+		require.Equal(t, "pass?word", parsed.Passwd)
+		require.Equal(t, "mydb", parsed.DBName)
+		require.Equal(t, "'READ-COMMITTED'", parsed.Params["transaction_isolation"])
+	}
+}
 
 func TestTransactionIsolationSemantics(t *testing.T) {
 	for _, backend := range preparedBackends() {
@@ -59,12 +105,8 @@ func TestTransactionIsolationSemantics(t *testing.T) {
 
 func TestMySQLDSNIsolationAndPooledTransactions(t *testing.T) {
 	backend := preparedBackends()[1]
-	separator := "?"
-	if strings.Contains(backend.url, "?") {
-		separator = "&"
-	}
-	db := dispatchQueryTimeout(t, backend.kind,
-		backend.url+separator+"transaction_isolation=%27READ-COMMITTED%27", 0)
+
+	db := dispatchQueryTimeout(t, backend.kind, isolationTestConnection(t, backend), 0)
 	for _, level := range []config.TxIsolationLevel{
 		config.TxIsolationLevelReadCommitted, config.TxIsolationLevelSerializable,
 		config.TxIsolationLevelUnspecified, config.TxIsolationLevelReadCommitted,
@@ -81,15 +123,7 @@ func TestMySQLDSNIsolationAndPooledTransactions(t *testing.T) {
 func TestTransactionIsolationVisibility(t *testing.T) {
 	for _, backend := range preparedBackends() {
 		t.Run(backend.name, func(t *testing.T) {
-			connection := backend.url
-			if backend.kind == config.DriverTypeMySQL {
-				separator := "?"
-				if strings.Contains(connection, "?") {
-					separator = "&"
-				}
-				connection += separator + "transaction_isolation=%27READ-COMMITTED%27"
-			}
-			db := dispatchQueryTimeout(t, backend.kind, connection, 0)
+			db := dispatchQueryTimeout(t, backend.kind, isolationTestConnection(t, backend), 0)
 			exec := func(query string) {
 				result, err := db.RunQuery(t.Context(), query, nil)
 				require.NoError(t, err)
@@ -110,10 +144,16 @@ func TestTransactionIsolationVisibility(t *testing.T) {
 							return session.Begin(ctx, level)
 						}
 					}
-					for _, level := range []config.TxIsolationLevel{
+
+					levels := []config.TxIsolationLevel{
 						config.TxIsolationLevelRepeatableRead, config.TxIsolationLevelReadCommitted,
 						config.TxIsolationLevelUnspecified,
-					} {
+					}
+					if backend.kind == config.DriverTypeMySQL {
+						levels = append(levels, config.TxIsolationLevelSerializable)
+					}
+
+					for _, level := range levels {
 						exec("UPDATE stroppy_isolation_visibility SET value = 1 WHERE id = 1")
 						tx, err := begin(t.Context(), level)
 						require.NoError(t, err)
@@ -123,6 +163,13 @@ func TestTransactionIsolationVisibility(t *testing.T) {
 							return preparedScalar(t, result, queryErr)
 						}
 						require.EqualValues(t, 1, read())
+
+						if level == config.TxIsolationLevelSerializable {
+							assertSerializableReadLock(t, db)
+							require.NoError(t, tx.Rollback(t.Context()))
+
+							continue
+						}
 						exec("UPDATE stroppy_isolation_visibility SET value = 2 WHERE id = 1")
 						expected := 2
 						if level == config.TxIsolationLevelRepeatableRead {
@@ -135,6 +182,27 @@ func TestTransactionIsolationVisibility(t *testing.T) {
 			}
 		})
 	}
+}
+
+func assertSerializableReadLock(t *testing.T, db driver.Driver) {
+	t.Helper()
+	writer, err := db.(driver.SessionProvider).OpenSession(t.Context())
+	require.NoError(t, err)
+
+	defer writer.Close(context.Background())
+
+	result, err := writer.RunQuery(t.Context(), "SET SESSION innodb_lock_wait_timeout = 1", nil)
+	require.NoError(t, err)
+	require.NoError(t, result.Rows.Close())
+
+	result, err = writer.RunQuery(t.Context(), "UPDATE stroppy_isolation_visibility SET value = 2 WHERE id = 1", nil)
+	if result != nil && result.Rows != nil {
+		require.NoError(t, result.Rows.Close())
+	}
+
+	var backend *gomysql.MySQLError
+	require.ErrorAs(t, err, &backend)
+	require.EqualValues(t, 1205, backend.Number, "serializable reads must block conflicting writes")
 }
 
 func TestMySQLDefaultIsolationAvoidsRedundantSet(t *testing.T) {
