@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Fixed
+
+- Unique-key and other constraint failures have distinct error classes, and terminal-error groups retain a bounded, sanitized sample and backend code without changing iteration continuation.
+
 ## [6.3.1] - 2026-11-02
 
 ### Added

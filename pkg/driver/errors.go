@@ -9,14 +9,16 @@ import (
 type ErrorKind string
 
 const (
-	ErrorKindUnknown       ErrorKind = "unknown"
-	ErrorKindSerialization ErrorKind = "serialization"
-	ErrorKindDeadlock      ErrorKind = "deadlock"
-	ErrorKindLockTimeout   ErrorKind = "lock_timeout"
-	ErrorKindTransient     ErrorKind = "transient"
-	ErrorKindUnsupported   ErrorKind = "unsupported"
-	ErrorKindCanceled      ErrorKind = "canceled"
-	ErrorKindTimeout       ErrorKind = "timeout"
+	ErrorKindUniqueViolation     ErrorKind = "unique_violation"
+	ErrorKindConstraintViolation ErrorKind = "constraint_violation"
+	ErrorKindUnknown             ErrorKind = "unknown"
+	ErrorKindSerialization       ErrorKind = "serialization"
+	ErrorKindDeadlock            ErrorKind = "deadlock"
+	ErrorKindLockTimeout         ErrorKind = "lock_timeout"
+	ErrorKindTransient           ErrorKind = "transient"
+	ErrorKindUnsupported         ErrorKind = "unsupported"
+	ErrorKindCanceled            ErrorKind = "canceled"
+	ErrorKindTimeout             ErrorKind = "timeout"
 )
 
 // ErrorFacts are backend-neutral properties used by workload error policy.

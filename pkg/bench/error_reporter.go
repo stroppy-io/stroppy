@@ -38,7 +38,9 @@ type errorGroup struct {
 
 type errorGroupSummary struct {
 	errorGroup
-	count uint64
+	count  uint64
+	code   string
+	sample string
 }
 
 type errorSummary struct {
@@ -50,7 +52,9 @@ type errorSummary struct {
 }
 
 type errorGroupState struct {
-	count atomic.Uint64
+	count  atomic.Uint64
+	code   string
+	sample string
 }
 
 type errorReporter struct {
@@ -132,7 +136,13 @@ func (r *errorReporter) record(
 		operation: boundErrorOperation(operation),
 		kind:      normalizeErrorKind(kind),
 	}
-	group, state := r.groupState(group)
+
+	var redactor *strings.Replacer
+	if vu != nil && vu.root != nil {
+		redactor = vu.root.reportRedactor
+	}
+
+	group, state := r.groupState(group, err, redactor)
 	count := state.count.Add(1)
 
 	switch scope {
@@ -166,7 +176,9 @@ func (r *errorReporter) record(
 	}
 }
 
-func (r *errorReporter) groupState(group errorGroup) (errorGroup, *errorGroupState) {
+func (r *errorReporter) groupState(
+	group errorGroup, err error, redactor *strings.Replacer,
+) (errorGroup, *errorGroupState) {
 	r.mu.RLock()
 	state := r.groups[group]
 	r.mu.RUnlock()
@@ -192,7 +204,8 @@ func (r *errorReporter) groupState(group errorGroup) (errorGroup, *errorGroupSta
 		group.operation = strings.Clone(group.operation)
 	}
 
-	state = &errorGroupState{}
+	code, sample := representativeError(err, redactor)
+	state = &errorGroupState{code: code, sample: sample}
 	r.groups[group] = state
 
 	return group, state
@@ -261,7 +274,9 @@ func (r *errorReporter) snapshot() errorSummary {
 	summary.groups = make([]errorGroupSummary, 0, len(r.groups))
 
 	for group, state := range r.groups {
-		summary.groups = append(summary.groups, errorGroupSummary{errorGroup: group, count: state.count.Load()})
+		summary.groups = append(summary.groups, errorGroupSummary{
+			errorGroup: group, count: state.count.Load(), code: state.code, sample: state.sample,
+		})
 	}
 
 	r.mu.RUnlock()
@@ -313,10 +328,12 @@ func (r *errorReporter) writeSummary(w io.Writer) {
 	for _, group := range summary.groups {
 		fmt.Fprintf(
 			w,
-			"    operation=%-20s class=%-14s count=%d\n",
+			"    operation=%-20s class=%-14s count=%d code=%s sample=%q\n",
 			group.operation,
 			group.kind,
 			group.count,
+			group.code,
+			group.sample,
 		)
 	}
 }
@@ -351,7 +368,9 @@ func boundErrorOperation(operation string) string {
 
 func normalizeErrorKind(kind driver.ErrorKind) driver.ErrorKind {
 	switch kind {
-	case driver.ErrorKindUnknown,
+	case driver.ErrorKindUniqueViolation,
+		driver.ErrorKindConstraintViolation,
+		driver.ErrorKindUnknown,
 		driver.ErrorKindSerialization,
 		driver.ErrorKindDeadlock,
 		driver.ErrorKindLockTimeout,

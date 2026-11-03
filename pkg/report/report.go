@@ -154,6 +154,8 @@ type ErrorGroup struct {
 	Operation string `json:"operation"`
 	Class     string `json:"class"`
 	Count     uint64 `json:"count"`
+	Code      string `json:"code,omitempty"`
+	Sample    string `json:"sample,omitempty"`
 }
 
 // Failure identifies the lifecycle phase that prevented clean completion.
