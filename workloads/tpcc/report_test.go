@@ -338,6 +338,28 @@ func TestComplianceReportUnpacedRun(t *testing.T) {
 	}
 }
 
+func TestComplianceReportPicodataApproximation(t *testing.T) {
+	report, err := complianceReport(fullMix([]float64{50, 40, 30, 60, 80}), reportOptions{
+		workload: "tpcc/tx", paced: true, nonTransactional: true, elapsed: time.Minute,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if report.ComplianceApplicable || !report.NonTransactional {
+		t.Fatal("non-transactional execution must not claim TPC-C compliance")
+	}
+
+	if report.MixCompliant != nil || report.ResponseCompliant != nil || report.Transactions[0].CeilingMs != nil {
+		t.Fatal("approximation must not expose compliance verdicts")
+	}
+
+	if !strings.Contains(report.Note, "non-transactional Picodata approximation") ||
+		!strings.Contains(report.text(), "NOT APPLICABLE (non-transactional Picodata approximation") {
+		t.Fatal("report must identify the approximation")
+	}
+}
+
 func TestObservationQuantile(t *testing.T) {
 	obs := binSamples(repeat(6000, 100)) // all samples in the (5000,10000] bucket
 

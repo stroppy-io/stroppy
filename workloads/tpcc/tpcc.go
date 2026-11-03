@@ -73,10 +73,11 @@ type workload struct {
 	steady          *steady
 	warmup          time.Duration
 
-	historyOnce sync.Once
-	historyID   atomic.Int64
-	historyErr  error
-	vuStates    []*vuState
+	approximationOnce sync.Once
+	historyOnce       sync.Once
+	historyID         atomic.Int64
+	historyErr        error
+	vuStates          []*vuState
 }
 
 type metrics struct {
@@ -416,6 +417,13 @@ func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64)
 }
 
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
+	if w.isPicodata {
+		w.approximationOnce.Do(func() {
+			b.Log.Warn("Picodata tpcc/tx is a non-transactional approximation, not compliant TPC-C; " +
+				"failed operations can leave partial writes and unused order IDs, and stock updates are not isolated")
+		})
+	}
+
 	if err := w.initializeHistory(ctx, b); err != nil {
 		return bench.Fatal(err)
 	}
@@ -637,7 +645,12 @@ func (w *workload) newOrderBody(
 		return fmt.Errorf("%w: %d", errNewOrderWarehouseMissing, wID)
 	}
 
-	distRow, err := tx.RawRow(ctx, w.q("workload_tx_new_order", "get_district"), map[string]any{
+	districtQuery := "get_district"
+	if w.isPicodata {
+		districtQuery = "allocate_order_id"
+	}
+
+	distRow, err := tx.RawRow(ctx, w.q("workload_tx_new_order", districtQuery), map[string]any{
 		"d_id": dID, "w_id": wID,
 	})
 	if err != nil {
@@ -650,10 +663,12 @@ func (w *workload) newOrderBody(
 
 	oID := toInt64(distRow[0])
 
-	if err := tx.Exec(ctx, w.q("workload_tx_new_order", "update_district"), map[string]any{
-		"d_id": dID, "w_id": wID,
-	}); err != nil {
-		return err
+	if !w.isPicodata {
+		if err := tx.Exec(ctx, w.q("workload_tx_new_order", "update_district"), map[string]any{
+			"d_id": dID, "w_id": wID,
+		}); err != nil {
+			return err
+		}
 	}
 
 	if err := tx.Exec(ctx, w.q("workload_tx_new_order", "insert_order"), map[string]any{

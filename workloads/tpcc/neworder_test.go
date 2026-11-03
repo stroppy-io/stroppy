@@ -161,10 +161,14 @@ func runNewOrderBody(
 	respond func(sql string) ([][]any, error),
 	lineIID []int64,
 	forceRollback bool,
+	configure ...func(*workload),
 ) error {
 	t.Helper()
 
 	w := &workload{sql: bench.ParseSQL(newOrderTestSQL), variant: "tx"}
+	for _, apply := range configure {
+		apply(w)
+	}
 
 	lineQty := make([]int64, len(lineIID))
 	lineSupply := make([]int64, len(lineIID))
@@ -282,6 +286,55 @@ func TestNewOrderBodyMissingStock(t *testing.T) {
 	}), []int64{10}, false)
 	if !errors.Is(err, errNewOrderStockMissing) {
 		t.Fatalf("missing stock error = %v, want %v", err, errNewOrderStockMissing)
+	}
+}
+
+func TestNewOrderPicodataReservesIDWithoutSecondIncrement(t *testing.T) {
+	queries, err := loadEmbeddedSQL("pico")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	allocation, ok := queries.Query("workload_tx_new_order", "allocate_order_id")
+	if !ok {
+		t.Fatal("missing atomic order allocation")
+	}
+
+	var allocations, inserts int
+
+	respond := func(sql string) ([][]any, error) {
+		switch {
+		case sql == allocation:
+			allocations++
+
+			return [][]any{districtRow()}, nil
+		case strings.Contains(sql, "UPDATE district"), strings.Contains(sql, "SELECT d_next_o_id"):
+			t.Fatalf("non-atomic district query: %s", sql)
+		case strings.Contains(sql, "INSERT INTO orders"):
+			inserts++
+		case strings.Contains(sql, "SELECT c_discount"):
+			return [][]any{customerRow()}, nil
+		case strings.Contains(sql, "SELECT w_tax"):
+			return [][]any{warehouseRow()}, nil
+		case strings.Contains(sql, "SELECT i_id, i_price"):
+			return [][]any{itemRow(10)}, nil
+		case strings.Contains(sql, "SELECT s_i_id, s_quantity"):
+			return [][]any{stockRow(10)}, nil
+		}
+
+		return nil, nil
+	}
+
+	err = runNewOrderBody(t, respond, []int64{10}, false, func(w *workload) {
+		w.sql = queries
+		w.isPicodata = true
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if allocations != 1 || inserts != 1 {
+		t.Fatalf("allocations=%d inserts=%d, want one each", allocations, inserts)
 	}
 }
 
