@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
-- MySQL avoids redundant isolation-setting round trips when transactions match the physical connection's known session default, while preserving explicit isolation overrides and safe fallback after session-changing SQL.
+- MySQL avoids redundant isolation-setting round trips when transactions match the physical connection's known session default, while preserving explicit isolation overrides and safe fallback after session-changing SQL. ([#253](https://github.com/stroppy-io/stroppy/pull/253))
 
 ## [6.3.1] - 2026-11-02
 
