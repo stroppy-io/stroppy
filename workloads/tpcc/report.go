@@ -236,8 +236,12 @@ type reportOptions struct {
 
 func (o reportOptions) complianceNote() string {
 	if o.nonTransactional {
-		return "non-transactional Picodata approximation: partial writes and unisolated stock updates are possible; " +
-			"TPC-C compliance is not applicable"
+		note := "non-transactional Picodata approximation: partial writes and unisolated stock updates are possible; "
+		if o.spreadWarehouses {
+			note += "home warehouse changes per transaction; "
+		}
+
+		return note + "TPC-C compliance is not applicable"
 	}
 
 	if o.spreadWarehouses {
@@ -599,6 +603,7 @@ func (r *Report) text() string {
 		switch {
 		case r.NonTransactional:
 			fmt.Fprintln(&b, "compliance: NOT APPLICABLE (non-transactional Picodata approximation; raw stats below)")
+			fmt.Fprintln(&b, r.Note)
 		case r.SpreadWarehouses:
 			fmt.Fprintln(&b, "compliance: NOT APPLICABLE (home warehouse changes per transaction; raw stats below)")
 		default:
@@ -638,6 +643,10 @@ func (r *Report) text() string {
 	}
 
 	if !r.ComplianceApplicable {
+		if r.NonTransactional && r.Paced {
+			fmt.Fprintf(&b, "tpmC: %.2f (non-transactional approximation)\n", r.TpmC)
+		}
+
 		return b.String()
 	}
 

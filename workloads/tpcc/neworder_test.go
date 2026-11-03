@@ -64,9 +64,14 @@ type fakeTx struct {
 	respond     func(sql string) ([][]any, error)
 	commitErr   error
 	rollbackErr error
+	orderID     any
 }
 
-func (t *fakeTx) RunQuery(_ context.Context, sql string, _ map[string]any) (*driver.QueryResult, error) {
+func (t *fakeTx) RunQuery(_ context.Context, sql string, args map[string]any) (*driver.QueryResult, error) {
+	if strings.Contains(sql, "INSERT INTO orders") {
+		t.orderID = args["o_id"]
+	}
+
 	rows, err := t.respond(sql)
 	if err != nil {
 		return nil, err
@@ -335,6 +340,10 @@ func TestNewOrderPicodataReservesIDWithoutSecondIncrement(t *testing.T) {
 
 	if allocations != 1 || inserts != 1 {
 		t.Fatalf("allocations=%d inserts=%d, want one each", allocations, inserts)
+	}
+
+	if tx, valid := currentDriver.tx.(*fakeTx); !valid || tx.orderID != districtRow()[0] {
+		t.Fatalf("inserted order ID does not match reserved ID: %+v", currentDriver.tx)
 	}
 }
 

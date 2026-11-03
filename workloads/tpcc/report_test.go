@@ -339,11 +339,16 @@ func TestComplianceReportUnpacedRun(t *testing.T) {
 }
 
 func TestComplianceReportPicodataApproximation(t *testing.T) {
-	report, err := complianceReport(fullMix([]float64{50, 40, 30, 60, 80}), reportOptions{
-		workload: "tpcc/tx", paced: true, nonTransactional: true, elapsed: time.Minute,
-	})
+	w := workload{variant: "tx", isPicodata: true, pacing: true, spreadWarehouses: true}
+
+	contribution, err := w.complianceContribution(bench.ReportContext{})
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	report, ok := contribution.Data.(Report)
+	if !ok {
+		t.Fatalf("unexpected report type: %T", contribution.Data)
 	}
 
 	if report.ComplianceApplicable || !report.NonTransactional {
@@ -357,6 +362,16 @@ func TestComplianceReportPicodataApproximation(t *testing.T) {
 	if !strings.Contains(report.Note, "non-transactional Picodata approximation") ||
 		!strings.Contains(report.text(), "NOT APPLICABLE (non-transactional Picodata approximation") {
 		t.Fatal("report must identify the approximation")
+	}
+
+	if !strings.Contains(report.Note, "home warehouse changes per transaction") ||
+		!strings.Contains(report.text(), "home warehouse changes per transaction") {
+		t.Fatal("report must preserve the spread-warehouses qualification")
+	}
+
+	if !strings.Contains(report.text(), "tpmC:") ||
+		!strings.Contains(report.text(), "(non-transactional approximation)") {
+		t.Fatal("paced approximation must retain qualified throughput")
 	}
 }
 

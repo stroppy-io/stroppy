@@ -103,6 +103,9 @@ func TestTpccPicodataAtomicOrderAllocation(t *testing.T) {
 
 	seen := make(map[int64]bool)
 	for id := range ids {
+		if id < 3001 || id >= 3001+workers*allocations {
+			t.Errorf("order ID %d outside reserved range [3001, %d)", id, 3001+workers*allocations)
+		}
 		if seen[id] {
 			t.Errorf("duplicate order ID: %d", id)
 		}
