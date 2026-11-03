@@ -37,6 +37,10 @@ func TestClassifyError(t *testing.T) {
 		{name: "foreign key", err: &gomysql.MySQLError{Number: 1452}, want: driver.ErrorKindConstraintViolation},
 		{name: "not null", err: &gomysql.MySQLError{Number: 1048}, want: driver.ErrorKindConstraintViolation},
 		{name: "check", err: &gomysql.MySQLError{Number: 3819}, want: driver.ErrorKindConstraintViolation},
+		{
+			name: "MariaDB check", err: &gomysql.MySQLError{Number: errMariaDBCheckConstraint},
+			want: driver.ErrorKindConstraintViolation,
+		},
 		{name: "other mysql", err: &gomysql.MySQLError{Number: 1105}, want: driver.ErrorKindUnknown},
 		{name: "other", err: errors.New("boom"), want: driver.ErrorKindUnknown},
 	}

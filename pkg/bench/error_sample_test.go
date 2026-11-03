@@ -3,6 +3,7 @@ package bench
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -41,7 +42,11 @@ func TestRepresentativeError(t *testing.T) {
 			"", "backend unavailable",
 		},
 		{"arguments", errors.New("backend failure; args [secret]"), "", "backend failure; <arguments omitted>"},
-		{"sql", errors.New("backend failure: SELECT secret FROM table"), "", "backend failure: <SQL omitted>"},
+		{"sql", errors.New("backend failure: SELECT secret FROM table"), "", "<SQL omitted>"},
+		{
+			"replace", errors.New("backend failure: REPLACE INTO users VALUES (12345)"),
+			"", "backend failure: <SQL omitted>",
+		},
 		{"configured secret", errors.New("authentication failed secret"), "", "authentication failed <redacted>"},
 		{
 			"serialization", &pgconn.PgError{Code: "40001", Message: "could not serialize access due to concurrent update"},
@@ -66,6 +71,27 @@ func TestRepresentativeError(t *testing.T) {
 	}
 }
 
+func TestErrorSampleRedactionCannotDisableSQLOmission(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		secret  string
+		message string
+	}{
+		{"SET", "execution failed: UPDATE users SET password=12345"},
+		{"UPDATE", "execution failed: UPDATE users SET password=12345"},
+		{"'prefix' SELECT", "failure 'prefix' SELECT private_suffix FROM users"},
+		{"prefix'quote", "failure prefix'quote private_suffix: REPLACE INTO users VALUES (12345)"},
+	} {
+		t.Run(tc.secret, func(t *testing.T) {
+			t.Parallel()
+
+			_, sample := representativeError(errors.New(tc.message), strings.NewReplacer(tc.secret, "<redacted>"))
+			require.Equal(t, "<SQL omitted>", sample)
+		})
+	}
+}
+
 func TestErrorReporterRetainsBoundedFirstSample(t *testing.T) {
 	t.Parallel()
 
@@ -73,7 +99,7 @@ func TestErrorReporterRetainsBoundedFirstSample(t *testing.T) {
 	t.Cleanup(reporter.stopAndWait)
 
 	first := "first " + strings.Repeat(string(rune(0x754c)), maxErrorSampleBytes)
-	reporter.record(nil, terminalErrorIteration, "workload", errors.New(first), nil)
+	reporter.record(nil, terminalErrorIteration, "workload", &pgconn.PgError{Code: "XX000", Message: first}, nil)
 
 	var workers sync.WaitGroup
 	for range 16 {
@@ -90,7 +116,12 @@ func TestErrorReporterRetainsBoundedFirstSample(t *testing.T) {
 	require.True(t, strings.HasPrefix(summary.groups[0].sample, "first "))
 	require.LessOrEqual(t, len(summary.groups[0].sample), maxErrorSampleBytes)
 	require.True(t, utf8.ValidString(summary.groups[0].sample))
-	require.Equal(t, summary.groups[0].sample, reportErrors(summary).Groups[0].Sample)
+	converted := reportErrors(summary)
+	require.Equal(t, summary.groups[0].sample, converted.Groups[0].Sample)
+	require.Equal(t, "XX000", converted.Groups[0].Code)
+	data, err := json.Marshal(converted)
+	require.NoError(t, err)
+	require.Contains(t, string(data), `"code":"XX000"`)
 
 	var output bytes.Buffer
 	reporter.writeSummary(&output)

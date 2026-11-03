@@ -187,6 +187,8 @@ func (r *errorReporter) groupState(
 		return group, state
 	}
 
+	code, sample := representativeError(err, redactor)
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -204,7 +206,6 @@ func (r *errorReporter) groupState(
 		group.operation = strings.Clone(group.operation)
 	}
 
-	code, sample := representativeError(err, redactor)
 	state = &errorGroupState{code: code, sample: sample}
 	r.groups[group] = state
 

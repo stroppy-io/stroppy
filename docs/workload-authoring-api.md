@@ -401,8 +401,12 @@ existing continuation policy.
 
 Terminal-error groups retain their first representative `sample` and native
 backend `code` in saved reports and the text summary. Samples are capped at 512
-UTF-8 bytes, remove configured credentials, quoted values, SQL and argument
-suffixes, and omit PostgreSQL detail/context fields. Samples are diagnostic, not
+UTF-8 bytes, remove configured credentials, quoted values, recognized SQL and
+argument suffixes, and omit PostgreSQL detail/context fields. SQL recognition
+covers SELECT, INSERT/REPLACE INTO, UPDATE ... SET, DELETE FROM, CALL,
+CREATE/ALTER/DROP TABLE, and WITH ... AS. If credential redaction overlaps a
+recognized SQL-bearing message, the entire sample is omitted. This is not a SQL
+parser or a general data-loss-prevention boundary. Samples are diagnostic, not
 metric labels; group cardinality remains bounded. Arbitrary unquoted application
 error text can still contain authored data: do not put secrets in errors.
 

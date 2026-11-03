@@ -16,7 +16,7 @@ const maxErrorSampleBytes = 512
 
 var (
 	errorSampleQuoted = regexp.MustCompile("\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'|`[^`]*`")
-	errorSampleSQL    = regexp.MustCompile(`(?is)\b(SELECT\s+|INSERT\s+INTO\s+|UPDATE\s+\S+\s+SET\s+|` +
+	errorSampleSQL    = regexp.MustCompile(`(?is)\b(SELECT\s+|(?:INSERT|REPLACE)\s+INTO\s+|UPDATE\s+\S+\s+SET\s+|` +
 		`DELETE\s+FROM\s+|CALL\s+|CREATE\s+TABLE\s+|ALTER\s+TABLE\s+|DROP\s+TABLE\s+|WITH\s+\S+\s+AS\s*\().*`)
 	errorSampleArguments = regexp.MustCompile(`(?is)\b(args|arguments|parameters)\s*[:=\[]?.*`)
 )
@@ -55,7 +55,12 @@ func representativeError(err error, redactor *strings.Replacer) (code, sample st
 	code, sample = backendErrorSample(err)
 
 	if redactor != nil {
-		sample = redactor.Replace(sample)
+		redacted := redactor.Replace(sample)
+		if redacted != sample && errorSampleSQL.MatchString(sample) {
+			redacted = "<SQL omitted>"
+		}
+
+		sample = redacted
 	}
 
 	sample = errorSampleQuoted.ReplaceAllString(sample, "<redacted>")
