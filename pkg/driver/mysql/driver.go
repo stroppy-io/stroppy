@@ -126,7 +126,7 @@ func prepareConnector(
 		return nil, fmt.Errorf("failed to create mysql connector: %w", err)
 	}
 
-	return connector, nil
+	return isolationConnector{connector}, nil
 }
 
 // applySecurityOverrides applies explicit security fields to the MySQL config.
