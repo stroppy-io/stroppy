@@ -6,8 +6,10 @@ import (
 	"database/sql/driver"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 
+	gomysql "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 )
 
@@ -105,6 +107,59 @@ func TestIsolationConnectorClosesFailedInitialization(t *testing.T) {
 	_, err := (isolationConnector{isolationTestConnector{connection: backend}}).Connect(t.Context())
 	require.ErrorContains(t, err, "probe failed")
 	require.True(t, backend.closed)
+}
+
+type legacyIsolationConnection struct {
+	isolationTestConnection
+	primaryErr error
+	statements []string
+}
+
+func (c *legacyIsolationConnection) QueryContext(
+	ctx context.Context, query string, args []driver.NamedValue,
+) (driver.Rows, error) {
+	c.statements = append(c.statements, query)
+	if strings.Contains(query, "transaction_isolation") {
+		return nil, c.primaryErr
+	}
+
+	return c.isolationTestConnection.QueryContext(ctx, query, args)
+}
+
+func TestSessionIsolationLegacyVariableFallback(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name       string
+		primaryErr error
+		fallback   bool
+	}{
+		{"legacy variable", &gomysql.MySQLError{Number: 1193}, true},
+		{"other backend error", &gomysql.MySQLError{Number: 1227}, false},
+		{"cancellation", context.Canceled, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			conn := &legacyIsolationConnection{
+				isolationTestConnection: isolationTestConnection{value: "READ-COMMITTED"},
+				primaryErr:              tc.primaryErr,
+			}
+
+			level, err := readSessionIsolation(t.Context(), conn)
+			if !tc.fallback {
+				require.ErrorIs(t, err, tc.primaryErr)
+				require.Len(t, conn.statements, 1)
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, sql.LevelReadCommitted, level)
+			require.Equal(t, []string{"SELECT @@SESSION.transaction_isolation", "SELECT @@SESSION.tx_isolation"},
+				conn.statements)
+		})
+	}
 }
 
 func TestIsolationCacheInvalidatesOpaqueSQL(t *testing.T) {

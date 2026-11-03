@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	gomysql "github.com/go-sql-driver/mysql"
 )
 
 type mysqlConnection interface {
@@ -55,9 +57,16 @@ func (c isolationConnector) Connect(ctx context.Context) (driver.Conn, error) {
 
 func readSessionIsolation(ctx context.Context, conn driver.QueryerContext) (sql.IsolationLevel, error) {
 	rows, err := conn.QueryContext(ctx, "SELECT @@SESSION.transaction_isolation", nil)
+
+	const errUnknownSystemVariable = 1193
+	if backend, ok := errors.AsType[*gomysql.MySQLError](err); ok && backend.Number == errUnknownSystemVariable {
+		rows, err = conn.QueryContext(ctx, "SELECT @@SESSION.tx_isolation", nil)
+	}
+
 	if err != nil {
 		return sql.LevelDefault, err
 	}
+
 	defer rows.Close()
 
 	values := make([]driver.Value, 1)
