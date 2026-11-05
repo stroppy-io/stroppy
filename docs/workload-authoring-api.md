@@ -384,6 +384,29 @@ outside the body when retries must preserve them. Manual `Begin`, `Commit`, and
 failure retains the original error; expected rollback is successful only after
 rollback is confirmed.
 
+Explicit isolation levels retain the same meaning across drivers and pooled or
+dedicated sessions; `db_default` uses the connection's current default without
+changing it. MySQL reads each new physical connection's session isolation once
+and omits the per-transaction `SET` only when the requested level matches that
+known default. Different levels retain transaction-scoped overrides. Opaque SQL
+(including `SET`, stored-procedure calls, and multi-statements) invalidates the
+cached default; the next explicit transaction rereads it and keeps its explicit
+isolation override, because a prior statement may also have set a next-transaction
+level. Later matching transactions can use the fast path again. Opaque calls can
+require a refresh each time. Reconnects read their own default. Unrecognized
+session isolation values disable the optimization, not the connection; explicit
+transaction levels still reach the backend unchanged.
+
+Workload stored functions and triggers must not change session isolation. Their
+side effects are hidden inside otherwise ordinary SELECT/DML and cannot be
+inferred from the submitted SQL. Change isolation through visible SET statements
+or transaction options instead. This requirement preserves the DML fast path
+without probing the server after every query.
+
+PostgreSQL-compatible drivers already express isolation in `BEGIN`; YDB keeps its
+native transaction-mode mapping, and Picodata continues to reject driver-managed
+transactions.
+
 Backend classification returns neutral `ErrorFacts`; workload policies choose
 actions and retry budget. Zero/default attempts mean one attempt, not automatic
 retry. Serialization, deadlock, lock timeout, and unconditional transient facts
