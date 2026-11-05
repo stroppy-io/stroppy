@@ -338,6 +338,43 @@ func TestComplianceReportUnpacedRun(t *testing.T) {
 	}
 }
 
+func TestComplianceReportPicodataApproximation(t *testing.T) {
+	w := workload{variant: "tx", isPicodata: true, pacing: true, spreadWarehouses: true}
+
+	contribution, err := w.complianceContribution(bench.ReportContext{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	report, ok := contribution.Data.(Report)
+	if !ok {
+		t.Fatalf("unexpected report type: %T", contribution.Data)
+	}
+
+	if report.ComplianceApplicable || !report.NonTransactional {
+		t.Fatal("non-transactional execution must not claim TPC-C compliance")
+	}
+
+	if report.MixCompliant != nil || report.ResponseCompliant != nil || report.Transactions[0].CeilingMs != nil {
+		t.Fatal("approximation must not expose compliance verdicts")
+	}
+
+	if !strings.Contains(report.Note, "non-transactional Picodata approximation") ||
+		!strings.Contains(report.text(), "NOT APPLICABLE (non-transactional Picodata approximation") {
+		t.Fatal("report must identify the approximation")
+	}
+
+	if !strings.Contains(report.Note, "home warehouse changes per transaction") ||
+		!strings.Contains(report.text(), "home warehouse changes per transaction") {
+		t.Fatal("report must preserve the spread-warehouses qualification")
+	}
+
+	if !strings.Contains(report.text(), "tpmC:") ||
+		!strings.Contains(report.text(), "(non-transactional approximation)") {
+		t.Fatal("paced approximation must retain qualified throughput")
+	}
+}
+
 func TestObservationQuantile(t *testing.T) {
 	obs := binSamples(repeat(6000, 100)) // all samples in the (5000,10000] bucket
 

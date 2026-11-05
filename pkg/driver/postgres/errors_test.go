@@ -37,7 +37,11 @@ func TestClassifyError(t *testing.T) {
 			err:  errors.Join(context.DeadlineExceeded, &pgconn.PgError{Code: "57014"}),
 			want: driver.ErrorKindTimeout,
 		},
-		{name: "other postgres", err: &pgconn.PgError{Code: "23505"}, want: driver.ErrorKindUnknown},
+		{name: "unique", err: &pgconn.PgError{Code: "23505"}, want: driver.ErrorKindUniqueViolation},
+		{name: "foreign key", err: &pgconn.PgError{Code: "23503"}, want: driver.ErrorKindConstraintViolation},
+		{name: "not null", err: &pgconn.PgError{Code: "23502"}, want: driver.ErrorKindConstraintViolation},
+		{name: "check", err: &pgconn.PgError{Code: "23514"}, want: driver.ErrorKindConstraintViolation},
+		{name: "other postgres", err: &pgconn.PgError{Code: "XX000"}, want: driver.ErrorKindUnknown},
 		{name: "other", err: errors.New("boom"), want: driver.ErrorKindUnknown},
 	}
 

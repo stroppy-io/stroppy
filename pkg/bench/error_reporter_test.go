@@ -236,6 +236,6 @@ func TestErrorSummaryIsProminentAndDeterministic(t *testing.T) {
 		strings.Index(text, "operation=iteration"),
 		strings.Index(text, "operation=q2"),
 	)
-	require.NotContains(t, text, "first")
-	require.NotContains(t, text, "second")
+	require.Contains(t, text, `sample="first"`)
+	require.Contains(t, text, `sample="second"`)
 }

@@ -12,6 +12,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- Picodata TPC-C reserves order IDs atomically to prevent concurrent New-Order duplicates, and explicitly identifies execution as a non-transactional approximation requiring Picodata 26.2 or newer. ([#251](https://github.com/stroppy-io/stroppy/pull/251))
+- Unique-key and other constraint failures have distinct error classes, and terminal-error groups retain a bounded, sanitized sample and backend code without changing iteration continuation. ([#252](https://github.com/stroppy-io/stroppy/pull/252))
 - MySQL avoids redundant isolation-setting round trips when transactions match the physical connection's known session default, while preserving explicit isolation overrides and safe fallback after session-changing SQL. ([#253](https://github.com/stroppy-io/stroppy/pull/253))
 
 ## [6.3.1] - 2026-11-02

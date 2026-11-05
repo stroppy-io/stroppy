@@ -127,6 +127,13 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 	d.environment = observed.environment
 	d.Drivers.configs = copyDriverConfigs(observed.Drivers.configs)
 	d.Drivers.testBackend = observed.Drivers.testBackend
+
+	redactionConfigs := copyDriverConfigs(observed.Drivers.configs)
+	for name, configuration := range observed.Drivers.declared {
+		redactionConfigs[name] = configuration
+	}
+
+	root.reportRedactor = reportRedactor(redactionConfigs, options.Metrics)
 	e := &d.Execution
 	e.ctx = ctx
 	e.root = root

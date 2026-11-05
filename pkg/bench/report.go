@@ -334,6 +334,7 @@ func reportErrors(summary errorSummary) report.ErrorSummary {
 	for _, group := range summary.groups {
 		out.Groups = append(out.Groups, report.ErrorGroup{
 			Operation: group.operation, Class: string(group.kind), Count: group.count,
+			Code: group.code, Sample: group.sample,
 		})
 	}
 
