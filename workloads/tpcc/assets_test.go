@@ -32,8 +32,6 @@ func TestEmbeddedAssetContract(t *testing.T) {
 	queries := []workloadtest.Query{
 		{Section: "workload_tx_new_order", Name: "get_customer"},
 		{Section: "workload_tx_new_order", Name: "get_warehouse"},
-		{Section: "workload_tx_new_order", Name: "get_district"},
-		{Section: "workload_tx_new_order", Name: "update_district"},
 		{Section: "workload_tx_new_order", Name: "insert_order"},
 		{Section: "workload_tx_new_order", Name: "insert_new_order"},
 		{Section: "workload_tx_new_order", Name: "get_items_batch"},
@@ -78,6 +76,15 @@ func TestEmbeddedAssetContract(t *testing.T) {
 			dialectSections := sections
 
 			dialectQueries := append([]workloadtest.Query(nil), queries...)
+			if dialect == "pico.sql" {
+				dialectQueries = append(dialectQueries,
+					workloadtest.Query{Section: "workload_tx_new_order", Name: "allocate_order_id"})
+			} else {
+				dialectQueries = append(dialectQueries,
+					workloadtest.Query{Section: "workload_tx_new_order", Name: "get_district"},
+					workloadtest.Query{Section: "workload_tx_new_order", Name: "update_district"})
+			}
+
 			if dialect == "pg.sql" || dialect == "crdb.sql" || dialect == "crdb24.sql" ||
 				dialect == "ydb.sql" || dialect == "ydb_no_indexes.sql" {
 				dialectQueries = append(dialectQueries, returningQueries...)

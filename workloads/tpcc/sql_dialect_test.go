@@ -48,6 +48,29 @@ func TestProcsRejectsProcedureFreeDialect(t *testing.T) {
 	}
 }
 
+func TestPicodataRequiresAtomicAllocationBeforeExecution(t *testing.T) {
+	catalog, err := bench.NewCatalog(Tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path := t.TempDir() + "/legacy-pico.sql"
+	if err = os.WriteFile(path, []byte(newOrderTestSQL), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	drivers := map[string]bench.DriverConfig{"": {Kind: bench.DriverPicodata}}
+
+	_, err = catalog.Resolve("tpcc/tx", bench.ParamInputs{CLI: map[string]string{"sql-file": path}}, drivers)
+	if !errors.Is(err, errPicodataAllocationMissing) {
+		t.Fatalf("error=%v, want missing atomic allocation", err)
+	}
+
+	if _, err = catalog.Resolve("tpcc/tx", bench.ParamInputs{}, drivers); err != nil {
+		t.Fatalf("embedded Picodata SQL rejected: %v", err)
+	}
+}
+
 func TestEmbeddedSQLDialectSelection(t *testing.T) {
 	catalog, err := bench.NewCatalog(Tx, Procs)
 	if err != nil {

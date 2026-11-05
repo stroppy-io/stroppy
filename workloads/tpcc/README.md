@@ -7,8 +7,8 @@ populated by transactions.
 
 ## Variants
 
-- `tpcc/tx` runs ordered DML in driver transactions and supports PostgreSQL,
-  MySQL, Picodata, and YDB.
+- `tpcc/tx` runs ordered DML in driver transactions on PostgreSQL, MySQL, and
+  YDB, and as a non-transactional approximation on Picodata 26.2 or newer.
 - `tpcc/procs` calls server-side procedures and supports PostgreSQL and MySQL.
 
 ## Run it
@@ -41,6 +41,21 @@ Typed workload parameters are listed by `stroppy run tpcc/tx --help` and
 - `--pg-unlogged` uses PostgreSQL unlogged tables during the load.
 - `--tx-isolation` overrides the driver-specific isolation default.
 - `--sql-file` overrides the dialect SQL file.
+
+## Picodata approximation
+
+Picodata execution uses isolation `none`, not a transaction spanning the
+operation's statements. It is a stress workload, not compliant TPC-C, and logs
+this limitation when execution starts. Picodata 26.2 or newer is required for
+the single-bucket atomic block that reads and increments the district's next
+order ID in one request; concurrent clients cannot reserve the same ID.
+
+The rest of each operation remains non-transactional. A later failure can leave
+partial writes and unused order IDs; stock read/update sequences and other
+multi-statement operations are not isolated. The expected invalid-item rollback
+is disabled. Duplicate-key errors are terminal for the iteration, not a reason
+to retry partially applied writes. Reusing an inconsistent dataset is not
+repaired by atomic ID reservation.
 
 ## Distributed warehouse ranges
 
