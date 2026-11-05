@@ -29,6 +29,10 @@ func (*Driver) ClassifyError(err error) driver.ErrorFacts {
 
 	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 		switch pgErr.Code {
+		case "23505":
+			return driver.ErrorFacts{Kind: driver.ErrorKindUniqueViolation}
+		case "23000", "23001", "23502", "23503", "23514", "23P01":
+			return driver.ErrorFacts{Kind: driver.ErrorKindConstraintViolation}
 		case "40001":
 			return driver.ErrorFacts{Kind: driver.ErrorKindSerialization}
 		case "40P01":

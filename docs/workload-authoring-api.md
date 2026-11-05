@@ -393,6 +393,23 @@ blindly retrying uncertain outcomes. Backoff honors cancellation. Scheduled
 retries have separate metrics and do not count failed iterations if they succeed.
 `Retry0` and `TxRetryPolicy` also support procedure/grouped operations.
 
+`unique_violation` identifies duplicate primary/unique keys; `constraint_violation`
+identifies foreign-key, not-null, and check failures. Neither retries by default
+or implies a broken workload: reused data or conflicting clients can also cause
+them. A terminal error fails the iteration while the VU continues under the
+existing continuation policy.
+
+Terminal-error groups retain their first representative `sample` and native
+backend `code` in saved reports and the text summary. Samples are capped at 512
+UTF-8 bytes, remove configured credentials, quoted values, recognized SQL and
+argument suffixes, and omit PostgreSQL detail/context fields. SQL recognition
+covers SELECT, INSERT/REPLACE INTO, UPDATE ... SET, DELETE FROM, CALL,
+CREATE/ALTER/DROP TABLE, and WITH ... AS. If credential redaction overlaps a
+recognized SQL-bearing message, the entire sample is omitted. This is not a SQL
+parser or a general data-loss-prevention boundary. Samples are diagnostic, not
+metric labels; group cardinality remains bounded. Arbitrary unquoted application
+error text can still contain authored data: do not put secrets in errors.
+
 Managed transactions count one logical success across retries. Use
 `LogicalOperation` for a procedure or custom grouped operation; nested managed
 transactions do not double-count. A logical success is not a TPC compliance score.

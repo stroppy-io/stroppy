@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
@@ -23,6 +25,19 @@ func TestClassifyError(t *testing.T) {
 			want: driver.ErrorKindUnsupported,
 		},
 		{name: "unsupported type", err: ErrUnsupportedType, want: driver.ErrorKindUnsupported},
+		{
+			name: "wrapped duplicate",
+			err: fmt.Errorf("query: %w", &pgconn.PgError{
+				Code: "XX000", Message: `sbroad: transaction rolled-back: TupleFound: Duplicate key exists in unique index "pkey"`,
+			}),
+			want: driver.ErrorKindUniqueViolation,
+		},
+		{name: "unique code", err: &pgconn.PgError{Code: "23505"}, want: driver.ErrorKindUniqueViolation},
+		{name: "foreign key", err: &pgconn.PgError{Code: "23503"}, want: driver.ErrorKindConstraintViolation},
+		{
+			name: "untyped duplicate text", err: errors.New("TupleFound: Duplicate key exists in unique index"),
+			want: driver.ErrorKindUnknown,
+		},
 		{name: "other", err: errors.New("boom"), want: driver.ErrorKindUnknown},
 	}
 
