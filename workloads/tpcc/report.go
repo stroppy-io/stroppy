@@ -164,6 +164,7 @@ type Report struct {
 	Workload             string      `json:"workload"`
 	Paced                bool        `json:"paced"`
 	SpreadWarehouses     bool        `json:"spread_warehouses,omitempty"`
+	NonTransactional     bool        `json:"non_transactional,omitempty"`
 	ComplianceApplicable bool        `json:"compliance_applicable"`
 	ElapsedSeconds       float64     `json:"elapsed_seconds"`
 	WarmupSeconds        float64     `json:"warmup_seconds,omitempty"`
@@ -228,11 +229,21 @@ type reportOptions struct {
 	workload         string
 	paced            bool
 	spreadWarehouses bool
+	nonTransactional bool
 	elapsed          time.Duration
 	steady           steadySeries
 }
 
 func (o reportOptions) complianceNote() string {
+	if o.nonTransactional {
+		note := "non-transactional Picodata approximation: partial writes and unisolated stock updates are possible; "
+		if o.spreadWarehouses {
+			note += "home warehouse changes per transaction; "
+		}
+
+		return note + "TPC-C compliance is not applicable"
+	}
+
 	if o.spreadWarehouses {
 		return "home warehouse changes per transaction: fixed-terminal TPC-C compliance is not applicable"
 	}
@@ -337,7 +348,8 @@ func complianceReport(obs []txObservation, opts reportOptions) (Report, error) {
 		Workload:             opts.workload,
 		Paced:                opts.paced,
 		SpreadWarehouses:     opts.spreadWarehouses,
-		ComplianceApplicable: opts.paced && !opts.spreadWarehouses,
+		NonTransactional:     opts.nonTransactional,
+		ComplianceApplicable: opts.paced && !opts.spreadWarehouses && !opts.nonTransactional,
 		ElapsedSeconds:       elapsedSeconds,
 		MixTolerancePct:      mixTolerancePct,
 		Transactions:         make([]TxReport, 0, len(obs)),
@@ -588,9 +600,13 @@ func (r *Report) text() string {
 		r.ElapsedSeconds, r.WarmupSeconds, r.DrainSeconds, r.Paced)
 
 	if !r.ComplianceApplicable {
-		if r.SpreadWarehouses {
+		switch {
+		case r.NonTransactional:
+			fmt.Fprintln(&b, "compliance: NOT APPLICABLE (non-transactional Picodata approximation; raw stats below)")
+			fmt.Fprintln(&b, r.Note)
+		case r.SpreadWarehouses:
 			fmt.Fprintln(&b, "compliance: NOT APPLICABLE (home warehouse changes per transaction; raw stats below)")
-		} else {
+		default:
 			fmt.Fprintln(&b, "compliance: NOT APPLICABLE (unpaced stress run; raw stats below)")
 		}
 	} else {
@@ -627,6 +643,10 @@ func (r *Report) text() string {
 	}
 
 	if !r.ComplianceApplicable {
+		if r.NonTransactional && r.Paced {
+			fmt.Fprintf(&b, "tpmC: %.2f (non-transactional approximation)\n", r.TpmC)
+		}
+
 		return b.String()
 	}
 
@@ -714,7 +734,8 @@ func (w *workload) complianceContribution(context bench.ReportContext) (bench.Re
 	}
 
 	compliance, err := complianceReport(obs, reportOptions{
-		workload: w.Name(), paced: w.pacing, spreadWarehouses: w.spreadWarehouses, elapsed: elapsed, steady: series,
+		workload: w.Name(), paced: w.pacing, spreadWarehouses: w.spreadWarehouses,
+		nonTransactional: w.isPicodata, elapsed: elapsed, steady: series,
 	})
 	if err != nil {
 		return bench.ReportContribution{}, err

@@ -154,10 +154,11 @@ CREATE TABLE stock (
 SELECT c_discount, c_last, c_credit FROM customer WHERE c_w_id = :w_id AND c_d_id = :d_id AND c_id = :c_id
 --= get_warehouse
 SELECT w_tax FROM warehouse WHERE w_id = :w_id
---= get_district
-SELECT d_next_o_id, d_tax FROM district WHERE d_id = :d_id AND d_w_id = :w_id
---= update_district
-UPDATE district SET d_next_o_id = d_next_o_id + 1 WHERE d_id = :d_id AND d_w_id = :w_id
+--= allocate_order_id
+DO $$ BEGIN
+    RETURN QUERY SELECT d_next_o_id, d_tax FROM district WHERE d_w_id = :w_id AND d_id = :d_id;
+    UPDATE district SET d_next_o_id = d_next_o_id + 1 WHERE d_w_id = :w_id AND d_id = :d_id;
+END $$;
 --= insert_order
 INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
 VALUES (:o_id, :d_id, :w_id, :c_id, LOCALTIMESTAMP, :ol_cnt, :all_local)

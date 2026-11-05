@@ -184,6 +184,43 @@ jobs:
           path: build/stroppy
           if-no-files-found: error
           retention-days: 7
+  picodata-order-allocation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    services:
+      picodata:
+        image: docker-public.binary.picodata.io/picodata:26.2.1
+        env:
+          PICODATA_ADMIN_PASSWORD: T0psecret
+          PICODATA_LOG_LEVEL: warn
+          PICODATA_PG_LISTEN: 0.0.0.0:5432
+          PICODATA_LISTEN: 0.0.0.0:3301
+          PICODATA_MEMTX_MEMORY: 1G
+        ports:
+          - 1331:5432
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Wait for Picodata
+        env:
+          PGPASSWORD: T0psecret
+        run: |
+          for attempt in $(seq 1 30); do
+            if psql -h 127.0.0.1 -p 1331 -U admin -d admin -c 'SELECT 1' >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs "${{ job.services.picodata.id }}"
+          exit 1
+      - name: Verify concurrent order ID allocation
+        run: go test -tags='integration integration_optional' -run '^TestTpccPicodataAtomicOrderAllocation$' -count=1 -timeout=3m ./test/integration
+
   # The injecting variant is the only part of the suite that needs a C extension inside
   # the server, so it gets its own job. Macavity is built here from the audited fork with
   # the same make target the workload's README documents — never fetched prebuilt, since

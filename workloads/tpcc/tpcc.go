@@ -22,15 +22,16 @@ import (
 var txNames = []string{"new_order", "payment", "order_status", "delivery", "stock_level"}
 
 var (
-	errWarmupExecutor           = errors.New("tpcc: warmup requires constant-vus executor")
-	errHistoryExhausted         = errors.New("history ID space exhausted")
-	errProcsDriverUnsupported   = errors.New("tpcc/procs needs stored procedures; use tpcc/tx for this driver")
-	errSQLSelectorsConflict     = errors.New("tpcc: sql-dialect and sql-file cannot be combined")
-	errDistrictNotFound         = errors.New("new_order: district not found")
-	errNewOrderCustomerMissing  = errors.New("new_order: customer not found")
-	errNewOrderWarehouseMissing = errors.New("new_order: warehouse not found")
-	errItemNotFound             = errors.New("new_order: item not found")
-	errNewOrderStockMissing     = errors.New("new_order: stock not found")
+	errWarmupExecutor            = errors.New("tpcc: warmup requires constant-vus executor")
+	errHistoryExhausted          = errors.New("history ID space exhausted")
+	errProcsDriverUnsupported    = errors.New("tpcc/procs needs stored procedures; use tpcc/tx for this driver")
+	errSQLSelectorsConflict      = errors.New("tpcc: sql-dialect and sql-file cannot be combined")
+	errPicodataAllocationMissing = errors.New("tpcc: Picodata SQL requires workload_tx_new_order/allocate_order_id")
+	errDistrictNotFound          = errors.New("new_order: district not found")
+	errNewOrderCustomerMissing   = errors.New("new_order: customer not found")
+	errNewOrderWarehouseMissing  = errors.New("new_order: warehouse not found")
+	errItemNotFound              = errors.New("new_order: item not found")
+	errNewOrderStockMissing      = errors.New("new_order: stock not found")
 
 	// errRollbackSentinel marks the spec-mandated invalid-item rollback: the
 	// transaction rolls back on a bogus item id and is reported as success.
@@ -73,10 +74,11 @@ type workload struct {
 	steady          *steady
 	warmup          time.Duration
 
-	historyOnce sync.Once
-	historyID   atomic.Int64
-	historyErr  error
-	vuStates    []*vuState
+	approximationOnce sync.Once
+	historyOnce       sync.Once
+	historyID         atomic.Int64
+	historyErr        error
+	vuStates          []*vuState
 }
 
 type metrics struct {
@@ -182,11 +184,11 @@ func define(d *bench.Def, variant string) error {
 		return err
 	}
 
-	if variant == "procs" && !w.procsSupported() {
-		return errProcsDriverUnsupported
+	w.isPicodata = w.driverType == bench.DriverPicodata
+	if err := w.validateSQL(); err != nil {
+		return err
 	}
 
-	w.isPicodata = w.driverType == bench.DriverPicodata
 	w.isYdb = w.driverType == bench.DriverYDB
 	w.hasReturning = w.driverType == bench.DriverPostgres || w.driverType == bench.DriverYDB
 
@@ -416,6 +418,13 @@ func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64)
 }
 
 func (w *workload) Iterate(ctx context.Context, b *bench.Bench) error {
+	if w.isPicodata {
+		w.approximationOnce.Do(func() {
+			b.Log.Warn("Picodata tpcc/tx is a non-transactional approximation, not compliant TPC-C; " +
+				"failed operations can leave partial writes and unused order IDs, and stock updates are not isolated")
+		})
+	}
+
 	if err := w.initializeHistory(ctx, b); err != nil {
 		return bench.Fatal(err)
 	}
@@ -637,7 +646,12 @@ func (w *workload) newOrderBody(
 		return fmt.Errorf("%w: %d", errNewOrderWarehouseMissing, wID)
 	}
 
-	distRow, err := tx.RawRow(ctx, w.q("workload_tx_new_order", "get_district"), map[string]any{
+	districtQuery := "get_district"
+	if w.isPicodata {
+		districtQuery = "allocate_order_id"
+	}
+
+	distRow, err := tx.RawRow(ctx, w.q("workload_tx_new_order", districtQuery), map[string]any{
 		"d_id": dID, "w_id": wID,
 	})
 	if err != nil {
@@ -650,10 +664,12 @@ func (w *workload) newOrderBody(
 
 	oID := toInt64(distRow[0])
 
-	if err := tx.Exec(ctx, w.q("workload_tx_new_order", "update_district"), map[string]any{
-		"d_id": dID, "w_id": wID,
-	}); err != nil {
-		return err
+	if !w.isPicodata {
+		if err := tx.Exec(ctx, w.q("workload_tx_new_order", "update_district"), map[string]any{
+			"d_id": dID, "w_id": wID,
+		}); err != nil {
+			return err
+		}
 	}
 
 	if err := tx.Exec(ctx, w.q("workload_tx_new_order", "insert_order"), map[string]any{

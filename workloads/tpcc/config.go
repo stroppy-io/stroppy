@@ -75,6 +75,18 @@ func (w *workload) procsSupported() bool {
 	return procsDriverSupported(w.driverType) && found
 }
 
+func (w *workload) validateSQL() error {
+	if w.variant == "procs" && !w.procsSupported() {
+		return errProcsDriverUnsupported
+	}
+
+	if _, found := w.sql.Lookup("workload_tx_new_order", "allocate_order_id"); w.isPicodata && !found {
+		return errPicodataAllocationMissing
+	}
+
+	return nil
+}
+
 func loadEmbeddedSQL(dialect string) (*bench.SQL, error) {
 	data, err := files.ReadFile(dialect + ".sql")
 	if err != nil {
