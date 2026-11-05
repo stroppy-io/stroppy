@@ -10,6 +10,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+## [6.3.2] - 2026-11-05
+
 ### Fixed
 
 - Picodata TPC-C reserves order IDs atomically to prevent concurrent New-Order duplicates, and explicitly identifies execution as a non-transactional approximation requiring Picodata 26.2 or newer. ([#251](https://github.com/stroppy-io/stroppy/pull/251))
