@@ -28,6 +28,24 @@ func TestFoldedFirstQueryFailureCannotRunOutsideTransaction(t *testing.T) {
 	}
 }
 
+func TestFoldedSessionRejectsCanceledBegin(t *testing.T) {
+	for _, backend := range preparedBackends() {
+		t.Run(backend.name, func(t *testing.T) {
+			db := dispatchQueryTimeout(t, backend.kind, backend.url, 0)
+			session, err := db.(driver.SessionProvider).OpenSession(t.Context())
+			require.NoError(t, err)
+
+			defer session.Close(context.Background())
+
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+
+			_, err = session.Begin(ctx, config.TxIsolationLevelReadCommitted)
+			require.ErrorIs(t, err, context.Canceled)
+		})
+	}
+}
+
 func TestFoldedTransactionCancellationAndReuse(t *testing.T) {
 	for _, backend := range preparedBackends() {
 		t.Run(backend.name, func(t *testing.T) {

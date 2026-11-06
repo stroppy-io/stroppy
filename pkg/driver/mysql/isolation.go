@@ -256,7 +256,14 @@ func (s *isolationStatement) ExecContext(ctx context.Context, args []driver.Name
 	}
 
 	if s.connection.pending != nil && !s.connection.pending.started {
-		return s.connection.ExecContext(ctx, s.query, args)
+		result, err := s.connection.ExecContext(ctx, s.query, args)
+		if !errors.Is(err, driver.ErrSkip) {
+			return result, err
+		}
+
+		if err := s.connection.flushBegin(ctx); err != nil {
+			return nil, err
+		}
 	}
 
 	s.connection.observe(s.query)
@@ -270,7 +277,14 @@ func (s *isolationStatement) QueryContext(ctx context.Context, args []driver.Nam
 	}
 
 	if s.connection.pending != nil && !s.connection.pending.started {
-		return s.connection.QueryContext(ctx, s.query, args)
+		rows, err := s.connection.QueryContext(ctx, s.query, args)
+		if !errors.Is(err, driver.ErrSkip) {
+			return rows, err
+		}
+
+		if err := s.connection.flushBegin(ctx); err != nil {
+			return nil, err
+		}
 	}
 
 	s.connection.observe(s.query)

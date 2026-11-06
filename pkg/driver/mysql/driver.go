@@ -40,15 +40,16 @@ func init() {
 }
 
 type Driver struct {
-	db           *sql.DB
-	options      driver.Options
-	routineMu    sync.Mutex
-	routines     map[config.TxIsolationLevel]*Driver
-	dialect      queries.Dialect
-	logger       *zap.Logger
-	sqlCfg       *config.SQLConfig
-	bulkSize     int
-	queryTimeout time.Duration
+	db            *sql.DB
+	options       driver.Options
+	routineMu     sync.Mutex
+	routineClosed bool
+	routines      map[config.TxIsolationLevel]*Driver
+	dialect       queries.Dialect
+	logger        *zap.Logger
+	sqlCfg        *config.SQLConfig
+	bulkSize      int
+	queryTimeout  time.Duration
 }
 
 var _ driver.Driver = (*Driver)(nil)
@@ -137,12 +138,21 @@ func prepareConnector(
 	}
 
 	connector, err := gomysql.NewConnector(mysqlCfg)
+	fold := driver.FoldBegin(driverCfg)
+
+	if err != nil && mysqlCfg.InterpolateParams {
+		fallback := mysqlCfg.Clone()
+		fallback.InterpolateParams = false
+		connector, err = gomysql.NewConnector(fallback)
+		fold = false
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mysql connector: %w", err)
 	}
 
 	return isolationConnector{
-		Connector: connector, fold: driver.FoldBegin(driverCfg), defaultIsolation: level,
+		Connector: connector, fold: fold, defaultIsolation: level,
 	}, nil
 }
 
@@ -249,6 +259,10 @@ func (d *Driver) RunQuery(
 }
 
 func (d *Driver) Teardown(ctx context.Context) error {
+	d.routineMu.Lock()
+	defer d.routineMu.Unlock()
+
+	d.routineClosed = true
 	d.logger.Debug("Driver Teardown Start")
 
 	var err error

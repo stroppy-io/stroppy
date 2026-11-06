@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
 
@@ -12,21 +13,16 @@ import (
 )
 
 func (d *Driver) routineDriver(ctx context.Context, isolation config.TxIsolationLevel) (*Driver, error) {
+	d.routineMu.Lock()
+	defer d.routineMu.Unlock()
+
+	if d.routineClosed {
+		return nil, sql.ErrConnDone
+	}
+
 	if isolation == config.TxIsolationLevelUnspecified {
 		return d, nil
 	}
-
-	level, err := driver.DefaultIsolation(d.options.Config)
-	if err != nil {
-		return nil, err
-	}
-
-	if level == isolation {
-		return d, nil
-	}
-
-	d.routineMu.Lock()
-	defer d.routineMu.Unlock()
 
 	if existing := d.routines[isolation]; existing != nil {
 		return existing, nil

@@ -425,9 +425,13 @@ backend restrictions still apply.
 the first query; MySQL sends transaction settings, `START TRANSACTION`, and the
 first query in one command. No server transaction starts for an unused handle.
 Disable folding for eager error timing. MySQL uses safe driver parameter
-interpolation and enables multi-statements when folding; the first execution of an explicitly
-prepared statement uses its parameterized SQL text, then later executions reuse
-the prepared statement. YDB uses its native lazy-transaction option. Picodata
+interpolation and enables multi-statements when folding; the first execution of
+an explicitly prepared statement uses its parameterized SQL text, then later
+executions reuse the prepared statement. If interpolation cannot handle the
+parameters, execution falls back to an eager start and the prepared statement.
+Unsafe interpolation collations keep a non-interpolating, eager connection path.
+PostgreSQL prepared statements with `simple_protocol` also use an eager start
+before prepared execution. YDB uses its native lazy-transaction option. Picodata
 continues to reject driver-managed transactions.
 
 `b.Routine(ctx, bench.BeginOpts{Name: "payment", Isolation: bench.IsoSerializable},
@@ -440,13 +444,17 @@ binary. Atomic MySQL procedures use `_atomic` names, so stale definitions
 fail explicitly instead of silently running without a transaction. Custom SQL
 overrides must follow the same contract.
 
-Routine isolation overrides use lazily initialized pools whose physical
-connections all have that default, so warmed invocations send only the CALL or
-SELECT. Each distinct override can allocate a separate pool with the configured
-pool limit. Initialization can add connection setup traffic; it is not repeated
+Explicit routine isolation uses dedicated, lazily initialized pools whose
+physical connections all have that default, even when the requested level
+matches the configured base default. Mutable dedicated sessions cannot change
+those pools' isolation. Warmed invocations send only the CALL or SELECT. Each
+distinct override can allocate a separate pool with the configured pool limit. Initialization can add connection setup traffic; it is not repeated
 per operation. The driver drains the complete invocation response before
 reporting success. Unconfirmed outcomes require idempotency before retry, even
-when a joined error also contains a retryable fact.
+when a joined error also contains a retryable fact. Confirmed ends increment
+transaction commit/rollback series; unknown outcomes and pre-invocation setup
+failures use separate `tx_action` values (`unknown`, `setup_error`) in duration
+and error metrics without incrementing rollback transaction counts.
 
 Backend classification returns neutral `ErrorFacts`; workload policies choose
 actions and retry budget. Zero/default attempts mean one attempt, not automatic

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	gomysql "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
@@ -214,6 +215,15 @@ func TestMySQLVisibleIsolationChangesPreserveExplicitTransactions(t *testing.T) 
 
 	defer session.Close(context.Background())
 
+	admin := NewMySQL(t)
+	_, err = admin.ExecContext(t.Context(), "CREATE TABLE stroppy_visible_isolation(id INT PRIMARY KEY,value INT)")
+	require.NoError(t, err)
+
+	defer admin.ExecContext(context.Background(), "DROP TABLE stroppy_visible_isolation")
+
+	_, err = admin.ExecContext(t.Context(), "INSERT INTO stroppy_visible_isolation VALUES(1,1)")
+	require.NoError(t, err)
+
 	for _, query := range []string{
 		"SET TRANSACTION ISOLATION LEVEL SERIALIZABLE",
 		"SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ",
@@ -235,10 +245,23 @@ func TestMySQLVisibleIsolationChangesPreserveExplicitTransactions(t *testing.T) 
 		before := counter()
 
 		for range 2 {
+			_, err = admin.ExecContext(t.Context(), "UPDATE stroppy_visible_isolation SET value=1 WHERE id=1")
+			require.NoError(t, err)
 			tx, beginErr := session.Begin(t.Context(), config.TxIsolationLevelReadCommitted)
 			require.NoError(t, beginErr)
-			result, queryErr = tx.RunQuery(t.Context(), "SELECT 1", nil)
-			require.EqualValues(t, 1, preparedScalar(t, result, queryErr))
+
+			read := func() any {
+				result, queryErr = tx.RunQuery(t.Context(), "SELECT value FROM stroppy_visible_isolation WHERE id=1", nil)
+
+				return preparedScalar(t, result, queryErr)
+			}
+			require.EqualValues(t, 1, read())
+			writeCtx, cancel := context.WithTimeout(t.Context(), time.Second)
+			_, err = admin.ExecContext(writeCtx, "UPDATE stroppy_visible_isolation SET value=2 WHERE id=1")
+
+			cancel()
+			require.NoError(t, err)
+			require.EqualValues(t, 2, read(), "READ COMMITTED must see the concurrent commit")
 			require.NoError(t, tx.Commit(t.Context()))
 		}
 

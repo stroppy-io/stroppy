@@ -78,7 +78,41 @@ func (t *foldedConnection) QueryPrepared(
 		return nil, driver.ErrSessionMismatch
 	}
 
+	if t.conn.Config().DefaultQueryExecMode == pgx.QueryExecModeSimpleProtocol && !t.started {
+		if t.done {
+			return nil, driver.ErrTransactionClosed
+		}
+
+		if err := t.beginEager(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	return t.QueryContext(ctx, prepared.name, args...)
+}
+
+func (t *foldedConnection) beginEager(ctx context.Context) error {
+	if t.startErr != nil {
+		return t.startErr
+	}
+
+	t.started = true
+	begin := "BEGIN"
+
+	if t.isolation != config.TxIsolationLevelUnspecified {
+		name, err := driver.IsolationSQL(t.isolation)
+		if err != nil {
+			t.startErr = err
+
+			return err
+		}
+
+		begin += " ISOLATION LEVEL " + name
+	}
+
+	_, t.startErr = t.conn.Exec(ctx, begin)
+
+	return t.startErr
 }
 
 func (t *foldedConnection) Commit(ctx context.Context) error   { return t.end(ctx, true) }

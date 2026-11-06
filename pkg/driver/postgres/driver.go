@@ -57,13 +57,14 @@ type Executor interface {
 }
 
 type Driver struct {
-	logger       *zap.Logger
-	pool         Executor
-	bulkSize     int
-	queryTimeout time.Duration
-	options      driver.Options
-	routineMu    sync.Mutex
-	routines     map[config.TxIsolationLevel]*Driver
+	logger        *zap.Logger
+	pool          Executor
+	bulkSize      int
+	queryTimeout  time.Duration
+	options       driver.Options
+	routineMu     sync.Mutex
+	routineClosed bool
+	routines      map[config.TxIsolationLevel]*Driver
 }
 
 var _ driver.Driver = new(Driver)
@@ -115,6 +116,8 @@ func NewDriver(
 	// TODO: make waiting optional
 	err = sqldriver.WaitForDB(ctx, d.logger, d.pool, dbConnectionTimeout)
 	if err != nil {
+		d.pool.Close()
+
 		return nil, err
 	}
 
@@ -158,6 +161,11 @@ func (d *Driver) Begin(ctx context.Context, isolation config.TxIsolationLevel) (
 }
 
 func (d *Driver) Teardown(ctx context.Context) error {
+	d.routineMu.Lock()
+	defer d.routineMu.Unlock()
+
+	d.routineClosed = true
+
 	var err error
 	for _, backend := range d.routines {
 		err = driver.JoinErrors(err, backend.Teardown(ctx))

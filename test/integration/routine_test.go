@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -17,6 +18,28 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
+
+func TestRoutineInitializationRacesTeardown(t *testing.T) {
+	for _, backend := range preparedBackends() {
+		t.Run(backend.name, func(t *testing.T) {
+			db := dispatchQueryTimeout(t, backend.kind, backend.url, 0)
+			start := make(chan struct{})
+
+			var group sync.WaitGroup
+			group.Go(func() {
+				<-start
+
+				_, _ = db.(driver.RoutineExecutor).RunRoutine(t.Context(), config.TxIsolationLevelSerializable, "SELECT 1", nil)
+			})
+			close(start)
+			require.NoError(t, db.Teardown(t.Context()))
+			group.Wait()
+
+			_, err := db.(driver.RoutineExecutor).RunRoutine(t.Context(), config.TxIsolationLevelRepeatableRead, "SELECT 1", nil)
+			require.Error(t, err, "routine pool must not be published after teardown")
+		})
+	}
+}
 
 func TestRoutineIsolationAndAtomicity(t *testing.T) {
 	for _, backend := range preparedBackends() {
@@ -119,6 +142,25 @@ END $$`)
 
 				require.Equal(t, expected, actual)
 			}
+
+			session, err := db.(driver.SessionProvider).OpenSession(t.Context())
+			require.NoError(t, err)
+
+			change := "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL REPEATABLE READ"
+			if backend.kind == config.DriverTypeMySQL {
+				change = "SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ"
+			}
+
+			changed, err := session.RunQuery(t.Context(), change, nil)
+			require.NoError(t, err)
+			require.NoError(t, changed.Rows.Close())
+			require.NoError(t, session.Close(context.Background()))
+			_, err = db.(driver.RoutineExecutor).RunRoutine(t.Context(), config.TxIsolationLevelReadCommitted,
+				call, map[string]any{"id": 6, "fail": 0})
+			require.NoError(t, err)
+			check, err := db.RunQuery(t.Context(), "SELECT isolation FROM stroppy_routine_values WHERE id=6", nil)
+			actual := strings.ToLower(strings.ReplaceAll(fmt.Sprint(preparedScalar(t, check, err)), "-", " "))
+			require.Equal(t, "read committed", actual, "explicit routine isolation must not reuse mutated base connections")
 
 			_, err = db.(driver.RoutineExecutor).RunRoutine(t.Context(), config.TxIsolationLevelSerializable,
 				call, map[string]any{"id": 99, "fail": 1})

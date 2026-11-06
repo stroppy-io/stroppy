@@ -165,7 +165,7 @@ func (p RetryPolicy) Retries(err error) bool {
 
 func (p RetryPolicy) decision(err error) RetryDecision {
 	facts := classifyError(err, p.Classify)
-	if routine, ok := errors.AsType[*driver.RoutineError](err); ok && routine.Ambiguous {
+	if ambiguousRoutineOutcome(err) {
 		facts.RequiresIdempotency = true
 	}
 

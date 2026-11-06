@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
@@ -12,21 +13,16 @@ import (
 )
 
 func (d *Driver) routineDriver(ctx context.Context, isolation config.TxIsolationLevel) (*Driver, error) {
+	d.routineMu.Lock()
+	defer d.routineMu.Unlock()
+
+	if d.routineClosed {
+		return nil, pgx.ErrTxClosed
+	}
+
 	if isolation == config.TxIsolationLevelUnspecified {
 		return d, nil
 	}
-
-	level, err := driver.DefaultIsolation(d.options.Config)
-	if err != nil {
-		return nil, err
-	}
-
-	if level == isolation {
-		return d, nil
-	}
-
-	d.routineMu.Lock()
-	defer d.routineMu.Unlock()
 
 	if existing := d.routines[isolation]; existing != nil {
 		return existing, nil

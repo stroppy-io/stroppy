@@ -53,6 +53,10 @@ func (c *sessionConnection) Begin(
 	ctx context.Context, isolation config.TxIsolationLevel,
 ) (sqldriver.TxConn[pgx.Rows], error) {
 	if c.fold {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
 		return &foldedConnection{conn: c.conn.Conn(), isolation: isolation}, nil
 	}
 

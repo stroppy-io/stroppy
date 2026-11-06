@@ -31,6 +31,22 @@ func TestConnectorTransactionSettings(t *testing.T) {
 	}
 }
 
+func TestUnsafeCollationUsesPreparedConnections(t *testing.T) {
+	t.Parallel()
+
+	for _, fold := range []bool{true, false} {
+		connector, err := prepareConnector(&config.DriverConfig{
+			URL:          "user:password@tcp(localhost:3306)/db?collation=gbk_chinese_ci",
+			Transactions: &config.TransactionConfig{FoldBegin: &fold},
+		}, nil, zap.NewNop())
+		require.NoError(t, err)
+
+		wrapped, ok := connector.(isolationConnector)
+		require.True(t, ok)
+		require.False(t, wrapped.fold)
+	}
+}
+
 func TestFoldedCancellationFailsBeforeQuery(t *testing.T) {
 	t.Parallel()
 

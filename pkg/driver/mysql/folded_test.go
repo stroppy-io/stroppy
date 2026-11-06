@@ -12,20 +12,72 @@ import (
 type foldedTestBackend struct {
 	isolationTestConnection
 	statements []string
+	skip       bool
 }
 
 func (c *foldedTestBackend) QueryContext(
 	ctx context.Context, query string, args []driver.NamedValue,
 ) (driver.Rows, error) {
 	c.statements = append(c.statements, query)
+	if c.skip && len(args) > 0 {
+		return nil, driver.ErrSkip
+	}
 
 	return c.isolationTestConnection.QueryContext(ctx, query, args)
 }
 
-func (c *foldedTestBackend) ExecContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Result, error) {
+func (c *foldedTestBackend) ExecContext(
+	_ context.Context, query string, args []driver.NamedValue,
+) (driver.Result, error) {
 	c.statements = append(c.statements, query)
+	if c.skip && len(args) > 0 {
+		return nil, driver.ErrSkip
+	}
 
 	return driver.RowsAffected(1), nil
+}
+
+type skippedPreparedStatement struct {
+	mysqlStatement
+	calls int
+}
+
+func (s *skippedPreparedStatement) ExecContext(context.Context, []driver.NamedValue) (driver.Result, error) {
+	s.calls++
+
+	return driver.RowsAffected(1), nil
+}
+
+func (s *skippedPreparedStatement) QueryContext(context.Context, []driver.NamedValue) (driver.Rows, error) {
+	s.calls++
+
+	return &isolationTestRows{value: int64(1)}, nil
+}
+
+func TestFoldedPreparedErrSkipFallsBack(t *testing.T) {
+	for _, query := range []bool{false, true} {
+		backend := &foldedTestBackend{skip: true}
+		conn := &isolationConnection{mysqlConnection: backend, fold: true}
+		tx, err := conn.BeginTx(t.Context(), driver.TxOptions{})
+		require.NoError(t, err)
+
+		prepared := &skippedPreparedStatement{}
+		statement := &isolationStatement{mysqlStatement: prepared, connection: conn, query: "SELECT ?"}
+
+		args := []driver.NamedValue{{Ordinal: 1, Value: "large"}}
+		if query {
+			rows, runErr := statement.QueryContext(t.Context(), args)
+			require.NoError(t, runErr)
+			require.NoError(t, rows.Close())
+		} else {
+			_, err = statement.ExecContext(t.Context(), args)
+			require.NoError(t, err)
+		}
+
+		require.Equal(t, 1, prepared.calls)
+		require.Equal(t, []string{"START TRANSACTION; SELECT ?", "START TRANSACTION"}, backend.statements)
+		require.NoError(t, tx.Rollback())
+	}
 }
 
 func TestFoldedBeginSharesFirstQuery(t *testing.T) {
