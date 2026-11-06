@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Fixed
+
+- MySQL TPC-C no longer rechecks isolation or repeats matching isolation settings after procedure calls and SQL comments, removing the extra round trips introduced in 6.3.2.
+
 ## [6.3.2] - 2026-11-05
 
 ### Fixed

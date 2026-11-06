@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -205,30 +206,102 @@ func assertSerializableReadLock(t *testing.T, db driver.Driver) {
 	require.EqualValues(t, 1205, backend.Number, "serializable reads must block conflicting writes")
 }
 
+func TestMySQLVisibleIsolationChangesPreserveExplicitTransactions(t *testing.T) {
+	backend := preparedBackends()[1]
+	db := dispatchQueryTimeout(t, backend.kind, isolationTestConnection(t, backend), 0)
+	session, err := db.(driver.SessionProvider).OpenSession(t.Context())
+	require.NoError(t, err)
+
+	defer session.Close(context.Background())
+
+	for _, query := range []string{
+		"SET TRANSACTION ISOLATION LEVEL SERIALIZABLE",
+		"SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ",
+	} {
+		result, queryErr := session.RunQuery(t.Context(), query, nil)
+		require.NoError(t, queryErr)
+		require.NoError(t, result.Rows.Close())
+
+		counter := func() uint64 {
+			status, statusErr := session.RunQuery(t.Context(), "SHOW SESSION STATUS LIKE 'Com_set_option'", nil)
+			require.NoError(t, statusErr)
+			require.True(t, status.Rows.Next())
+			value, parseErr := strconv.ParseUint(status.Rows.Values()[1].(string), 10, 64)
+			require.NoError(t, parseErr)
+			require.NoError(t, status.Rows.Close())
+
+			return value
+		}
+		before := counter()
+
+		for range 2 {
+			tx, beginErr := session.Begin(t.Context(), config.TxIsolationLevelReadCommitted)
+			require.NoError(t, beginErr)
+			require.NoError(t, tx.Commit(t.Context()))
+		}
+
+		require.Equal(t, uint64(2), counter()-before, "explicit isolation must override changed session/next defaults")
+	}
+}
+
 func TestMySQLDefaultIsolationAvoidsRedundantSet(t *testing.T) {
 	backend := preparedBackends()[1]
 	db := dispatchQueryTimeout(t, backend.kind, backend.url, 0)
 	session, err := db.(driver.SessionProvider).OpenSession(t.Context())
 	require.NoError(t, err)
 	defer session.Close(context.Background())
-	result, err := session.RunQuery(t.Context(), "SELECT @@SESSION.transaction_isolation", nil)
+
+	for _, query := range []string{
+		"DROP PROCEDURE IF EXISTS stroppy_isolation_noop",
+		"CREATE PROCEDURE stroppy_isolation_noop() SELECT 1",
+	} {
+		result, queryErr := session.RunQuery(t.Context(), query, nil)
+		require.NoError(t, queryErr)
+		require.NoError(t, result.Rows.Close())
+	}
+
+	defer func() {
+		result, queryErr := session.RunQuery(t.Context(), "DROP PROCEDURE stroppy_isolation_noop", nil)
+		require.NoError(t, queryErr)
+		require.NoError(t, result.Rows.Close())
+	}()
+
+	isolationResult, isolationErr := session.RunQuery(t.Context(), "SELECT @@SESSION.transaction_isolation", nil)
 	level := config.TxIsolationLevelRepeatableRead
-	if strings.EqualFold(preparedScalar(t, result, err).(string), "READ-COMMITTED") {
+	if strings.EqualFold(preparedScalar(t, isolationResult, isolationErr).(string), "READ-COMMITTED") {
 		level = config.TxIsolationLevelReadCommitted
 	}
-	counter := func() string {
-		result, queryErr := session.RunQuery(t.Context(), "SHOW SESSION STATUS LIKE 'Com_set_option'", nil)
+
+	counter := func(name string) uint64 {
+		result, queryErr := session.RunQuery(t.Context(), "SHOW SESSION STATUS LIKE '"+name+"'", nil)
 		require.NoError(t, queryErr)
 		require.True(t, result.Rows.Next())
-		value := result.Rows.Values()[1].(string)
+		value, parseErr := strconv.ParseUint(result.Rows.Values()[1].(string), 10, 64)
+		require.NoError(t, parseErr)
 		require.NoError(t, result.Rows.Close())
 		return value
 	}
-	before := counter()
+	prepared, err := session.Prepare(t.Context(), "procedure", "CALL stroppy_isolation_noop()")
+	require.NoError(t, err)
+
+	defer prepared.Close(context.Background())
+
+	before := counter("Com_set_option")
+	selects := counter("Com_select")
 	for range 4 {
 		tx, beginErr := session.Begin(t.Context(), level)
 		require.NoError(t, beginErr)
+
+		for _, query := range []string{"CALL stroppy_isolation_noop()", "/* workload comment */ SELECT 1"} {
+			result, queryErr := tx.RunQuery(t.Context(), query, nil)
+			require.EqualValues(t, 1, preparedScalar(t, result, queryErr))
+		}
+
+		result, queryErr := tx.RunPrepared(t.Context(), prepared, nil)
+		require.EqualValues(t, 1, preparedScalar(t, result, queryErr))
 		require.NoError(t, tx.Commit(t.Context()))
 	}
-	require.Equal(t, before, counter(), "matching isolation must not send SET per transaction")
+
+	require.Equal(t, before, counter("Com_set_option"), "workload SQL must not reintroduce isolation SET statements")
+	require.Equal(t, uint64(12), counter("Com_select")-selects, "workload SQL must not trigger isolation probes")
 }

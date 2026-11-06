@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	gomysql "github.com/go-sql-driver/mysql"
@@ -28,6 +29,8 @@ var (
 	errIsolationInterfaces  = errors.New("mysql connection lacks required context interfaces")
 	errIsolationResult      = errors.New("unexpected MySQL session isolation result")
 	errIsolationUnsupported = errors.New("unsupported MySQL session isolation")
+	isolationChangingSQL    = regexp.MustCompile(`(?is)\bSET\b.*\b(TRANSACTION|transaction_isolation|tx_isolation)\b|` +
+		`\b(RESET|EXECUTE)\b`)
 )
 
 type isolationConnector struct{ driver.Connector }
@@ -108,16 +111,7 @@ type isolationConnection struct {
 }
 
 func (c *isolationConnection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	if !c.known && sql.IsolationLevel(opts.Isolation) != sql.LevelDefault {
-		level, err := readSessionIsolation(ctx, c.mysqlConnection)
-		if err != nil && !errors.Is(err, errIsolationUnsupported) {
-			return nil, fmt.Errorf("refresh MySQL session isolation: %w", err)
-		}
-
-		if err == nil {
-			c.level, c.known = level, true
-		}
-	} else if c.known && sql.IsolationLevel(opts.Isolation) == c.level {
+	if c.known && sql.IsolationLevel(opts.Isolation) == c.level {
 		opts.Isolation = driver.IsolationLevel(sql.LevelDefault)
 	}
 
@@ -129,64 +123,11 @@ func (c *isolationConnection) BeginTx(ctx context.Context, opts driver.TxOptions
 	return tx, err
 }
 
-// Opaque SQL can change session state, so the next explicit transaction refreshes it.
+// Hidden routines preserve isolation; visible changes disable the fast path until reconnect.
 func (c *isolationConnection) observe(query string) {
-	if !c.known {
-		return
-	}
-
-	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
-
-	fields := strings.Fields(query)
-	if len(fields) == 0 || !singleIsolationStatement(query) {
-		c.known = false
-
-		return
-	}
-
-	// Stored functions and triggers must preserve isolation; their side effects are not visible here.
-	switch strings.ToUpper(fields[0]) {
-	case "SELECT", "INSERT", "UPDATE", "DELETE", "REPLACE", "SHOW":
-	default:
+	if c.known && isolationChangingSQL.MatchString(query) {
 		c.known = false
 	}
-}
-
-func singleIsolationStatement(query string) bool {
-	// Backslash quoting depends on sql_mode; ambiguity must invalidate the cache.
-	if strings.Contains(query, "\\") {
-		return false
-	}
-
-	var quote byte
-
-	for i := 0; i < len(query); i++ {
-		ch := query[i]
-		if quote != 0 {
-			if ch == quote {
-				if i+1 < len(query) && query[i+1] == quote {
-					i++
-				} else {
-					quote = 0
-				}
-			}
-
-			continue
-		}
-
-		switch ch {
-		case '\'', '"', '`':
-			quote = ch
-		case ';', '#':
-			return false
-		case '/', '-':
-			if i+1 < len(query) && (query[i:i+2] == "/*" || query[i:i+2] == "--") {
-				return false
-			}
-		}
-	}
-
-	return quote == 0
 }
 
 func (c *isolationConnection) ExecContext(
