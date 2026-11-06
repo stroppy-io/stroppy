@@ -3,14 +3,24 @@
 SET FOREIGN_KEY_CHECKS = 0
 --= drop_neword
 DROP PROCEDURE IF EXISTS NEWORD
+--= drop_atomic_neword
+DROP PROCEDURE IF EXISTS NEWORD_atomic
 --= drop_payment
 DROP PROCEDURE IF EXISTS PAYMENT
+--= drop_atomic_payment
+DROP PROCEDURE IF EXISTS PAYMENT_atomic
 --= drop_delivery
 DROP PROCEDURE IF EXISTS DELIVERY
+--= drop_atomic_delivery
+DROP PROCEDURE IF EXISTS DELIVERY_atomic
 --= drop_ostat
 DROP PROCEDURE IF EXISTS OSTAT
+--= drop_atomic_ostat
+DROP PROCEDURE IF EXISTS OSTAT_atomic
 --= drop_slev
 DROP PROCEDURE IF EXISTS SLEV
+--= drop_atomic_slev
+DROP PROCEDURE IF EXISTS SLEV_atomic
 --= drop_order_line
 DROP TABLE IF EXISTS order_line
 --= drop_new_order
@@ -160,7 +170,7 @@ CREATE TABLE stock (
 
 --+ create_procedures
 --= neword
-CREATE PROCEDURE NEWORD(
+CREATE PROCEDURE NEWORD_atomic(
   IN no_w_id INT,
   IN no_min_w_id INT,
   IN no_max_w_id INT,
@@ -190,7 +200,13 @@ BEGIN
   DECLARE loop_counter INT;
   DECLARE item_not_found INT DEFAULT 0;
   DECLARE CONTINUE HANDLER FOR NOT FOUND SET item_not_found = 1;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
 
+  START TRANSACTION;
   SET no_o_all_local = 1;
 
   SELECT c_discount, c_last, c_credit
@@ -298,9 +314,10 @@ BEGIN
   /* Insert orders after the loop so o_all_local reflects the actual remote flag. */
   INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
   VALUES (no_d_next_o_id, no_d_id, no_w_id, no_c_id, NOW(), no_o_ol_cnt, no_o_all_local);
+  COMMIT;
 END
 --= payment
-CREATE PROCEDURE PAYMENT(
+CREATE PROCEDURE PAYMENT_atomic(
   IN p_w_id INT,
   IN p_d_id INT,
   IN p_c_w_id INT,
@@ -321,7 +338,13 @@ BEGIN
   DECLARE name_count INT;
   DECLARE v_offset INT;
   DECLARE h_data_val VARCHAR(30);
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
 
+  START TRANSACTION;
   SET p_c_id = p_c_id_in;
   SET p_c_last = p_c_last_in;
 
@@ -385,9 +408,10 @@ BEGIN
 
   INSERT INTO history (h_id, h_c_d_id, h_c_w_id, h_c_id, h_d_id, h_w_id, h_date, h_amount, h_data)
   VALUES (p_h_id, p_c_d_id, p_c_w_id, p_c_id, p_d_id, p_w_id, NOW(), p_h_amount, h_data_val);
+  COMMIT;
 END
 --= delivery
-CREATE PROCEDURE DELIVERY(
+CREATE PROCEDURE DELIVERY_atomic(
   IN d_w_id INT,
   IN d_o_carrier_id INT
 )
@@ -396,7 +420,13 @@ BEGIN
   DECLARE v_no_o_id INT;
   DECLARE v_c_id INT;
   DECLARE v_ol_total DECIMAL(12,2);
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
 
+  START TRANSACTION;
   SET v_d_id = 1;
   WHILE v_d_id <= 10 DO
     SET v_no_o_id = NULL;
@@ -430,9 +460,10 @@ BEGIN
 
     SET v_d_id = v_d_id + 1;
   END WHILE;
+  COMMIT;
 END
 --= ostat
-CREATE PROCEDURE OSTAT(
+CREATE PROCEDURE OSTAT_atomic(
   IN os_w_id INT,
   IN os_d_id INT,
   IN os_c_id INT,
@@ -449,7 +480,13 @@ BEGIN
   DECLARE v_o_id INT;
   DECLARE v_entdate DATETIME;
   DECLARE v_o_carrier_id INT;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
 
+  START TRANSACTION;
   SET v_c_id = os_c_id;
 
   IF byname = 1 THEN
@@ -481,9 +518,10 @@ BEGIN
   WHERE o_d_id = os_d_id AND o_w_id = os_w_id AND o_c_id = v_c_id
   ORDER BY o_id DESC
   LIMIT 1;
+  COMMIT;
 END
 --= slev
-CREATE PROCEDURE SLEV(
+CREATE PROCEDURE SLEV_atomic(
   IN st_w_id INT,
   IN st_d_id INT,
   IN threshold INT
@@ -491,7 +529,13 @@ CREATE PROCEDURE SLEV(
 BEGIN
   DECLARE v_next_o_id INT;
   DECLARE stock_count INT;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
 
+  START TRANSACTION;
   SELECT d_next_o_id INTO v_next_o_id
   FROM district
   WHERE d_w_id = st_w_id AND d_id = st_d_id;
@@ -505,6 +549,7 @@ BEGIN
     AND s_w_id = st_w_id
     AND s_i_id = ol_i_id
     AND s_quantity < threshold;
+  COMMIT;
 END
 
 
@@ -526,15 +571,15 @@ ANALYZE TABLE warehouse, district, customer, history, new_order, orders, order_l
 
 --+ workload_procs
 --= new_order
-CALL NEWORD(:w_id, :min_w_id, :max_w_id, :d_id, :c_id, :ol_cnt, :force_rollback)
+CALL NEWORD_atomic(:w_id, :min_w_id, :max_w_id, :d_id, :c_id, :ol_cnt, :force_rollback)
 --= payment
-CALL PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last, :p_h_id)
+CALL PAYMENT_atomic(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amount, :c_last, :p_h_id)
 --= order_status
-CALL OSTAT(:os_w_id, :os_d_id, :os_c_id, :byname, :os_c_last)
+CALL OSTAT_atomic(:os_w_id, :os_d_id, :os_c_id, :byname, :os_c_last)
 --= delivery
-CALL DELIVERY(:d_w_id, :d_o_carrier_id)
+CALL DELIVERY_atomic(:d_w_id, :d_o_carrier_id)
 --= stock_level
-CALL SLEV(:st_w_id, :st_d_id, :threshold)
+CALL SLEV_atomic(:st_w_id, :st_d_id, :threshold)
 
 --+ workload_tx_new_order
 --= get_customer

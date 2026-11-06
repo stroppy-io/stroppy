@@ -2,7 +2,6 @@ package tpcc
 
 import (
 	"context"
-	"errors"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
@@ -17,11 +16,6 @@ func bynameInt(b bool) int64 {
 	return 0
 }
 
-// iterateProcs is the stored-procedure variant of the dispatch: each transaction is a
-// single round-trip (SELECT/CALL <proc>(...)) inside a driver transaction. pg/mysql
-// only — Setup rejects picodata/ydb. Dialect-specific DML lives inside the procs, so
-// the HAS_RETURNING / IS_PICODATA branches of the tx variant are absent here. The
-// by-name / remote-wh / rollback decisions stay client-side (they feed proc params).
 func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, vs *vuState, idx int) error {
 	switch idx {
 	case 0:
@@ -55,27 +49,15 @@ func (w *workload) procNewOrder(ctx context.Context, b *bench.Bench, vs *vuState
 	}
 
 	err := bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
-		tx, beginErr := b.Begin(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"})
-		if beginErr != nil {
-			return beginErr
+		bodyErr := b.Routine(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"},
+			w.q("workload_procs", "new_order"), args)
+		if forceRollback && isRollbackSentinel(bodyErr) && bench.RoutineRollbackConfirmed(bodyErr) {
+			w.m.rollbackDone.Add(ctx, 1)
+
+			return nil
 		}
 
-		if bodyErr := tx.Exec(ctx, w.q("workload_procs", "new_order"), args); bodyErr != nil {
-			rollbackErr := tx.Rollback(ctx)
-			if forceRollback && isRollbackSentinel(bodyErr) {
-				if result := finishNewOrder(bodyErr, rollbackErr); result != nil {
-					return result
-				}
-
-				w.m.rollbackDone.Add(ctx, 1)
-
-				return nil
-			}
-
-			return errors.Join(bodyErr, rollbackErr)
-		}
-
-		return tx.Commit(ctx)
+		return bodyErr
 	})
 	if err != nil {
 		return err
@@ -123,9 +105,7 @@ func (w *workload) procPayment(ctx context.Context, b *bench.Bench, vs *vuState)
 		"p_c_id": cIDPick, "byname": bynameInt(isByName), "h_amount": amount, "c_last": cLastPick, "p_h_id": hID,
 	}
 	err = bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
-		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "payment"}, func(tx *bench.Tx) error {
-			return tx.Exec(ctx, w.q("workload_procs", "payment"), args)
-		})
+		return b.Routine(ctx, bench.BeginOpts{Isolation: w.iso, Name: "payment"}, w.q("workload_procs", "payment"), args)
 	})
 
 	if isByName {
@@ -155,11 +135,10 @@ func (w *workload) procOrderStatus(ctx context.Context, b *bench.Bench, vs *vuSt
 	err := bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
 		bynameObserved = false
 
-		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "order_status"}, func(tx *bench.Tx) error {
-			bynameObserved = isByName
+		bynameObserved = isByName
 
-			return tx.Exec(ctx, w.q("workload_procs", "order_status"), args)
-		})
+		return b.Routine(ctx, bench.BeginOpts{Isolation: w.iso, Name: "order_status"},
+			w.q("workload_procs", "order_status"), args)
 	})
 	if bynameObserved {
 		w.m.orderStatusByname.Add(ctx, 1)
@@ -175,9 +154,7 @@ func (w *workload) procDelivery(ctx context.Context, b *bench.Bench, vs *vuState
 	args := map[string]any{"d_w_id": vs.homeWID, "d_o_carrier_id": carrierID}
 
 	return bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
-		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, func(tx *bench.Tx) error {
-			return tx.Exec(ctx, w.q("workload_procs", "delivery"), args)
-		})
+		return b.Routine(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, w.q("workload_procs", "delivery"), args)
 	})
 }
 
@@ -193,8 +170,7 @@ func (w *workload) procStockLevel(ctx context.Context, b *bench.Bench, vs *vuSta
 	}
 
 	return bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
-		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "stock_level"}, func(tx *bench.Tx) error {
-			return tx.Exec(ctx, w.q("workload_procs", "stock_level"), args)
-		})
+		return b.Routine(ctx, bench.BeginOpts{Isolation: w.iso, Name: "stock_level"},
+			w.q("workload_procs", "stock_level"), args)
 	})
 }

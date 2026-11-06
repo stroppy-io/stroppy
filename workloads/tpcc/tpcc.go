@@ -167,7 +167,7 @@ func define(d *bench.Def, variant string) error {
 	db := d.Drivers.Declare("default", bench.DriverConfig{})
 	w.driverType = db.Kind()
 
-	w.iso = resolveIsolation(w.driverType, bench.TxIsolationName(iso))
+	w.iso = db.ResolveIsolation(bench.TxIsolationName(iso), resolveIsolation(w.driverType, ""))
 
 	var err error
 

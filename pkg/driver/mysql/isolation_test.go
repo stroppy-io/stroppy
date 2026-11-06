@@ -81,7 +81,7 @@ func TestIsolationConnectorReadsEachPhysicalConnection(t *testing.T) {
 
 	for _, value := range []any{"REPEATABLE-READ", []byte("REPEATABLE-READ")} {
 		backend := &isolationTestConnection{value: value}
-		connector := isolationConnector{isolationTestConnector{connection: backend}}
+		connector := isolationConnector{Connector: isolationTestConnector{connection: backend}}
 		conn, err := connector.Connect(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, 1, backend.queries)
@@ -115,7 +115,7 @@ func TestIsolationConnectorPreservesUnsupportedDefaults(t *testing.T) {
 	t.Parallel()
 
 	backend := &isolationTestConnection{value: "SNAPSHOT"}
-	connector := isolationConnector{isolationTestConnector{connection: backend}}
+	connector := isolationConnector{Connector: isolationTestConnector{connection: backend}}
 	conn, err := connector.Connect(t.Context())
 	require.NoError(t, err)
 	require.False(t, backend.closed)
@@ -137,7 +137,7 @@ func TestIsolationConnectorClosesFailedInitialization(t *testing.T) {
 	t.Parallel()
 
 	backend := &isolationTestConnection{queryErr: errors.New("probe failed")}
-	_, err := (isolationConnector{isolationTestConnector{connection: backend}}).Connect(t.Context())
+	_, err := (isolationConnector{Connector: isolationTestConnector{connection: backend}}).Connect(t.Context())
 	require.ErrorContains(t, err, "probe failed")
 	require.True(t, backend.closed)
 }

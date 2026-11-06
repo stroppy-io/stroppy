@@ -211,7 +211,28 @@ func (p *prepared[R]) run(ctx context.Context, tx *sessionTx[R], args map[string
 		return nil, err
 	}
 
-	return s.result(RunQuery(ctx, p, s.wrapRows, s.dialect, s.logger, p.sql, args, s.timeout))
+	var executor QueryContext[R] = p
+
+	if tx != nil {
+		if backend, ok := tx.conn.(interface {
+			QueryPrepared(ctx context.Context, statement PreparedQuery[R], args ...any) (R, error)
+		}); ok {
+			executor = preparedTransactionQuery[R]{backend: backend, statement: p.statement}
+		}
+	}
+
+	return s.result(RunQuery(ctx, executor, s.wrapRows, s.dialect, s.logger, p.sql, args, s.timeout))
+}
+
+type preparedTransactionQuery[R any] struct {
+	backend interface {
+		QueryPrepared(ctx context.Context, statement PreparedQuery[R], args ...any) (R, error)
+	}
+	statement PreparedQuery[R]
+}
+
+func (q preparedTransactionQuery[R]) QueryContext(ctx context.Context, _ string, args ...any) (R, error) {
+	return q.backend.QueryPrepared(ctx, q.statement, args...)
 }
 
 func (p *prepared[R]) RunQuery(ctx context.Context, args map[string]any) (*driver.QueryResult, error) {

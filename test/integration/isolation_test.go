@@ -237,6 +237,8 @@ func TestMySQLVisibleIsolationChangesPreserveExplicitTransactions(t *testing.T) 
 		for range 2 {
 			tx, beginErr := session.Begin(t.Context(), config.TxIsolationLevelReadCommitted)
 			require.NoError(t, beginErr)
+			result, queryErr = tx.RunQuery(t.Context(), "SELECT 1", nil)
+			require.EqualValues(t, 1, preparedScalar(t, result, queryErr))
 			require.NoError(t, tx.Commit(t.Context()))
 		}
 

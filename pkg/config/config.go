@@ -379,8 +379,14 @@ func (c *RunConfig) GetSQL() string {
 	return ""
 }
 
+type TransactionConfig struct {
+	DefaultIsolation *string `json:"defaultIsolation,omitempty"`
+	FoldBegin        *bool   `json:"foldBegin,omitempty"`
+}
+
 // DriverRunConfig is the user-facing driver configuration for the config file.
 type DriverRunConfig struct {
+	Transactions          *TransactionConfig    `json:"transactions,omitempty"`
 	DriverType            *string               `json:"driverType,omitempty"`
 	URL                   *string               `json:"url,omitempty"`
 	Pool                  *PoolConfig           `json:"pool,omitempty"`
@@ -602,8 +608,9 @@ func (c *PoolConfig) GetConnMaxIdleTime() string {
 // DriverConfig is the runtime driver configuration consumed by the drivers and
 // bench engine. It is assembled internally, never JSON-decoded directly.
 type DriverConfig struct {
-	URL        string     `json:"url,omitempty"`
-	DriverType DriverType `json:"driverType,omitempty"`
+	Transactions *TransactionConfig `json:"transactions,omitempty"`
+	URL          string             `json:"url,omitempty"`
+	DriverType   DriverType         `json:"driverType,omitempty"`
 	// DefaultInsertMethod is the driver fallback when a workload leaves
 	// InsertRequest.Method unset.
 	DefaultInsertMethod   string                `json:"defaultInsertMethod,omitempty"`

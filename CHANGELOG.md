@@ -10,6 +10,11 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- Driver transaction settings can apply a default isolation level to every connection and disable the default first-query transaction-start folding when eager starts are needed.
+- TPC-B and TPC-C procedure variants execute atomic server-side routines with one invocation per operation while preserving per-operation isolation overrides.
+
 ### Fixed
 
 - MySQL TPC-C no longer rechecks isolation or repeats matching isolation settings after procedure calls and SQL comments, removing the extra round trips introduced in 6.3.2.

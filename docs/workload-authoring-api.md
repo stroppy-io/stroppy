@@ -404,9 +404,49 @@ ordinary CALL/SELECT/DML and cannot be inferred from the submitted SQL. Change
 isolation through visible SET statements or transaction options instead. This
 requirement preserves the fast path without probing after every operation.
 
-PostgreSQL-compatible drivers already express isolation in `BEGIN`; YDB keeps its
-native transaction-mode mapping, and Picodata continues to reject driver-managed
-transactions.
+Driver-wide defaults are configured under `transactions`:
+
+```json
+{"transactions":{"defaultIsolation":"read_committed","foldBegin":true}}
+```
+
+Use `-D transactions.defaultIsolation=read_committed` and
+`-D transactions.foldBegin=false` on the CLI. The SDK exposes the same fields in
+`bench.DriverConfig.Transactions`. Defaults apply to every new physical
+connection, including replacements. Built-in transactional workloads resolve
+explicit `--tx-isolation`, then this driver default, then their backend fallback.
+Explicit transaction isolation overrides the default for that transaction only.
+Custom workloads can use `DriverRef.ResolveIsolation(override, fallback)` for the
+same precedence. Supported default names are `db_default`,
+`read_uncommitted`, `read_committed`, `repeatable_read`, and `serializable`;
+backend restrictions still apply.
+
+`foldBegin` defaults to true. PostgreSQL-compatible drivers batch `BEGIN` and
+the first query; MySQL sends transaction settings, `START TRANSACTION`, and the
+first query in one command. No server transaction starts for an unused handle.
+Disable folding for eager error timing. MySQL uses safe driver parameter
+interpolation and enables multi-statements when folding; the first execution of an explicitly
+prepared statement uses its parameterized SQL text, then later executions reuse
+the prepared statement. YDB uses its native lazy-transaction option. Picodata
+continues to reject driver-managed transactions.
+
+`b.Routine(ctx, bench.BeginOpts{Name: "payment", Isolation: bench.IsoSerializable},
+query, arguments)` executes one self-contained server-owned atomic routine.
+PostgreSQL-compatible functions use the invocation's implicit transaction. MySQL
+procedures must own `START TRANSACTION`, `COMMIT`, and an exception handler that
+rolls back and rethrows. TPC-B/TPC-C's built-in procedures follow this contract;
+recreate their MySQL procedures before reusing a database created by an older
+binary. Atomic MySQL procedures use `_atomic` names, so stale definitions
+fail explicitly instead of silently running without a transaction. Custom SQL
+overrides must follow the same contract.
+
+Routine isolation overrides use lazily initialized pools whose physical
+connections all have that default, so warmed invocations send only the CALL or
+SELECT. Each distinct override can allocate a separate pool with the configured
+pool limit. Initialization can add connection setup traffic; it is not repeated
+per operation. The driver drains the complete invocation response before
+reporting success. Unconfirmed outcomes require idempotency before retry, even
+when a joined error also contains a retryable fact.
 
 Backend classification returns neutral `ErrorFacts`; workload policies choose
 actions and retry budget. Zero/default attempts mean one attempt, not automatic

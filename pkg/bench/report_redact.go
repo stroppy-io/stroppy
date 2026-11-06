@@ -12,7 +12,9 @@ import (
 // reportRedactor removes configured connection data from report diagnostics.
 func reportRedactor(configurations map[string]DriverConfig, metrics *MetricsConfig) *strings.Replacer {
 	values := []string{}
-	for _, configuration := range configurations {
+
+	for name := range configurations {
+		configuration := configurations[name]
 		values = append(values, driverReportSecrets(&configuration)...)
 	}
 

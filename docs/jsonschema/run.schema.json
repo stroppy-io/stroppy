@@ -341,6 +341,16 @@
             }
           ]
         },
+        "transactions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TransactionConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "url": {
           "anyOf": [
             {
@@ -2193,6 +2203,70 @@
                   "x-stroppy-exactInt32": true
                 }
               ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "TransactionConfig": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "defaultIsolation",
+              "default_isolation"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "foldBegin",
+              "fold_begin"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "defaultIsolation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "default_isolation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "foldBegin": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fold_begin": {
+          "anyOf": [
+            {
+              "type": "boolean"
             },
             {
               "type": "null"

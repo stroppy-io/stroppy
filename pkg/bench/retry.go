@@ -165,6 +165,9 @@ func (p RetryPolicy) Retries(err error) bool {
 
 func (p RetryPolicy) decision(err error) RetryDecision {
 	facts := classifyError(err, p.Classify)
+	if routine, ok := errors.AsType[*driver.RoutineError](err); ok && routine.Ambiguous {
+		facts.RequiresIdempotency = true
+	}
 
 	// Only serialization and deadlock prove that COMMIT did not apply the writes.
 	// Other commit failures may have lost the acknowledgement after applying them.

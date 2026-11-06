@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -60,6 +61,9 @@ type Driver struct {
 	pool         Executor
 	bulkSize     int
 	queryTimeout time.Duration
+	options      driver.Options
+	routineMu    sync.Mutex
+	routines     map[config.TxIsolationLevel]*Driver
 }
 
 var _ driver.Driver = new(Driver)
@@ -79,6 +83,7 @@ func NewDriver(
 		logger:       lg,
 		bulkSize:     defaultBulkSize,
 		queryTimeout: opts.QueryTimeout,
+		options:      opts,
 	}
 
 	cfg := opts.Config
@@ -135,6 +140,15 @@ func (d *Driver) Begin(ctx context.Context, isolation config.TxIsolationLevel) (
 		return NewConnOnlyTx(conn, d.logger, d.queryTimeout), nil
 	}
 
+	if driver.FoldBegin(d.options.Config) {
+		conn, err := d.pool.Acquire(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		return d.foldedTx(conn, isolation), nil
+	}
+
 	pgxTx, err := d.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: toTxIsoLevel(isolation)})
 	if err != nil {
 		return nil, err
@@ -143,12 +157,17 @@ func (d *Driver) Begin(ctx context.Context, isolation config.TxIsolationLevel) (
 	return newTx(pgxTx, isolation, d), nil
 }
 
-func (d *Driver) Teardown(_ context.Context) error {
+func (d *Driver) Teardown(ctx context.Context) error {
+	var err error
+	for _, backend := range d.routines {
+		err = driver.JoinErrors(err, backend.Teardown(ctx))
+	}
+
 	d.logger.Debug("Driver Teardown Start")
 	d.pool.Close()
 	d.logger.Debug("Driver Teardown End")
 
-	return nil
+	return err
 }
 
 // RunQuery executes sql with named :arg placeholders and returns rows cursor.

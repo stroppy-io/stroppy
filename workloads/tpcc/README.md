@@ -9,7 +9,12 @@ populated by transactions.
 
 - `tpcc/tx` runs ordered DML in driver transactions on PostgreSQL, MySQL, and
   YDB, and as a non-transactional approximation on Picodata 26.2 or newer.
-- `tpcc/procs` calls server-side procedures and supports PostgreSQL and MySQL.
+- `tpcc/procs` sends one atomic routine invocation per operation. PostgreSQL,
+  YugabyteDB, and supported CockroachDB dialects use functions; MySQL procedures
+  own transaction start, commit, and rollback. Atomic MySQL procedure names end
+  in `_atomic`; run `--steps create_procedures` to install them before reusing a
+  dataset from an older binary. Old names cannot silently bypass transaction
+  boundaries. Custom procedure SQL must own the same lifecycle.
 
 ## Run it
 

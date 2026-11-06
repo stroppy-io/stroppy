@@ -20,6 +20,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 const (
@@ -84,6 +85,20 @@ func ParseConfig(
 		return nil, err
 	}
 
+	level, err := driver.DefaultIsolation(driverConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if level != config.TxIsolationLevelUnspecified {
+		name, levelErr := driver.IsolationSQL(level)
+		if levelErr != nil {
+			return nil, levelErr
+		}
+
+		cfg.ConnConfig.RuntimeParams["default_transaction_isolation"] = strings.ToLower(name)
+	}
+
 	cfg.ConnConfig.BuildContextWatcherHandler = func(conn *pgconn.PgConn) ctxwatch.Handler {
 		return &pgconn.CancelRequestContextWatcherHandler{
 			Conn:               conn,
@@ -102,6 +117,10 @@ func ParseConfig(
 	}
 
 	pg := driverConfig.Postgres
+	if pg == nil && !strings.Contains(driverConfig.URL, "default_query_exec_mode") {
+		cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
+	}
+
 	if pg != nil {
 		if err := applyPostgresConfig(cfg, pg); err != nil {
 			return nil, err

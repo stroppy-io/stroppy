@@ -1148,6 +1148,20 @@ func applyDriverRunConfigExtras(
 		driverConfig.TLSInsecureSkipVerify = fileConfig.TLSInsecureSkipVerify
 	}
 
+	if fileConfig.Transactions != nil {
+		if driverConfig.Transactions == nil {
+			driverConfig.Transactions = &config.TransactionConfig{}
+		}
+
+		if fileConfig.Transactions.DefaultIsolation != nil {
+			driverConfig.Transactions.DefaultIsolation = fileConfig.Transactions.DefaultIsolation
+		}
+
+		if fileConfig.Transactions.FoldBegin != nil {
+			driverConfig.Transactions.FoldBegin = fileConfig.Transactions.FoldBegin
+		}
+	}
+
 	if fileConfig.InsertProgress != nil {
 		driverConfig.InsertProgress = fileConfig.InsertProgress
 	}

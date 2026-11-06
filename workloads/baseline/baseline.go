@@ -53,7 +53,7 @@ func define(d *bench.Def) error {
 	)
 	iso, _ := d.Param.String("tx-isolation", "", "Transaction isolation override.")
 	db := d.Drivers.Declare("default", bench.DriverConfig{})
-	w.iso = resolveIsolation(db.Kind(), bench.TxIsolationName(iso))
+	w.iso = db.ResolveIsolation(bench.TxIsolationName(iso), resolveIsolation(db.Kind(), ""))
 	d.Execution.Step("drop_schema", w.drop)
 	d.Execution.Step("create_schema", w.create)
 	d.Execution.Step("load_data", w.load)

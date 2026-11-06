@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	gomysql "github.com/go-sql-driver/mysql"
@@ -40,6 +41,9 @@ func init() {
 
 type Driver struct {
 	db           *sql.DB
+	options      driver.Options
+	routineMu    sync.Mutex
+	routines     map[config.TxIsolationLevel]*Driver
 	dialect      queries.Dialect
 	logger       *zap.Logger
 	sqlCfg       *config.SQLConfig
@@ -93,6 +97,7 @@ func NewDriver(
 
 	return &Driver{
 		db:           db,
+		options:      opts,
 		dialect:      mysqlDialect{},
 		logger:       lg,
 		sqlCfg:       sqlCfg,
@@ -111,6 +116,16 @@ func prepareConnector(
 		return nil, fmt.Errorf("failed to parse mysql DSN: %w", err)
 	}
 
+	level, err := driver.DefaultIsolation(driverCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	mysqlCfg.InterpolateParams = true
+	if driver.FoldBegin(driverCfg) {
+		mysqlCfg.MultiStatements = true
+	}
+
 	applySecurityOverrides(lg, mysqlCfg, driverCfg)
 
 	if dialFunc != nil {
@@ -126,7 +141,9 @@ func prepareConnector(
 		return nil, fmt.Errorf("failed to create mysql connector: %w", err)
 	}
 
-	return isolationConnector{connector}, nil
+	return isolationConnector{
+		Connector: connector, fold: driver.FoldBegin(driverCfg), defaultIsolation: level,
+	}, nil
 }
 
 // applySecurityOverrides applies explicit security fields to the MySQL config.
@@ -233,7 +250,13 @@ func (d *Driver) RunQuery(
 
 func (d *Driver) Teardown(ctx context.Context) error {
 	d.logger.Debug("Driver Teardown Start")
-	err := sqldriver.Teardown(ctx, d.db)
+
+	var err error
+	for _, backend := range d.routines {
+		err = driver.JoinErrors(err, backend.Teardown(ctx))
+	}
+
+	err = driver.JoinErrors(err, sqldriver.Teardown(ctx, d.db))
 	d.logger.Debug("Driver Teardown End")
 
 	return err
