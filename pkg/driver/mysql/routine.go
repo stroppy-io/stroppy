@@ -13,26 +13,80 @@ import (
 )
 
 func (d *Driver) routineDriver(ctx context.Context, isolation config.TxIsolationLevel) (*Driver, error) {
+	var pending chan struct{}
+
+	for {
+		d.routineMu.Lock()
+		if d.routineClosed {
+			d.routineMu.Unlock()
+
+			return nil, sql.ErrConnDone
+		}
+
+		if isolation == config.TxIsolationLevelUnspecified {
+			d.routineMu.Unlock()
+
+			return d, nil
+		}
+
+		if existing := d.routines[isolation]; existing != nil {
+			d.routineMu.Unlock()
+
+			return existing, nil
+		}
+
+		if initializing := d.routineInit[isolation]; initializing != nil {
+			d.routineMu.Unlock()
+
+			select {
+			case <-initializing:
+				continue
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+
+		if d.routineInit == nil {
+			d.routineInit = make(map[config.TxIsolationLevel]chan struct{})
+		}
+
+		pending = make(chan struct{})
+		d.routineInit[isolation] = pending
+		d.routineMu.Unlock()
+
+		break
+	}
+
+	defer func() {
+		d.routineMu.Lock()
+		delete(d.routineInit, isolation)
+		close(pending)
+		d.routineMu.Unlock()
+	}()
+
+	backend, err := d.newRoutineDriver(ctx, isolation)
+	if err != nil {
+		return nil, err
+	}
+
 	d.routineMu.Lock()
 	if d.routineClosed {
 		d.routineMu.Unlock()
 
-		return nil, sql.ErrConnDone
+		return nil, driver.JoinErrors(sql.ErrConnDone, backend.Teardown(context.WithoutCancel(ctx)))
 	}
 
-	if isolation == config.TxIsolationLevelUnspecified {
-		d.routineMu.Unlock()
-
-		return d, nil
+	if d.routines == nil {
+		d.routines = make(map[config.TxIsolationLevel]*Driver)
 	}
 
-	if existing := d.routines[isolation]; existing != nil {
-		d.routineMu.Unlock()
-
-		return existing, nil
-	}
+	d.routines[isolation] = backend
 	d.routineMu.Unlock()
 
+	return backend, nil
+}
+
+func (d *Driver) newRoutineDriver(ctx context.Context, isolation config.TxIsolationLevel) (*Driver, error) {
 	name, err := driver.IsolationSQL(isolation)
 	if err != nil {
 		return nil, err
@@ -51,32 +105,7 @@ func (d *Driver) routineDriver(ctx context.Context, isolation config.TxIsolation
 	options := d.options
 	options.Config = &cfg
 
-	backend, err := NewDriver(ctx, options)
-	if err != nil {
-		return nil, err
-	}
-
-	d.routineMu.Lock()
-	if d.routineClosed {
-		d.routineMu.Unlock()
-
-		return nil, driver.JoinErrors(sql.ErrConnDone, backend.Teardown(context.WithoutCancel(ctx)))
-	}
-
-	if existing := d.routines[isolation]; existing != nil {
-		d.routineMu.Unlock()
-
-		return existing, backend.Teardown(context.WithoutCancel(ctx))
-	}
-
-	if d.routines == nil {
-		d.routines = make(map[config.TxIsolationLevel]*Driver)
-	}
-
-	d.routines[isolation] = backend
-	d.routineMu.Unlock()
-
-	return backend, nil
+	return NewDriver(ctx, options)
 }
 
 func (d *Driver) RunRoutine(

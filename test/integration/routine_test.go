@@ -11,6 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -37,6 +38,147 @@ func TestRoutineInitializationRacesTeardown(t *testing.T) {
 
 			_, err := db.(driver.RoutineExecutor).RunRoutine(t.Context(), config.TxIsolationLevelRepeatableRead, "SELECT 1", nil)
 			require.Error(t, err, "routine pool must not be published after teardown")
+		})
+	}
+}
+
+func TestRoutineConcurrentInitialization(t *testing.T) {
+	for _, backend := range preparedBackends() {
+		t.Run(backend.name, func(t *testing.T) {
+			var dials atomic.Int64
+
+			connection := backend.url
+			if backend.kind == config.DriverTypePostgres {
+				if strings.HasPrefix(connection, "postgres://") || strings.HasPrefix(connection, "postgresql://") {
+					parsed, parseErr := url.Parse(connection)
+					require.NoError(t, parseErr)
+
+					parameters := parsed.Query()
+					parameters.Set("sslmode", "disable")
+					parsed.RawQuery = parameters.Encode()
+					connection = parsed.String()
+				} else {
+					connection += " sslmode=disable"
+				}
+			}
+
+			limit := int32(1)
+			db, err := driver.Dispatch(t.Context(), driver.Options{
+				Config: &config.DriverConfig{
+					DriverType: backend.kind, URL: connection,
+					SQL:      &config.SQLConfig{MaxOpenConns: &limit, MaxIdleConns: &limit},
+					Postgres: &config.PostgresConfig{MaxConns: &limit},
+				},
+				Logger: zap.NewNop(),
+				DialFunc: func(ctx context.Context, network, address string) (net.Conn, error) {
+					dials.Add(1)
+
+					return (&net.Dialer{}).DialContext(ctx, network, address)
+				},
+			})
+			require.NoError(t, err)
+
+			defer db.Teardown(context.Background())
+
+			for _, isolation := range []config.TxIsolationLevel{
+				config.TxIsolationLevelSerializable, config.TxIsolationLevelRepeatableRead,
+			} {
+				before := dials.Load()
+				start := make(chan struct{})
+
+				const callers = 16
+
+				results := make(chan error, callers)
+				ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+
+				var group sync.WaitGroup
+				for range callers {
+					group.Go(func() {
+						<-start
+
+						_, runErr := db.(driver.RoutineExecutor).RunRoutine(ctx, isolation, "SELECT 1", nil)
+						results <- runErr
+					})
+				}
+
+				close(start)
+				group.Wait()
+				cancel()
+				close(results)
+
+				for runErr := range results {
+					require.NoError(t, runErr)
+				}
+
+				require.Equal(t, int64(1), dials.Load()-before, "one initialization connection per isolation pool")
+			}
+		})
+	}
+}
+
+func TestRoutineInitializationWaiterCancellation(t *testing.T) {
+	for _, backend := range preparedBackends() {
+		t.Run(backend.name, func(t *testing.T) {
+			var blockNext atomic.Bool
+
+			connecting := make(chan struct{})
+			db, err := driver.Dispatch(t.Context(), driver.Options{
+				Config: &config.DriverConfig{DriverType: backend.kind, URL: backend.url},
+				Logger: zap.NewNop(),
+				DialFunc: func(ctx context.Context, network, address string) (net.Conn, error) {
+					if blockNext.CompareAndSwap(true, false) {
+						close(connecting)
+						<-ctx.Done()
+
+						return nil, ctx.Err()
+					}
+
+					return (&net.Dialer{}).DialContext(ctx, network, address)
+				},
+			})
+			require.NoError(t, err)
+
+			defer db.Teardown(context.Background())
+
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+
+			owner, cancelOwner := context.WithCancel(ctx)
+			defer cancelOwner()
+
+			result := make(chan error, 1)
+
+			blockNext.Store(true)
+
+			go func() {
+				_, runErr := db.(driver.RoutineExecutor).RunRoutine(owner, config.TxIsolationLevelSerializable, "SELECT 1", nil)
+				result <- runErr
+			}()
+
+			select {
+			case <-connecting:
+			case <-ctx.Done():
+				t.Fatal("routine initialization did not reach the dialer")
+			}
+
+			waiter, cancelWaiter := context.WithCancel(ctx)
+			cancelWaiter()
+
+			_, err = db.(driver.RoutineExecutor).RunRoutine(waiter, config.TxIsolationLevelSerializable, "SELECT 1", nil)
+			require.ErrorIs(t, err, context.Canceled)
+
+			for _, isolation := range []config.TxIsolationLevel{
+				config.TxIsolationLevelUnspecified, config.TxIsolationLevelRepeatableRead,
+			} {
+				_, err = db.(driver.RoutineExecutor).RunRoutine(ctx, isolation, "SELECT 1", nil)
+				require.NoError(t, err, "other isolation levels must not wait for blocked initialization")
+			}
+
+			cancelOwner()
+			require.Error(t, <-result)
+
+			_, err = db.(driver.RoutineExecutor).RunRoutine(ctx, config.TxIsolationLevelSerializable, "SELECT 1", nil)
+			require.NoError(t, err, "failed initialization must be retryable")
 		})
 	}
 }

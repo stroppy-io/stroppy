@@ -44,6 +44,7 @@ type Driver struct {
 	options       driver.Options
 	routineMu     sync.Mutex
 	routineClosed bool
+	routineInit   map[config.TxIsolationLevel]chan struct{}
 	routines      map[config.TxIsolationLevel]*Driver
 	dialect       queries.Dialect
 	logger        *zap.Logger
