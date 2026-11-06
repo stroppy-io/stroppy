@@ -13,11 +13,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/postgres/pool"
 )
 
 func TestRoutineInitializationRacesTeardown(t *testing.T) {
@@ -180,6 +182,86 @@ func TestRoutineInitializationWaiterCancellation(t *testing.T) {
 			_, err = db.(driver.RoutineExecutor).RunRoutine(ctx, config.TxIsolationLevelSerializable, "SELECT 1", nil)
 			require.NoError(t, err, "failed initialization must be retryable")
 		})
+	}
+}
+
+func TestPostgresPoolWarmupSurvivesCallerCancellation(t *testing.T) {
+	backend := preparedBackends()[0]
+	parsed, err := pool.ParseConfig(&config.DriverConfig{URL: backend.url}, zap.NewNop())
+	require.NoError(t, err)
+
+	parsed.MaxConns = 2
+	parsed.MinConns = 2
+	parsed.HealthCheckPeriod = time.Hour
+	connected := make(chan context.Context, 2)
+	release := make(chan struct{})
+
+	parsed.AfterConnect = func(ctx context.Context, _ *pgx.Conn) error {
+		connected <- ctx
+
+		select {
+		case <-release:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	db, err := pool.NewWithConfig(ctx, parsed)
+	require.NoError(t, err)
+
+	defer db.Close()
+	defer close(release)
+
+	warming := make([]context.Context, 0, 2)
+
+	for range 2 {
+		select {
+		case connectionCtx := <-connected:
+			warming = append(warming, connectionCtx)
+		case <-time.After(5 * time.Second):
+			t.Fatal("minimum connection warmup did not reach AfterConnect")
+		}
+	}
+
+	cancel()
+
+	for _, connectionCtx := range warming {
+		require.NoError(t, connectionCtx.Err(), "minimum connection warmup must outlive its creator")
+	}
+}
+
+func TestPostgresPoolSurvivesCallerCancellation(t *testing.T) {
+	backend := preparedBackends()[0]
+	limit := int32(3)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	db, err := driver.Dispatch(ctx, driver.Options{
+		Config: &config.DriverConfig{
+			DriverType: backend.kind, URL: backend.url,
+			Postgres: &config.PostgresConfig{MaxConns: &limit, MinConns: &limit},
+		},
+		Logger: zap.NewNop(),
+	})
+	require.NoError(t, err)
+
+	defer db.Teardown(context.Background())
+
+	cancel()
+
+	for range limit {
+		session, openErr := db.(driver.SessionProvider).OpenSession(t.Context())
+		require.NoError(t, openErr)
+
+		defer session.Close(context.Background())
+
+		result, queryErr := session.RunQuery(t.Context(), "SELECT 1", nil)
+		require.EqualValues(t, 1, preparedScalar(t, result, queryErr))
 	}
 }
 

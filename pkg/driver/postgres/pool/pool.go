@@ -62,7 +62,7 @@ func NewPool(
 		return nil, err
 	}
 
-	pool, err := pgxpool.NewWithConfig(ctx, parsedConfig)
+	pool, err := pgxpool.NewWithConfig(context.WithoutCancel(ctx), parsedConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func NewPool(
 }
 
 func NewWithConfig(ctx context.Context, pgConfig *pgxpool.Config) (*PoolX, error) {
-	pool, err := pgxpool.NewWithConfig(ctx, pgConfig)
+	pool, err := pgxpool.NewWithConfig(context.WithoutCancel(ctx), pgConfig)
 
 	return &PoolX{pool}, err
 }
