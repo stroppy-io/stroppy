@@ -216,11 +216,17 @@ func TestMySQLVisibleIsolationChangesPreserveExplicitTransactions(t *testing.T) 
 	defer session.Close(context.Background())
 
 	admin := NewMySQL(t)
+	_, err = admin.ExecContext(t.Context(), "DROP TABLE IF EXISTS stroppy_visible_isolation")
+	require.NoError(t, err)
 	_, err = admin.ExecContext(t.Context(), "CREATE TABLE stroppy_visible_isolation(id INT PRIMARY KEY,value INT)")
 	require.NoError(t, err)
 
-	defer admin.ExecContext(context.Background(), "DROP TABLE stroppy_visible_isolation")
-
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_, dropErr := admin.ExecContext(ctx, "DROP TABLE IF EXISTS stroppy_visible_isolation")
+		require.NoError(t, dropErr)
+	})
 	_, err = admin.ExecContext(t.Context(), "INSERT INTO stroppy_visible_isolation VALUES(1,1)")
 	require.NoError(t, err)
 

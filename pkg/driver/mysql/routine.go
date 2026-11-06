@@ -14,19 +14,24 @@ import (
 
 func (d *Driver) routineDriver(ctx context.Context, isolation config.TxIsolationLevel) (*Driver, error) {
 	d.routineMu.Lock()
-	defer d.routineMu.Unlock()
-
 	if d.routineClosed {
+		d.routineMu.Unlock()
+
 		return nil, sql.ErrConnDone
 	}
 
 	if isolation == config.TxIsolationLevelUnspecified {
+		d.routineMu.Unlock()
+
 		return d, nil
 	}
 
 	if existing := d.routines[isolation]; existing != nil {
+		d.routineMu.Unlock()
+
 		return existing, nil
 	}
+	d.routineMu.Unlock()
 
 	name, err := driver.IsolationSQL(isolation)
 	if err != nil {
@@ -51,11 +56,25 @@ func (d *Driver) routineDriver(ctx context.Context, isolation config.TxIsolation
 		return nil, err
 	}
 
+	d.routineMu.Lock()
+	if d.routineClosed {
+		d.routineMu.Unlock()
+
+		return nil, driver.JoinErrors(sql.ErrConnDone, backend.Teardown(context.WithoutCancel(ctx)))
+	}
+
+	if existing := d.routines[isolation]; existing != nil {
+		d.routineMu.Unlock()
+
+		return existing, backend.Teardown(context.WithoutCancel(ctx))
+	}
+
 	if d.routines == nil {
 		d.routines = make(map[config.TxIsolationLevel]*Driver)
 	}
 
 	d.routines[isolation] = backend
+	d.routineMu.Unlock()
 
 	return backend, nil
 }
