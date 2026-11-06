@@ -9,7 +9,10 @@ transaction.
 - `tpcb/tx` runs the DML statements in one client-side transaction and supports
   PostgreSQL, MySQL, Picodata, and YDB.
 - `tpcb/procs` calls `tpcb_transaction` once per iteration and supports
-  PostgreSQL, MySQL, CockroachDB, and YugabyteDB.
+  PostgreSQL, MySQL, CockroachDB, and YugabyteDB. Each invocation uses the selected
+  transaction isolation and reports transaction metrics. MySQL procedures own
+  rollback as well as commit and use `tpcb_transaction_atomic`; install the new
+  definition before reusing a loaded database. PostgreSQL-compatible functions use the statement's implicit transaction.
 
 ## Run it
 

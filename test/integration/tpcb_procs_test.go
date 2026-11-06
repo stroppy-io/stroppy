@@ -105,7 +105,7 @@ func TestTpcbProcsMySQL(t *testing.T) {
 	var routineCount int64
 	if err := db.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM information_schema.ROUTINES
-		WHERE ROUTINE_SCHEMA = DATABASE() AND ROUTINE_NAME = 'tpcb_transaction'`).Scan(&routineCount); err != nil {
+		WHERE ROUTINE_SCHEMA = DATABASE() AND ROUTINE_NAME = 'tpcb_transaction_atomic'`).Scan(&routineCount); err != nil {
 		t.Fatalf("check tpcb_transaction: %v", err)
 	}
 	if routineCount != 1 {

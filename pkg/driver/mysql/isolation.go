@@ -7,9 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	gomysql "github.com/go-sql-driver/mysql"
+
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
+	stroppydriver "github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
 type mysqlConnection interface {
@@ -28,9 +32,15 @@ var (
 	errIsolationInterfaces  = errors.New("mysql connection lacks required context interfaces")
 	errIsolationResult      = errors.New("unexpected MySQL session isolation result")
 	errIsolationUnsupported = errors.New("unsupported MySQL session isolation")
+	isolationChangingSQL    = regexp.MustCompile(`(?is)\bSET\b.*\b(TRANSACTION|transaction_isolation|tx_isolation)\b|` +
+		`\b(RESET|EXECUTE)\b`)
 )
 
-type isolationConnector struct{ driver.Connector }
+type isolationConnector struct {
+	driver.Connector
+	fold             bool
+	defaultIsolation config.TxIsolationLevel
+}
 
 func (c isolationConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	conn, err := c.Connector.Connect(ctx)
@@ -45,9 +55,24 @@ func (c isolationConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		return nil, errIsolationInterfaces
 	}
 
+	if c.defaultIsolation != config.TxIsolationLevelUnspecified {
+		name, levelErr := stroppydriver.IsolationSQL(c.defaultIsolation)
+		if levelErr != nil {
+			_ = conn.Close()
+
+			return nil, levelErr
+		}
+
+		if _, setErr := backend.ExecContext(ctx, "SET SESSION TRANSACTION ISOLATION LEVEL "+name, nil); setErr != nil {
+			_ = conn.Close()
+
+			return nil, setErr
+		}
+	}
+
 	level, err := readSessionIsolation(ctx, backend)
 	if errors.Is(err, errIsolationUnsupported) {
-		return &isolationConnection{mysqlConnection: backend}, nil
+		return &isolationConnection{mysqlConnection: backend, fold: c.fold}, nil
 	}
 
 	if err != nil {
@@ -56,7 +81,9 @@ func (c isolationConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		return nil, fmt.Errorf("read MySQL session isolation: %w", err)
 	}
 
-	return &isolationConnection{mysqlConnection: backend, level: level, known: level != sql.LevelDefault}, nil
+	return &isolationConnection{
+		mysqlConnection: backend, level: level, known: level != sql.LevelDefault, fold: c.fold,
+	}, nil
 }
 
 func readSessionIsolation(ctx context.Context, conn driver.QueryerContext) (sql.IsolationLevel, error) {
@@ -103,22 +130,19 @@ func readSessionIsolation(ctx context.Context, conn driver.QueryerContext) (sql.
 
 type isolationConnection struct {
 	mysqlConnection
-	level sql.IsolationLevel
-	known bool
+	level   sql.IsolationLevel
+	known   bool
+	fold    bool
+	pending *foldedTransaction
 }
 
 func (c *isolationConnection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	if !c.known && sql.IsolationLevel(opts.Isolation) != sql.LevelDefault {
-		level, err := readSessionIsolation(ctx, c.mysqlConnection)
-		if err != nil && !errors.Is(err, errIsolationUnsupported) {
-			return nil, fmt.Errorf("refresh MySQL session isolation: %w", err)
-		}
-
-		if err == nil {
-			c.level, c.known = level, true
-		}
-	} else if c.known && sql.IsolationLevel(opts.Isolation) == c.level {
+	if c.known && sql.IsolationLevel(opts.Isolation) == c.level {
 		opts.Isolation = driver.IsolationLevel(sql.LevelDefault)
+	}
+
+	if c.fold {
+		return c.beginFolded(ctx, opts)
 	}
 
 	tx, err := c.mysqlConnection.BeginTx(ctx, opts)
@@ -129,80 +153,57 @@ func (c *isolationConnection) BeginTx(ctx context.Context, opts driver.TxOptions
 	return tx, err
 }
 
-// Opaque SQL can change session state, so the next explicit transaction refreshes it.
+// Hidden routines preserve isolation; visible changes disable the fast path until reconnect.
 func (c *isolationConnection) observe(query string) {
-	if !c.known {
-		return
-	}
-
-	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
-
-	fields := strings.Fields(query)
-	if len(fields) == 0 || !singleIsolationStatement(query) {
-		c.known = false
-
-		return
-	}
-
-	// Stored functions and triggers must preserve isolation; their side effects are not visible here.
-	switch strings.ToUpper(fields[0]) {
-	case "SELECT", "INSERT", "UPDATE", "DELETE", "REPLACE", "SHOW":
-	default:
+	if c.known && isolationChangingSQL.MatchString(query) {
 		c.known = false
 	}
-}
-
-func singleIsolationStatement(query string) bool {
-	// Backslash quoting depends on sql_mode; ambiguity must invalidate the cache.
-	if strings.Contains(query, "\\") {
-		return false
-	}
-
-	var quote byte
-
-	for i := 0; i < len(query); i++ {
-		ch := query[i]
-		if quote != 0 {
-			if ch == quote {
-				if i+1 < len(query) && query[i+1] == quote {
-					i++
-				} else {
-					quote = 0
-				}
-			}
-
-			continue
-		}
-
-		switch ch {
-		case '\'', '"', '`':
-			quote = ch
-		case ';', '#':
-			return false
-		case '/', '-':
-			if i+1 < len(query) && (query[i:i+2] == "/*" || query[i:i+2] == "--") {
-				return false
-			}
-		}
-	}
-
-	return quote == 0
 }
 
 func (c *isolationConnection) ExecContext(
 	ctx context.Context, query string, args []driver.NamedValue,
 ) (driver.Result, error) {
-	c.observe(query)
+	if c.pending != nil && c.pending.startErr != nil {
+		return nil, c.pending.startErr
+	}
 
-	return c.mysqlConnection.ExecContext(ctx, query, args)
+	c.observe(query)
+	starting := c.pending != nil && !c.pending.started
+	query = c.prefixBegin(query)
+
+	result, err := c.mysqlConnection.ExecContext(ctx, query, args)
+	if starting {
+		if errors.Is(err, driver.ErrSkip) {
+			c.pending.started = false
+		} else {
+			c.pending.startErr = err
+		}
+	}
+
+	return result, err
 }
 
 func (c *isolationConnection) QueryContext(
 	ctx context.Context, query string, args []driver.NamedValue,
 ) (driver.Rows, error) {
-	c.observe(query)
+	if c.pending != nil && c.pending.startErr != nil {
+		return nil, c.pending.startErr
+	}
 
-	return c.mysqlConnection.QueryContext(ctx, query, args)
+	c.observe(query)
+	starting := c.pending != nil && !c.pending.started
+	query = c.prefixBegin(query)
+
+	rows, err := c.mysqlConnection.QueryContext(ctx, query, args)
+	if starting {
+		if errors.Is(err, driver.ErrSkip) {
+			c.pending.started = false
+		} else {
+			c.pending.startErr = err
+		}
+	}
+
+	return rows, err
 }
 
 type mysqlStatement interface {
@@ -230,24 +231,62 @@ func (c *isolationConnection) wrapStatement(statement driver.Stmt, query string)
 }
 
 func (s *isolationStatement) Exec(args []driver.Value) (driver.Result, error) {
+	if err := s.connection.flushBegin(context.Background()); err != nil {
+		return nil, err
+	}
+
 	s.connection.observe(s.query)
 
 	return s.mysqlStatement.Exec(args)
 }
 
 func (s *isolationStatement) Query(args []driver.Value) (driver.Rows, error) {
+	if err := s.connection.flushBegin(context.Background()); err != nil {
+		return nil, err
+	}
+
 	s.connection.observe(s.query)
 
 	return s.mysqlStatement.Query(args)
 }
 
 func (s *isolationStatement) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
+	if s.connection.pending != nil && s.connection.pending.startErr != nil {
+		return nil, s.connection.pending.startErr
+	}
+
+	if s.connection.pending != nil && !s.connection.pending.started {
+		result, err := s.connection.ExecContext(ctx, s.query, args)
+		if !errors.Is(err, driver.ErrSkip) {
+			return result, err
+		}
+
+		if err := s.connection.flushBegin(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	s.connection.observe(s.query)
 
 	return s.mysqlStatement.ExecContext(ctx, args)
 }
 
 func (s *isolationStatement) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+	if s.connection.pending != nil && s.connection.pending.startErr != nil {
+		return nil, s.connection.pending.startErr
+	}
+
+	if s.connection.pending != nil && !s.connection.pending.started {
+		rows, err := s.connection.QueryContext(ctx, s.query, args)
+		if !errors.Is(err, driver.ErrSkip) {
+			return rows, err
+		}
+
+		if err := s.connection.flushBegin(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	s.connection.observe(s.query)
 
 	return s.mysqlStatement.QueryContext(ctx, args)

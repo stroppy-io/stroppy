@@ -104,7 +104,7 @@ func define(d *bench.Def, variant string) error {
 	db := d.Drivers.Declare("default", bench.DriverConfig{})
 	w.driverType = db.Kind()
 
-	w.iso = resolveIsolation(w.driverType, bench.TxIsolationName(iso))
+	w.iso = db.ResolveIsolation(bench.TxIsolationName(iso), resolveIsolation(w.driverType, ""))
 	if variant == "procs" && !procsSupported(w.driverType) {
 		return errProcsDriverUnsupported
 	}
@@ -258,17 +258,10 @@ func (w *workload) txBody(ctx context.Context, tx *bench.Tx, aid, tid, bid, delt
 	)
 }
 
-// iterateProcs executes the stored procedure tpcb_transaction as a single
-// server-side round-trip per iteration (workload_procs section). No client-side
-// BeginTx wraps the call: the procedure body runs the whole 5-statement
-// transaction on the server (postgres' implicit statement transaction; mysql's
-// procedure manages its own START TRANSACTION ... COMMIT). By design the procs
-// variant therefore emits no client-side commit/rollback metric — the commit
-// happens inside the procedure — so its metric shape differs from tpcb/tx.
 func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, aid, tid, bid, delta int, hid int64) error {
 	return b.LogicalOperation(func() error {
 		return bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
-			return b.Exec(ctx, w.procQuery, map[string]any{
+			return b.Routine(ctx, bench.BeginOpts{Isolation: w.iso, Name: "tpcb"}, w.procQuery, map[string]any{
 				"p_aid": aid, "p_tid": tid, "p_bid": bid, "p_delta": delta, "p_hid": hid,
 			})
 		})

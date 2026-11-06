@@ -52,13 +52,14 @@ func init() {
 }
 
 type Driver struct {
-	db           *sql.DB
-	nativeDB     *ydbsdk.Driver
-	dialect      queries.Dialect
-	logger       *zap.Logger
-	sqlCfg       *config.SQLConfig
-	bulkSize     int
-	queryTimeout time.Duration
+	db               *sql.DB
+	nativeDB         *ydbsdk.Driver
+	dialect          queries.Dialect
+	logger           *zap.Logger
+	sqlCfg           *config.SQLConfig
+	bulkSize         int
+	queryTimeout     time.Duration
+	defaultIsolation config.TxIsolationLevel
 }
 
 var _ driver.Driver = (*Driver)(nil)
@@ -83,6 +84,12 @@ func newDriver(
 	}
 
 	cfg := opts.Config
+
+	defaultIsolation, err := driver.DefaultIsolation(cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	if cfg.GetServiceAccountKeyFile() != "" {
 		// IAM TLS protects token issuance; the database hop must protect its use.
 		endpoint, err := url.Parse(cfg.URL)
@@ -142,13 +149,14 @@ func newDriver(
 	}
 
 	return &Driver{
-		db:           db,
-		nativeDB:     nativeDB,
-		dialect:      ydbDialect{},
-		logger:       lg,
-		sqlCfg:       sqlCfg,
-		bulkSize:     bulkSize,
-		queryTimeout: opts.QueryTimeout,
+		db:               db,
+		nativeDB:         nativeDB,
+		dialect:          ydbDialect{},
+		logger:           lg,
+		sqlCfg:           sqlCfg,
+		bulkSize:         bulkSize,
+		queryTimeout:     opts.QueryTimeout,
+		defaultIsolation: defaultIsolation,
 	}, nil
 }
 
@@ -217,7 +225,7 @@ func buildConnectionOptions(
 	opts := []ydbsdk.Option{
 		// Defer BeginTransaction until the first statement in a sql.Tx so TPC-C
 		// and other multi-statement workloads save one query-service RPC per tx.
-		ydbsdk.WithLazyTx(true),
+		ydbsdk.WithLazyTx(driver.FoldBegin(cfg)),
 	}
 
 	if dialFunc != nil {
@@ -285,6 +293,10 @@ func (d *Driver) Begin(ctx context.Context, isolation config.TxIsolationLevel) (
 		}
 
 		return sqldriver.NewConnOnlyTx(conn, sqldriver.NewRows, d.dialect, d.logger, d.queryTimeout, conn.Close), nil
+	}
+
+	if isolation == config.TxIsolationLevelUnspecified {
+		isolation = d.defaultIsolation
 	}
 
 	sqlTx, err := d.db.BeginTx(ctx, &sql.TxOptions{Isolation: sqldriver.IsolationToSQL(isolation)})

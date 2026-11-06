@@ -81,7 +81,7 @@ func TestIsolationConnectorReadsEachPhysicalConnection(t *testing.T) {
 
 	for _, value := range []any{"REPEATABLE-READ", []byte("REPEATABLE-READ")} {
 		backend := &isolationTestConnection{value: value}
-		connector := isolationConnector{isolationTestConnector{connection: backend}}
+		connector := isolationConnector{Connector: isolationTestConnector{connection: backend}}
 		conn, err := connector.Connect(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, 1, backend.queries)
@@ -115,7 +115,7 @@ func TestIsolationConnectorPreservesUnsupportedDefaults(t *testing.T) {
 	t.Parallel()
 
 	backend := &isolationTestConnection{value: "SNAPSHOT"}
-	connector := isolationConnector{isolationTestConnector{connection: backend}}
+	connector := isolationConnector{Connector: isolationTestConnector{connection: backend}}
 	conn, err := connector.Connect(t.Context())
 	require.NoError(t, err)
 	require.False(t, backend.closed)
@@ -125,17 +125,19 @@ func TestIsolationConnectorPreservesUnsupportedDefaults(t *testing.T) {
 	_, err = begin.BeginTx(t.Context(), driver.TxOptions{Isolation: driver.IsolationLevel(sql.LevelReadCommitted)})
 	require.NoError(t, err)
 	require.Equal(t, driver.IsolationLevel(sql.LevelReadCommitted), backend.begins[0].Isolation)
-	backend.queryErr = context.Canceled
+	backend.queryErr = errors.New("unexpected isolation refresh")
 	_, err = begin.BeginTx(t.Context(), driver.TxOptions{Isolation: driver.IsolationLevel(sql.LevelReadCommitted)})
-	require.ErrorIs(t, err, context.Canceled)
-	require.Len(t, backend.begins, 1)
+	require.NoError(t, err)
+	require.Len(t, backend.begins, 2)
+	require.Equal(t, 1, backend.queries)
+	require.Equal(t, backend.begins[0], backend.begins[1])
 }
 
 func TestIsolationConnectorClosesFailedInitialization(t *testing.T) {
 	t.Parallel()
 
 	backend := &isolationTestConnection{queryErr: errors.New("probe failed")}
-	_, err := (isolationConnector{isolationTestConnector{connection: backend}}).Connect(t.Context())
+	_, err := (isolationConnector{Connector: isolationTestConnector{connection: backend}}).Connect(t.Context())
 	require.ErrorContains(t, err, "probe failed")
 	require.True(t, backend.closed)
 }
@@ -193,12 +195,18 @@ func TestSessionIsolationLegacyVariableFallback(t *testing.T) {
 	}
 }
 
-func TestIsolationCacheInvalidatesOpaqueSQL(t *testing.T) {
+func TestIsolationChangesDisableFastPathWithoutRefresh(t *testing.T) {
 	t.Parallel()
 
 	for _, query := range []string{
-		"SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED", "CALL workload()", "/* comment */ SELECT 1",
-		"SELECT 1; SET SESSION transaction_isolation='READ-COMMITTED'", "CREATE PROCEDURE example() SELECT 1",
+		"SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED",
+		"SET TRANSACTION ISOLATION LEVEL READ COMMITTED",
+		"SET @@SESSION.transaction_isolation='READ-COMMITTED'",
+		"SET SESSION tx_isolation='READ-COMMITTED'",
+		"/* comment */ SET /* session */ TRANSACTION ISOLATION LEVEL READ COMMITTED",
+		"SELECT 1; SET SESSION transaction_isolation='READ-COMMITTED'",
+		"SET -- comment\n SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED",
+		"RESET CONNECTION", "EXECUTE session_change",
 	} {
 		t.Run(query, func(t *testing.T) {
 			t.Parallel()
@@ -210,12 +218,15 @@ func TestIsolationCacheInvalidatesOpaqueSQL(t *testing.T) {
 			require.False(t, conn.known)
 			_, err = conn.BeginTx(t.Context(), driver.TxOptions{Isolation: driver.IsolationLevel(sql.LevelRepeatableRead)})
 			require.NoError(t, err)
-			require.Equal(t, 1, backend.queries)
+			require.Zero(t, backend.queries)
 			require.Equal(t, driver.IsolationLevel(sql.LevelRepeatableRead), backend.begins[0].Isolation)
 			_, err = conn.BeginTx(t.Context(), driver.TxOptions{Isolation: driver.IsolationLevel(sql.LevelReadCommitted)})
 			require.NoError(t, err)
-			require.Equal(t, 1, backend.queries)
-			require.Zero(t, backend.begins[1].Isolation)
+			require.Zero(t, backend.queries)
+			require.Equal(t, driver.IsolationLevel(sql.LevelReadCommitted), backend.begins[1].Isolation)
+			_, err = conn.BeginTx(t.Context(), driver.TxOptions{})
+			require.NoError(t, err)
+			require.Zero(t, backend.begins[2].Isolation)
 		})
 	}
 }
@@ -254,19 +265,23 @@ func TestPreparedExecutionInvalidatesIsolationEachTime(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	require.Equal(t, 2, backend.queries)
+	require.Zero(t, backend.queries)
 
 	for _, opts := range backend.begins {
 		require.Equal(t, driver.IsolationLevel(sql.LevelRepeatableRead), opts.Isolation)
 	}
 }
 
-func TestIsolationCachePreservesDMLFastPath(t *testing.T) {
+func TestIsolationCachePreservesWorkloadSQL(t *testing.T) {
 	t.Parallel()
 
 	for _, query := range []string{
 		"SELECT 1", "SELECT 'a;b'", `SELECT "a;b"`, "SELECT `a;b` FROM t", "SELECT 'a'';b'",
 		"INSERT INTO t VALUES (1)", "UPDATE t SET value=1", "DELETE FROM t",
+		"CALL PAYMENT(1, 2)", "/* read-then-increment */ SELECT d_next_o_id FROM district FOR UPDATE",
+		"SELECT 'back\\slash'", "SELECT 1; SELECT 2", "SET FOREIGN_KEY_CHECKS=0",
+		"SELECT @@SESSION.transaction_isolation",
+		"CREATE PROCEDURE workload() SELECT 1", "-- comment\nSELECT 1",
 	} {
 		backend := &isolationTestConnection{}
 		conn := &isolationConnection{mysqlConnection: backend, level: sql.LevelRepeatableRead, known: true}

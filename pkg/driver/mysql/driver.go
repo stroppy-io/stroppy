@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	gomysql "github.com/go-sql-driver/mysql"
@@ -39,12 +40,17 @@ func init() {
 }
 
 type Driver struct {
-	db           *sql.DB
-	dialect      queries.Dialect
-	logger       *zap.Logger
-	sqlCfg       *config.SQLConfig
-	bulkSize     int
-	queryTimeout time.Duration
+	db            *sql.DB
+	options       driver.Options
+	routineMu     sync.Mutex
+	routineClosed bool
+	routineInit   map[config.TxIsolationLevel]chan struct{}
+	routines      map[config.TxIsolationLevel]*Driver
+	dialect       queries.Dialect
+	logger        *zap.Logger
+	sqlCfg        *config.SQLConfig
+	bulkSize      int
+	queryTimeout  time.Duration
 }
 
 var _ driver.Driver = (*Driver)(nil)
@@ -93,6 +99,7 @@ func NewDriver(
 
 	return &Driver{
 		db:           db,
+		options:      opts,
 		dialect:      mysqlDialect{},
 		logger:       lg,
 		sqlCfg:       sqlCfg,
@@ -111,6 +118,16 @@ func prepareConnector(
 		return nil, fmt.Errorf("failed to parse mysql DSN: %w", err)
 	}
 
+	level, err := driver.DefaultIsolation(driverCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	mysqlCfg.InterpolateParams = true
+	if driver.FoldBegin(driverCfg) {
+		mysqlCfg.MultiStatements = true
+	}
+
 	applySecurityOverrides(lg, mysqlCfg, driverCfg)
 
 	if dialFunc != nil {
@@ -122,11 +139,22 @@ func prepareConnector(
 	}
 
 	connector, err := gomysql.NewConnector(mysqlCfg)
+	fold := driver.FoldBegin(driverCfg)
+
+	if err != nil && mysqlCfg.InterpolateParams {
+		fallback := mysqlCfg.Clone()
+		fallback.InterpolateParams = false
+		connector, err = gomysql.NewConnector(fallback)
+		fold = false
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mysql connector: %w", err)
 	}
 
-	return isolationConnector{connector}, nil
+	return isolationConnector{
+		Connector: connector, fold: fold, defaultIsolation: level,
+	}, nil
 }
 
 // applySecurityOverrides applies explicit security fields to the MySQL config.
@@ -232,8 +260,18 @@ func (d *Driver) RunQuery(
 }
 
 func (d *Driver) Teardown(ctx context.Context) error {
+	d.routineMu.Lock()
+	defer d.routineMu.Unlock()
+
+	d.routineClosed = true
 	d.logger.Debug("Driver Teardown Start")
-	err := sqldriver.Teardown(ctx, d.db)
+
+	var err error
+	for _, backend := range d.routines {
+		err = driver.JoinErrors(err, backend.Teardown(ctx))
+	}
+
+	err = driver.JoinErrors(err, sqldriver.Teardown(ctx, d.db))
 	d.logger.Debug("Driver Teardown End")
 
 	return err

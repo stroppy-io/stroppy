@@ -18,23 +18,25 @@ import (
 // DriverConfig supplies soft defaults or explicit host configuration.
 // Secrets are consumed by backends, never emitted by driver discovery.
 type DriverConfig struct {
-	Kind                  DriverTypeName   `json:"kind,omitempty"`
-	URL                   string           `json:"url,omitempty"`
-	DefaultInsertMethod   InsertStrategy   `json:"defaultInsertMethod,omitempty"`
-	BulkSize              *int32           `json:"bulkSize,omitempty"`
-	Postgres              *PostgresConfig  `json:"postgres,omitempty"`
-	SQL                   *SQLConfig       `json:"sql,omitempty"`
-	CaCertFile            *string          `json:"caCertFile,omitempty"`
-	AuthToken             *string          `json:"authToken,omitempty"`
-	ServiceAccountKeyFile *string          `json:"serviceAccountKeyFile,omitempty"`
-	AuthUser              *string          `json:"authUser,omitempty"`
-	AuthPassword          *string          `json:"authPassword,omitempty"`
-	TLSInsecureSkipVerify *bool            `json:"tlsInsecureSkipVerify,omitempty"`
-	Recording             *record.Recorder `json:"-"`
+	Transactions          *TransactionConfig `json:"transactions,omitempty"`
+	Kind                  DriverTypeName     `json:"kind,omitempty"`
+	URL                   string             `json:"url,omitempty"`
+	DefaultInsertMethod   InsertStrategy     `json:"defaultInsertMethod,omitempty"`
+	BulkSize              *int32             `json:"bulkSize,omitempty"`
+	Postgres              *PostgresConfig    `json:"postgres,omitempty"`
+	SQL                   *SQLConfig         `json:"sql,omitempty"`
+	CaCertFile            *string            `json:"caCertFile,omitempty"`
+	AuthToken             *string            `json:"authToken,omitempty"`
+	ServiceAccountKeyFile *string            `json:"serviceAccountKeyFile,omitempty"`
+	AuthUser              *string            `json:"authUser,omitempty"`
+	AuthPassword          *string            `json:"authPassword,omitempty"`
+	TLSInsecureSkipVerify *bool              `json:"tlsInsecureSkipVerify,omitempty"`
+	Recording             *record.Recorder   `json:"-"`
 }
 type (
-	PostgresConfig = config.PostgresConfig
-	SQLConfig      = config.SQLConfig
+	PostgresConfig    = config.PostgresConfig
+	SQLConfig         = config.SQLConfig
+	TransactionConfig = config.TransactionConfig
 )
 
 // DriverRef identifies a named declaration in one definition replay.
@@ -46,6 +48,28 @@ type DriverRef struct {
 
 func (r DriverRef) Name() string         { return r.name }
 func (r DriverRef) Kind() DriverTypeName { return r.kind }
+
+func (r DriverRef) DefaultIsolation() TxIsolationName {
+	configuration := r.owner.Drivers.declared[r.name]
+	if configuration.Transactions == nil || configuration.Transactions.DefaultIsolation == nil {
+		return ""
+	}
+
+	return TxIsolationName(*configuration.Transactions.DefaultIsolation)
+}
+
+func (r DriverRef) ResolveIsolation(override, fallback TxIsolationName) TxIsolationName {
+	if override != "" {
+		return override
+	}
+
+	if configured := r.DefaultIsolation(); configured != "" {
+		return configured
+	}
+
+	return fallback
+}
+
 func (r DriverRef) SupportsInsert(method InsertStrategy) bool {
 	kind, err := ParseDriverType(string(r.kind))
 
@@ -119,8 +143,8 @@ func (d *DriverDeclarations) bindTestBackend(value DriverConfig) DriverConfig {
 
 func (d *DriverDeclarations) description() []DriverDescription {
 	out := make([]DriverDescription, 0, len(d.declared))
-	for name, cfg := range d.declared {
-		out = append(out, DriverDescription{name, cfg.Kind})
+	for name := range d.declared {
+		out = append(out, DriverDescription{name, d.declared[name].Kind})
 	}
 
 	slices.SortFunc(out, func(a, b DriverDescription) int { return strings.Compare(a.Name, b.Name) })
@@ -209,6 +233,7 @@ func (c DriverConfig) runtime() (*config.DriverConfig, error) {
 
 	return &config.DriverConfig{
 		DriverType:            kind,
+		Transactions:          c.Transactions,
 		URL:                   c.URL,
 		DefaultInsertMethod:   method,
 		BulkSize:              c.BulkSize,
@@ -238,6 +263,7 @@ func DriverConfiguration(c *config.DriverConfig) DriverConfig {
 
 	return mergeDriverDefaults(DriverConfig{}, DriverConfig{
 		Kind:                  DriverTypeNameOf(c.DriverType),
+		Transactions:          c.Transactions,
 		URL:                   c.URL,
 		DefaultInsertMethod:   InsertStrategy(method),
 		BulkSize:              c.BulkSize,
@@ -386,7 +412,8 @@ func defaultDriverConfig() DriverConfig {
 
 func copyDriverConfigs(values map[string]DriverConfig) map[string]DriverConfig {
 	out := make(map[string]DriverConfig, len(values))
-	for name, value := range values {
+	for name := range values {
+		value := values[name]
 		if name != "" && !paramNamePattern.MatchString(name) {
 			invalid("driver configuration", inputError("invalid name %q", name))
 		}

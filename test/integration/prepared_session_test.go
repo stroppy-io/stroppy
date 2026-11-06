@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/v6/examples/authoring"
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
@@ -48,6 +49,30 @@ func preparedScalar(t *testing.T, result *driver.QueryResult, err error) any {
 	require.True(t, result.Rows.Next())
 
 	return result.Rows.Values()[0]
+}
+
+func TestPreparedFoldedSimpleProtocol(t *testing.T) {
+	mode := "simple_protocol"
+	backend := preparedBackends()[0]
+	db, err := driver.Dispatch(t.Context(), driver.Options{Config: &config.DriverConfig{
+		DriverType: backend.kind, URL: backend.url, Postgres: &config.PostgresConfig{DefaultQueryExecMode: &mode},
+	}, Logger: zap.NewNop()})
+	require.NoError(t, err)
+
+	defer db.Teardown(context.Background())
+
+	session, err := db.(driver.SessionProvider).OpenSession(t.Context())
+	require.NoError(t, err)
+
+	defer session.Close(context.Background())
+
+	prepared, err := session.Prepare(t.Context(), "value", "SELECT :value::bigint")
+	require.NoError(t, err)
+	tx, err := session.Begin(t.Context(), config.TxIsolationLevelSerializable)
+	require.NoError(t, err)
+	result, err := tx.RunPrepared(t.Context(), prepared, map[string]any{"value": int64(7)})
+	require.EqualValues(t, 7, preparedScalar(t, result, err))
+	require.NoError(t, tx.Rollback(t.Context()))
 }
 
 func TestPreparedSessionLifecycle(t *testing.T) {

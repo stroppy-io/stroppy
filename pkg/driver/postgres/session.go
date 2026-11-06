@@ -23,13 +23,14 @@ func (d *Driver) OpenSession(ctx context.Context) (driver.Session, error) {
 		return nil, err
 	}
 
-	return sqldriver.NewSession(&sessionConnection{conn: conn}, NewRows,
+	return sqldriver.NewSession(&sessionConnection{conn: conn, fold: driver.FoldBegin(d.options.Config)}, NewRows,
 		PgxDialect{}, d.logger, d.queryTimeout), nil
 }
 
 type sessionConnection struct {
 	conn     *pgxpool.Conn
 	sequence uint64
+	fold     bool
 }
 
 func (c *sessionConnection) QueryContext(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
@@ -51,6 +52,14 @@ func (c *sessionConnection) PrepareContext(ctx context.Context, sql string) (sql
 func (c *sessionConnection) Begin(
 	ctx context.Context, isolation config.TxIsolationLevel,
 ) (sqldriver.TxConn[pgx.Rows], error) {
+	if c.fold {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		return &foldedConnection{conn: c.conn.Conn(), isolation: isolation}, nil
+	}
+
 	tx, err := c.conn.BeginTx(ctx, pgx.TxOptions{IsoLevel: toTxIsoLevel(isolation)})
 	if err != nil {
 		return nil, err

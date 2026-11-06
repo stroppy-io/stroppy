@@ -388,24 +388,73 @@ Explicit isolation levels retain the same meaning across drivers and pooled or
 dedicated sessions; `db_default` uses the connection's current default without
 changing it. MySQL reads each new physical connection's session isolation once
 and omits the per-transaction `SET` only when the requested level matches that
-known default. Different levels retain transaction-scoped overrides. Opaque SQL
-(including `SET`, stored-procedure calls, and multi-statements) invalidates the
-cached default; the next explicit transaction rereads it and keeps its explicit
-isolation override, because a prior statement may also have set a next-transaction
-level. Later matching transactions can use the fast path again. Opaque calls can
-require a refresh each time. Reconnects read their own default. Unrecognized
-session isolation values disable the optimization, not the connection; explicit
-transaction levels still reach the backend unchanged.
+known default. Different levels retain transaction-scoped overrides. Ordinary
+DML, SQL comments, and stored-procedure calls preserve that knowledge, including
+prepared execution. Visible isolation-setting statements, RESET, and dynamic
+EXECUTE disable the fast path for the connection. Detection is conservative and
+can also match those tokens in comments or data. Later explicit transactions
+then use the original per-transaction SET without any isolation refresh query;
+`db_default` is still passed through unchanged. Reconnects read their own default.
+Unrecognized session isolation values disable the optimization, not the
+connection; explicit transaction levels still reach the backend unchanged.
 
-Workload stored functions and triggers must not change session isolation. Their
-side effects are hidden inside otherwise ordinary SELECT/DML and cannot be
-inferred from the submitted SQL. Change isolation through visible SET statements
-or transaction options instead. This requirement preserves the DML fast path
-without probing the server after every query.
+Workload stored procedures, functions, and triggers must not change session or
+next-transaction isolation. Their side effects are hidden inside otherwise
+ordinary CALL/SELECT/DML and cannot be inferred from the submitted SQL. Change
+isolation through visible SET statements or transaction options instead. This
+requirement preserves the fast path without probing after every operation.
 
-PostgreSQL-compatible drivers already express isolation in `BEGIN`; YDB keeps its
-native transaction-mode mapping, and Picodata continues to reject driver-managed
-transactions.
+Driver-wide defaults are configured under `transactions`:
+
+```json
+{"transactions":{"defaultIsolation":"read_committed","foldBegin":true}}
+```
+
+Use `-D transactions.defaultIsolation=read_committed` and
+`-D transactions.foldBegin=false` on the CLI. The SDK exposes the same fields in
+`bench.DriverConfig.Transactions`. Defaults apply to every new physical
+connection, including replacements. Built-in transactional workloads resolve
+explicit `--tx-isolation`, then this driver default, then their backend fallback.
+Explicit transaction isolation overrides the default for that transaction only.
+Custom workloads can use `DriverRef.ResolveIsolation(override, fallback)` for the
+same precedence. Supported default names are `db_default`,
+`read_uncommitted`, `read_committed`, `repeatable_read`, and `serializable`;
+backend restrictions still apply.
+
+`foldBegin` defaults to true. PostgreSQL-compatible drivers batch `BEGIN` and
+the first query; MySQL sends transaction settings, `START TRANSACTION`, and the
+first query in one command. No server transaction starts for an unused handle.
+Disable folding for eager error timing. MySQL uses safe driver parameter
+interpolation and enables multi-statements when folding; the first execution of
+an explicitly prepared statement uses its parameterized SQL text, then later
+executions reuse the prepared statement. If interpolation cannot handle the
+parameters, execution falls back to an eager start and the prepared statement.
+Unsafe interpolation collations keep a non-interpolating, eager connection path.
+PostgreSQL prepared statements with `simple_protocol` also use an eager start
+before prepared execution. YDB uses its native lazy-transaction option. Picodata
+continues to reject driver-managed transactions.
+
+`b.Routine(ctx, bench.BeginOpts{Name: "payment", Isolation: bench.IsoSerializable},
+query, arguments)` executes one self-contained server-owned atomic routine.
+PostgreSQL-compatible functions use the invocation's implicit transaction. MySQL
+procedures must own `START TRANSACTION`, `COMMIT`, and an exception handler that
+rolls back and rethrows. TPC-B/TPC-C's built-in procedures follow this contract;
+recreate their MySQL procedures before reusing a database created by an older
+binary. Atomic MySQL procedures use `_atomic` names, so stale definitions
+fail explicitly instead of silently running without a transaction. Custom SQL
+overrides must follow the same contract.
+
+Explicit routine isolation uses dedicated, lazily initialized pools whose
+physical connections all have that default, even when the requested level
+matches the configured base default. Mutable dedicated sessions cannot change
+those pools' isolation. Warmed invocations send only the CALL or SELECT. Each
+distinct override can allocate a separate pool with the configured pool limit. Initialization can add connection setup traffic; it is not repeated
+per operation. The driver drains the complete invocation response before
+reporting success. Unconfirmed outcomes require idempotency before retry, even
+when a joined error also contains a retryable fact. Confirmed ends increment
+transaction commit/rollback series; unknown outcomes and pre-invocation setup
+failures use separate `tx_action` values (`unknown`, `setup_error`) in duration
+and error metrics without incrementing rollback transaction counts.
 
 Backend classification returns neutral `ErrorFacts`; workload policies choose
 actions and retry budget. Zero/default attempts mean one attempt, not automatic

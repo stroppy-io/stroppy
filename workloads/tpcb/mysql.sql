@@ -2,6 +2,8 @@
 --=
 DROP PROCEDURE IF EXISTS tpcb_transaction
 --=
+DROP PROCEDURE IF EXISTS tpcb_transaction_atomic
+--=
 DROP TABLE IF EXISTS pgbench_history
 --=
 DROP TABLE IF EXISTS pgbench_accounts
@@ -46,7 +48,7 @@ CREATE TABLE pgbench_history (
 
 --+ create_procedures
 --=
-CREATE PROCEDURE tpcb_transaction(
+CREATE PROCEDURE tpcb_transaction_atomic(
     IN p_aid INT,
     IN p_tid INT,
     IN p_bid INT,
@@ -54,6 +56,11 @@ CREATE PROCEDURE tpcb_transaction(
     IN p_hid BIGINT
 )
 BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
     START TRANSACTION;
     UPDATE pgbench_accounts SET abalance = abalance + p_delta WHERE aid = p_aid;
     UPDATE pgbench_tellers  SET tbalance = tbalance + p_delta WHERE tid = p_tid;
@@ -97,7 +104,7 @@ ANALYZE TABLE pgbench_branches, pgbench_tellers, pgbench_accounts, pgbench_histo
 
 --+ workload_procs
 --= tpcb_transaction
-CALL tpcb_transaction(:p_aid, :p_tid, :p_bid, :p_delta, :p_hid)
+CALL tpcb_transaction_atomic(:p_aid, :p_tid, :p_bid, :p_delta, :p_hid)
 
 
 --+ workload_tx_tpcb
