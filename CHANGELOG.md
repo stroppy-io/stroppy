@@ -10,6 +10,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+## [6.3.3] - 2026-11-06
+
 ### Added
 
 - Driver transaction settings can apply a default isolation level to every connection and disable the default first-query transaction-start folding when eager starts are needed. ([#254](https://github.com/stroppy-io/stroppy/pull/254))
@@ -18,6 +20,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 ### Fixed
 
 - MySQL TPC-C no longer rechecks isolation or repeats matching isolation settings after procedure calls and SQL comments, removing the extra round trips introduced in 6.3.2. ([#254](https://github.com/stroppy-io/stroppy/pull/254))
+
 ## [6.3.2] - 2026-11-05
 
 ### Fixed
