@@ -38,6 +38,15 @@ var (
 
 type PoolX struct {
 	*pgxpool.Pool
+	cancelWarmup context.CancelFunc
+}
+
+func (p *PoolX) Close() {
+	if p.cancelWarmup != nil {
+		p.cancelWarmup()
+	}
+
+	p.Pool.Close()
 }
 
 func (p *PoolX) ExecContext(
@@ -62,18 +71,20 @@ func NewPool(
 		return nil, err
 	}
 
-	pool, err := pgxpool.NewWithConfig(context.WithoutCancel(ctx), parsedConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return &PoolX{pool}, nil
+	return NewWithConfig(ctx, parsedConfig)
 }
 
 func NewWithConfig(ctx context.Context, pgConfig *pgxpool.Config) (*PoolX, error) {
-	pool, err := pgxpool.NewWithConfig(context.WithoutCancel(ctx), pgConfig)
+	warmupCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 
-	return &PoolX{pool}, err
+	pool, err := pgxpool.NewWithConfig(warmupCtx, pgConfig)
+	if err != nil {
+		cancel()
+
+		return nil, err
+	}
+
+	return &PoolX{Pool: pool, cancelWarmup: cancel}, nil
 }
 
 func ParseConfig(

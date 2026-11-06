@@ -232,6 +232,74 @@ func TestPostgresPoolWarmupSurvivesCallerCancellation(t *testing.T) {
 	for _, connectionCtx := range warming {
 		require.NoError(t, connectionCtx.Err(), "minimum connection warmup must outlive its creator")
 	}
+
+	closed := make(chan struct{})
+
+	go func() {
+		db.Close()
+		close(closed)
+	}()
+
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("pool close did not cancel minimum connection warmup")
+	}
+
+	for _, connectionCtx := range warming {
+		require.ErrorIs(t, connectionCtx.Err(), context.Canceled)
+	}
+}
+
+func TestPostgresStartupFailureCancelsWarmup(t *testing.T) {
+	backend := preparedBackends()[0]
+	limit := int32(2)
+	connecting := make(chan struct{}, 3)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	result := make(chan error, 1)
+
+	go func() {
+		db, err := driver.Dispatch(ctx, driver.Options{
+			Config: &config.DriverConfig{
+				DriverType: backend.kind, URL: backend.url,
+				Postgres: &config.PostgresConfig{MaxConns: &limit, MinConns: &limit},
+			},
+			Logger: zap.NewNop(),
+			DialFunc: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				select {
+				case connecting <- struct{}{}:
+				default:
+				}
+
+				<-ctx.Done()
+
+				return nil, ctx.Err()
+			},
+		})
+		if err == nil {
+			_ = db.Teardown(context.Background())
+		}
+
+		result <- err
+	}()
+
+	select {
+	case <-connecting:
+	case <-time.After(5 * time.Second):
+		t.Fatal("pool startup did not reach the dialer")
+	}
+
+	cancel()
+
+	select {
+	case err := <-result:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("failed startup did not cancel pool warmup before closing")
+	}
 }
 
 func TestPostgresPoolSurvivesCallerCancellation(t *testing.T) {
