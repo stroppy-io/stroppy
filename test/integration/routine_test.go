@@ -117,7 +117,8 @@ func TestRoutineConcurrentInitialization(t *testing.T) {
 					expectedDials = 0
 				}
 
-				require.Equal(t, expectedDials, dials.Load()-before, "PostgreSQL reuses its main pool; MySQL initializes one pool per isolation")
+				require.Equal(t, expectedDials, dials.Load()-before,
+					"PostgreSQL reuses its main pool; MySQL initializes one pool per isolation")
 			}
 		})
 	}

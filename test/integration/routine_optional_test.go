@@ -71,10 +71,12 @@ END $$`)
 				actual := fmt.Sprint(preparedScalar(t, result, err))
 				name, nameErr := driver.IsolationSQL(isolation)
 				require.NoError(t, nameErr)
+
 				expected := strings.ToLower(name)
 				if backend.kind == config.DriverTypeCRDB && isolation == config.TxIsolationLevelRepeatableRead {
 					expected = "serializable"
 				}
+
 				require.Equal(t, expected, actual)
 			}
 
