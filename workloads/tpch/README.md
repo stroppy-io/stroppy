@@ -15,6 +15,10 @@ canonical dbgen implementation through the `pkg/datagen/tpchgen` batch adapter;
 ./build/stroppy run tpch/tx -d mysql \
   -D 'url=root:pass@tcp(127.0.0.1:3306)/stroppy' \
   --scale-factor 0.01
+
+# Greenplum, Greengage, WarehousePG and Cloudberry use the pg driver and their own schema.
+./build/stroppy run tpch/tx -d pg --sql-dialect gp \
+  -D url=postgres://gpadmin@localhost:5432/stroppy --scale-factor 1
 ```
 
 Typed workload parameters are listed by `stroppy run tpch/tx --help`:
@@ -25,6 +29,26 @@ Typed workload parameters are listed by `stroppy run tpch/tx --help`:
 - `--pg-unlogged` uses PostgreSQL unlogged tables during the load.
 - `--ydb-store-mode` selects `column` (default) or `row` tables on YDB.
 - `--sql-file` overrides the dialect SQL file.
+- `--sql-dialect` selects a built-in dialect: `pg` or `gp`; empty picks by driver.
+  `pg` and `gp` need the pg driver. `gp` is for Greenplum-family MPP servers
+  (Greenplum 6 and 7, Greengage, WarehousePG, Cloudberry) and cannot be combined
+  with `--sql-file` or `--pg-unlogged`.
+
+## Greenplum family
+
+`--sql-dialect gp` runs the pg queries on `schema.gp.sql`, which differs from the
+pg schema in physical design only. `lineitem` and `orders` are hash-distributed on
+the order key and `partsupp` on the part key, so those joins stay on one segment;
+`customer`, `part` and `supplier` are hashed on their key; `nation` and `region`
+are `DISTRIBUTED REPLICATED`. `lineitem`, `orders`, `partsupp`, `part` and
+`customer` are append-optimized, column-oriented, zstd level 1. There are no
+constraints or indexes, as in the pivotalguru/TPC-H Greenplum kit, whose
+distribution keys these follow. SF=1 answer comparison applies as on PostgreSQL.
+
+The server is checked before the first step: a Greenplum-family server without
+`--sql-dialect gp`, or `gp` against plain PostgreSQL, stops the run before any
+statement changes the database. A run with `--sql-file` skips this check, because
+that file replaces the schema and the queries and its author owns what it runs.
 
 ## Setup and execution
 

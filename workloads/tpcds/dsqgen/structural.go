@@ -17,7 +17,7 @@ var derivedKW = map[string]bool{
 }
 
 // aliasDerivedTables gives every FROM/JOIN/comma derived table that lacks one a
-// generated alias. MySQL requires it; Postgres does not. Scans with balanced
+// generated alias. MySQL and PostgreSQL before 16 require it. Scans with balanced
 // parentheses, distinguishing FROM-position subqueries from scalar/IN subqueries
 // by the preceding token.
 func aliasDerivedTables(sql string) string {
