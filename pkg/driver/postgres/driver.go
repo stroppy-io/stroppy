@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -57,15 +56,11 @@ type Executor interface {
 }
 
 type Driver struct {
-	logger        *zap.Logger
-	pool          Executor
-	bulkSize      int
-	queryTimeout  time.Duration
-	options       driver.Options
-	routineMu     sync.Mutex
-	routineClosed bool
-	routineInit   map[config.TxIsolationLevel]chan struct{}
-	routines      map[config.TxIsolationLevel]*Driver
+	logger       *zap.Logger
+	pool         Executor
+	bulkSize     int
+	queryTimeout time.Duration
+	options      driver.Options
 }
 
 var _ driver.Driver = new(Driver)
@@ -161,22 +156,12 @@ func (d *Driver) Begin(ctx context.Context, isolation config.TxIsolationLevel) (
 	return newTx(pgxTx, isolation, d), nil
 }
 
-func (d *Driver) Teardown(ctx context.Context) error {
-	d.routineMu.Lock()
-	defer d.routineMu.Unlock()
-
-	d.routineClosed = true
-
-	var err error
-	for _, backend := range d.routines {
-		err = driver.JoinErrors(err, backend.Teardown(ctx))
-	}
-
+func (d *Driver) Teardown(context.Context) error {
 	d.logger.Debug("Driver Teardown Start")
 	d.pool.Close()
 	d.logger.Debug("Driver Teardown End")
 
-	return err
+	return nil
 }
 
 // RunQuery executes sql with named :arg placeholders and returns rows cursor.

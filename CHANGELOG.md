@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Fixed
+
+- PostgreSQL, CockroachDB, and YugabyteDB routines share the main connection pool instead of doubling warm connections, while preserving per-operation isolation and ordinary session defaults.
+
 ## [6.3.3] - 2026-11-06
 
 ### Added

@@ -157,6 +157,7 @@ func ParseConfig(
 
 		return nil
 	}
+	cfg.PrepareConn = prepareRoutineConnection
 
 	return cfg, nil
 }
