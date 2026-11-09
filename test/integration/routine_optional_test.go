@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -56,6 +57,27 @@ END $$`)
 
 			if result.Rows != nil {
 				require.NoError(t, result.Rows.Close())
+			}
+
+			for index, isolation := range []config.TxIsolationLevel{
+				config.TxIsolationLevelReadCommitted, config.TxIsolationLevelRepeatableRead,
+				config.TxIsolationLevelSerializable,
+			} {
+				_, err = db.(driver.RoutineExecutor).RunRoutine(t.Context(), isolation,
+					"SELECT stroppy_optional(:id)", map[string]any{"id": index + 3})
+				require.NoError(t, err)
+				result, err = db.RunQuery(t.Context(),
+					fmt.Sprintf("SELECT isolation FROM stroppy_routine_optional WHERE id=%d", index+3), nil)
+				actual := fmt.Sprint(preparedScalar(t, result, err))
+				name, nameErr := driver.IsolationSQL(isolation)
+				require.NoError(t, nameErr)
+
+				expected := strings.ToLower(name)
+				if backend.kind == config.DriverTypeCRDB && isolation == config.TxIsolationLevelRepeatableRead {
+					expected = "serializable"
+				}
+
+				require.Equal(t, expected, actual)
 			}
 
 			result, err = db.RunQuery(t.Context(), "SELECT isolation FROM stroppy_routine_optional WHERE id=1", nil)

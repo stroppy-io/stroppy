@@ -112,14 +112,20 @@ func TestRoutineConcurrentInitialization(t *testing.T) {
 					require.NoError(t, runErr)
 				}
 
-				require.Equal(t, int64(1), dials.Load()-before, "one initialization connection per isolation pool")
+				expectedDials := int64(1)
+				if backend.kind == config.DriverTypePostgres {
+					expectedDials = 0
+				}
+
+				require.Equal(t, expectedDials, dials.Load()-before,
+					"PostgreSQL reuses its main pool; MySQL initializes one pool per isolation")
 			}
 		})
 	}
 }
 
 func TestRoutineInitializationWaiterCancellation(t *testing.T) {
-	for _, backend := range preparedBackends() {
+	for _, backend := range preparedBackends()[1:] {
 		t.Run(backend.name, func(t *testing.T) {
 			var blockNext atomic.Bool
 
@@ -419,8 +425,8 @@ END $$`)
 					require.NoError(t, result.Rows.Close())
 				}
 
-				if i == 3 || i == 4 {
-					require.Equal(t, int64(1), writes.Load(), "warmed routine must use one network request")
+				if (i == 3 || i == 4) && backend.kind == config.DriverTypeMySQL {
+					require.Equal(t, int64(1), writes.Load(), "warmed MySQL isolation pool must use one network request")
 				}
 
 				result, runErr = db.RunQuery(t.Context(),

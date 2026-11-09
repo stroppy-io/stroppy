@@ -444,14 +444,19 @@ binary. Atomic MySQL procedures use `_atomic` names, so stale definitions
 fail explicitly instead of silently running without a transaction. Custom SQL
 overrides must follow the same contract.
 
-Explicit routine isolation uses dedicated, lazily initialized pools whose
-physical connections all have that default, even when the requested level
-matches the configured base default. Mutable dedicated sessions cannot change
-those pools' isolation. Warmed invocations send only the CALL or SELECT. Each
-distinct override can allocate a separate pool with the configured pool limit. Initialization can add connection setup traffic; it is not repeated
-per operation. The driver drains the complete invocation response before
-reporting success. Unconfirmed outcomes require idempotency before retry, even
-when a joined error also contains a retryable fact. Confirmed ends increment
+PostgreSQL, CockroachDB, and YugabyteDB routines share the main connection pool
+and its configured connection limit. Explicit routine isolation is applied to
+the acquired physical connection and cached there; repeated invocations at the
+same level send only the SELECT. Switching levels adds isolation setup traffic.
+Before a connection returns to ordinary queries or dedicated sessions, its
+pre-routine session default is restored. Visible session changes therefore do
+not override an explicit routine level or leak routine overrides into ordinary
+work. Routine functions must preserve session isolation, as described above.
+MySQL explicit routine levels retain dedicated, lazily initialized pools, each
+with the configured pool limit; warmed invocations send only the CALL. The
+driver drains the complete invocation response before reporting success.
+Unconfirmed outcomes require idempotency before retry, even when a joined error
+also contains a retryable fact. Confirmed ends increment
 transaction commit/rollback series; unknown outcomes and pre-invocation setup
 failures use separate `tx_action` values (`unknown`, `setup_error`) in duration
 and error metrics without incrementing rollback transaction counts.
