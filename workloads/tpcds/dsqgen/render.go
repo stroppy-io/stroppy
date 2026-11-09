@@ -8,10 +8,11 @@ import (
 
 // Dialect controls how a rendered query is adapted to a target SQL engine.
 // The generator renders the ANSI template body, injects parameter values, then
-// applies the dialect's syntactic transforms. Structural rewrites that are not
-// expressible as text transforms (derived-table aliasing, full-outer-join
-// emulation, query-6 decorrelation for MySQL) are NOT applied here — those live
-// in the hand-maintained baked .sql files; see the package docs.
+// applies the dialect's syntactic transforms, which include giving every
+// derived table an alias (pgTransform and mysqlTransform both do). Structural
+// rewrites that are not expressible as text transforms (full-outer-join
+// emulation for MySQL) are NOT applied here — those live in the hand-maintained
+// baked .sql files; see the package docs.
 type Dialect struct {
 	Name      string
 	transform func(query, sql string) string

@@ -303,7 +303,8 @@ the `pg` driver with `--sql-dialect gp` on TPC-H and TPC-DS: `schema.gp.sql`
 replaces the schema (distribution and storage only) and the pg queries are
 shared. `pkg/bench/mpp` probes `gp_segment_configuration` before the first step
 and refuses a mismatch in either direction, so the pg schema never runs on an MPP
-server unnoticed. It is a public package because built-in workloads publish their
+server unnoticed. The check is skipped when the author supplies the schema
+(`--schema-file` on tpcds, `--sql-file` on tpch). It is a public package because built-in workloads publish their
 source and cannot import repository-internal helpers.
 
 Relational loads use once-only `d.Execution.Step("load_data", ...)` and

@@ -3,6 +3,7 @@ package tpcds
 import (
 	"errors"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
@@ -20,14 +21,26 @@ func TestGreenplumSchemaPlacesEveryTable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	creates := regexp.MustCompile(`(?m)^CREATE TABLE (\w+) `).FindAllSubmatch(schema, -1)
-	if len(creates) != len(tpcdsTables) {
-		t.Fatalf("schema.gp.sql creates %d tables, want %d", len(creates), len(tpcdsTables))
+	placement := regexp.MustCompile(`(?m)^DISTRIBUTED (BY \(\w+\)|REPLICATED);$`)
+	seen := map[string]int{}
+
+	for _, statement := range strings.Split(string(schema), "CREATE TABLE ")[1:] {
+		name, _, _ := strings.Cut(statement, " ")
+		seen[name]++
+
+		if got := len(placement.FindAllString(statement, -1)); got != 1 {
+			t.Errorf("table %s has %d distribution clauses, want 1", name, got)
+		}
 	}
 
-	placed := regexp.MustCompile(`(?m)^DISTRIBUTED (BY \(\w+\)|REPLICATED);$`).FindAll(schema, -1)
-	if len(placed) != len(creates) {
-		t.Errorf("%d tables, %d distribution clauses: every table needs exactly one", len(creates), len(placed))
+	for _, table := range tpcdsTables {
+		if seen[table] != 1 {
+			t.Errorf("schema.gp.sql creates table %s %d times, want 1", table, seen[table])
+		}
+	}
+
+	if len(seen) != len(tpcdsTables) {
+		t.Errorf("schema.gp.sql creates %d distinct tables, want %d", len(seen), len(tpcdsTables))
 	}
 
 	statements := regexp.MustCompile(`(?m)^--.*$`).ReplaceAll(schema, nil)
@@ -63,7 +76,9 @@ func TestDialectRequestsAreRefusedAtDefinition(t *testing.T) {
 		want   error
 	}{
 		{"gp on pg", bench.DriverPostgres, gp(), nil},
-		{"gp with a schema file", bench.DriverPostgres, gp("schema-file", "x.sql"), mpp.ErrFiles},
+		{"gp with a schema file", bench.DriverPostgres, gp("schema-file", "x.sql"), mpp.ErrSchema},
+		{"gp with its own queries", bench.DriverPostgres, gp("sql-file", "pg.sql"), nil},
+		{"pg on mysql", bench.DriverMySQL, map[string]string{"sql-dialect": "pg"}, mpp.ErrDriver},
 		{"gp with unlogged tables", bench.DriverPostgres, gp("pg-unlogged", "true"), mpp.ErrUnlog},
 		{"gp on mysql", bench.DriverMySQL, gp(), mpp.ErrDriver},
 		{"generated stream on gp", bench.DriverPostgres, gp("query-stream", "0"), nil},

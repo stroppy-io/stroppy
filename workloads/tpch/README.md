@@ -30,9 +30,9 @@ Typed workload parameters are listed by `stroppy run tpch/tx --help`:
 - `--ydb-store-mode` selects `column` (default) or `row` tables on YDB.
 - `--sql-file` overrides the dialect SQL file.
 - `--sql-dialect` selects a built-in dialect: `pg` or `gp`; empty picks by driver.
-  `gp` is for Greenplum-family MPP servers (Greenplum 6 and 7, Greengage,
-  WarehousePG, Cloudberry) and cannot be combined with `--sql-file` or
-  `--pg-unlogged`.
+  `pg` and `gp` need the pg driver. `gp` is for Greenplum-family MPP servers
+  (Greenplum 6 and 7, Greengage, WarehousePG, Cloudberry) and cannot be combined
+  with `--sql-file` or `--pg-unlogged`.
 
 ## Greenplum family
 
@@ -47,7 +47,8 @@ distribution keys these follow. SF=1 answer comparison applies as on PostgreSQL.
 
 The server is checked before the first step: a Greenplum-family server without
 `--sql-dialect gp`, or `gp` against plain PostgreSQL, stops the run before any
-statement changes the database.
+statement changes the database. A run with `--sql-file` skips this check, because
+that file replaces the schema and the queries and its author owns what it runs.
 
 ## Setup and execution
 

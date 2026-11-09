@@ -108,7 +108,7 @@ func define(d *bench.Def) error {
 	w.ydbColumn = w.driver == bench.DriverYDB && w.ydbStoreMode == "column"
 
 	dialectChoice, err := mpp.Select(mpp.Request{
-		Dialect: dialect, Driver: w.driver, OwnFiles: w.schemaFile != "" || w.sqlFile != "", Unlogged: w.useUnlogged,
+		Dialect: dialect, Driver: w.driver, OwnSchema: w.schemaFile != "", Unlogged: w.useUnlogged,
 	})
 	if err != nil {
 		return err

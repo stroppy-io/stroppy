@@ -27,8 +27,8 @@ const Dialect = "gp"
 const probeSQL = "SELECT to_regclass('pg_catalog.gp_segment_configuration') IS NOT NULL"
 
 var (
-	ErrDriver = errors.New("sql-dialect gp needs the pg driver: Greenplum-family engines speak the PostgreSQL wire")
-	ErrFiles  = errors.New("sql-dialect gp brings its own schema; do not combine it with schema-file or sql-file")
+	ErrDriver = errors.New("sql-dialect needs the pg driver: Greenplum-family engines speak the PostgreSQL wire")
+	ErrSchema = errors.New("sql-dialect gp brings its own schema; do not combine it with a schema override")
 	ErrUnlog  = errors.New("pg-unlogged does not apply to sql-dialect gp: Greenplum has no unlogged tables")
 	ErrNeedGP = errors.New("the server is a Greenplum-family MPP engine: run with --sql-dialect gp " +
 		"(the pg dialect declares no distribution or storage for its tables)")
@@ -38,10 +38,10 @@ var (
 
 // Request is what a workload knows when it picks its dialect.
 type Request struct {
-	Dialect  string
-	Driver   bench.DriverTypeName
-	OwnFiles bool // schema-file or sql-file given: the author owns the SQL
-	Unlogged bool // pg-unlogged given
+	Dialect   string
+	Driver    bench.DriverTypeName
+	OwnSchema bool // the author supplies the schema SQL, so the built-in one is not used
+	Unlogged  bool // pg-unlogged given
 }
 
 // Selection is the dialect a run uses and, where it can be checked, the server check.
@@ -57,20 +57,26 @@ type Selection struct {
 // noop and recording stand in for the pg driver in dry runs and tests.
 func Select(r Request) (*Selection, error) {
 	s := &Selection{gp: r.Dialect == Dialect}
+
+	pgDriver := r.Driver == bench.DriverPostgres || r.Driver == bench.DriverNoop || r.Driver == bench.DriverRecording
+	if r.Dialect != "" && !pgDriver {
+		return nil, ErrDriver
+	}
+
 	if s.gp {
 		switch {
-		case r.OwnFiles:
-			return nil, ErrFiles
+		case r.OwnSchema:
+			return nil, ErrSchema
 		case r.Unlogged:
 			return nil, ErrUnlog
-		case r.Driver != bench.DriverPostgres && r.Driver != bench.DriverNoop && r.Driver != bench.DriverRecording:
-			return nil, ErrDriver
 		}
 	}
 
 	// Only the pg driver reaches a real server whose family is unknown; other drivers
-	// have no probe to run. Own SQL files are the author's responsibility.
-	s.verify = r.Driver == bench.DriverPostgres && !r.OwnFiles
+	// have no probe to run. A schema the author supplies is the author's responsibility,
+	// but custom queries over the built-in schema still need the server checked, because
+	// the built-in schema is what the run drops and recreates.
+	s.verify = r.Driver == bench.DriverPostgres && !r.OwnSchema
 
 	return s, nil
 }
@@ -89,13 +95,15 @@ func (s *Selection) Step(action bench.Action) bench.Action {
 		s.once.Do(func() { s.err = s.check(ctx, b) })
 
 		if s.err != nil {
-			return s.err
+			// Fatal, so a timed run stops at once instead of recording an error per iteration.
+			return bench.Fatal(s.err)
 		}
 
 		return action(ctx, b)
 	}
 }
 
+// check asks the server which family it belongs to and compares that with the dialect.
 func (s *Selection) check(ctx context.Context, b *bench.Bench) error {
 	isGP, err := b.QueryValue[bool](ctx, probeSQL, nil)
 	if err != nil {

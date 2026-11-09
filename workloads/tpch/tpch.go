@@ -68,7 +68,7 @@ func define(d *bench.Def) error {
 	w.driverType = db.Kind()
 
 	dialectChoice, err := mpp.Select(mpp.Request{
-		Dialect: dialect, Driver: w.driverType, OwnFiles: w.sqlFile != "", Unlogged: w.useUnlogged,
+		Dialect: dialect, Driver: w.driverType, OwnSchema: w.sqlFile != "", Unlogged: w.useUnlogged,
 	})
 	if err != nil {
 		return err

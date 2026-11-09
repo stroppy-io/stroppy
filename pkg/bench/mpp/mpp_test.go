@@ -18,10 +18,13 @@ func TestSelectRefusesIncoherentRequests(t *testing.T) {
 		req  Request
 		want error
 	}{
-		{"gp with a schema file", Request{Dialect: Dialect, Driver: bench.DriverPostgres, OwnFiles: true}, ErrFiles},
+		{"gp with a schema override", Request{Dialect: Dialect, Driver: bench.DriverPostgres, OwnSchema: true}, ErrSchema},
 		{"gp with unlogged tables", Request{Dialect: Dialect, Driver: bench.DriverPostgres, Unlogged: true}, ErrUnlog},
 		{"gp on mysql", Request{Dialect: Dialect, Driver: bench.DriverMySQL}, ErrDriver},
 		{"gp on yugabyte", Request{Dialect: Dialect, Driver: bench.DriverYugabyte}, ErrDriver},
+		{"pg on mysql", Request{Dialect: "pg", Driver: bench.DriverMySQL}, ErrDriver},
+		{"pg on picodata", Request{Dialect: "pg", Driver: bench.DriverPicodata}, ErrDriver},
+		{"pg on ydb", Request{Dialect: "pg", Driver: bench.DriverYDB}, ErrDriver},
 		{"gp on pg", Request{Dialect: Dialect, Driver: bench.DriverPostgres}, nil},
 		{"gp dry run on noop", Request{Dialect: Dialect, Driver: bench.DriverNoop}, nil},
 		{"gp on recording", Request{Dialect: Dialect, Driver: bench.DriverRecording}, nil},
@@ -54,16 +57,20 @@ func TestStepChecksTheServerOnceForEveryStep(t *testing.T) {
 		name      string
 		req       Request
 		serverGP  bool
+		only      []string // selected steps; empty selects both
 		wantErr   error
+		wantRan   int
 		wantProbe int
 	}{
-		{"gp on an MPP server", Request{Dialect: Dialect, Driver: bench.DriverPostgres}, true, nil, 1},
-		{"gp on plain PostgreSQL", Request{Dialect: Dialect, Driver: bench.DriverPostgres}, false, ErrNotGP, 1},
-		{"auto on an MPP server", Request{Driver: bench.DriverPostgres}, true, ErrNeedGP, 1},
-		{"pg dialect on an MPP server", Request{Dialect: "pg", Driver: bench.DriverPostgres}, true, ErrNeedGP, 1},
-		{"auto on plain PostgreSQL", Request{Driver: bench.DriverPostgres}, false, nil, 1},
-		{"own files are the author's call", Request{Driver: bench.DriverPostgres, OwnFiles: true}, true, nil, 0},
-		{"no probe for other drivers", Request{Driver: bench.DriverMySQL}, false, nil, 0},
+		{"gp on an MPP server", Request{Dialect: Dialect, Driver: bench.DriverPostgres}, true, nil, nil, 2, 1},
+		{"gp on plain PostgreSQL", Request{Dialect: Dialect, Driver: bench.DriverPostgres}, false, nil, ErrNotGP, 0, 1},
+		{"auto on an MPP server", Request{Driver: bench.DriverPostgres}, true, nil, ErrNeedGP, 0, 1},
+		{"pg dialect on an MPP server", Request{Dialect: "pg", Driver: bench.DriverPostgres}, true, nil, ErrNeedGP, 0, 1},
+		{"auto on plain PostgreSQL", Request{Driver: bench.DriverPostgres}, false, nil, nil, 2, 1},
+		{"second step only, wrong server", Request{Driver: bench.DriverPostgres}, true, []string{"second"}, ErrNeedGP, 0, 1},
+		{"second step only, right server", Request{Driver: bench.DriverPostgres}, false, []string{"second"}, nil, 1, 1},
+		{"own schema is the author's call", Request{Driver: bench.DriverPostgres, OwnSchema: true}, true, nil, nil, 2, 0},
+		{"no probe for other drivers", Request{Driver: bench.DriverMySQL}, false, nil, nil, 2, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -92,17 +99,18 @@ func TestStepChecksTheServerOnceForEveryStep(t *testing.T) {
 			recorder := &record.Recorder{}
 			recorder.Reply(probeSQL, record.Response{Columns: []string{"gp"}, Rows: [][]any{{tc.serverGP}}})
 
-			_, err := testkit.Record(t.Context(), test, recorder, bench.RunOptions{})
+			_, err := testkit.Record(t.Context(), test, recorder, bench.RunOptions{Steps: tc.only})
 			if !errors.Is(err, tc.wantErr) {
 				t.Fatalf("run error = %v, want %v", err, tc.wantErr)
 			}
 
-			if tc.wantErr != nil && ran != 0 {
-				t.Errorf("%d steps ran against the wrong dialect", ran)
+			var fatal *bench.FatalError
+			if tc.wantErr != nil && !errors.As(err, &fatal) {
+				t.Errorf("run error %v is not fatal: a repeated executor would keep running", err)
 			}
 
-			if tc.wantErr == nil && ran != 2 {
-				t.Errorf("%d steps ran, want 2", ran)
+			if ran != tc.wantRan {
+				t.Errorf("%d steps ran, want %d", ran, tc.wantRan)
 			}
 
 			var probes int
