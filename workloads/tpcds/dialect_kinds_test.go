@@ -31,7 +31,7 @@ func TestEngineKindsMapToTheirDialects(t *testing.T) {
 		{bench.DriverYDB, "schema.ydb.sql", "ydb.sql", "postgres"},
 		{bench.DriverPicodata, "schema.pico.sql", "pico.sql", "postgres"},
 	} {
-		schema, queries := dialectFiles(tc.driver, "", "")
+		schema, queries := dialectFiles(tc.driver, false, "", "")
 		if schema != tc.schema || queries != tc.queries {
 			t.Errorf(
 				"dialectFiles(%s) = %q, %q; want %q, %q",

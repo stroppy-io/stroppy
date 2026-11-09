@@ -16,6 +16,7 @@ func TestEmbeddedAssetContract(t *testing.T) {
 		"pico.sql",
 		"ydb.sql",
 		"schema.pg.sql",
+		"schema.gp.sql",
 		"schema.mysql.sql",
 		"schema.pico.sql",
 		"schema.ydb.sql",
@@ -24,6 +25,7 @@ func TestEmbeddedAssetContract(t *testing.T) {
 
 	schemas := map[string][]string{
 		"schema.pg.sql":    {"create_schema", "create_indexes"},
+		"schema.gp.sql":    {"create_schema"},
 		"schema.mysql.sql": {"create_schema", "create_indexes"},
 		"schema.pico.sql":  {"drop_schema", "create_schema", "create_indexes"},
 		"schema.ydb.sql":   {"drop_schema", "create_schema", "create_schema_column", "create_indexes"},

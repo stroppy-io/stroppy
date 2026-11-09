@@ -10,9 +10,14 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- TPC-H and TPC-DS run on Greenplum-family MPP servers (Greenplum, Greengage, WarehousePG, Apache Cloudberry) with `--sql-dialect gp`: tables are hash-distributed or replicated, and the large ones are append-optimized column-oriented with zstd. A run against such a server without the flag, or with the flag against plain PostgreSQL, stops before changing the database and says which flag to use. The check is skipped when you supply your own schema. ([#259](https://github.com/stroppy-io/stroppy/pull/259))
+
 ### Fixed
 
 - PostgreSQL, CockroachDB, and YugabyteDB routines share the main connection pool instead of doubling warm connections, while preserving per-operation isolation and ordinary session defaults. ([#261](https://github.com/stroppy-io/stroppy/pull/261))
+- TPC-DS queries 2, 14, 23 and 49, and generated query streams, give every derived table an alias, so they run on PostgreSQL before 16 and on Greenplum. ([#259](https://github.com/stroppy-io/stroppy/pull/259))
 
 ## [6.3.3] - 2026-11-06
 

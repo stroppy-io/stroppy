@@ -44,6 +44,7 @@ func TestBuiltInWorkloadParameterSchemas(t *testing.T) {
 			param("query-stream", bench.ParamTypeInt, 0, "QUERY_STREAM", "queryStream"),
 			param("scale-factor", bench.ParamTypeFloat64, float64(1), "SCALE_FACTOR", "scaleFactor"),
 			param("schema-file", bench.ParamTypeString, "", "SCHEMA_FILE", "schemaFile"),
+			mppDialectParam(),
 			param("sql-file", bench.ParamTypeString, "", "SQL_FILE", "sqlFile"),
 			param("streams", bench.ParamTypeInt, 1, "STREAMS", "streams"),
 			param("validate-force", bench.ParamTypeBool, false, "VALIDATE_FORCE", "validateForce"),
@@ -53,6 +54,7 @@ func TestBuiltInWorkloadParameterSchemas(t *testing.T) {
 			param("load-workers", bench.ParamTypeInt, 0, "LOAD_WORKERS", "loadWorkers"),
 			param("pg-unlogged", bench.ParamTypeBool, false, "PG_UNLOGGED", "pgUnlogged"),
 			param("scale-factor", bench.ParamTypeFloat64, float64(1), "SCALE_FACTOR", "scaleFactor"),
+			mppDialectParam(),
 			param("sql-file", bench.ParamTypeString, "", "SQL_FILE", "sqlFile"),
 			param("ydb-store-mode", bench.ParamTypeString, "column", "YDB_STORE_MODE", "ydbStoreMode"),
 		}},
@@ -136,6 +138,14 @@ func TestBuiltInWorkloadsDoNotReadPublicEnvDirectly(t *testing.T) {
 
 func isEnvRead(name string) bool {
 	return name == "Env" || name == "EnvInt" || name == "EnvFloat"
+}
+
+// mppDialectParam is the sql-dialect knob of the workloads that ship a Greenplum-family schema.
+func mppDialectParam() bench.ParamSchema {
+	dialect := param("sql-dialect", bench.ParamTypeString, "", "SQL_DIALECT", "sqlDialect")
+	dialect.Constraints = []bench.Constraint{{Kind: "one-of", Value: []string{"", "pg", "gp"}}}
+
+	return dialect
 }
 
 func tpccParamSchema() []bench.ParamSchema {
