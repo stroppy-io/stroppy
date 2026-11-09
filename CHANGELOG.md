@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- TPC-H and TPC-DS run on Greenplum-family MPP servers (Greenplum, Greengage, WarehousePG, Apache Cloudberry) with `--sql-dialect gp`: tables are hash-distributed or replicated, and the large ones are append-optimized column-oriented with zstd. A run against such a server without the flag, or with the flag against plain PostgreSQL, stops before changing the database and says which flag to use.
+
 ### Fixed
 
 - TPC-DS queries 2, 14, 23 and 49, and generated query streams, give every derived table an alias, so they run on PostgreSQL before 16 and on Greenplum.

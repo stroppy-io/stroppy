@@ -53,14 +53,20 @@ func TestDialectFileDefaults(t *testing.T) {
 		{bench.DriverYDB, "schema.ydb.sql", "ydb.sql"},
 	}
 	for _, tt := range tests {
-		schema, queries := dialectFiles(tt.driver, "", "")
+		schema, queries := dialectFiles(tt.driver, false, "", "")
 		if schema != tt.wantSchema || queries != tt.wantQueries {
 			t.Errorf("dialectFiles(%s) = (%s, %s), want (%s, %s)",
 				tt.driver, schema, queries, tt.wantSchema, tt.wantQueries)
 		}
 	}
 
-	schema, queries := dialectFiles(bench.DriverPostgres, "custom-schema.sql", "custom.sql")
+	// The MPP schema changes physical design only: it runs the pg queries.
+	schema, queries := dialectFiles(bench.DriverPostgres, true, "", "")
+	if schema != "schema.gp.sql" || queries != "pg.sql" {
+		t.Errorf("dialectFiles(postgres, gp) = (%s, %s), want (schema.gp.sql, pg.sql)", schema, queries)
+	}
+
+	schema, queries = dialectFiles(bench.DriverPostgres, false, "custom-schema.sql", "custom.sql")
 	if schema != "custom-schema.sql" || queries != "custom.sql" {
 		t.Fatalf("file overrides = (%s, %s), want custom files", schema, queries)
 	}

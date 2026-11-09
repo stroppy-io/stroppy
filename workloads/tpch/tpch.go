@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench/mpp"
 	"github.com/stroppy-io/stroppy/v6/workloads/tpch/tpchgen"
 )
 
@@ -19,6 +20,7 @@ var errScaleFactorMustBePositive = errors.New("SCALE_FACTOR must be positive")
 
 type workload struct {
 	sql           *bench.SQL
+	schema        *bench.SQL // sql, except on the MPP dialect where the schema has its own file
 	driverType    bench.DriverTypeName
 	isPicodata    bool
 	needsEndDates bool
@@ -54,18 +56,33 @@ func define(d *bench.Def) error {
 	w.ydbStoreMode, _ = d.Param.String("ydb-store-mode", "column", "YDB table store mode.")
 
 	w.sqlFile, _ = d.Param.String("sql-file", "", "SQL dialect file override.")
+	dialect, _ := d.Param.String("sql-dialect", "",
+		"Built-in SQL dialect: pg, or gp for Greenplum-family MPP servers; empty selects by driver.",
+		bench.OneOf("", "pg", mpp.Dialect))
+
 	if w.scaleFactor <= 0 {
 		return fmt.Errorf("%w, got %v", errScaleFactorMustBePositive, w.scaleFactor)
 	}
 
 	db := d.Drivers.Declare("default", bench.DriverConfig{})
 	w.driverType = db.Kind()
+
+	dialectChoice, err := mpp.Select(mpp.Request{
+		Dialect: dialect, Driver: w.driverType, OwnFiles: w.sqlFile != "", Unlogged: w.useUnlogged,
+	})
+	if err != nil {
+		return err
+	}
+
+	step := func(name string, action bench.Action, options ...bench.StepOption) {
+		d.Execution.Step(name, dialectChoice.Step(action), options...)
+	}
+
 	w.useUnlogged = w.useUnlogged && w.driverType == bench.DriverPostgres
 	w.ydbColumn = w.driverType == bench.DriverYDB && w.ydbStoreMode == "column"
 	w.isPicodata = w.driverType == bench.DriverPicodata
 	w.needsEndDates = w.isPicodata || w.driverType == bench.DriverYDB
 
-	var err error
 	if w.sqlFile != "" {
 		w.sql, err = d.Queries.Override(w.sqlFile)
 	} else {
@@ -76,32 +93,40 @@ func define(d *bench.Def) error {
 		return err
 	}
 
+	// The MPP schema differs from pg.sql in physical design only; the queries stay in pg.sql.
+	w.schema = w.sql
+	if dialectChoice.GP() {
+		if w.schema, err = d.Queries.Load(files, "schema.gp.sql"); err != nil {
+			return err
+		}
+	}
+
 	w.m = w.initMetrics(&d.Metrics)
 
 	w.params = w.buildParams()
 	for _, name := range []string{"drop_schema", "create_schema"} {
 		section := sqlSection{w, name}
-		d.Execution.Step(name, section.Run)
+		step(name, section.Run)
 	}
 
 	if w.useUnlogged {
 		section := sqlSection{w, "set_unlogged"}
-		d.Execution.Step(section.name, section.Run)
+		step(section.name, section.Run)
 	}
 
-	d.Execution.Step("load_data", w.load)
+	step("load_data", w.load)
 	section := sqlSection{w, "create_indexes"}
-	d.Execution.Step(section.name, section.Run)
+	step(section.name, section.Run)
 
 	if w.useUnlogged {
 		loggedSection := sqlSection{w, "set_logged"}
-		d.Execution.Step(loggedSection.name, loggedSection.Run)
+		step(loggedSection.name, loggedSection.Run)
 	}
 
 	section = sqlSection{w, "analyze"}
-	d.Execution.Step(section.name, section.Run)
-	d.Execution.Step("validate_answers", w.validate)
-	d.Execution.Step("workload", w.runQueries, settings.Policy())
+	step(section.name, section.Run)
+	step("validate_answers", w.validate)
+	step("workload", w.runQueries, settings.Policy())
 
 	return d.Execution.Err()
 }
@@ -117,7 +142,7 @@ func (s sqlSection) Run(ctx context.Context, b *bench.Bench) error {
 		section = "create_schema_column"
 	}
 
-	for _, q := range s.workload.sql.Section(section) {
+	for _, q := range s.workload.schema.Section(section) {
 		if err := b.Exec(ctx, q, nil); err != nil {
 			return fmt.Errorf("%s: %w", section, err)
 		}

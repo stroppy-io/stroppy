@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/bench/mpp"
 	"github.com/stroppy-io/stroppy/v6/workloads/tpcds/dsqgen"
 	"github.com/stroppy-io/stroppy/v6/workloads/tpcds/tpcdsgen"
 )
@@ -87,6 +88,9 @@ func define(d *bench.Def) error {
 
 	w.schemaFile, _ = d.Param.String("schema-file", "", "Schema SQL file override.")
 	w.sqlFile, _ = d.Param.String("sql-file", "", "Query SQL file override.")
+	dialect, _ := d.Param.String("sql-dialect", "",
+		"Built-in SQL dialect: pg, or gp for Greenplum-family MPP servers; empty selects by driver.",
+		bench.OneOf("", "pg", mpp.Dialect))
 
 	w.validateForce, _ = d.Param.Bool("validate-force", false, "Validate outside scale factor 1.")
 	if w.scaleFactor <= 0 {
@@ -102,6 +106,18 @@ func define(d *bench.Def) error {
 
 	w.isPgOrMs = w.driver == bench.DriverPostgres || w.driver == bench.DriverMySQL
 	w.ydbColumn = w.driver == bench.DriverYDB && w.ydbStoreMode == "column"
+
+	dialectChoice, err := mpp.Select(mpp.Request{
+		Dialect: dialect, Driver: w.driver, OwnFiles: w.schemaFile != "" || w.sqlFile != "", Unlogged: w.useUnlogged,
+	})
+	if err != nil {
+		return err
+	}
+
+	step := func(name string, action bench.Action, options ...bench.StepOption) {
+		d.Execution.Step(name, dialectChoice.Step(action), options...)
+	}
+
 	w.useUnlogged = w.useUnlogged && w.driver == bench.DriverPostgres
 
 	w.throughput = w.streams > 1
@@ -124,9 +140,8 @@ func define(d *bench.Def) error {
 		}
 	}
 
-	schemaFile, queryFile := dialectFiles(w.driver, w.schemaFile, w.sqlFile)
+	schemaFile, queryFile := dialectFiles(w.driver, dialectChoice.GP(), w.schemaFile, w.sqlFile)
 
-	var err error
 	if w.schemaFile != "" {
 		w.schemaSQL, err = d.Queries.Override(schemaFile)
 	} else {
@@ -147,28 +162,28 @@ func define(d *bench.Def) error {
 		return err
 	}
 
-	d.Execution.Step("drop_schema", w.drop)
-	d.Execution.Step("create_schema", w.create)
+	step("drop_schema", w.drop)
+	step("create_schema", w.create)
 
 	if w.useUnlogged {
-		d.Execution.Step("set_unlogged", w.unlogged)
+		step("set_unlogged", w.unlogged)
 	}
 
-	d.Execution.Step("load_data", w.load)
+	step("load_data", w.load)
 	section := schemaSection{w, "create_indexes"}
-	d.Execution.Step(section.name, section.Run)
+	step(section.name, section.Run)
 
 	if w.useUnlogged {
-		d.Execution.Step("set_logged", w.logged)
+		step("set_logged", w.logged)
 	}
 
-	d.Execution.Step("analyze", w.analyzeAction)
+	step("analyze", w.analyzeAction)
 
 	if !w.throughput && w.genStream < 0 && w.isPgOrMs {
-		d.Execution.Step("validate_answers", w.validate)
+		step("validate_answers", w.validate)
 	}
 
-	d.Execution.Step("workload", w.work, settings.Policy())
+	step("workload", w.work, settings.Policy())
 
 	return d.Execution.Err()
 }

@@ -12,6 +12,10 @@ adapter and `Bench.InsertTpcds`.
   -D url=postgres://postgres:postgres@localhost:5432/stroppy \
   --scale-factor 0.01
 
+# Greenplum, Greengage, WarehousePG and Cloudberry use the pg driver and their own schema.
+./build/stroppy run tpcds -d pg --sql-dialect gp \
+  -D url=postgres://gpadmin@localhost:5432/stroppy --scale-factor 1
+
 ./build/stroppy run tpcds -d mysql \
   -D 'url=root:pass@tcp(127.0.0.1:3306)/stroppy?charset=utf8mb4&parseTime=true' \
   --scale-factor 0.01 --load-workers 4
@@ -36,6 +40,9 @@ Typed workload parameters are listed by `stroppy run tpcds --help`:
   checked-in canonical query set is used.
 - `--query-seed` seeds generated streams.
 - `--schema-file` and `--sql-file` override the dialect schema and query files.
+- `--sql-dialect` selects a built-in dialect: `pg` or `gp`; empty picks by driver.
+  `gp` is for Greenplum-family MPP servers and cannot be combined with
+  `--schema-file`, `--sql-file` or `--pg-unlogged`.
 - `--validate-force` compares reference answers outside SF=1 on PostgreSQL or
   MySQL; comparison remains diagnostic.
 
@@ -82,6 +89,20 @@ the SF=1 reference set by default.
 
 - **PostgreSQL:** all 103 baked statements, generated streams, and answer
   comparison are supported.
+- **Greenplum family (`--sql-dialect gp`):** Greenplum 6 and 7, Greengage 6 and 7,
+  WarehousePG and Apache Cloudberry run the pg queries on `schema.gp.sql`, which
+  differs from the pg schema in physical design only. The fact tables, `inventory`
+  and `item` are hash-distributed on their `*_item_sk`, so item joins and
+  sales-to-returns joins stay on one segment; `customer`, `customer_address` and
+  `customer_demographics` are hash-distributed on their key; the other dimensions
+  are `DISTRIBUTED REPLICATED`. Fact tables and the three large dimensions are
+  append-optimized, column-oriented, zstd level 1. There are no constraints,
+  indexes or partitions, as in the pivotalguru/TPC-DS Greenplum kit, whose
+  distribution keys these follow (it hashes the sales and returns tables on
+  item plus ticket or order number; one column keeps them co-located with `item`
+  as well). The server is checked before the first step: a Greenplum-family server
+  without `--sql-dialect gp`, or `gp` against plain PostgreSQL, stops the run
+  before any statement changes the database. Generated streams work.
 - **MySQL:** all 103 baked statements and answer comparison are supported.
   Generated streams are rejected before schema changes or loading: queries 51
   and 97 require an unsupported FULL OUTER JOIN rewrite. Use the baked set.

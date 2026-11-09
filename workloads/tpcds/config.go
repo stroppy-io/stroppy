@@ -19,8 +19,28 @@ var tpcdsTables = [24]string{
 }
 
 // dialectFiles maps a driver to its (schema, query) SQL files. Explicit file
-// parameters take precedence over driver defaults.
-func dialectFiles(dt bench.DriverTypeName, schemaOverride, queryOverride string) (schema, queries string) {
+// parameters take precedence over driver defaults. The Greenplum-family schema
+// differs from the pg one in physical design only, so it runs the pg queries.
+func dialectFiles(dt bench.DriverTypeName, gp bool, schemaOverride, queryOverride string) (schema, queries string) {
+	switch {
+	case gp:
+		schema, queries = "schema.gp.sql", "pg.sql"
+	default:
+		schema, queries = driverFiles(dt)
+	}
+
+	if schemaOverride != "" {
+		schema = schemaOverride
+	}
+
+	if queryOverride != "" {
+		queries = queryOverride
+	}
+
+	return schema, queries
+}
+
+func driverFiles(dt bench.DriverTypeName) (schema, queries string) {
 	switch dt {
 	case bench.DriverMySQL, bench.DriverTiDB:
 		schema, queries = "schema.mysql.sql", "mysql.sql"
@@ -30,14 +50,6 @@ func dialectFiles(dt bench.DriverTypeName, schemaOverride, queryOverride string)
 		schema, queries = "schema.ydb.sql", "ydb.sql"
 	default:
 		schema, queries = "schema.pg.sql", "pg.sql"
-	}
-
-	if schemaOverride != "" {
-		schema = schemaOverride
-	}
-
-	if queryOverride != "" {
-		queries = queryOverride
 	}
 
 	return schema, queries

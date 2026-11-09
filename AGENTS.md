@@ -96,6 +96,7 @@ If deleting a comment would change no reader's decision, delete it.
 | `internal/pgnoop/` | pg-noop server resolution (embed/cache/download) + process lifecycle |
 | `internal/author/` | shared init/eject scaffold, published source validation, exclusive confined project writes |
 | `pkg/bench/testkit/` | real-runtime noop and recording workload execution helpers |
+| `pkg/bench/mpp/` | `--sql-dialect gp` selection and the Greenplum-family server check shared by tpch and tpcds |
 | `pkg/record/` | typed deterministic operation snapshots and explicit query replies |
 | `pkg/bench/` | Go-native engine: `Workload` interface, `Run`, scenario executor, VU/Bench SDK, metrics sink + summary |
 | `workloads/<name>/` | one package per built-in workload, containing Go implementation/tests plus owned SQL/JSON/README assets |
@@ -296,6 +297,14 @@ TPC-H (`tpch/tx`) does a relational load of 8 tables plus q1–q22 execution;
 SF=1 answer validation is PostgreSQL-only, while load/query execution has
 pg/mysql/pico/ydb dialect files. TPC-DS (`tpcds`) loads all 24 tables and runs
 the 99 query suite.
+
+Greenplum-family MPP servers (Greenplum, Greengage, WarehousePG, Cloudberry) use
+the `pg` driver with `--sql-dialect gp` on TPC-H and TPC-DS: `schema.gp.sql`
+replaces the schema (distribution and storage only) and the pg queries are
+shared. `pkg/bench/mpp` probes `gp_segment_configuration` before the first step
+and refuses a mismatch in either direction, so the pg schema never runs on an MPP
+server unnoticed. It is a public package because built-in workloads publish their
+source and cannot import repository-internal helpers.
 
 Relational loads use once-only `d.Execution.Step("load_data", ...)` and
 `b.Insert(ctx, table, source, options...)`. `LOAD_WORKERS` controls the per-request

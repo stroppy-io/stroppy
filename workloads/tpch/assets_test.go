@@ -32,4 +32,8 @@ func TestEmbeddedAssetContract(t *testing.T) {
 			workloadtest.SQL(t, files, dialect, sections[dialect], queries)
 		})
 	}
+
+	// The MPP dialect supplies only the schema; its queries are pg.sql's.
+	workloadtest.Files(t, files, "schema.gp.sql")
+	workloadtest.SQL(t, files, "schema.gp.sql", []string{"drop_schema", "create_schema", "analyze"}, nil)
 }
