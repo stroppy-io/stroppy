@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Fixed
+
+- TPC-DS queries 2, 14, 23 and 49, and generated query streams, give every derived table an alias, so they run on PostgreSQL before 16 and on Greenplum.
+
 ## [6.3.3] - 2026-11-06
 
 ### Added

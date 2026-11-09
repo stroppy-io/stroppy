@@ -18,8 +18,8 @@ type Dialect struct {
 }
 
 // Postgres and MySQL dialects. Postgres needs only the universal fixes plus
-// integer-day date arithmetic; MySQL adds interval dates, WITH ROLLUP, CONCAT,
-// function-paren spacing, and signed casts.
+// integer-day date arithmetic and derived-table aliases; MySQL adds interval dates,
+// WITH ROLLUP, CONCAT, function-paren spacing, and signed casts.
 var (
 	Postgres = Dialect{Name: "postgres", transform: pgTransform}
 	MySQL    = Dialect{Name: "mysql", transform: mysqlTransform}
@@ -116,6 +116,8 @@ func pgTransform(_, sql string) string {
 	sql = universalTransform(sql)
 	// Postgres: date + integer adds days.
 	sql = daysParenRe.ReplaceAllString(sql, "$1)")
+	// PostgreSQL before 16, and so every Greenplum release, rejects an unaliased derived table.
+	sql = aliasDerivedTables(sql)
 	return sql
 }
 
