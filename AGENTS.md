@@ -20,7 +20,16 @@ make build          # plain go build — never go build ./... (use the target fo
 make linter_fix     # run first; auto-fixes formatting and may rewrite files across the repo
 make linter         # read-only check after linter_fix
 make tests          # all tests with race detector and coverage
+make modulecompat   # full external-module and author-tooling release checks (20-minute budget)
 ```
+
+Push CI runs `make tests TEST_FLAGS=-short`: module compatibility still checks the
+external consumer, published workload packages, starter execution, and documented
+samples, but skips the starter's init/eject/export round trips. `make modulecompat`
+runs the complete matrix without `-short`; release builds require it, and the
+Module compatibility workflow can also validate a chosen ref manually. Nested
+packaging checks reuse the Go build cache and do not rebuild dependencies with
+race instrumentation; the ordinary repository test suite retains `-race`.
 
 ### Integration tests
 

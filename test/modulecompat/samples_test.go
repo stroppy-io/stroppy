@@ -55,8 +55,6 @@ func TestSampleWorkloadsServeTheDocumentedContract(t *testing.T) {
 	writeModuleProxy(t, proxyDir, repoRoot)
 
 	proxyURL := (&url.URL{Scheme: "file", Path: proxyDir}).String()
-	moduleCache := filepath.Join(t.TempDir(), "modcache")
-	t.Cleanup(func() { makeWritable(t, moduleCache) })
 
 	env := append(os.Environ(),
 		"GOPROXY="+proxyURL+",https://proxy.golang.org,direct",
@@ -71,7 +69,7 @@ func TestSampleWorkloadsServeTheDocumentedContract(t *testing.T) {
 		t.Run(sample.name, func(t *testing.T) {
 			directory := writeSampleProject(t, sample)
 
-			runCommand(t, directory, env, "go", "test", "-mod=mod", "-race", "./...")
+			runCommand(t, directory, env, "go", "test", "-mod=mod", "./...")
 
 			binary := filepath.Join(directory, "sample")
 			runCommand(t, directory, env, "go", "build", "-mod=mod", "-o", binary, ".")
