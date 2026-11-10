@@ -99,11 +99,21 @@ jobs:
       # `playground` to nightly and then fails to find it.
       - name: Start TiDB
         run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
+          # Keep the TiUP binary and bootstrap trust root from the same verified release.
+          tiup_version=v1.17.1
+          tiup_sha256=0b09de9892a19798115f45356a379891e85a950fa86008f8e4b0cf7257766d32
+          archive="$RUNNER_TEMP/tiup.tar.gz"
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 3 \
+            "https://github.com/pingcap/tiup/releases/download/$tiup_version/tiup-$tiup_version-linux-amd64.tar.gz" \
+            -o "$archive"
+          printf '%s  %s\n' "$tiup_sha256" "$archive" | sha256sum -c -
+          mkdir -p ~/.tiup/bin
+          tar -xzf "$archive" -C ~/.tiup bin/tiup bin/root.json
           # --tiflash 0: a measurement run died with TiKV at 2.5 GiB RSS and 75 MiB
           # free, while the playground was also pulling a 526 MB TiFlash that TiDB
           # tests here do not need.
-          ~/.tiup/bin/tiup playground v8.5.8 --without-monitor --tiflash 0 > /tmp/tidb.log 2>&1 &
+          # An explicit component version avoids TiUP's concurrent background update check.
+          ~/.tiup/bin/tiup "playground:$tiup_version" v8.5.8 --without-monitor --tiflash 0 > /tmp/tidb.log 2>&1 &
           for _ in $(seq 1 60); do
             if mysqladmin ping -h 127.0.0.1 -P 4000 -u root --silent >/dev/null 2>&1; then
               echo "tidb is accepting connections"

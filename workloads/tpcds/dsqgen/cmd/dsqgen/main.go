@@ -35,7 +35,7 @@ func main() {
 	}
 
 	for s := 0; s < *streams; s++ {
-		res, err := dsqgen.Generate(dialect, *scale, *seed+int64(s)*1_000_003, s)
+		res, err := dsqgen.Generate(dialect, *scale, *seed, s)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)

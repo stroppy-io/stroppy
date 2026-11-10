@@ -26,7 +26,7 @@ var (
 	errIncompleteQuerySet          = errors.New("tpcds: generated query set is incomplete")
 	errGeneratedStreamsUnsupported = errors.New("[tpcds] this driver runs the baked query set (power test) only; " +
 		"STREAMS>1 and QUERY_STREAM need the in-process generator, which renders a complete " +
-		"99-query set for postgres and mysql only")
+		"99-query set for postgres, mysql, yugabyte and tidb only")
 )
 
 type workload struct {
@@ -121,13 +121,7 @@ func define(d *bench.Def) error {
 	w.useUnlogged = w.useUnlogged && w.driver == bench.DriverPostgres
 
 	w.throughput = w.streams > 1
-	// Only drivers whose generator renders the full 99-query set can build a stream.
-	// The mysql generator skips q51 and q97 and generateStream rejects a skipped set,
-	// and the postgres streams carry ROLLUP and window functions that pico.sql
-	// documents as unsupported. Those engines run the baked set only, and saying so at
-	// definition is the difference between a refusal and a load followed by a failure —
-	// but only where a stream is wanted at all: a run that excludes the workload step
-	// never generates one, and loading data on those engines stays legitimate.
+	// Check only runs that execute generated queries: load-only runs need no generator.
 	streamsWanted := (w.throughput || w.genStream >= 0) && d.Execution.Enabled("workload")
 
 	if streamsWanted && !generatedStreamsSupported(w.driver) {
@@ -243,14 +237,10 @@ func (w *workload) validate(ctx context.Context, b *bench.Bench) error {
 	return nil
 }
 
-// generatedStreamsSupported reports whether dsqgen can render a complete query stream
-// for this driver. TiDB is excluded despite speaking mysql: the mysql generator skips
-// q51 and q97, and generateStream refuses a set with skips in it. Picodata is excluded
-// because the postgres streams carry ROLLUP and window functions its asset documents
-// as unsupported.
+// Picodata and YDB need their baked rewrites for constructs in generated streams.
 func generatedStreamsSupported(dt bench.DriverTypeName) bool {
 	switch dt {
-	case bench.DriverPostgres, bench.DriverMySQL, bench.DriverYugabyte:
+	case bench.DriverPostgres, bench.DriverMySQL, bench.DriverYugabyte, bench.DriverTiDB:
 		return true
 	default:
 		return false

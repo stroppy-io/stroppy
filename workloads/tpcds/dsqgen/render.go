@@ -8,11 +8,7 @@ import (
 
 // Dialect controls how a rendered query is adapted to a target SQL engine.
 // The generator renders the ANSI template body, injects parameter values, then
-// applies the dialect's syntactic transforms, which include giving every
-// derived table an alias (pgTransform and mysqlTransform both do). Structural
-// rewrites that are not expressible as text transforms (full-outer-join
-// emulation for MySQL) are NOT applied here — those live in the hand-maintained
-// baked .sql files; see the package docs.
+// applies the dialect's syntactic and query-specific structural transforms.
 type Dialect struct {
 	Name      string
 	transform func(query, sql string) string
@@ -140,23 +136,17 @@ func mysqlTransform(query, sql string) string {
 	if query == "query6" {
 		sql = decorrelateQ6(sql)
 	}
-	return sql
+	return emulateFullOuterJoin(query, sql)
 }
 
-// mysqlStructuralGap reports query names whose MySQL form needs a structural
-// rewrite the stream generator does not apply (full outer join). They are
-// correct in the baked workloads/tpcds/mysql.sql.
-func mysqlStructuralGap(query string) bool { return fullOuterJoinQueries[query] }
-
 var (
-	pipeWordRe = regexp.MustCompile(`'([A-Za-z_]+)'\s*\|\|\s*([A-Za-z_][A-Za-z0-9_]*)`)
+	pipeWordRe    = regexp.MustCompile(`'([A-Za-z_]+)'\s*\|\|\s*([A-Za-z_][A-Za-z0-9_]*)`)
+	pipeCarrierRe = regexp.MustCompile(`('(?:[^']|'')*')\s*\|\|\s*','\s*\|\|\s*('(?:[^']|'')*')`)
 )
 
 func rewritePipeConcat(sql string) string {
 	sql = pipeWordRe.ReplaceAllString(sql, "concat('$1', $2)")
-	sql = strings.ReplaceAll(sql,
-		"'ORIENTAL' || ',' || 'BOXBUNDLES'",
-		"concat('ORIENTAL', ',', 'BOXBUNDLES')")
+	sql = pipeCarrierRe.ReplaceAllString(sql, "concat($1, ',', $2)")
 	sql = strings.ReplaceAll(sql,
 		"coalesce(c_last_name,'') || ', ' || coalesce(c_first_name,'')",
 		"concat(coalesce(c_last_name,''), ', ', coalesce(c_first_name,''))")
