@@ -128,7 +128,12 @@ func collectAnswers(in string) (map[string]*block, error) {
 			return nil, fmt.Errorf("read %s: %w", path, err)
 		}
 
-		blocks, err := readBlocks(raw)
+		var blocks []block
+		if qNum == 17 {
+			blocks, err = readWrappedQuery17(raw)
+		} else {
+			blocks, err = readBlocks(raw)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", filepath.Base(path), err)
 		}

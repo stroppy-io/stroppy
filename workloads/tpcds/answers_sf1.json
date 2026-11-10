@@ -4538,12 +4538,13 @@
         "STORE_SALES_QUANTITYSTDEV",
         "STORE_SALES_QUANTITYCOV",
         "STORE_RETURNS_QUANTITYCOUNT",
-        "STORE_RETURNS_QUANTITYAV   STORE_RETURNS_QUANTITYSTDEV",
+        "STORE_RETURNS_QUANTITYAVE",
+        "STORE_RETURNS_QUANTITYSTDEV",
         "STORE_RETURNS_QUANTITYCOV",
         "CATALOG_SALES_QUANTITYCOUNT",
         "CATALOG_SALES_QUANTITYAVE",
         "CATALOG_SALES_QUANTITYSTDEV",
-        "CATALOG_SALES_QUANTITYCOVE"
+        "CATALOG_SALES_QUANTITYCOV"
       ],
       "rows": [
         [
@@ -4558,23 +4559,8 @@
           "66",
           "",
           "",
-          "",
-          "",
-          ""
-        ],
-        [
-          "",
-          "1                        32",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
+          "1",
+          "32",
           "",
           ""
         ]
@@ -33295,21 +33281,21 @@
           "ationbarn station",
           "amalgbrand #8",
           "bathroom",
-          "%",
+          "",
           "430.357724"
         ],
         [
           "ationbarn station",
           "amalgbrand #8",
-          "%",
-          "%",
+          "",
+          "",
           "430.357724"
         ],
         [
           "ationbarn station",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "430.357724"
         ],
         [
@@ -33323,21 +33309,21 @@
           "ationoughtn stn st",
           "edu packimporto #2",
           "sports-apparel",
-          "%",
+          "",
           "435.26506"
         ],
         [
           "ationoughtn stn st",
           "edu packimporto #2",
-          "%",
-          "%",
+          "",
+          "",
           "435.26506"
         ],
         [
           "ationoughtn stn st",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "435.26506"
         ],
         [
@@ -33351,21 +33337,21 @@
           "ationationprin st",
           "amalgexporti #2",
           "newborn",
-          "%",
+          "",
           "435.510288"
         ],
         [
           "ationationprin st",
           "amalgexporti #2",
-          "%",
-          "%",
+          "",
+          "",
           "435.510288"
         ],
         [
           "ationationprin st",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "435.510288"
         ],
         [
@@ -33379,21 +33365,21 @@
           "oughtcallyn stantiought",
           "corpcorp #2",
           "rings",
-          "%",
+          "",
           "436.494024"
         ],
         [
           "oughtcallyn stantiought",
           "corpcorp #2",
-          "%",
-          "%",
+          "",
+          "",
           "436.494024"
         ],
         [
           "oughtcallyn stantiought",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "436.494024"
         ],
         [
@@ -33407,21 +33393,21 @@
           "callyesebaration",
           "namelesscorp #7",
           "mens watch",
-          "%",
+          "",
           "437.394309"
         ],
         [
           "callyesebaration",
           "namelesscorp #7",
-          "%",
-          "%",
+          "",
+          "",
           "437.394309"
         ],
         [
           "callyesebaration",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "437.394309"
         ],
         [
@@ -33435,21 +33421,21 @@
           "n stprieingationought",
           "namelesscorp #8",
           "mens watch",
-          "%",
+          "",
           "439.064777"
         ],
         [
           "n stprieingationought",
           "namelesscorp #8",
-          "%",
-          "%",
+          "",
+          "",
           "439.064777"
         ],
         [
           "n stprieingationought",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "439.064777"
         ],
         [
@@ -33463,21 +33449,21 @@
           "priationn stn st",
           "importoscholar #2",
           "country",
-          "%",
+          "",
           "439.096"
         ],
         [
           "priationn stn st",
           "importoscholar #2",
-          "%",
-          "%",
+          "",
+          "",
           "439.096"
         ],
         [
           "priationn stn st",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "439.096"
         ],
         [
@@ -33491,21 +33477,21 @@
           "n stcallyableoughtought",
           "amalgimporto #2",
           "accessories",
-          "%",
+          "",
           "439.718367"
         ],
         [
           "n stcallyableoughtought",
           "amalgimporto #2",
-          "%",
-          "%",
+          "",
+          "",
           "439.718367"
         ],
         [
           "n stcallyableoughtought",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "439.718367"
         ],
         [
@@ -33519,21 +33505,21 @@
           "n stbarought",
           "corpbrand #10",
           "rugs",
-          "%",
+          "",
           "440.314741"
         ],
         [
           "n stbarought",
           "corpbrand #10",
-          "%",
-          "%",
+          "",
+          "",
           "440.314741"
         ],
         [
           "n stbarought",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "440.314741"
         ],
         [
@@ -33547,21 +33533,21 @@
           "n stn stantioughtought",
           "exportimaxi #8",
           "computers",
-          "%",
+          "",
           "440.928571"
         ],
         [
           "n stn stantioughtought",
           "exportimaxi #8",
-          "%",
-          "%",
+          "",
+          "",
           "440.928571"
         ],
         [
           "n stn stantioughtought",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "440.928571"
         ],
         [
@@ -33575,21 +33561,21 @@
           "n stcallyesepriought",
           "edu packscholar #2",
           "classical",
-          "%",
+          "",
           "441.541833"
         ],
         [
           "n stcallyesepriought",
           "edu packscholar #2",
-          "%",
-          "%",
+          "",
+          "",
           "441.541833"
         ],
         [
           "n stcallyesepriought",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "441.541833"
         ],
         [
@@ -33603,21 +33589,21 @@
           "priantiationation",
           "importoimporto #2",
           "shirts",
-          "%",
+          "",
           "441.670732"
         ],
         [
           "priantiationation",
           "importoimporto #2",
-          "%",
-          "%",
+          "",
+          "",
           "441.670732"
         ],
         [
           "priantiationation",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "441.670732"
         ],
         [
@@ -33631,21 +33617,21 @@
           "oughtbarantiese",
           "exportiedu pack #2",
           "kids",
-          "%",
+          "",
           "441.745968"
         ],
         [
           "oughtbarantiese",
           "exportiedu pack #2",
-          "%",
-          "%",
+          "",
+          "",
           "441.745968"
         ],
         [
           "oughtbarantiese",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "441.745968"
         ],
         [
@@ -33659,21 +33645,21 @@
           "oughtbarprin st",
           "edu packscholar #2",
           "classical",
-          "%",
+          "",
           "442.073469"
         ],
         [
           "oughtbarprin st",
           "edu packscholar #2",
-          "%",
-          "%",
+          "",
+          "",
           "442.073469"
         ],
         [
           "oughtbarprin st",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "442.073469"
         ],
         [
@@ -33687,21 +33673,21 @@
           "ationeingation",
           "amalgexporti #2",
           "newborn",
-          "%",
+          "",
           "443.782258"
         ],
         [
           "ationeingation",
           "amalgexporti #2",
-          "%",
-          "%",
+          "",
+          "",
           "443.782258"
         ],
         [
           "ationeingation",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "443.782258"
         ],
         [
@@ -33715,21 +33701,21 @@
           "ationbarn stableought",
           "corpbrand #8",
           "rugs",
-          "%",
+          "",
           "444.092742"
         ],
         [
           "ationbarn stableought",
           "corpbrand #8",
-          "%",
-          "%",
+          "",
+          "",
           "444.092742"
         ],
         [
           "ationbarn stableought",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "444.092742"
         ],
         [
@@ -33743,21 +33729,21 @@
           "eseationcallyableought",
           "importoexporti #1",
           "infants",
-          "%",
+          "",
           "444.544355"
         ],
         [
           "eseationcallyableought",
           "importoexporti #1",
-          "%",
-          "%",
+          "",
+          "",
           "444.544355"
         ],
         [
           "eseationcallyableought",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "444.544355"
         ],
         [
@@ -33771,21 +33757,21 @@
           "eingableableationought",
           "amalgimporto #1",
           "accessories",
-          "%",
+          "",
           "444.714286"
         ],
         [
           "eingableableationought",
           "amalgimporto #1",
-          "%",
-          "%",
+          "",
+          "",
           "444.714286"
         ],
         [
           "eingableableationought",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "444.714286"
         ],
         [
@@ -33799,21 +33785,21 @@
           "n steseantiation",
           "univmaxi #10",
           "pools",
-          "%",
+          "",
           "445.331967"
         ],
         [
           "n steseantiation",
           "univmaxi #10",
-          "%",
-          "%",
+          "",
+          "",
           "445.331967"
         ],
         [
           "n steseantiation",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "445.331967"
         ],
         [
@@ -33827,21 +33813,21 @@
           "antibareingantiought",
           "importoimporto #2",
           "shirts",
-          "%",
+          "",
           "445.406504"
         ],
         [
           "antibareingantiought",
           "importoimporto #2",
-          "%",
-          "%",
+          "",
+          "",
           "445.406504"
         ],
         [
           "antibareingantiought",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "445.406504"
         ],
         [
@@ -33855,21 +33841,21 @@
           "ationantibarationought",
           "univmaxi #8",
           "pools",
-          "%",
+          "",
           "445.419087"
         ],
         [
           "ationantibarationought",
           "univmaxi #8",
-          "%",
-          "%",
+          "",
+          "",
           "445.419087"
         ],
         [
           "ationantibarationought",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "445.419087"
         ],
         [
@@ -33883,21 +33869,21 @@
           "oughtpricallybarought",
           "edu packexporti #2",
           "school-uniforms",
-          "%",
+          "",
           "445.485944"
         ],
         [
           "oughtpricallybarought",
           "edu packexporti #2",
-          "%",
-          "%",
+          "",
+          "",
           "445.485944"
         ],
         [
           "oughtpricallybarought",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "445.485944"
         ],
         [
@@ -33911,21 +33897,21 @@
           "ableationprieing",
           "amalgamalg #1",
           "dresses",
-          "%",
+          "",
           "445.995833"
         ],
         [
           "ableationprieing",
           "amalgamalg #1",
-          "%",
-          "%",
+          "",
+          "",
           "445.995833"
         ],
         [
           "ableationprieing",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "445.995833"
         ],
         [
@@ -33939,21 +33925,21 @@
           "pribarpribarought",
           "edu packimporto #2",
           "sports-apparel",
-          "%",
+          "",
           "446.040816"
         ],
         [
           "pribarpribarought",
           "edu packimporto #2",
-          "%",
-          "%",
+          "",
+          "",
           "446.040816"
         ],
         [
           "pribarpribarought",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "446.040816"
         ],
         [
@@ -33967,21 +33953,21 @@
           "oughtn stprin st",
           "exportiamalgamalg #8",
           "stereo",
-          "%",
+          "",
           "447.266667"
         ],
         [
           "oughtn stprin st",
           "exportiamalgamalg #8",
-          "%",
-          "%",
+          "",
+          "",
           "447.266667"
         ],
         [
           "oughtn stprin st",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "447.266667"
         ]
       ]
@@ -34029,26 +34015,26 @@
       "columns": [
         "C_LAST_NAME",
         "C_FIRST_NAME",
-        "_STORE_NAME",
+        "S_STORE_NAME",
         "PAID"
       ],
       "rows": [
         [
           "Martins",
           "Cara",
-          "ar",
+          "bar",
           "241.96"
         ],
         [
           "Smallwood",
           "Rhonda",
-          "ar",
+          "bar",
           "3089.28"
         ],
         [
           "Terry",
           "Sandra",
-          "ar",
+          "bar",
           "509.42"
         ]
       ]
@@ -34057,32 +34043,32 @@
       "columns": [
         "C_LAST_NAME",
         "C_FIRST_NAME",
-        "_STORE_NAME",
+        "S_STORE_NAME",
         "PAID"
       ],
       "rows": [
         [
           "Hamlin",
-          "eather",
-          "ble",
+          "Heather",
+          "able",
           "149.65"
         ],
         [
           "Martin",
-          "arold              b",
-          "r",
+          "Harold",
+          "bar",
           "5834.88"
         ],
         [
           "Nall",
-          "ike                a",
-          "le",
+          "Mike",
+          "able",
           "999.7"
         ],
         [
           "Southern",
-          "eannie",
-          "ar",
+          "Jeannie",
+          "bar",
           "446.31"
         ]
       ]
@@ -34842,7 +34828,7 @@
         ],
         [
           "AAAAAAAAAAABAAAA",
-          "%",
+          "",
           "1",
           "46",
           "114.72",
@@ -34860,7 +34846,7 @@
         ],
         [
           "AAAAAAAAAAAEAAAA",
-          "%",
+          "",
           "1",
           "100",
           "77.97",
@@ -34878,7 +34864,7 @@
         ],
         [
           "AAAAAAAAAABAAAAA",
-          "%",
+          "",
           "1",
           "6",
           "48.89",
@@ -34896,7 +34882,7 @@
         ],
         [
           "AAAAAAAAAACAAAAA",
-          "%",
+          "",
           "1",
           "62",
           "32.2133333",
@@ -34914,7 +34900,7 @@
         ],
         [
           "AAAAAAAAAACDAAAA",
-          "%",
+          "",
           "1",
           "97",
           "161.78",
@@ -34932,7 +34918,7 @@
         ],
         [
           "AAAAAAAAAADBAAAA",
-          "%",
+          "",
           "1",
           "28",
           "136.01",
@@ -34950,7 +34936,7 @@
         ],
         [
           "AAAAAAAAAADCAAAA",
-          "%",
+          "",
           "1",
           "64",
           "116.14",
@@ -34968,7 +34954,7 @@
         ],
         [
           "AAAAAAAAAAEBAAAA",
-          "%",
+          "",
           "1",
           "9",
           "5.43",
@@ -34986,7 +34972,7 @@
         ],
         [
           "AAAAAAAAAAEDAAAA",
-          "%",
+          "",
           "1",
           "45.5",
           "87.635",
@@ -35004,7 +34990,7 @@
         ],
         [
           "AAAAAAAAAAGBAAAA",
-          "%",
+          "",
           "1",
           "29",
           "101.94",
@@ -35022,7 +35008,7 @@
         ],
         [
           "AAAAAAAAAAGCAAAA",
-          "%",
+          "",
           "1",
           "97",
           "65.27",
@@ -35040,7 +35026,7 @@
         ],
         [
           "AAAAAAAAAAGEAAAA",
-          "%",
+          "",
           "1",
           "55",
           "73.875",
@@ -35058,7 +35044,7 @@
         ],
         [
           "AAAAAAAAAAHAAAAA",
-          "%",
+          "",
           "1",
           "20",
           "134.3",
@@ -35076,7 +35062,7 @@
         ],
         [
           "AAAAAAAAAAHBAAAA",
-          "%",
+          "",
           "1",
           "97",
           "7.4",
@@ -35094,7 +35080,7 @@
         ],
         [
           "AAAAAAAAAAHDAAAA",
-          "%",
+          "",
           "1",
           "69",
           "5.62",
@@ -35112,7 +35098,7 @@
         ],
         [
           "AAAAAAAAAAIAAAAA",
-          "%",
+          "",
           "1",
           "87",
           "106.98",
@@ -35130,7 +35116,7 @@
         ],
         [
           "AAAAAAAAAAKBAAAA",
-          "%",
+          "",
           "1",
           "84.5",
           "66.175",
@@ -35148,7 +35134,7 @@
         ],
         [
           "AAAAAAAAAALAAAAA",
-          "%",
+          "",
           "1",
           "6",
           "32.28",
@@ -35166,7 +35152,7 @@
         ],
         [
           "AAAAAAAAAALCAAAA",
-          "%",
+          "",
           "1",
           "98",
           "34.31",
@@ -35184,7 +35170,7 @@
         ],
         [
           "AAAAAAAAAALDAAAA",
-          "%",
+          "",
           "1",
           "59",
           "129.47",
@@ -35202,7 +35188,7 @@
         ],
         [
           "AAAAAAAAAANAAAAA",
-          "%",
+          "",
           "1",
           "74",
           "60.875",
@@ -35220,7 +35206,7 @@
         ],
         [
           "AAAAAAAAAANBAAAA",
-          "%",
+          "",
           "1",
           "96",
           "130.79",
@@ -35238,7 +35224,7 @@
         ],
         [
           "AAAAAAAAAAOAAAAA",
-          "%",
+          "",
           "1",
           "85",
           "130.34",
@@ -35256,7 +35242,7 @@
         ],
         [
           "AAAAAAAAAAOCAAAA",
-          "%",
+          "",
           "1",
           "14",
           "64.575",
@@ -35274,7 +35260,7 @@
         ],
         [
           "AAAAAAAAAAODAAAA",
-          "%",
+          "",
           "1",
           "84",
           "30.5",
@@ -35292,7 +35278,7 @@
         ],
         [
           "AAAAAAAAAAPBAAAA",
-          "%",
+          "",
           "1",
           "45",
           "118.89",
@@ -35310,7 +35296,7 @@
         ],
         [
           "AAAAAAAAABAAAAAA",
-          "%",
+          "",
           "1",
           "97",
           "124.75",
@@ -35328,7 +35314,7 @@
         ],
         [
           "AAAAAAAAABABAAAA",
-          "%",
+          "",
           "1",
           "31",
           "29.98",
@@ -35346,7 +35332,7 @@
         ],
         [
           "AAAAAAAAABAEAAAA",
-          "%",
+          "",
           "1",
           "34",
           "17.21",
@@ -35364,7 +35350,7 @@
         ],
         [
           "AAAAAAAAABCBAAAA",
-          "%",
+          "",
           "1",
           "38",
           "131.375",
@@ -35382,7 +35368,7 @@
         ],
         [
           "AAAAAAAAABDAAAAA",
-          "%",
+          "",
           "1",
           "31.5",
           "68.345",
@@ -35400,7 +35386,7 @@
         ],
         [
           "AAAAAAAAABDBAAAA",
-          "%",
+          "",
           "1",
           "56",
           "103.85",
@@ -35418,7 +35404,7 @@
         ],
         [
           "AAAAAAAAABDDAAAA",
-          "%",
+          "",
           "1",
           "67.3333333",
           "119.42",
@@ -35436,7 +35422,7 @@
         ],
         [
           "AAAAAAAAABDEAAAA",
-          "%",
+          "",
           "1",
           "61",
           "85.95",
@@ -35454,7 +35440,7 @@
         ],
         [
           "AAAAAAAAABEDAAAA",
-          "%",
+          "",
           "1",
           "61",
           "85.14",
@@ -35472,7 +35458,7 @@
         ],
         [
           "AAAAAAAAABFBAAAA",
-          "%",
+          "",
           "1",
           "31",
           "23.55",
@@ -35490,7 +35476,7 @@
         ],
         [
           "AAAAAAAAABFCAAAA",
-          "%",
+          "",
           "1",
           "83",
           "15.5",
@@ -35508,7 +35494,7 @@
         ],
         [
           "AAAAAAAAABGAAAAA",
-          "%",
+          "",
           "1",
           "64",
           "35.08",
@@ -35526,7 +35512,7 @@
         ],
         [
           "AAAAAAAAABGBAAAA",
-          "%",
+          "",
           "1",
           "40",
           "25.07",
@@ -35544,7 +35530,7 @@
         ],
         [
           "AAAAAAAAABGEAAAA",
-          "%",
+          "",
           "1",
           "39.5",
           "56.765",
@@ -35562,7 +35548,7 @@
         ],
         [
           "AAAAAAAAABHAAAAA",
-          "%",
+          "",
           "1",
           "93",
           "74.8",
@@ -35580,7 +35566,7 @@
         ],
         [
           "AAAAAAAAABHCAAAA",
-          "%",
+          "",
           "1",
           "31.5",
           "79.835",
@@ -35598,7 +35584,7 @@
         ],
         [
           "AAAAAAAAABIBAAAA",
-          "%",
+          "",
           "1",
           "48",
           "170.89",
@@ -35616,7 +35602,7 @@
         ],
         [
           "AAAAAAAAABJAAAAA",
-          "%",
+          "",
           "1",
           "46.5",
           "82.325",
@@ -35634,7 +35620,7 @@
         ],
         [
           "AAAAAAAAABJBAAAA",
-          "%",
+          "",
           "1",
           "76",
           "12.4",
@@ -35652,7 +35638,7 @@
         ],
         [
           "AAAAAAAAABJDAAAA",
-          "%",
+          "",
           "1",
           "34",
           "118.505",
@@ -35670,7 +35656,7 @@
         ],
         [
           "AAAAAAAAABKAAAAA",
-          "%",
+          "",
           "1",
           "65",
           "8.775",
@@ -35688,7 +35674,7 @@
         ],
         [
           "AAAAAAAAABKCAAAA",
-          "%",
+          "",
           "1",
           "26",
           "51.57",
@@ -35706,7 +35692,7 @@
         ],
         [
           "AAAAAAAAABLBAAAA",
-          "%",
+          "",
           "1",
           "61.5",
           "149.12",
@@ -35724,7 +35710,7 @@
         ],
         [
           "AAAAAAAAABMAAAAA",
-          "%",
+          "",
           "1",
           "14",
           "109.97",
@@ -36370,7 +36356,7 @@
           "11",
           "1950",
           "GHANA",
-          "%",
+          "",
           "Eduardo.Goodwin@rolemn2xusv5Ot0.edu",
           "2452312",
           "3838"
@@ -36385,7 +36371,7 @@
           "5",
           "1924",
           "HONG KONG",
-          "%",
+          "",
           "Robert.Thornton@jas.edu",
           "2452431",
           "2434.58"
@@ -36400,7 +36386,7 @@
           "4",
           "1957",
           "FAROE ISLANDS",
-          "%",
+          "",
           "Alonzo.Huddleston@g.edu",
           "2452289",
           "2813"
@@ -36415,7 +36401,7 @@
           "6",
           "1931",
           "GAMBIA",
-          "%",
+          "",
           "Pamela.Slater@ajU1sMrf5vC7.com",
           "2452613",
           "1746.58"
@@ -36430,7 +36416,7 @@
           "2",
           "1925",
           "ICELAND",
-          "%",
+          "",
           "Keith.Stern@34Hb991eohmd.com",
           "2452549",
           "1850.7"
@@ -36445,7 +36431,7 @@
           "2",
           "1925",
           "ICELAND",
-          "%",
+          "",
           "Keith.Stern@34Hb991eohmd.com",
           "2452549",
           "10898.4"
@@ -36460,7 +36446,7 @@
           "8",
           "1953",
           "THAILAND",
-          "%",
+          "",
           "Trevor.Battle@0F.com",
           "2452643",
           "3556"
@@ -36475,7 +36461,7 @@
           "12",
           "1930",
           "MONACO",
-          "%",
+          "",
           "Joseph.Miller@Ampmde.edu",
           "2452332",
           "7037.55"
@@ -36490,23 +36476,23 @@
           "3",
           "1982",
           "MALAYSIA",
-          "%",
+          "",
           "Brenda.Sloan@csCoX.edu",
           "2452336",
           "1783.19"
         ],
         [
           "AAAAAAAAAKDNAAAA",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "12",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
           "2452544",
           "2448.03"
         ],
@@ -36520,7 +36506,7 @@
           "12",
           "1977",
           "MONTENEGRO",
-          "%",
+          "",
           "Raymond.Dixon@07IH.edu",
           "2452514",
           "1785.96"
@@ -36535,7 +36521,7 @@
           "8",
           "1982",
           "UGANDA",
-          "%",
+          "",
           "Cindy.Julian@ChEB5eyUCBe.org",
           "2452368",
           "2449.04"
@@ -36550,7 +36536,7 @@
           "12",
           "1930",
           "NICARAGUA",
-          "%",
+          "",
           "Elizabeth.Pepper@xlygC22.org",
           "2452645",
           "1764.4"
@@ -36565,7 +36551,7 @@
           "4",
           "1958",
           "JAMAICA",
-          "%",
+          "",
           "Denise.Brock@7ffTBTNaX7is.com",
           "2452435",
           "1618.24"
@@ -36580,7 +36566,7 @@
           "10",
           "1948",
           "BELARUS",
-          "%",
+          "",
           "Walter.Bernard@Th.org",
           "2452628",
           "1755.66"
@@ -36595,7 +36581,7 @@
           "12",
           "1947",
           "ALBANIA",
-          "%",
+          "",
           "Lorene.Mayfield@ECni6UFkF2.edu",
           "2452450",
           "3157.7"
@@ -36610,7 +36596,7 @@
           "2",
           "1953",
           "BARBADOS",
-          "%",
+          "",
           "Paul.Stevenson@tHMZG9.com",
           "2452488",
           "1947.77"
@@ -36625,7 +36611,7 @@
           "2",
           "1931",
           "ANGUILLA",
-          "%",
+          "",
           "Marion.Mclain@PKik2BMH.com",
           "2452382",
           "3134.46"
@@ -36640,7 +36626,7 @@
           "5",
           "1945",
           "SYRIAN ARAB REPUBLIC",
-          "%",
+          "",
           "Kristofer.Payne@nc70sAM.com",
           "2452436",
           "3813.33"
@@ -36655,7 +36641,7 @@
           "1",
           "1941",
           "LEBANON",
-          "%",
+          "",
           "Lisa.Way@nnVbE2MvTT.com",
           "2452383",
           "1829.88"
@@ -36670,7 +36656,7 @@
           "7",
           "1969",
           "IRAQ",
-          "%",
+          "",
           "Gabriela.Jerome@Hay.com",
           "2452567",
           "5360.55"
@@ -36685,7 +36671,7 @@
           "8",
           "1957",
           "UGANDA",
-          "%",
+          "",
           "Timothy.Carroll@pUcgCvxC4nkcM.edu",
           "2452535",
           "1642.8"
@@ -36700,7 +36686,7 @@
           "2",
           "1955",
           "RWANDA",
-          "%",
+          "",
           "Shana.Fulton@2CAVqR7d.org",
           "2452378",
           "2089.36"
@@ -36715,7 +36701,7 @@
           "3",
           "1956",
           "YEMEN",
-          "%",
+          "",
           "Mark.Pacheco@NMMki.edu",
           "2452377",
           "1838.48"
@@ -36730,7 +36716,7 @@
           "10",
           "1964",
           "ARGENTINA",
-          "%",
+          "",
           "Adriane.Harmon@X0nMJZPDL.com",
           "2452562",
           "8986.95"
@@ -36745,7 +36731,7 @@
           "1",
           "1985",
           "KIRIBATI",
-          "%",
+          "",
           "Elizabeth.Gilbreath@4LxlO8fArnEeEavQe.com",
           "2452485",
           "2450.86"
@@ -36760,7 +36746,7 @@
           "6",
           "1941",
           "ICELAND",
-          "%",
+          "",
           "Holly.Kim@OkTfC7tRYgy4.edu",
           "2452580",
           "2719.44"
@@ -36775,7 +36761,7 @@
           "3",
           "1980",
           "KENYA",
-          "%",
+          "",
           "Nolan.Mosley@5E.org",
           "2452317",
           "1865.64"
@@ -36789,11 +36775,11 @@
           "21",
           "5",
           "1928",
-          "C�TE D'IVOIRE",
-          "%",
+          "CÔTE D'IVOIRE",
+          "",
           "Dallas.Courtney@c7.org",
           "2452496",
-          "4394."
+          "4394.79"
         ],
         [
           "AAAAAAAACKOFAAAA",
@@ -36805,7 +36791,7 @@
           "9",
           "1979",
           "ALBANIA",
-          "%",
+          "",
           "Eric.Bucher@sxSne.org",
           "2452541",
           "4662.35"
@@ -36820,7 +36806,7 @@
           "3",
           "1964",
           "SOLOMON ISLANDS",
-          "%",
+          "",
           "Lisa.Dukes@tuRJRXkQm.com",
           "2452303",
           "10387.84"
@@ -36835,7 +36821,7 @@
           "5",
           "1933",
           "SWAZILAND",
-          "%",
+          "",
           "Michael.Haley@OfAOvhrm.com",
           "2452359",
           "4187.82"
@@ -36850,7 +36836,7 @@
           "5",
           "1989",
           "SURINAME",
-          "%",
+          "",
           "Tammy.Searcy@6ZFFGtIuCqT.com",
           "2452295",
           "5091.84"
@@ -36865,7 +36851,7 @@
           "12",
           "1992",
           "CAMBODIA",
-          "%",
+          "",
           "Charles.Fernandez@MVhjrzVNVY.com",
           "2452574",
           "4640.37"
@@ -36880,7 +36866,7 @@
           "9",
           "1934",
           "HONDURAS",
-          "%",
+          "",
           "Micheal.Collier@NztJvzb.org",
           "2452446",
           "15944.4"
@@ -36895,7 +36881,7 @@
           "8",
           "1950",
           "NAMIBIA",
-          "%",
+          "",
           "Vikki.Garza@v.edu",
           "2452608",
           "2373.84"
@@ -36910,7 +36896,7 @@
           "12",
           "1950",
           "TIMOR-LESTE",
-          "%",
+          "",
           "Angel.Dodd@gQOLRKqU285BfTIT.edu",
           "2452634",
           "2227.83"
@@ -36925,7 +36911,7 @@
           "12",
           "1971",
           "VANUATU",
-          "%",
+          "",
           "Martha.Dillon@iKkeDtKERbu.org",
           "2452404",
           "1863.4"
@@ -36940,7 +36926,7 @@
           "1",
           "1970",
           "BURUNDI",
-          "%",
+          "",
           "Walter.Stout@Q961tU4iePsOy.org",
           "2452449",
           "2465.55"
@@ -36955,7 +36941,7 @@
           "3",
           "1940",
           "ARMENIA",
-          "%",
+          "",
           "Joseph.Mckinney@4YYp7B8ccPz.edu",
           "2452595",
           "1820.02"
@@ -36970,7 +36956,7 @@
           "3",
           "1992",
           "HONDURAS",
-          "%",
+          "",
           "Darrell.Padgett@IrqARXX.org",
           "2452554",
           "2052.54"
@@ -36985,7 +36971,7 @@
           "2",
           "1925",
           "NICARAGUA",
-          "%",
+          "",
           "John.Mathews@UOtpEd.edu",
           "2452543",
           "7883.4"
@@ -37000,7 +36986,7 @@
           "1",
           "1950",
           "ESTONIA",
-          "%",
+          "",
           "Yvonne.Poirier@l.org",
           "2452648",
           "4075.55"
@@ -37015,7 +37001,7 @@
           "11",
           "1947",
           "KAZAKHSTAN",
-          "%",
+          "",
           "Elizabeth.Spalding@ihnjlmxMbs.edu",
           "2452318",
           "10349.68"
@@ -37030,7 +37016,7 @@
           "9",
           "1951",
           "COMOROS",
-          "%",
+          "",
           "Amy.Causey@7EvHzf02opq6QlO.com",
           "2452443",
           "8005.4"
@@ -37045,7 +37031,7 @@
           "5",
           "1938",
           "SWITZERLAND",
-          "%",
+          "",
           "Leroy.Couture@vqrL.com",
           "2452595",
           "1683.88"
@@ -37060,7 +37046,7 @@
           "8",
           "1938",
           "SWAZILAND",
-          "%",
+          "",
           "Robert.Donohue@U2xz7.org",
           "2452436",
           "11083.8"
@@ -37075,7 +37061,7 @@
           "5",
           "1960",
           "JERSEY",
-          "%",
+          "",
           "Victoria.Morgan@Sk3jzrDZTq.org",
           "2452646",
           "1712.16"
@@ -37090,7 +37076,7 @@
           "7",
           "1978",
           "TURKMENISTAN",
-          "%",
+          "",
           "Jillian.Nelson@ph0qObqh3fbv.com",
           "2452315",
           "4432.69"
@@ -37105,7 +37091,7 @@
           "11",
           "1927",
           "PANAMA",
-          "%",
+          "",
           "Rachael.King@t8dA2klrEIBiCd.edu",
           "2452438",
           "2251.5"
@@ -37120,7 +37106,7 @@
           "4",
           "1960",
           "CROATIA",
-          "%",
+          "",
           "George.Garcia@uzGHyYUnvs.edu",
           "2452306",
           "1783.12"
@@ -37135,7 +37121,7 @@
           "4",
           "1960",
           "CROATIA",
-          "%",
+          "",
           "George.Garcia@uzGHyYUnvs.edu",
           "2452306",
           "1857.63"
@@ -37150,7 +37136,7 @@
           "6",
           "1992",
           "KYRGYZSTAN",
-          "%",
+          "",
           "Gary.Davis@GTXc2AbKvkM.edu",
           "2452322",
           "1652.7"
@@ -37165,7 +37151,7 @@
           "11",
           "1937",
           "BULGARIA",
-          "%",
+          "",
           "Chad.Baldwin@cN988.org",
           "2452560",
           "11133.36"
@@ -37180,7 +37166,7 @@
           "2",
           "1986",
           "MONTENEGRO",
-          "%",
+          "",
           "Alexandra.Henderson@4FCXABbkVkrLK.com",
           "2452376",
           "3426.36"
@@ -37195,7 +37181,7 @@
           "7",
           "1949",
           "ICELAND",
-          "%",
+          "",
           "Dianne.Ross@D4VH75e9n.org",
           "2452429",
           "4018.3"
@@ -37210,7 +37196,7 @@
           "8",
           "1926",
           "JERSEY",
-          "%",
+          "",
           "Scott.Obrien@a84VTAJCTB.com",
           "2452504",
           "1456.67"
@@ -37225,7 +37211,7 @@
           "10",
           "1955",
           "IRAQ",
-          "%",
+          "",
           "Danny.Ness@CC8vAp.edu",
           "2452487",
           "5569.5"
@@ -37240,7 +37226,7 @@
           "10",
           "1976",
           "FINLAND",
-          "%",
+          "",
           "Milton.Oakley@O4DHXT.com",
           "2452355",
           "1505.16"
@@ -37255,7 +37241,7 @@
           "10",
           "1933",
           "BRUNEI DARUSSALAM",
-          "%",
+          "",
           "Gilbert.Palmer@7UYjIOOIg0.org",
           "2452463",
           "2391.95"
@@ -37270,7 +37256,7 @@
           "1",
           "1967",
           "BULGARIA",
-          "%",
+          "",
           "Joseph.Gaffney@nBDj.org",
           "2452608",
           "6135.48"
@@ -37285,7 +37271,7 @@
           "3",
           "1981",
           "MOZAMBIQUE",
-          "%",
+          "",
           "Emily.Thomas@qtJnzLvYcK598T.edu",
           "2452617",
           "3239.04"
@@ -37300,7 +37286,7 @@
           "11",
           "1950",
           "MONACO",
-          "%",
+          "",
           "Carter.Lombardo@X.edu",
           "2452582",
           "3965.43"
@@ -37315,7 +37301,7 @@
           "7",
           "1934",
           "LATVIA",
-          "%",
+          "",
           "Diana.Hall@Be.com",
           "2452546",
           "9391.76"
@@ -37330,7 +37316,7 @@
           "9",
           "1977",
           "ANGUILLA",
-          "%",
+          "",
           "John.Hardy@LnaYnyZ9AYee.edu",
           "2452289",
           "1640.8"
@@ -37345,7 +37331,7 @@
           "8",
           "1956",
           "ZAMBIA",
-          "%",
+          "",
           "Demetrius.Hunt@J3.com",
           "2452647",
           "3673.6"
@@ -37360,7 +37346,7 @@
           "10",
           "1934",
           "GUADELOUPE",
-          "%",
+          "",
           "Karen.Middleton@q.com",
           "2452343",
           "1415.7"
@@ -37375,7 +37361,7 @@
           "8",
           "1952",
           "ITALY",
-          "%",
+          "",
           "Anne.Jernigan@BBtNT7SneOEKG.edu",
           "2452612",
           "1735.14"
@@ -37384,15 +37370,15 @@
           "AAAAAAAAFMLEAAAA",
           "Mr.",
           "Gavin",
-          "%",
-          "%",
+          "",
+          "",
           "21",
-          "%",
+          "",
           "1933",
           "BRAZIL",
-          "%",
+          "",
           "Gavin.Maples@AT6ClrGUc79.com",
-          "%",
+          "",
           "4882.15"
         ],
         [
@@ -37405,7 +37391,7 @@
           "1",
           "1971",
           "ARMENIA",
-          "%",
+          "",
           "Jack.Thomas@dn0mBXIEu7XPH.com",
           "2452409",
           "2501.94"
@@ -37420,7 +37406,7 @@
           "6",
           "1984",
           "VENEZUELA",
-          "%",
+          "",
           "Jennifer.Long@RyRC5oxxCoVPG.com",
           "2452285",
           "4430.88"
@@ -37435,7 +37421,7 @@
           "8",
           "1974",
           "GUADELOUPE",
-          "%",
+          "",
           "Jeffrey.Cleveland@ijNnAoDZQajhuz.edu",
           "2452380",
           "4215.15"
@@ -37450,7 +37436,7 @@
           "12",
           "1926",
           "SAN MARINO",
-          "%",
+          "",
           "Jack.Stewart@G6N710E1oO.edu",
           "2452618",
           "2859.5"
@@ -37458,16 +37444,16 @@
         [
           "AAAAAAAAGFKEAAAA",
           "Dr.",
-          "%",
+          "",
           "Brown",
-          "%",
-          "%",
+          "",
+          "",
           "4",
           "1933",
           "ROMANIA",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "11364.32"
         ],
         [
@@ -37480,7 +37466,7 @@
           "3",
           "1947",
           "ISRAEL",
-          "%",
+          "",
           "Michael.Christiansen@kQmauEb.org",
           "2452583",
           "1726.2"
@@ -37495,7 +37481,7 @@
           "6",
           "1942",
           "ANTIGUA AND BARBUDA",
-          "%",
+          "",
           "Jerry.Glover@yCUI3N8C0o7LPvL.edu",
           "2452645",
           "6382.26"
@@ -37510,7 +37496,7 @@
           "4",
           "1991",
           "KOREA, REPUBLIC OF",
-          "%",
+          "",
           "Charles.Sloan@gnfGZRA0F.com",
           "2452431",
           "2793.57"
@@ -37525,7 +37511,7 @@
           "10",
           "1969",
           "FRENCH POLYNESIA",
-          "%",
+          "",
           "Joe.Jackson@eHmBJ4QqjNKJypF.com",
           "2452534",
           "1692.69"
@@ -37540,7 +37526,7 @@
           "11",
           "1947",
           "DOMINICA",
-          "%",
+          "",
           "Carlos.Hampton@nrYQ8MXgIunX6gf.com",
           "2452470",
           "5556.75"
@@ -37555,7 +37541,7 @@
           "12",
           "1958",
           "DJIBOUTI",
-          "%",
+          "",
           "Christopher.Payne@R6POV.org",
           "2452350",
           "1638.72"
@@ -37570,7 +37556,7 @@
           "12",
           "1977",
           "SOLOMON ISLANDS",
-          "%",
+          "",
           "Donna.West@6Q.com",
           "2452645",
           "1623.2"
@@ -37578,30 +37564,30 @@
         [
           "AAAAAAAAHBBDBAAA",
           "Mrs.",
-          "%",
+          "",
           "Henry",
           "N",
-          "%",
-          "%",
+          "",
+          "",
           "1948",
           "ARUBA",
-          "%",
-          "%",
+          "",
+          "",
           "2452337",
           "4377.3"
         ],
         [
           "AAAAAAAAHBBDBAAA",
           "Mrs.",
-          "%",
+          "",
           "Henry",
           "N",
-          "%",
-          "%",
+          "",
+          "",
           "1948",
           "ARUBA",
-          "%",
-          "%",
+          "",
+          "",
           "2452337",
           "5013.12"
         ],
@@ -37615,7 +37601,7 @@
           "10",
           "1935",
           "LATVIA",
-          "%",
+          "",
           "Emma.Bailey@beDlbUDUUcPhilRyy9.edu",
           "2452491",
           "5638.14"
@@ -37630,7 +37616,7 @@
           "2",
           "1931",
           "DENMARK",
-          "%",
+          "",
           "Thomas.Hull@XobY92y.com",
           "2452648",
           "2487.6"
@@ -37645,7 +37631,7 @@
           "10",
           "1937",
           "JERSEY",
-          "%",
+          "",
           "James.Turner@4RGTbOoV.org",
           "2452293",
           "2757.44"
@@ -37660,7 +37646,7 @@
           "5",
           "1992",
           "GUERNSEY",
-          "%",
+          "",
           "Andrew.Barrett@i85phxAtKhZfES.com",
           "2452319",
           "7854.67"
@@ -37675,22 +37661,22 @@
           "7",
           "1930",
           "FIJI",
-          "%",
+          "",
           "April.Wallace@9iuUi3U0K.edu",
           "2452382",
           "4596.6"
         ],
         [
           "AAAAAAAAHMEFBAAA",
-          "%",
+          "",
           "Joshua",
           "Bruno",
-          "%",
+          "",
           "1",
           "11",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "Joshua.Bruno@7Ds6hF5nMgOTel9.org",
           "2452303",
           "1806.33"
@@ -37705,7 +37691,7 @@
           "3",
           "1929",
           "MONTSERRAT",
-          "%",
+          "",
           "Jeffery.Thomas@Ld7t.org",
           "2452598",
           "2441.4"
@@ -37720,7 +37706,7 @@
           "7",
           "1967",
           "PUERTO RICO",
-          "%",
+          "",
           "Edith.Robinson@zuf2DUz3bhKnEB.org",
           "2452319",
           "7193.61"
@@ -37735,7 +37721,7 @@
           "8",
           "1944",
           "DJIBOUTI",
-          "%",
+          "",
           "Erika.Edmondson@BuAbOSrTiD06f.edu",
           "2452460",
           "2381.83"
@@ -37750,7 +37736,7 @@
           "9",
           "1936",
           "BULGARIA",
-          "%",
+          "",
           "Carolyn.Cardona@EhKjaAPoU8gf.edu",
           "2452453",
           "7659.19"
@@ -37765,7 +37751,7 @@
           "9",
           "1950",
           "GREECE",
-          "%",
+          "",
           "Elizabeth.Guzman@4Rq0Cyh9c.edu",
           "2452315",
           "1856.2"
@@ -37780,7 +37766,7 @@
           "11",
           "1935",
           "GREECE",
-          "%",
+          "",
           "Paul.Powell@3EgM4I28gtaqb.org",
           "2452320",
           "8416.8"
@@ -37795,7 +37781,7 @@
           "10",
           "1978",
           "BULGARIA",
-          "%",
+          "",
           "Dennis.Brown@fAvOOY4Q13dVdPfb.com",
           "2452404",
           "1552.46"
@@ -37810,7 +37796,7 @@
           "10",
           "1978",
           "BULGARIA",
-          "%",
+          "",
           "Dennis.Brown@fAvOOY4Q13dVdPfb.com",
           "2452404",
           "2639.34"
@@ -37825,7 +37811,7 @@
           "1",
           "1936",
           "ALAND ISLANDS",
-          "%",
+          "",
           "Charles.Chadwick@ofbPzGan.org",
           "2452414",
           "4241.44"
@@ -37840,24 +37826,24 @@
           "2",
           "1967",
           "ETHIOPIA",
-          "%",
+          "",
           "Robert.Parham@0GnPcZbUE.org",
           "2452519",
           "4317.18"
         ],
         [
           "AAAAAAAAJABDBAAA",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
           "9",
           "6",
           "1972",
           "TIMOR-LESTE",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "2387.28"
         ]
       ]
@@ -42317,38 +42303,6 @@
           "N",
           "220211",
           "15"
-        ],
-        [
-          "Elapsed: 00:00:03.36",
-          "",
-          "",
-          "",
-          "",
-          ""
-        ],
-        [
-          "SQL\u003e Disconnected from Oracle",
-          "atabase 12c Enterpri",
-          "e Edition",
-          "e",
-          "ease 12.1.0.2.0",
-          "64bit Pro"
-        ],
-        [
-          "With the Partitioning, Real Ap",
-          "lication Clusters, A",
-          "tomatic St",
-          "r",
-          "ge Management, O",
-          "AP,"
-        ],
-        [
-          "Advanced Analytics and Real Ap",
-          "lication Testing opt",
-          "ons",
-          "",
-          "",
-          ""
         ]
       ]
     },
@@ -44387,92 +44341,92 @@
       "rows": [
         [
           "-.43462725",
-          "%",
-          "%",
+          "",
+          "",
           "2",
           "1"
         ],
         [
           "-.44572555",
           "Electronics",
-          "%",
+          "",
           "1",
           "1"
         ],
         [
           "-.43905844",
           "Children",
-          "%",
+          "",
           "1",
           "2"
         ],
         [
           "-.4353748",
           "Home",
-          "%",
+          "",
           "1",
           "3"
         ],
         [
           "-.4351349",
           "Sports",
-          "%",
+          "",
           "1",
           "4"
         ],
         [
           "-.43478699",
           "Shoes",
-          "%",
+          "",
           "1",
           "5"
         ],
         [
           "-.43393698",
           "Men",
-          "%",
+          "",
           "1",
           "6"
         ],
         [
           "-.43281416",
           "Books",
-          "%",
+          "",
           "1",
           "7"
         ],
         [
           "-.43278561",
           "Women",
-          "%",
+          "",
           "1",
           "8"
         ],
         [
           "-.42883926",
           "Jewelry",
-          "%",
+          "",
           "1",
           "9"
         ],
         [
           "-.42839678",
           "Music",
-          "%",
+          "",
           "1",
           "10"
         ],
         [
           "-.40836402",
-          "%",
-          "%",
+          "",
+          "",
           "1",
           "11"
         ],
         [
           "-.49313849",
           "Books",
-          "%",
+          "",
           "0",
           "1"
         ],
@@ -44591,7 +44545,7 @@
         [
           "-.51972874",
           "Children",
-          "%",
+          "",
           "0",
           "1"
         ],
@@ -44850,7 +44804,7 @@
         [
           "-.27508678",
           "Home",
-          "%",
+          "",
           "0",
           "17"
         ],
@@ -44885,7 +44839,7 @@
         [
           "-.43752822",
           "Jewelry",
-          "%",
+          "",
           "0",
           "5"
         ],
@@ -45004,14 +44958,14 @@
         [
           "-.37624818",
           "Men",
-          "%",
+          "",
           "0",
           "5"
         ],
         [
           "-.47431133",
           "Music",
-          "%",
+          "",
           "0",
           "1"
         ],
@@ -45046,7 +45000,7 @@
         [
           "-.64408685",
           "Shoes",
-          "%",
+          "",
           "0",
           "1"
         ],
@@ -45984,7 +45938,7 @@
         [
           "6",
           "callyeseationantiought",
-          "%"
+          ""
         ],
         [
           "7",
@@ -46109,11 +46063,6 @@
           "88370",
           "Oak Grove",
           "52.42"
-        ],
-        [
-          "19 recor",
-          "(s) selected.",
-          ""
         ]
       ]
     },
@@ -46229,7 +46178,7 @@
         ],
         [
           "Ackerman",
-          "%",
+          "",
           "Hopewell",
           "Pleasant Grove",
           "94468",
@@ -46760,7 +46709,7 @@
         ],
         [
           "Aldrich",
-          "%",
+          "",
           "Salem",
           "Woodville",
           "107876",
@@ -49339,14 +49288,14 @@
           "14",
           "2000-01-10",
           "176.83",
-          "%",
+          "",
           "176.83",
           "73.6"
         ],
         [
           "14",
           "2000-01-21",
-          "%",
+          "",
           "75.29",
           "176.83",
           "75.29"
@@ -49355,7 +49304,7 @@
           "14",
           "2000-01-29",
           "222.33",
-          "%",
+          "",
           "222.33",
           "75.29"
         ],
@@ -49363,14 +49312,14 @@
           "14",
           "2000-02-02",
           "224.01",
-          "%",
+          "",
           "224.01",
           "75.29"
         ],
         [
           "14",
           "2000-02-08",
-          "%",
+          "",
           "85.07",
           "224.01",
           "85.07"
@@ -49378,7 +49327,7 @@
         [
           "14",
           "2000-02-19",
-          "%",
+          "",
           "98.6",
           "224.01",
           "98.6"
@@ -49387,14 +49336,14 @@
           "14",
           "2000-02-21",
           "241.64",
-          "%",
+          "",
           "241.64",
           "98.6"
         ],
         [
           "14",
           "2000-02-22",
-          "%",
+          "",
           "99.83",
           "241.64",
           "99.83"
@@ -49402,7 +49351,7 @@
         [
           "14",
           "2000-03-18",
-          "%",
+          "",
           "112.82",
           "241.64",
           "112.82"
@@ -49411,7 +49360,7 @@
           "14",
           "2000-03-23",
           "251.15",
-          "%",
+          "",
           "251.15",
           "112.82"
         ],
@@ -49419,7 +49368,7 @@
           "14",
           "2000-03-28",
           "260.17",
-          "%",
+          "",
           "260.17",
           "112.82"
         ],
@@ -49427,14 +49376,14 @@
           "14",
           "2000-03-31",
           "370.74",
-          "%",
+          "",
           "370.74",
           "112.82"
         ],
         [
           "14",
           "2000-04-05",
-          "%",
+          "",
           "115.94",
           "370.74",
           "115.94"
@@ -49443,14 +49392,14 @@
           "14",
           "2000-04-15",
           "445.3",
-          "%",
+          "",
           "445.3",
           "115.94"
         ],
         [
           "14",
           "2000-04-27",
-          "%",
+          "",
           "151.48",
           "445.3",
           "151.48"
@@ -49458,7 +49407,7 @@
         [
           "14",
           "2000-05-03",
-          "%",
+          "",
           "176.89",
           "445.3",
           "176.89"
@@ -49467,14 +49416,14 @@
           "14",
           "2000-05-10",
           "451.4",
-          "%",
+          "",
           "451.4",
           "176.89"
         ],
         [
           "14",
           "2000-05-21",
-          "%",
+          "",
           "238.39",
           "451.4",
           "238.39"
@@ -49483,14 +49432,14 @@
           "14",
           "2000-05-26",
           "596.81",
-          "%",
+          "",
           "596.81",
           "238.39"
         ],
         [
           "14",
           "2000-05-29",
-          "%",
+          "",
           "242.51",
           "596.81",
           "242.51"
@@ -49498,7 +49447,7 @@
         [
           "14",
           "2000-06-05",
-          "%",
+          "",
           "304.64",
           "596.81",
           "304.64"
@@ -49507,14 +49456,14 @@
           "14",
           "2000-07-03",
           "623.77",
-          "%",
+          "",
           "623.77",
           "304.64"
         ],
         [
           "14",
           "2000-07-07",
-          "%",
+          "",
           "307.77",
           "623.77",
           "307.77"
@@ -49522,7 +49471,7 @@
         [
           "14",
           "2000-07-18",
-          "%",
+          "",
           "320.04",
           "623.77",
           "320.04"
@@ -49531,14 +49480,14 @@
           "14",
           "2000-07-25",
           "673.08",
-          "%",
+          "",
           "673.08",
           "320.04"
         ],
         [
           "14",
           "2000-08-10",
-          "%",
+          "",
           "411.48",
           "673.08",
           "411.48"
@@ -49546,7 +49495,7 @@
         [
           "14",
           "2000-08-14",
-          "%",
+          "",
           "465.85",
           "673.08",
           "465.85"
@@ -49554,7 +49503,7 @@
         [
           "14",
           "2000-08-21",
-          "%",
+          "",
           "541.45",
           "673.08",
           "541.45"
@@ -49562,7 +49511,7 @@
         [
           "14",
           "2000-08-26",
-          "%",
+          "",
           "574.56",
           "673.08",
           "574.56"
@@ -49579,7 +49528,7 @@
           "25",
           "2000-01-21",
           "97.29",
-          "%",
+          "",
           "97.29",
           "4.49"
         ],
@@ -49587,14 +49536,14 @@
           "25",
           "2000-01-28",
           "192.46",
-          "%",
+          "",
           "192.46",
           "4.49"
         ],
         [
           "25",
           "2000-02-09",
-          "%",
+          "",
           "24.23",
           "192.46",
           "24.23"
@@ -49602,7 +49551,7 @@
         [
           "25",
           "2000-02-11",
-          "%",
+          "",
           "98.99",
           "192.46",
           "98.99"
@@ -49610,7 +49559,7 @@
         [
           "25",
           "2000-02-21",
-          "%",
+          "",
           "170.6",
           "192.46",
           "170.6"
@@ -49618,7 +49567,7 @@
         [
           "25",
           "2000-02-22",
-          "%",
+          "",
           "185.05",
           "192.46",
           "185.05"
@@ -49626,7 +49575,7 @@
         [
           "35",
           "2000-01-14",
-          "%",
+          "",
           "55.24",
           "177.88",
           "55.24"
@@ -49634,7 +49583,7 @@
         [
           "35",
           "2000-01-16",
-          "%",
+          "",
           "95.92",
           "177.88",
           "95.92"
@@ -49642,7 +49591,7 @@
         [
           "35",
           "2000-01-18",
-          "%",
+          "",
           "126.45",
           "177.88",
           "126.45"
@@ -49650,7 +49599,7 @@
         [
           "35",
           "2000-01-19",
-          "%",
+          "",
           "167.07",
           "177.88",
           "167.07"
@@ -49658,7 +49607,7 @@
         [
           "35",
           "2000-02-17",
-          "%",
+          "",
           "173.97",
           "177.88",
           "173.97"
@@ -49667,14 +49616,14 @@
           "35",
           "2000-02-22",
           "270.43",
-          "%",
+          "",
           "270.43",
           "173.97"
         ],
         [
           "35",
           "2000-02-23",
-          "%",
+          "",
           "180.61",
           "270.43",
           "180.61"
@@ -49682,7 +49631,7 @@
         [
           "35",
           "2000-03-03",
-          "%",
+          "",
           "181.99",
           "270.43",
           "181.99"
@@ -49690,7 +49639,7 @@
         [
           "35",
           "2000-03-05",
-          "%",
+          "",
           "221.24",
           "270.43",
           "221.24"
@@ -49698,7 +49647,7 @@
         [
           "35",
           "2000-03-06",
-          "%",
+          "",
           "266.41",
           "270.43",
           "266.41"
@@ -49714,7 +49663,7 @@
         [
           "37",
           "2000-01-04",
-          "%",
+          "",
           "17.15",
           "31.75",
           "17.15"
@@ -49723,14 +49672,14 @@
           "37",
           "2000-01-05",
           "34.34",
-          "%",
+          "",
           "34.34",
           "17.15"
         ],
         [
           "37",
           "2000-01-06",
-          "%",
+          "",
           "29.67",
           "34.34",
           "29.67"
@@ -49738,7 +49687,7 @@
         [
           "41",
           "2000-01-21",
-          "%",
+          "",
           "15.54",
           "123.34",
           "15.54"
@@ -49746,7 +49695,7 @@
         [
           "41",
           "2000-02-03",
-          "%",
+          "",
           "21.04",
           "123.34",
           "21.04"
@@ -49754,7 +49703,7 @@
         [
           "41",
           "2000-02-16",
-          "%",
+          "",
           "33.46",
           "123.34",
           "33.46"
@@ -49762,7 +49711,7 @@
         [
           "41",
           "2000-02-20",
-          "%",
+          "",
           "37.46",
           "123.34",
           "37.46"
@@ -49770,7 +49719,7 @@
         [
           "41",
           "2000-02-22",
-          "%",
+          "",
           "58.57",
           "123.34",
           "58.57"
@@ -49778,7 +49727,7 @@
         [
           "41",
           "2000-03-05",
-          "%",
+          "",
           "70.06",
           "123.34",
           "70.06"
@@ -49795,7 +49744,7 @@
           "41",
           "2000-04-26",
           "263.14",
-          "%",
+          "",
           "263.14",
           "254.88"
         ],
@@ -49803,14 +49752,14 @@
           "41",
           "2000-07-12",
           "474.83",
-          "%",
+          "",
           "474.83",
           "393.87"
         ],
         [
           "41",
           "2000-07-18",
-          "%",
+          "",
           "421.23",
           "474.83",
           "421.23"
@@ -49818,7 +49767,7 @@
         [
           "41",
           "2000-08-15",
-          "%",
+          "",
           "430.77",
           "474.83",
           "430.77"
@@ -49826,7 +49775,7 @@
         [
           "49",
           "2000-01-18",
-          "%",
+          "",
           "2.51",
           "4.58",
           "2.51"
@@ -49835,14 +49784,14 @@
           "49",
           "2000-01-31",
           "72.47",
-          "%",
+          "",
           "72.47",
           "13.05"
         ],
         [
           "49",
           "2000-02-13",
-          "%",
+          "",
           "70.68",
           "72.47",
           "70.68"
@@ -49850,7 +49799,7 @@
         [
           "49",
           "2000-02-29",
-          "%",
+          "",
           "71.86",
           "72.47",
           "71.86"
@@ -49859,7 +49808,7 @@
           "49",
           "2000-04-17",
           "225.29",
-          "%",
+          "",
           "225.29",
           "219.03"
         ],
@@ -49875,7 +49824,7 @@
           "53",
           "2000-01-08",
           "119.24",
-          "%",
+          "",
           "119.24",
           "1.13"
         ],
@@ -49883,14 +49832,14 @@
           "53",
           "2000-01-09",
           "126.98",
-          "%",
+          "",
           "126.98",
           "1.13"
         ],
         [
           "53",
           "2000-01-15",
-          "%",
+          "",
           "3.2",
           "126.98",
           "3.2"
@@ -49898,7 +49847,7 @@
         [
           "53",
           "2000-02-04",
-          "%",
+          "",
           "22.89",
           "126.98",
           "22.89"
@@ -49906,7 +49855,7 @@
         [
           "53",
           "2000-02-05",
-          "%",
+          "",
           "64.45",
           "126.98",
           "64.45"
@@ -49914,7 +49863,7 @@
         [
           "53",
           "2000-02-12",
-          "%",
+          "",
           "66.06",
           "126.98",
           "66.06"
@@ -49931,14 +49880,14 @@
           "61",
           "2000-02-17",
           "421.6",
-          "%",
+          "",
           "421.6",
           "344.03"
         ],
         [
           "61",
           "2000-03-01",
-          "%",
+          "",
           "411.33",
           "421.6",
           "411.33"
@@ -49947,7 +49896,7 @@
           "61",
           "2000-04-22",
           "600.2",
-          "%",
+          "",
           "600.2",
           "573.28"
         ],
@@ -49962,7 +49911,7 @@
         [
           "85",
           "2000-02-03",
-          "%",
+          "",
           "42.3",
           "65.5",
           "42.3"
@@ -49970,7 +49919,7 @@
         [
           "85",
           "2000-02-16",
-          "%",
+          "",
           "42.95",
           "65.5",
           "42.95"
@@ -49979,14 +49928,14 @@
           "85",
           "2000-04-19",
           "335.16",
-          "%",
+          "",
           "335.16",
           "247.67"
         ],
         [
           "85",
           "2000-04-23",
-          "%",
+          "",
           "252.83",
           "335.16",
           "252.83"
@@ -49994,7 +49943,7 @@
         [
           "85",
           "2000-05-02",
-          "%",
+          "",
           "289.65",
           "335.16",
           "289.65"
@@ -50002,7 +49951,7 @@
         [
           "85",
           "2000-05-11",
-          "%",
+          "",
           "312.62",
           "335.16",
           "312.62"
@@ -50011,7 +49960,7 @@
           "86",
           "2000-01-19",
           "31.7",
-          "%",
+          "",
           "31.7",
           "25.97"
         ],
@@ -50019,14 +49968,14 @@
           "86",
           "2000-02-03",
           "151.26",
-          "%",
+          "",
           "151.26",
           "91.16"
         ],
         [
           "86",
           "2000-02-04",
-          "%",
+          "",
           "112.15",
           "151.26",
           "112.15"
@@ -50034,7 +49983,7 @@
         [
           "89",
           "2000-01-12",
-          "%",
+          "",
           "28.84",
           "181.56",
           "28.84"
@@ -50042,7 +49991,7 @@
         [
           "89",
           "2000-01-23",
-          "%",
+          "",
           "67.19",
           "181.56",
           "67.19"
@@ -50050,7 +49999,7 @@
         [
           "89",
           "2000-01-30",
-          "%",
+          "",
           "104.65",
           "181.56",
           "104.65"
@@ -50058,7 +50007,7 @@
         [
           "89",
           "2000-02-22",
-          "%",
+          "",
           "146.96",
           "181.56",
           "146.96"
@@ -50066,7 +50015,7 @@
         [
           "89",
           "2000-02-25",
-          "%",
+          "",
           "147.02",
           "181.56",
           "147.02"
@@ -50074,7 +50023,7 @@
         [
           "89",
           "2000-03-19",
-          "%",
+          "",
           "172.85",
           "181.56",
           "172.85"
@@ -50083,7 +50032,7 @@
           "89",
           "2000-03-20",
           "191.66",
-          "%",
+          "",
           "191.66",
           "172.85"
         ],
@@ -50091,14 +50040,14 @@
           "89",
           "2000-04-11",
           "295.81",
-          "%",
+          "",
           "295.81",
           "172.85"
         ],
         [
           "89",
           "2000-04-13",
-          "%",
+          "",
           "203.86",
           "295.81",
           "203.86"
@@ -50107,14 +50056,14 @@
           "89",
           "2000-04-20",
           "373.3",
-          "%",
+          "",
           "373.3",
           "203.86"
         ],
         [
           "89",
           "2000-04-23",
-          "%",
+          "",
           "219.74",
           "373.3",
           "219.74"
@@ -50122,7 +50071,7 @@
         [
           "89",
           "2000-04-26",
-          "%",
+          "",
           "235.97",
           "373.3",
           "235.97"
@@ -50130,7 +50079,7 @@
         [
           "89",
           "2000-05-04",
-          "%",
+          "",
           "248.05",
           "373.3",
           "248.05"
@@ -55161,8 +55110,8 @@
     "query_61": {
       "columns": [
         "PROMOTIONS",
-        "TOTAL CAST",
-        "PROMOTIONSASDECIMAL(15,4))/CAST(TOTALASDECIMAL(15,4))*100"
+        "TOTAL",
+        "CAST(PROMOTIONSASDECIMAL(15,4))/CAST(TOTALASDECIMAL(15,4))*100"
       ],
       "rows": [
         [
@@ -56753,8 +56702,8 @@
           "11757",
           "772",
           "Valley",
-          "[NULL]",
-          "[NULL]",
+          "",
+          "",
           "1999",
           "1",
           "16.24000",
@@ -56776,8 +56725,8 @@
           "11757",
           "772",
           "Valley",
-          "[NULL]",
-          "[NULL]",
+          "",
+          "",
           "1999",
           "1",
           "16.24000",
@@ -57997,8 +57946,8 @@
           "92770328.3"
         ],
         [
-          "%",
-          "%",
+          "",
+          "",
           "Fairview",
           "Williamson County",
           "TN",
@@ -58017,18 +57966,18 @@
           "21495513.7",
           "34795669.2",
           "33122997.9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "21913594.6",
           "32518476.5",
           "24885662.7",
@@ -58062,11 +58011,11 @@
           "Books",
           "arts",
           "amalgmaxi #12",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1577322.2",
           "26"
         ],
@@ -58074,11 +58023,11 @@
           "Books",
           "arts",
           "amalgmaxi #2",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "757558.15",
           "93"
         ],
@@ -58086,11 +58035,11 @@
           "Books",
           "arts",
           "amalgmaxi #3",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "889848.65",
           "79"
         ],
@@ -58098,23 +58047,23 @@
           "Books",
           "arts",
           "amalgmaxi #9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "816219.08",
           "89"
         ],
         [
           "Books",
           "arts",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "5188162.15",
           "17"
         ],
@@ -58122,11 +58071,11 @@
           "Books",
           "business",
           "importomaxi #12",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1288307.29",
           "42"
         ],
@@ -58134,11 +58083,11 @@
           "Books",
           "business",
           "importomaxi #2",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "985887.08",
           "68"
         ],
@@ -58146,11 +58095,11 @@
           "Books",
           "business",
           "importomaxi #8",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1067725.65",
           "61"
         ],
@@ -58158,23 +58107,23 @@
           "Books",
           "business",
           "importomaxi #9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1269598.91",
           "45"
         ],
         [
           "Books",
           "business",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "5905977.34",
           "10"
         ],
@@ -58182,11 +58131,11 @@
           "Books",
           "computers",
           "exportimaxi #12",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1456918.73",
           "28"
         ],
@@ -58194,11 +58143,11 @@
           "Books",
           "computers",
           "exportimaxi #2",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1626664.04",
           "24"
         ],
@@ -58206,11 +58155,11 @@
           "Books",
           "computers",
           "exportimaxi #3",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "875667.64",
           "82"
         ],
@@ -58218,11 +58167,11 @@
           "Books",
           "computers",
           "exportimaxi #6",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "847659.03",
           "86"
         ],
@@ -58230,11 +58179,11 @@
           "Books",
           "computers",
           "exportimaxi #8",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1189646.65",
           "49"
         ],
@@ -58242,23 +58191,23 @@
           "Books",
           "computers",
           "exportimaxi #9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1059845.98",
           "63"
         ],
         [
           "Books",
           "computers",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "7061536.03",
           "7"
         ],
@@ -58266,11 +58215,11 @@
           "Books",
           "cooking",
           "amalgunivamalg #12",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1097730",
           "58"
         ],
@@ -58278,11 +58227,11 @@
           "Books",
           "cooking",
           "amalgunivamalg #3",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "978431.47",
           "69"
         ],
@@ -58290,11 +58239,11 @@
           "Books",
           "cooking",
           "amalgunivamalg #6",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "858562.34",
           "84"
         ],
@@ -58302,11 +58251,11 @@
           "Books",
           "cooking",
           "amalgunivamalg #8",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "917692",
           "74"
         ],
@@ -58314,23 +58263,23 @@
           "Books",
           "cooking",
           "amalgunivamalg #9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "881045.3",
           "80"
         ],
         [
           "Books",
           "cooking",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "5357549.49",
           "16"
         ],
@@ -58338,11 +58287,11 @@
           "Books",
           "entertainments",
           "edu packmaxi #12",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "962267.01",
           "70"
         ],
@@ -58350,11 +58299,11 @@
           "Books",
           "entertainments",
           "edu packmaxi #2",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "750249.81",
           "94"
         ],
@@ -58362,11 +58311,11 @@
           "Books",
           "entertainments",
           "edu packmaxi #3",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1325140.63",
           "39"
         ],
@@ -58374,11 +58323,11 @@
           "Books",
           "entertainments",
           "edu packmaxi #6",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "874454.87",
           "83"
         ],
@@ -58386,23 +58335,23 @@
           "Books",
           "entertainments",
           "edu packmaxi #8",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "894416.62",
           "78"
         ],
         [
           "Books",
           "entertainments",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "5465761.48",
           "14"
         ],
@@ -58410,11 +58359,11 @@
           "Books",
           "fiction",
           "scholarunivamalg #12",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "957012.63",
           "71"
         ],
@@ -58422,11 +58371,11 @@
           "Books",
           "fiction",
           "scholarunivamalg #2",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1798976.95",
           "20"
         ],
@@ -58434,11 +58383,11 @@
           "Books",
           "fiction",
           "scholarunivamalg #3",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1288272.89",
           "43"
         ],
@@ -58446,11 +58395,11 @@
           "Books",
           "fiction",
           "scholarunivamalg #6",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1031571.39",
           "65"
         ],
@@ -58458,11 +58407,11 @@
           "Books",
           "fiction",
           "scholarunivamalg #8",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1444468.85",
           "30"
         ],
@@ -58470,23 +58419,23 @@
           "Books",
           "fiction",
           "scholarunivamalg #9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1333004.22",
           "38"
         ],
         [
           "Books",
           "fiction",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "7867516.44",
           "3"
         ],
@@ -58494,11 +58443,11 @@
           "Books",
           "history",
           "scholarmaxi #12",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1407800.96",
           "34"
         ],
@@ -58506,11 +58455,11 @@
           "Books",
           "history",
           "scholarmaxi #2",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1601550.87",
           "25"
         ],
@@ -58518,11 +58467,11 @@
           "Books",
           "history",
           "scholarmaxi #3",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1181491.2",
           "50"
         ],
@@ -58530,11 +58479,11 @@
           "Books",
           "history",
           "scholarmaxi #6",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1175904.65",
           "51"
         ],
@@ -58542,11 +58491,11 @@
           "Books",
           "history",
           "scholarmaxi #8",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1205167.13",
           "48"
         ],
@@ -58554,23 +58503,23 @@
           "Books",
           "history",
           "scholarmaxi #9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1873407.99",
           "18"
         ],
         [
           "Books",
           "history",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "8458815.11",
           "2"
         ],
@@ -58578,11 +58527,11 @@
           "Books",
           "home repair",
           "importounivamalg #12",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "929871.46",
           "72"
         ],
@@ -58590,11 +58539,11 @@
           "Books",
           "home repair",
           "importounivamalg #2",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1672201.56",
           "22"
         ],
@@ -58602,11 +58551,11 @@
           "Books",
           "home repair",
           "importounivamalg #3",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1321000.94",
           "40"
         ],
@@ -58614,11 +58563,11 @@
           "Books",
           "home repair",
           "importounivamalg #6",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "717528.04",
           "96"
         ],
@@ -58626,11 +58575,11 @@
           "Books",
           "home repair",
           "importounivamalg #8",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1669033.95",
           "23"
         ],
@@ -58638,23 +58587,23 @@
           "Books",
           "home repair",
           "importounivamalg #9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1066519.11",
           "62"
         ],
         [
           "Books",
           "home repair",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "7388154.74",
           "4"
         ],
@@ -58662,11 +58611,11 @@
           "Books",
           "mystery",
           "corpunivamalg #12",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1146116.05",
           "54"
         ],
@@ -58674,11 +58623,11 @@
           "Books",
           "mystery",
           "corpunivamalg #2",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "747999.99",
           "95"
         ],
@@ -58686,11 +58635,11 @@
           "Books",
           "mystery",
           "corpunivamalg #3",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1145257.96",
           "55"
         ],
@@ -58698,11 +58647,11 @@
           "Books",
           "mystery",
           "corpunivamalg #6",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1098189.71",
           "57"
         ],
@@ -58710,23 +58659,23 @@
           "Books",
           "mystery",
           "corpunivamalg #8",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "759890.03",
           "92"
         ],
         [
           "Books",
           "mystery",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "5559086.76",
           "13"
         ],
@@ -58734,11 +58683,11 @@
           "Books",
           "parenting",
           "corpmaxi #12",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1022503.6",
           "66"
         ],
@@ -58746,11 +58695,11 @@
           "Books",
           "parenting",
           "corpmaxi #2",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "908607.31",
           "76"
         ],
@@ -58758,11 +58707,11 @@
           "Books",
           "parenting",
           "corpmaxi #6",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1717275.15",
           "21"
         ],
@@ -58770,23 +58719,23 @@
           "Books",
           "parenting",
           "corpmaxi #9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "895829.36",
           "77"
         ],
         [
           "Books",
           "parenting",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "5905648.45",
           "11"
         ],
@@ -58794,11 +58743,11 @@
           "Books",
           "reference",
           "brandmaxi #12",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1418372.8",
           "33"
         ],
@@ -58806,11 +58755,11 @@
           "Books",
           "reference",
           "brandmaxi #2",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1154379.77",
           "53"
         ],
@@ -58818,11 +58767,11 @@
           "Books",
           "reference",
           "brandmaxi #3",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1168210.15",
           "52"
         ],
@@ -58830,11 +58779,11 @@
           "Books",
           "reference",
           "brandmaxi #6",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1349780.84",
           "37"
         ],
@@ -58842,11 +58791,11 @@
           "Books",
           "reference",
           "brandmaxi #8",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1429502.89",
           "31"
         ],
@@ -58854,23 +58803,23 @@
           "Books",
           "reference",
           "brandmaxi #9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "714094.43",
           "97"
         ],
         [
           "Books",
           "reference",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "7245435.64",
           "6"
         ],
@@ -58878,11 +58827,11 @@
           "Books",
           "romance",
           "namelessmaxi #12",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1356568.45",
           "36"
         ],
@@ -58890,11 +58839,11 @@
           "Books",
           "romance",
           "namelessmaxi #2",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1236630.16",
           "47"
         ],
@@ -58902,11 +58851,11 @@
           "Books",
           "romance",
           "namelessmaxi #3",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1866764.2",
           "19"
         ],
@@ -58914,11 +58863,11 @@
           "Books",
           "romance",
           "namelessmaxi #6",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1086707.92",
           "59"
         ],
@@ -58926,11 +58875,11 @@
           "Books",
           "romance",
           "namelessmaxi #8",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "825762.4",
           "88"
         ],
@@ -58938,23 +58887,23 @@
           "Books",
           "romance",
           "namelessmaxi #9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "876869.83",
           "81"
         ],
         [
           "Books",
           "romance",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "7252274.41",
           "5"
         ],
@@ -58962,11 +58911,11 @@
           "Books",
           "science",
           "maximaxi #2",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "702171.3",
           "98"
         ],
@@ -58974,11 +58923,11 @@
           "Books",
           "science",
           "maximaxi #3",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "777021.93",
           "90"
         ],
@@ -58986,11 +58935,11 @@
           "Books",
           "science",
           "maximaxi #6",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1446589.43",
           "29"
         ],
@@ -58998,11 +58947,11 @@
           "Books",
           "science",
           "maximaxi #8",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1004042.04",
           "67"
         ],
@@ -59010,23 +58959,23 @@
           "Books",
           "science",
           "maximaxi #9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "849422.2",
           "85"
         ],
         [
           "Books",
           "science",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "5359276.19",
           "15"
         ],
@@ -59034,11 +58983,11 @@
           "Books",
           "self-help",
           "exportiunivamalg #2",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1283148.53",
           "44"
         ],
@@ -59046,11 +58995,11 @@
           "Books",
           "self-help",
           "exportiunivamalg #3",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "770181.59",
           "91"
         ],
@@ -59058,11 +59007,11 @@
           "Books",
           "self-help",
           "exportiunivamalg #6",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1391623.86",
           "35"
         ],
@@ -59070,11 +59019,11 @@
           "Books",
           "self-help",
           "exportiunivamalg #8",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "695644.62",
           "100"
         ],
@@ -59082,23 +59031,23 @@
           "Books",
           "self-help",
           "exportiunivamalg #9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1427999.91",
           "32"
         ],
         [
           "Books",
           "self-help",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "6261649.72",
           "8"
         ],
@@ -59106,11 +59055,11 @@
           "Books",
           "sports",
           "edu packunivamalg #12",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "928301.94",
           "73"
         ],
@@ -59118,11 +59067,11 @@
           "Books",
           "sports",
           "edu packunivamalg #6",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1503681.79",
           "27"
         ],
@@ -59130,11 +59079,11 @@
           "Books",
           "sports",
           "edu packunivamalg #8",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1263974.84",
           "46"
         ],
@@ -59142,23 +59091,23 @@
           "Books",
           "sports",
           "edu packunivamalg #9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "840684.29",
           "87"
         ],
         [
           "Books",
           "sports",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "5610649.06",
           "12"
         ],
@@ -59166,11 +59115,11 @@
           "Books",
           "travel",
           "univunivamalg #12",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1135250.45",
           "56"
         ],
@@ -59178,11 +59127,11 @@
           "Books",
           "travel",
           "univunivamalg #2",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1053533.86",
           "64"
         ],
@@ -59190,11 +59139,11 @@
           "Books",
           "travel",
           "univunivamalg #3",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1085484.15",
           "60"
         ],
@@ -59202,11 +59151,11 @@
           "Books",
           "travel",
           "univunivamalg #6",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "696575.97",
           "99"
         ],
@@ -59214,11 +59163,11 @@
           "Books",
           "travel",
           "univunivamalg #8",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "1310411.8",
           "41"
         ],
@@ -59226,35 +59175,35 @@
           "Books",
           "travel",
           "univunivamalg #9",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
           "917487.24",
           "75"
         ],
         [
           "Books",
           "travel",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "6200882.35",
           "9"
         ],
         [
           "Books",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
           "102246972",
           "1"
         ]
@@ -59814,7 +59763,7 @@
         ],
         [
           "Archuleta",
-          "%",
+          "",
           "Yorktown",
           "Welcome",
           "205016",
@@ -62010,15 +61959,15 @@
       "rows": [
         [
           "-440986113",
-          "%",
-          "%",
+          "",
+          "",
           "2",
           "1"
         ],
         [
           "-440986113",
           "TN",
-          "%",
+          "",
           "1",
           "1"
         ],
@@ -69993,7 +69942,7 @@
         [
           "Greene",
           "Clarence",
-          "-",
+          "",
           "N",
           "1541",
           "5"
@@ -70181,8 +70130,8 @@
         ],
         [
           "AAAAAAAAFHACBAAA",
-          "%",
-          "%"
+          "",
+          ""
         ],
         [
           "AAAAAAAAFJHFAAAA",
@@ -70446,8 +70395,8 @@
         ],
         [
           "AAAAAAAAOCLBBAAA",
-          "%",
-          "%"
+          "",
+          ""
         ],
         [
           "AAAAAAAAOFLCAAAA",
@@ -71913,7 +71862,7 @@
           "cs_ship_addr_sk",
           "1998",
           "2",
-          "%",
+          "",
           "1",
           "1535.61"
         ],
@@ -72102,7 +72051,7 @@
           "cs_ship_addr_sk",
           "1998",
           "4",
-          "%",
+          "",
           "2",
           "839.65"
         ],
@@ -72471,9 +72420,9 @@
           "cs_ship_addr_sk",
           "1999",
           "4",
-          "%",
+          "",
           "1",
-          "%"
+          ""
         ],
         [
           "catalog",
@@ -74700,8 +74649,8 @@
           "Earnestine",
           "Midway",
           "159660",
-          "%",
-          "%"
+          "",
+          ""
         ],
         [
           "Allen",
@@ -74825,7 +74774,7 @@
         ],
         [
           "Allen",
-          "%",
+          "",
           "Midway",
           "43827",
           "844.35",
@@ -75902,7 +75851,7 @@
           "AAAAAAAAAMFBBAAA",
           "Mr.",
           "Jackson",
-          "%",
+          "",
           "177",
           "8th Walnut",
           "Ct.",
@@ -76208,7 +76157,7 @@
           "AAAAAAAABEHABAAA",
           "Dr.",
           "Gregory",
-          "%",
+          "",
           "391",
           "Seventh",
           "Road",
@@ -76262,7 +76211,7 @@
           "AAAAAAAABHOFAAAA",
           "Ms.",
           "Anthony",
-          "%",
+          "",
           "518",
           "Meadow Smith",
           "Ct.",
@@ -76566,9 +76515,9 @@
         ],
         [
           "AAAAAAAACFADBAAA",
-          "%",
-          "%",
-          "%",
+          "",
+          "",
+          "",
           "502",
           "Willow Park",
           "Cir.",
@@ -76660,16 +76609,16 @@
           "Neal",
           "Nash",
           "95",
-          "%",
+          "",
           "Street",
           "Suite 110",
           "Spring Hill",
           "Murray County",
           "GA",
           "36787",
-          "%",
+          "",
           "-5",
-          "%",
+          "",
           "2144.31"
         ],
         [
@@ -77197,7 +77146,7 @@
         [
           "AAAAAAAAEDOAAAAA",
           "Dr.",
-          "%",
+          "",
           "Finley",
           "899",
           "Willow Pine",
@@ -77946,85 +77895,85 @@
       "rows": [
         [
           "325552631",
-          "%",
-          "%",
+          "",
+          "",
           "2",
           "1"
         ],
         [
           "33602545.4",
           "Shoes",
-          "%",
+          "",
           "1",
           "1"
         ],
         [
           "33399717.8",
           "Music",
-          "%",
+          "",
           "1",
           "2"
         ],
         [
           "33061835.6",
           "Women",
-          "%",
+          "",
           "1",
           "3"
         ],
         [
           "32942681",
           "Books",
-          "%",
+          "",
           "1",
           "4"
         ],
         [
           "32233369.7",
           "Men",
-          "%",
+          "",
           "1",
           "5"
         ],
         [
           "32135907.2",
           "Electronics",
-          "%",
+          "",
           "1",
           "6"
         ],
         [
           "32027085.1",
           "Jewelry",
-          "%",
+          "",
           "1",
           "7"
         ],
         [
           "31908139.7",
           "Sports",
-          "%",
+          "",
           "1",
           "8"
         ],
         [
           "31877378.2",
           "Children",
-          "%",
+          "",
           "1",
           "9"
         ],
         [
           "31428816.3",
           "Home",
-          "%",
+          "",
           "1",
           "10"
         ],
         [
           "935154.67",
-          "%",
-          "%",
+          "",
+          "",
           "1",
           "11"
         ],
@@ -78143,7 +78092,7 @@
         [
           "84068.23",
           "Books",
-          "%",
+          "",
           "0",
           "17"
         ],
@@ -78178,7 +78127,7 @@
         [
           "45178.92",
           "Children",
-          "%",
+          "",
           "0",
           "5"
         ],
@@ -78409,7 +78358,7 @@
         [
           "55823.63",
           "Home",
-          "%",
+          "",
           "0",
           "17"
         ],
@@ -78528,7 +78477,7 @@
         [
           "98583.06",
           "Jewelry",
-          "%",
+          "",
           "0",
           "17"
         ],
@@ -78591,7 +78540,7 @@
         [
           "111525.32",
           "Music",
-          "%",
+          "",
           "0",
           "5"
         ],
@@ -103598,7 +103547,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "EXPRESS",
           "Mid Atlantic",
           "1223",
@@ -103608,7 +103557,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "EXPRESS",
           "NY Metro",
           "1274",
@@ -103618,7 +103567,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "EXPRESS",
           "North Midwest",
           "1159",
@@ -103628,7 +103577,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "LIBRARY",
           "Mid Atlantic",
           "941",
@@ -103638,7 +103587,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "LIBRARY",
           "NY Metro",
           "886",
@@ -103648,7 +103597,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "LIBRARY",
           "North Midwest",
           "917",
@@ -103658,7 +103607,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "NEXT DAY",
           "Mid Atlantic",
           "1304",
@@ -103668,7 +103617,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "NEXT DAY",
           "NY Metro",
           "1271",
@@ -103678,7 +103627,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "NEXT DAY",
           "North Midwest",
           "1199",
@@ -103688,7 +103637,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "OVERNIGHT",
           "Mid Atlantic",
           "965",
@@ -103698,7 +103647,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "OVERNIGHT",
           "NY Metro",
           "979",
@@ -103708,7 +103657,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "OVERNIGHT",
           "North Midwest",
           "946",
@@ -103718,7 +103667,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "REGULAR",
           "Mid Atlantic",
           "933",
@@ -103728,7 +103677,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "REGULAR",
           "NY Metro",
           "961",
@@ -103738,7 +103687,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "REGULAR",
           "North Midwest",
           "893",
@@ -103748,7 +103697,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "TWO DAY",
           "Mid Atlantic",
           "972",
@@ -103758,7 +103707,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "TWO DAY",
           "NY Metro",
           "926",
@@ -103768,7 +103717,7 @@
           "0"
         ],
         [
-          "%",
+          "",
           "TWO DAY",
           "North Midwest",
           "941",

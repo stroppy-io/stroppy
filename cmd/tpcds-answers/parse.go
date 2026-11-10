@@ -8,6 +8,7 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 // block is one result set: column names plus rows of stringified cells.
@@ -22,7 +23,7 @@ var errParse = errors.New("parse error")
 // rowsFooter matches the result-count trailers both source DBs append: psql's
 // "(42 rows)" and the kit's sqlplus-style "100 rows selected." /
 // "19 record(s) selected." — none of which are data.
-var rowsFooter = regexp.MustCompile(`^(\(\s*\d+\s+rows?\s*\)|\d+\s+(rows?|records?|record\(s\))\s+selected\.?)\s*$`)
+var rowsFooter = regexp.MustCompile(`^\s*(\(\s*\d+\s+rows?\s*\)|\d+\s+(rows?|records?|record\(s\))\s+selected\.?)\s*$`)
 
 // outputMarker matches the "---------------------- OUTPUT Query 2" lines that
 // separate the two result sets of a two-part query (q24). Treated as noise:
@@ -78,10 +79,23 @@ func collectLines(r io.Reader) ([]string, error) {
 	var lines []string
 
 	for scanner.Scan() {
-		ln := expandTabs(scanner.Text())
+		raw := scanner.Text()
+		if !utf8.ValidString(raw) {
+			var decoded strings.Builder
+			for _, value := range []byte(raw) {
+				decoded.WriteRune(rune(value))
+			}
+			raw = decoded.String()
+		}
+		ln := expandTabs(raw)
 
 		ln = strings.TrimRight(ln, " \t\r")
-		if ln == "" || rowsFooter.MatchString(ln) || outputMarker.MatchString(ln) {
+		trimmed := strings.TrimSpace(ln)
+		if strings.HasPrefix(trimmed, "SQL> Disconnected") {
+			break
+		}
+		if ln == "" || rowsFooter.MatchString(ln) || outputMarker.MatchString(ln) ||
+			strings.HasPrefix(trimmed, "SQL>") || strings.HasPrefix(trimmed, "Elapsed:") {
 			continue
 		}
 
@@ -172,20 +186,28 @@ func spansOf(dashes string) [][2]int {
 // sliceBySpans cuts a fixed-width line into trimmed cells at the given spans.
 // A line shorter than a span yields an empty cell for that column.
 func sliceBySpans(line string, spans [][2]int) []string {
+	characters := []rune(line)
 	out := make([]string, len(spans))
 	for i, sp := range spans {
 		start, end := sp[0], sp[1]
-		if start > len(line) {
+		if start > len(characters) {
 			out[i] = ""
 
 			continue
 		}
 
-		if end > len(line) {
-			end = len(line)
+		if end > len(characters) {
+			end = len(characters)
 		}
 
-		out[i] = strings.TrimSpace(line[start:end])
+		// Some kit rulers are one column wider than their data; do not cut a word.
+		for start > 0 && start < len(characters) && characters[start] != ' ' && characters[start-1] != ' ' {
+			start--
+		}
+		for end > start && end < len(characters) && characters[end] != ' ' && characters[end-1] != ' ' {
+			end--
+		}
+		out[i] = normalizeAnswerCell(string(characters[start:end]))
 	}
 
 	return out
@@ -282,10 +304,41 @@ func splitPipe(line string) []string {
 
 	out := make([]string, len(parts))
 	for i, p := range parts {
-		out[i] = strings.TrimSpace(p)
+		out[i] = normalizeAnswerCell(p)
 	}
 
 	return out
+}
+
+func normalizeAnswerCell(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "%" || value == "[NULL]" || value == "-" {
+		return ""
+	}
+	return value
+}
+
+// Query 17's kit answer wraps its final five columns and merges two ruler spans.
+func readWrappedQuery17(raw []byte) ([]block, error) {
+	lines, err := collectLines(bytes.NewReader(raw))
+	if err != nil {
+		return nil, err
+	}
+	if len(lines) != 4 || !strings.Contains(lines[0], "STORE_RETURNS_QUANTITYAV   STORE_RETURNS_QUANTITYSTDEV") {
+		return nil, fmt.Errorf("%w: unexpected query 17 wrapped layout", errParse)
+	}
+	spans := spansOf(lines[1])
+	if len(spans) != 14 {
+		return nil, fmt.Errorf("%w: unexpected query 17 ruler", errParse)
+	}
+	first := sliceBySpans(lines[2], spans)
+	continuation := strings.Fields(lines[3])
+	if len(continuation) != 2 {
+		return nil, fmt.Errorf("%w: unexpected query 17 continuation", errParse)
+	}
+	columns := append(headerNames(lines[0], spans)[:8], "STORE_RETURNS_QUANTITYAVE", "STORE_RETURNS_QUANTITYSTDEV", "STORE_RETURNS_QUANTITYCOV", "CATALOG_SALES_QUANTITYCOUNT", "CATALOG_SALES_QUANTITYAVE", "CATALOG_SALES_QUANTITYSTDEV", "CATALOG_SALES_QUANTITYCOV")
+	row := append(first[:9], "", "", continuation[0], continuation[1], "", "")
+	return []block{{Columns: columns, Rows: [][]string{row}}}, nil
 }
 
 // readBlocks is a small helper for tests / callers operating on bytes.
