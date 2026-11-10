@@ -112,7 +112,8 @@ jobs:
           # --tiflash 0: a measurement run died with TiKV at 2.5 GiB RSS and 75 MiB
           # free, while the playground was also pulling a 526 MB TiFlash that TiDB
           # tests here do not need.
-          ~/.tiup/bin/tiup playground v8.5.8 --without-monitor --tiflash 0 > /tmp/tidb.log 2>&1 &
+          # An explicit component version avoids TiUP's concurrent background update check.
+          ~/.tiup/bin/tiup "playground:$tiup_version" v8.5.8 --without-monitor --tiflash 0 > /tmp/tidb.log 2>&1 &
           for _ in $(seq 1 60); do
             if mysqladmin ping -h 127.0.0.1 -P 4000 -u root --silent >/dev/null 2>&1; then
               echo "tidb is accepting connections"
