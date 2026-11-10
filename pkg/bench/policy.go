@@ -66,6 +66,15 @@ func TrySharedIterations(workers int, count int64) (Policy, error) {
 	return Policy{mode: "shared-iterations", workers: workers, iterations: count}, nil
 }
 
+// OncePerWorker runs one invocation on every worker without sharing iterations.
+func OncePerWorker(workers int) Policy {
+	if workers < 1 {
+		invalid("per-worker-iterations", inputError("workers must be positive"))
+	}
+
+	return Policy{mode: "per-worker-iterations", workers: workers, iterations: int64(workers)}
+}
+
 // ConstantWorkers stops new invocations at duration and drains existing ones.
 func ConstantWorkers(workers int, duration time.Duration, drain Drain) Policy {
 	p, err := TryConstantWorkers(workers, duration, drain)

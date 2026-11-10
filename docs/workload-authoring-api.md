@@ -261,6 +261,11 @@ policies; all candidates are eagerly constructed. Missing/duplicate modes,
 unknown selection strings, and explicitly passed zero policies are invalid.
 Plain Go selection or a fixed policy is equally supported.
 
+`bench.OncePerWorker(workers)` executes one action on each worker, with no shared
+iteration allocation. It reports `per-worker-iterations` and a total iteration
+budget equal to the worker count; this is useful when every worker owns a distinct
+finite query stream. It also works with `Execution.WorkerStep` initialization.
+
 Timed policies stop starting actions when duration expires. Active actions can
 finish during the explicit drain. `DrainNoTimeout` waits without a grace limit;
 `DrainHalfMinuteTimeout` allows 30 seconds; `DrainTimeout(0)` cancels immediately

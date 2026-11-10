@@ -237,7 +237,7 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 				}
 
 				result.Scenario = report.Scenario{Executor: execution.Executor, VUs: execution.Workers}
-				if execution.Executor == "shared-iterations" {
+				if execution.Executor == "shared-iterations" || execution.Executor == "per-worker-iterations" {
 					count := execution.Iterations
 					result.Scenario.IterationsRequested = &count
 				} else {

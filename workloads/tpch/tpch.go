@@ -34,6 +34,7 @@ type workload struct {
 	params     map[string]map[string]any // final per-query params (end dates + q1 cutoff precomputed)
 	m          map[string]*queryMetrics
 	validation validationReport
+	streams    []queryStream
 }
 
 type queryMetrics struct {
@@ -47,9 +48,15 @@ var Test = bench.Test{Name: "tpch/tx", Define: define, Source: publication("Test
 
 func init() { bench.Register(Test) }
 func define(d *bench.Def) error {
-	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
+	selection, settings, err := selectStreams(d)
+	if err != nil {
+		return err
+	}
+
 	w := &workload{}
 	d.Report.Contribute("tpch.validation", 1, w.validationContribution)
+	d.Report.Contribute("tpch.streams", 1, w.streamContribution)
+	d.Report.Render("tpch.streams", renderStreams)
 	w.scaleFactor, _ = d.Param.Float64("scale-factor", 1, "TPC-H scale factor.")
 	w.loadWorkers, _ = d.Param.Int("load-workers", 0, "Workers used to load each table.")
 	w.useUnlogged, _ = d.Param.Bool("pg-unlogged", false, "Use unlogged tables while loading.")
@@ -83,27 +90,17 @@ func define(d *bench.Def) error {
 	w.isPicodata = w.driverType == bench.DriverPicodata
 	w.needsEndDates = w.isPicodata || w.driverType == bench.DriverYDB
 
-	if w.sqlFile != "" {
-		w.sql, err = d.Queries.Override(w.sqlFile)
-	} else {
-		w.sql, err = d.Queries.Load(files, sqlFile(w.driverType, ""))
-	}
-
-	if err != nil {
+	if err := w.loadSQL(d, dialectChoice.GP()); err != nil {
 		return err
-	}
-
-	// The MPP schema differs from pg.sql in physical design only; the queries stay in pg.sql.
-	w.schema = w.sql
-	if dialectChoice.GP() {
-		if w.schema, err = d.Queries.Load(files, "schema.gp.sql"); err != nil {
-			return err
-		}
 	}
 
 	w.m = w.initMetrics(&d.Metrics)
 
 	w.params = w.buildParams()
+	if err := w.prepareStreams(selection); err != nil {
+		return err
+	}
+
 	for _, name := range []string{"drop_schema", "create_schema"} {
 		section := sqlSection{w, name}
 		step(name, section.Run)
@@ -125,10 +122,35 @@ func define(d *bench.Def) error {
 
 	section = sqlSection{w, "analyze"}
 	step(section.name, section.Run)
-	step("validate_answers", w.validate)
-	step("workload", w.runQueries, settings.Policy())
+
+	if !selection.enabled {
+		step("validate_answers", w.validate)
+		step("workload", w.runQueries, settings.Policy())
+	} else {
+		d.Execution.WorkerStep("workload", w.streamInitializer(dialectChoice), bench.OncePerWorker(selection.count))
+	}
 
 	return d.Execution.Err()
+}
+
+func (w *workload) loadSQL(d *bench.Def, gp bool) error {
+	var err error
+	if w.sqlFile != "" {
+		w.sql, err = d.Queries.Override(w.sqlFile)
+	} else {
+		w.sql, err = d.Queries.Load(files, sqlFile(w.driverType, ""))
+	}
+
+	if err != nil {
+		return err
+	}
+
+	w.schema = w.sql
+	if gp {
+		w.schema, err = d.Queries.Load(files, "schema.gp.sql")
+	}
+
+	return err
 }
 
 type sqlSection struct {
@@ -190,8 +212,11 @@ func (w *workload) initMetrics(b *bench.MetricDeclarations) map[string]*queryMet
 // buildParams assembles per-query params: base §2.4 values, with pico/ydb end
 // dates and the q1 picodata shipdate_cutoff precomputed once.
 func (w *workload) buildParams() map[string]map[string]any {
+	return w.prepareParams(queryParams(w.scaleFactor))
+}
+
+func (w *workload) prepareParams(base map[string]map[string]any) map[string]map[string]any {
 	params := make(map[string]map[string]any, len(queryNames))
-	base := queryParams(w.scaleFactor)
 
 	for _, name := range queryNames {
 		p := map[string]any{}
@@ -201,7 +226,8 @@ func (w *workload) buildParams() map[string]map[string]any {
 
 		p = withEndDates(p, w.needsEndDates)
 		if name == "q1" && w.isPicodata {
-			p["shipdate_cutoff"] = shiftDate("1998-12-01", -90, 0, 0)
+			delta, _ := p["delta"].(int)
+			p["shipdate_cutoff"] = shiftDate("1998-12-01", -delta, 0, 0)
 		}
 
 		params[name] = p
