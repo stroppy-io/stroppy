@@ -39,8 +39,14 @@ jobs:
     needs: [validate-tag]
     uses: ./.github/workflows/ci.yml
 
+  modulecompat:
+    needs: [validate-tag]
+    uses: ./.github/workflows/modulecompat.yml
+    with:
+      ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
   build:
-    needs: [ci]
+    needs: [ci, modulecompat]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

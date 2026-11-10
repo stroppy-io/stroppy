@@ -63,6 +63,10 @@ linter_fix: # Start linter with possible fixes (NEVER run casually — rewrites 
 tests: # Run tests with coverage; pass TEST_FLAGS=-short for the CI-sized suite
 	go test -race $(TEST_FLAGS) ./... -coverprofile=coverage.out
 
+.PHONY: modulecompat
+modulecompat: # Run full external-module and author-tooling release checks
+	go test -v -count=1 -timeout=20m ./test/modulecompat
+
 # Macavity is the fault injector banking/inject depends on. It is built here from the
 # stroppy-io fork at the commit this repository audited (865b9b42b24c, identical to
 # upstream), never fetched prebuilt: the extension is a .so that has to match the

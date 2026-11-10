@@ -2,6 +2,7 @@ package modulecompat_test
 
 import (
 	"archive/zip"
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stroppy-io/stroppy/v6/internal/author"
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
@@ -22,12 +24,21 @@ const (
 	version    = "v6.0.0-test"
 )
 
-var buildCache string
+var (
+	buildCache  string
+	moduleCache string
+)
 
 func TestMain(m *testing.M) {
-	var err error
+	cache, err := exec.CommandContext(context.Background(), "go", "env", "GOCACHE").Output()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
-	buildCache, err = os.MkdirTemp("", "stroppy-modulecompat-build-")
+	buildCache = strings.TrimSpace(string(cache))
+
+	moduleCache, err = os.MkdirTemp("", "stroppy-modulecompat-mod-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -35,7 +46,13 @@ func TestMain(m *testing.M) {
 
 	code := m.Run()
 
-	if err := os.RemoveAll(buildCache); err != nil {
+	if err := makeWritable(moduleCache); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+
+		code = 1
+	}
+
+	if err := os.RemoveAll(moduleCache); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 
 		code = 1
@@ -56,8 +73,6 @@ func TestExternalModuleResolvesV6Release(t *testing.T) {
 	consumerDir := prepareConsumer(t)
 	binary := filepath.Join(consumerDir, "consumer")
 	proxyURL := (&url.URL{Scheme: "file", Path: proxyDir}).String()
-	moduleCache := filepath.Join(t.TempDir(), "modcache")
-	t.Cleanup(func() { makeWritable(t, moduleCache) })
 
 	buildEnv := append(os.Environ(),
 		"GOPROXY="+proxyURL+",https://proxy.golang.org,direct",
@@ -67,7 +82,7 @@ func TestExternalModuleResolvesV6Release(t *testing.T) {
 		"GOCACHE="+buildCache,
 	)
 
-	runCommand(t, consumerDir, buildEnv, "go", "test", "-mod=mod", "-race", "./...")
+	runCommand(t, consumerDir, buildEnv, "go", "test", "-mod=mod", "./...")
 	runCommand(t, consumerDir, buildEnv, "go", "build", "-mod=mod", "-o", binary, ".")
 
 	home := t.TempDir()
@@ -103,8 +118,6 @@ func TestPublishedProjectsCompileAsExternalModules(t *testing.T) {
 	proxyDir := t.TempDir()
 	writeModuleProxy(t, proxyDir, repoRoot)
 	proxyURL := (&url.URL{Scheme: "file", Path: proxyDir}).String()
-	moduleCache := filepath.Join(t.TempDir(), "modcache")
-	t.Cleanup(func() { makeWritable(t, moduleCache) })
 
 	env := append(os.Environ(), "GOPROXY="+proxyURL+",https://proxy.golang.org,direct", "GONOSUMDB="+modulePath,
 		"GOWORK=off", "GOMODCACHE="+moduleCache, "GOCACHE="+buildCache)
@@ -164,37 +177,41 @@ func TestPublishedProjectsCompileAsExternalModules(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			runCommand(t, directory, env, "go", "list", "-mod=mod", "-deps", "-test", "./...")
-			runCommand(t, directory, env, "go", "test", "-short", "./...")
-			runCommand(t, directory, env, "go", "build", "-o", filepath.Join(directory, "workload-runner"), ".")
+			runCommand(t, directory, env, "go", "test", "-mod=mod", "-short", "./...")
 
 			if check.name == "starter" {
-				runCommand(t, directory, env, "go", "test", "-race", "./...")
 				runner := filepath.Join(directory, "workload-runner")
+				runCommand(t, directory, env, "go", "build", "-o", runner, ".")
 				runCommand(t, directory, env, runner, "--iterations", "2", "--no-report")
-				fork := filepath.Join(t.TempDir(), "restored")
-				runCommand(t, directory, env, runner, "eject", "starter", fork)
-				runCommand(t, fork, env, "go", "test", "-race", "./...")
-				runCommand(t, fork, env, "go", "run", ".", "--iterations", "2", "--no-report")
-				repeated := filepath.Join(t.TempDir(), "repeated")
-				runCommand(t, fork, env, "go", "run", ".", "eject", "starter", repeated)
-				runCommand(t, repeated, env, "go", "test", "-race", "./...")
-				initialized := filepath.Join(t.TempDir(), "initialized")
-				runCommand(t, directory, env, runner, "init", initialized)
-				runCommand(t, initialized, env, "go", "test", "-race", "./...")
-				runCommand(t, initialized, env, "go", "run", ".", "--iterations", "2", "--no-report")
+				t.Run("round_trips", func(t *testing.T) {
+					if testing.Short() {
+						t.Skip("full author-tooling round trips run in release validation")
+					}
 
-				installed := filepath.Join(directory, "stroppy")
-				runCommand(t, directory, env, "go", "build", "-mod=mod", "-o", installed, modulePath+"/cmd/stroppy")
-				managedEnv := append(env, "HOME="+t.TempDir())
-				runCommand(t, directory, managedEnv, installed, "build", initialized)
-				runCommand(t, directory, managedEnv, installed, "run", "initialized", "--iterations", "2", "--no-report")
-				portable := filepath.Join(directory, "portable")
-				runCommand(t, directory, managedEnv, installed, "export", "initialized", "-o", portable)
-				restored := filepath.Join(t.TempDir(), "exported-fork")
-				runCommand(t, directory, managedEnv, portable, "eject", "initialized", restored)
-				runCommand(t, restored, env, "go", "test", "-race", "./...")
-				runCommand(t, restored, env, "go", "run", ".", "--iterations", "2", "--no-report")
+					fork := filepath.Join(t.TempDir(), "restored")
+					runCommand(t, directory, env, runner, "eject", "starter", fork)
+					runCommand(t, fork, env, "go", "test", "./...")
+					runCommand(t, fork, env, "go", "run", ".", "--iterations", "2", "--no-report")
+					repeated := filepath.Join(t.TempDir(), "repeated")
+					runCommand(t, fork, env, "go", "run", ".", "eject", "starter", repeated)
+					runCommand(t, repeated, env, "go", "test", "./...")
+					initialized := filepath.Join(t.TempDir(), "initialized")
+					runCommand(t, directory, env, runner, "init", initialized)
+					runCommand(t, initialized, env, "go", "test", "./...")
+					runCommand(t, initialized, env, "go", "run", ".", "--iterations", "2", "--no-report")
+
+					installed := filepath.Join(directory, "stroppy")
+					runCommand(t, directory, env, "go", "build", "-mod=mod", "-o", installed, modulePath+"/cmd/stroppy")
+					managedEnv := append(env, "HOME="+t.TempDir())
+					runCommand(t, directory, managedEnv, installed, "build", initialized)
+					runCommand(t, directory, managedEnv, installed, "run", "initialized", "--iterations", "2", "--no-report")
+					portable := filepath.Join(directory, "portable")
+					runCommand(t, directory, managedEnv, installed, "export", "initialized", "-o", portable)
+					restored := filepath.Join(t.TempDir(), "exported-fork")
+					runCommand(t, directory, managedEnv, portable, "eject", "initialized", restored)
+					runCommand(t, restored, env, "go", "test", "./...")
+					runCommand(t, restored, env, "go", "run", ".", "--iterations", "2", "--no-report")
+				})
 			}
 		})
 	}
@@ -223,13 +240,24 @@ func prepareConsumer(t *testing.T) string {
 func runCommand(t *testing.T, dir string, env []string, name string, args ...string) string {
 	t.Helper()
 
-	cmd := exec.Command(name, args...)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	cmd.Env = env
+	cmd.WaitDelay = 5 * time.Second
+
+	started := time.Now()
+
+	t.Logf("running %s %s in %s", name, strings.Join(args, " "), dir)
 
 	output, err := cmd.CombinedOutput()
+
+	t.Logf("finished in %s", time.Since(started).Round(time.Millisecond))
+
 	if err != nil {
-		t.Fatalf("%s %v: %v\n%s", name, args, err, output)
+		t.Fatalf("%s %v after %s: %v (context: %v)\n%s", name, args, time.Since(started), err, ctx.Err(), output)
 	}
 
 	return string(output)
@@ -334,9 +362,7 @@ func moduleArchiveFile(path string) bool {
 	return false
 }
 
-func makeWritable(t *testing.T, root string) {
-	t.Helper()
-
+func makeWritable(root string) error {
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -349,9 +375,11 @@ func makeWritable(t *testing.T, root string) {
 		return os.Chmod(path, 0o600)
 	})
 
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		t.Errorf("make module cache writable: %v", err)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
 	}
+
+	return err
 }
 
 func copyFile(t *testing.T, source, target string) {

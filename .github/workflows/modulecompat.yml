@@ -1,0 +1,37 @@
+name: Module compatibility
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to validate
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to validate
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  modulecompat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Validate external modules and author-tooling round trips
+        run: make modulecompat
