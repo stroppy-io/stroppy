@@ -434,7 +434,7 @@ func (e *Execution) execute(
 					}
 				}
 
-				if opts.policy.mode == "once" {
+				if opts.policy.mode == "once" || opts.policy.mode == "per-worker-iterations" {
 					return
 				}
 			}

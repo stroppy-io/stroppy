@@ -70,15 +70,55 @@ parameter values, drains each result set, and records per-query duration,
 run, and error metrics. Picodata and YDB date bounds are computed in Go for
 SQL dialects without the required interval expressions.
 
+## Query streams
+
+`--streams S` executes streams 1 through S concurrently, each running all 22 queries
+exactly once on its own retained database session. `--query-stream K` selects one
+stream instead; explicit stream 0 uses the Appendix A power ordering. All 41
+prescribed orderings wrap by stream ID, without wrapping the stream's seed.
+
+```bash
+./build/stroppy run tpch/tx -d pg --scale-factor 0.01 --streams 4
+./build/stroppy run tpch/tx -d pg --scale-factor 0.01 \
+  --query-stream 0 --query-seed 19620718
+```
+
+The base seed defaults to 19620718; stream s uses base+s. Parameters follow QGEN's
+per-query RNG and the specification's performance substitution domains. Stream ID,
+effective seed, query order, and parameters are included in the `tpch.streams`
+report. A pinned QGEN 2.17.3 oracle regression covers all 22 parameter sets.
+Generated streams support PostgreSQL (including `--sql-dialect gp`), CockroachDB,
+YugabyteDB, MySQL, and TiDB. Picodata, YDB, and noop lack retained-session support
+and reject generated streams before setup; their existing qualification paths
+are unchanged.
+
+Explicit `--streams`, `--query-stream`, or `--query-seed` selects generated mode.
+Its run defaults are S VUs and S total iterations; conflicting values or
+`--executor constant-vus` are rejected. Each worker owns exactly one stream rather
+than drawing from a shared iteration budget. The driver pool must support at least
+S dedicated sessions. A standalone `--query-stream` uses one worker.
+
+Reports and summaries expose raw queries/hour over the interval from the first
+query submission to the final result, excluding connection initialization. The rate
+is omitted for incomplete or failed streams. Existing per-query metrics retain their
+names. The result is explicitly **query-only**, not TPC-H Throughput@Size or
+QphH@Size: RF1/RF2, full power/throughput sequencing, official seed selection and
+other benchmark requirements are not implemented. Refresh execution is tracked in
+[#262](https://github.com/stroppy-io/stroppy/issues/262).
+
+Without stream options, numeric q1–q22 order and qualification substitutions remain
+unchanged. `validate_answers` applies only to that qualification mode; generated
+streams do not compare randomized results with the qualification answer set.
+
 ## Run shapes and two-pass runs
 
 Use typed run flags directly:
 
 ```bash
-# One power-test pass.
+# One qualification-parameter query pass.
 ./build/stroppy run tpch/tx --executor shared-iterations --iterations 1
 
-# Fixed-duration throughput.
+# Fixed-duration stress run with qualification parameters.
 ./build/stroppy run tpch/tx --executor constant-vus --vus 8 --duration 10m
 
 # Load first, then measure the existing data.

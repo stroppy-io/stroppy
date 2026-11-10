@@ -53,9 +53,12 @@ func TestBuiltInWorkloadParameterSchemas(t *testing.T) {
 		{"tpch/tx", []bench.ParamSchema{
 			param("load-workers", bench.ParamTypeInt, 0, "LOAD_WORKERS", "loadWorkers"),
 			param("pg-unlogged", bench.ParamTypeBool, false, "PG_UNLOGGED", "pgUnlogged"),
+			tpchSeedParam(),
+			boundedIntParam("query-stream", 0, "QUERY_STREAM", "queryStream", 0),
 			param("scale-factor", bench.ParamTypeFloat64, float64(1), "SCALE_FACTOR", "scaleFactor"),
 			mppDialectParam(),
 			param("sql-file", bench.ParamTypeString, "", "SQL_FILE", "sqlFile"),
+			boundedIntParam("streams", 1, "STREAMS", "streams", 1),
 			param("ydb-store-mode", bench.ParamTypeString, "column", "YDB_STORE_MODE", "ydbStoreMode"),
 		}},
 	}
@@ -138,6 +141,20 @@ func TestBuiltInWorkloadsDoNotReadPublicEnvDirectly(t *testing.T) {
 
 func isEnvRead(name string) bool {
 	return name == "Env" || name == "EnvInt" || name == "EnvFloat"
+}
+
+func tpchSeedParam() bench.ParamSchema {
+	seed := param("query-seed", bench.ParamTypeInt64, int64(19620718), "QUERY_SEED", "querySeed")
+	seed.Constraints = []bench.Constraint{{Kind: "min", Value: int64(1)}, {Kind: "max", Value: int64(2147483646)}}
+
+	return seed
+}
+
+func boundedIntParam(name string, fallback int, env, config string, minimum int) bench.ParamSchema {
+	value := param(name, bench.ParamTypeInt, fallback, env, config)
+	value.Constraints = []bench.Constraint{{Kind: "min", Value: minimum}}
+
+	return value
 }
 
 // mppDialectParam is the sql-dialect knob of the workloads that ship a Greenplum-family schema.
