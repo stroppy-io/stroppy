@@ -132,7 +132,7 @@ type tableMeta struct {
 }
 
 // baseTableMeta holds the 24 generated base tables (+ dbgen_version). Values
-// transcribed from Table.java.
+// follow Table.java, except reason follows specification 4.0.0 Table 3-2.
 var baseTableMeta = map[TableID]tableMeta{
 	TCallCenter:            {scalingInfo{0, logarithmicScale, [10]int64{0, 3, 12, 15, 18, 21, 24, 27, 30, 30}}, true, true},
 	TCatalogPage:           {scalingInfo{0, staticScale, [10]int64{0, 11718, 12000, 20400, 26000, 30000, 36000, 40000, 46000, 50000}}, false, false},
@@ -147,7 +147,7 @@ var baseTableMeta = map[TableID]tableMeta{
 	TInventory:             {scalingInfo{0, logarithmicScale, [10]int64{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}, false, false}, // scaled from item x warehouse
 	TItem:                  {scalingInfo{3, logarithmicScale, [10]int64{0, 9, 51, 102, 132, 150, 180, 201, 231, 251}}, true, false},
 	TPromotion:             {scalingInfo{0, logarithmicScale, [10]int64{0, 300, 500, 1000, 1300, 1500, 1800, 2000, 2300, 2500}}, false, false},
-	TReason:                {scalingInfo{0, logarithmicScale, [10]int64{0, 75, 75, 75, 75, 75, 75, 75, 75, 75}}, false, false},
+	TReason:                {scalingInfo{0, logarithmicScale, [10]int64{0, 35, 45, 55, 60, 65, 67, 70, 72, 75}}, false, false},
 	TShipMode:              {scalingInfo{0, staticScale, [10]int64{0, 20, 20, 20, 20, 20, 20, 20, 20, 20}}, false, false},
 	TStore:                 {scalingInfo{0, logarithmicScale, [10]int64{0, 6, 51, 201, 402, 501, 675, 750, 852, 951}}, true, true},
 	TStoreReturns:          {scalingInfo{4, linearScale, [10]int64{0, 24, 240, 2400, 7200, 24000, 72000, 240000, 720000, 2400000}}, false, false},

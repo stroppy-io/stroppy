@@ -47,6 +47,13 @@ Typed workload parameters are listed by `stroppy run tpcds --help`:
 - `--validate-force` compares reference answers outside SF=1 on PostgreSQL or
   MySQL; comparison remains diagnostic.
 
+Reason cardinality follows specification 4.0.0 Table 3-2: 35 rows at SF=1,
+65 at SF=1000, and 75 at SF=100000. The kit 4.0.0 C generator instead fixes
+this table at 75 rows, which disagrees with its qualification answers. Reload
+existing datasets after this correction: return-fact reason keys change too.
+C-oracle comparisons for reason and return tables require the specification's
+reason counts in `tools/scaling.dst` before compiling the reference generator.
+
 Some static dimensions do not shrink with the scale factor.
 `customer_demographics`, for example, always has about 1.9 million rows, so
 small-scale loads are still substantial.

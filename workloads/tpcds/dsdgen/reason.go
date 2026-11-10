@@ -29,14 +29,12 @@ func mustLoadStringValues(file string, nv, nw int) *StringValuesDistribution {
 	return d
 }
 
-// Reason is the TPC-DS reason table. It is flat and fixed-size (75 rows at every
-// scale). nullBasisPoints is 0, so no column is ever nulled, but R_NULLS still
-// consumes its two draws per row to keep stream alignment identical to dsdgen.
+// R_NULLS consumes two draws per row even though reason columns are never null.
 var Reason = &Table{
 	Name:     "reason",
 	Columns:  []string{"r_reason_sk", "r_reason_id", "r_reason_desc"},
 	Cols:     reasonCols,
-	RowCount: func(float64) int64 { return 75 },
+	RowCount: func(scale float64) int64 { return NewScaling(scale).RowCount(TReason) },
 	Row: func(rowNumber int64, ss *streamSet, _ *Scaling) []any {
 		CreateNullBitMap(0, 0x03, ss.at(rNulls))
 
