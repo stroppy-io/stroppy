@@ -66,9 +66,10 @@ Setup runs these gatable steps in order:
 
 On supported query dialects, each `workload` iteration resolves the selected
 stream and executes every query in order. The default is the checked-in
-canonical qualification set. On PostgreSQL, `--query-stream`
+canonical qualification set. On PostgreSQL, MySQL and TiDB, `--query-stream`
 generates a reproducible stream in process, while `--streams N` assigns
-generated streams to virtual users for a throughput run.
+generated streams to virtual users for a throughput run. Each stream uses its
+own reproducible parameter values and query order derived from `--query-seed`.
 
 ```bash
 ./build/stroppy run tpcds -d pg --scale-factor 1 \
@@ -77,7 +78,7 @@ generated streams to virtual users for a throughput run.
   --executor constant-vus --vus 4 --duration 10m
 ```
 
-Generated PostgreSQL streams include all 99 query IDs (103 SQL statements,
+Generated streams include all 99 query IDs (103 SQL statements,
 including multipart queries). Any generator skip is a setup error listing the
 unsupported queries, rather than a successful partial run. Load-only runs that
 exclude the workload step do not require query generation.
@@ -106,9 +107,10 @@ the SF=1 reference set by default.
   before any statement changes the database. A run with `--schema-file` skips
   this check, because its author owns the schema; `--sql-file` alone does not.
   Generated streams work.
-- **MySQL:** all 103 baked statements and answer comparison are supported.
-  Generated streams are rejected before schema changes or loading: queries 51
-  and 97 require an unsupported FULL OUTER JOIN rewrite. Use the baked set.
+- **MySQL:** all 103 baked statements, generated streams and answer comparison
+  are supported. Generated queries 51 and 97 emulate FULL OUTER JOIN with
+  LEFT JOIN UNION ALL an anti-matched RIGHT JOIN.
+- **TiDB:** uses the MySQL baked queries and generated streams.
 - **YDB:** all 103 baked statements run on the YQL port. Column storage is the
   default; row storage is optional. Dates are ISO text because TPC-DS spans
   years outside YDB's date epoch. Generated streams and answer comparison are

@@ -103,9 +103,32 @@ func decorrelateQ6(sql string) string {
 	return sql
 }
 
-// NOTE: queries 51 and 97 use FULL OUTER JOIN, which MySQL lacks. The correct
-// emulation (LEFT JOIN UNION ALL RIGHT JOIN with the whole SELECT restructured
-// around a derived union) is not a local text transform, so it is NOT applied
-// here — those two queries are handled in the hand-maintained baked mysql.sql
-// and are reported as Skipped for MySQL stream generation.
-var fullOuterJoinQueries = map[string]bool{"query51": true, "query97": true}
+var (
+	q51FullJoinRe = regexp.MustCompile(`(?is)(select\s+case when web\.item_sk\b.*?from web_v1 web)\s+full outer join(\s+store_v1 store on\s*\([^)]*\))`)
+	q97FullJoinRe = regexp.MustCompile(`(?is)select\s+sum\(case when ssci\.customer_sk\b.*?from ssci full outer join csci on\s*\([^)]*\)`)
+)
+
+// Keep the union below the window functions and aggregates. UNION ALL preserves
+// duplicates; the anti-match filter prevents counting matched rows twice.
+func emulateFullOuterJoin(query, sql string) string {
+	switch query {
+	case "query51":
+		return q51FullJoinRe.ReplaceAllString(sql,
+			"${1} left join${2}\n union all\n ${1} right join${2}\n where web.item_sk is null")
+	case "query97":
+		return q97FullJoinRe.ReplaceAllString(sql, `select
+ sum(case when t.scs is not null and t.ccs is null then 1 else 0 end) store_only
+,sum(case when t.scs is null and t.ccs is not null then 1 else 0 end) catalog_only
+,sum(case when t.scs is not null and t.ccs is not null then 1 else 0 end) store_and_catalog
+from (
+ select ssci.customer_sk scs, csci.customer_sk ccs
+ from ssci left join csci on (ssci.customer_sk=csci.customer_sk and ssci.item_sk=csci.item_sk)
+ union all
+ select ssci.customer_sk scs, csci.customer_sk ccs
+ from ssci right join csci on (ssci.customer_sk=csci.customer_sk and ssci.item_sk=csci.item_sk)
+ where ssci.customer_sk is null
+) t`)
+	default:
+		return sql
+	}
+}

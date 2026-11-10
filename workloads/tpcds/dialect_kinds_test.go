@@ -45,11 +45,6 @@ func TestEngineKindsMapToTheirDialects(t *testing.T) {
 	}
 }
 
-// TestGeneratedStreamsAreRefusedWhereTheGeneratorCannot is the second half of #218: a
-// correct dialect name is not enough if the downstream generator cannot render the set.
-// TiDB speaks mysql, whose generator skips q51 and q97; Picodata and YDB take streams
-// the postgres generator produces with constructs their assets reject. All three must be
-// refused at definition, before a load, rather than after one.
 func TestGeneratedStreamsAreRefusedWhereTheGeneratorCannot(t *testing.T) {
 	for _, tc := range []struct {
 		driver bench.DriverTypeName
@@ -58,7 +53,7 @@ func TestGeneratedStreamsAreRefusedWhereTheGeneratorCannot(t *testing.T) {
 		{bench.DriverPostgres, true},
 		{bench.DriverMySQL, true},
 		{bench.DriverYugabyte, true},
-		{bench.DriverTiDB, false},
+		{bench.DriverTiDB, true},
 		{bench.DriverPicodata, false},
 		{bench.DriverYDB, false},
 		{bench.DriverCRDB, false}, // refused earlier, by the TPC-DS support check
@@ -79,7 +74,7 @@ func TestALoadOnlyRunIsNotRefusedForAStreamItNeverGenerates(t *testing.T) {
 		t.Fatalf("NewCatalog: %v", err)
 	}
 
-	for _, driver := range []bench.DriverTypeName{bench.DriverTiDB, bench.DriverPicodata} {
+	for _, driver := range []bench.DriverTypeName{bench.DriverYDB, bench.DriverPicodata} {
 		options := func(noSteps []string) bench.RunOptions {
 			return bench.RunOptions{
 				Params:  bench.ParamInputs{CLI: map[string]string{"streams": "2"}},
@@ -108,10 +103,14 @@ func TestTheDefinitionGeneratesWithTheEnginesDialect(t *testing.T) {
 		t.Fatalf("NewCatalog: %v", err)
 	}
 
-	if _, err := catalog.ResolveRun(Test.Name, bench.RunOptions{
-		Params:  bench.ParamInputs{CLI: map[string]string{"query-stream": "0"}},
-		Drivers: map[string]bench.DriverConfig{"default": {Kind: bench.DriverYugabyte}},
-	}); err != nil {
-		t.Fatalf("yugabyte definition with a generated stream: error = %v, want a generated set", err)
+	for _, driver := range []bench.DriverTypeName{bench.DriverYugabyte, bench.DriverMySQL, bench.DriverTiDB} {
+		for _, params := range []map[string]string{{"query-stream": "0"}, {"streams": "2"}} {
+			if _, err := catalog.ResolveRun(Test.Name, bench.RunOptions{
+				Params:  bench.ParamInputs{CLI: params},
+				Drivers: map[string]bench.DriverConfig{"default": {Kind: driver}},
+			}); err != nil {
+				t.Fatalf("%s definition with %v: error = %v, want a generated set", driver, params, err)
+			}
+		}
 	}
 }

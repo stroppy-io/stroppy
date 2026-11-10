@@ -15,22 +15,19 @@ type Result struct {
 	Skipped []string // template names that could not be fully generated, with reason
 }
 
-// Generate renders every template for one dialect/scale/seed/stream. Each query
-// is seeded by (seed + query index) so a stream varies per query and is
-// reproducible. Templates that reference an unsupported pseudo-distribution
-// are reported in Skipped rather than emitted with a broken parameter.
+// Generate renders every template for one dialect/scale/seed/stream. Mixing
+// the stream into the seed keeps parameters independent and reproducible.
+// Templates that reference an unsupported pseudo-distribution are reported in
+// Skipped rather than emitted with a broken parameter.
 func Generate(dialect Dialect, scale float64, seed int64, streamNum int) (*Result, error) {
 	tmpls, err := LoadTemplates()
 	if err != nil {
 		return nil, err
 	}
+	seed += int64(streamNum) * 1_000_003
 	dc := newDistCache()
 	res := &Result{}
 	for i, t := range tmpls {
-		if dialect.Name == "mysql" && mysqlStructuralGap(t.Name) {
-			res.Skipped = append(res.Skipped, t.Name+": full outer join (use baked mysql.sql)")
-			continue
-		}
 		ev := newEvaluator(seed+int64(i)*2654435761, scale, dc)
 		env, err := ev.evalTemplate(t)
 		if err != nil {
