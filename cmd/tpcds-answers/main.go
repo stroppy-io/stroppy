@@ -1,14 +1,12 @@
 // tpcds-answers parses the official TPC-DS kit reference answer sets
 // (`answer_sets/*.ans`) into a single `answers_sf1.json` document keyed by the
 // query-statement names used in the baked per-dialect SQL (`query_1` …
-// `query_99`, with the two-part queries 14/23/24 split into `_a`/`_b`).
+// `query_99`, with the two-part queries 14/23/24/39 split into `_a`/`_b`).
 //
 // The kit ships one .ans per query at the SF=1 qualification database, in two
 // formats (pipe-delimited and psql fixed-width with tab-packed padding); see
 // parse.go. Queries with NULLS_FIRST/NULLS_LAST variants differ only in row
-// order (same multiset), so one variant is kept. Query 39's answer joins its
-// two parts horizontally into one table and is skipped (it still executes in
-// the workload; it is just not value-checked).
+// order (same multiset), so one variant is kept.
 //
 // Usage:
 //
@@ -26,21 +24,18 @@ import (
 )
 
 const (
-	exitUsage   = 2
-	outFilePerm = 0o600
-	numQueries  = 99
-	twoPartCnt  = 2 // a two-part query's .ans holds two fixed-width blocks
+	exitUsage    = 2
+	outFilePerm  = 0o600
+	numQueries   = 99
+	twoPartCnt   = 2 // a two-part query's .ans holds two fixed-width blocks
+	wrappedQuery = 17
 )
 
 var errInput = errors.New("input error")
 
 // twoPart are the queries whose template holds two statements; the baked SQL
 // splits them into `_a`/`_b`. Their .ans carries two fixed-width blocks.
-var twoPart = map[int]bool{14: true, 23: true, 24: true}
-
-// skipQuery 39 joins its two parts horizontally into a single pipe table, so
-// it does not map cleanly onto the `_a`/`_b` split. Left unvalidated.
-var skipQuery = map[int]bool{39: true}
+var twoPart = map[int]bool{14: true, 23: true, 24: true, 39: true}
 
 type doc struct {
 	Version string            `json:"version"`
@@ -98,37 +93,34 @@ func main() {
 
 // collectAnswers parses one file per query number into the keyed answer map.
 func collectAnswers(in string) (map[string]*block, error) {
-	info, err := os.Stat(in)
+	root, err := os.OpenRoot(in)
 	if err != nil {
-		return nil, fmt.Errorf("stat %s: %w", in, err)
+		return nil, fmt.Errorf("open answers directory %s: %w", in, err)
 	}
-
-	if !info.IsDir() {
-		return nil, fmt.Errorf("%w: -in must be a directory, got %s", errInput, in)
-	}
+	defer root.Close()
 
 	answers := map[string]*block{}
 
 	for qNum := 1; qNum <= numQueries; qNum++ {
-		if skipQuery[qNum] {
-			fmt.Fprintf(os.Stderr, "tpcds-answers: query %d skipped (horizontally-joined two-part answer)\n", qNum)
-
-			continue
-		}
-
-		path, ok := answerPath(in, qNum)
+		path, ok := answerPath(root, qNum)
 		if !ok {
 			fmt.Fprintf(os.Stderr, "tpcds-answers: query %d has no .ans file\n", qNum)
 
 			continue
 		}
 
-		raw, err := os.ReadFile(path)
+		raw, err := root.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", path, err)
 		}
 
-		blocks, err := readBlocks(raw)
+		var blocks []block
+		if qNum == wrappedQuery {
+			blocks, err = readWrappedQuery17(raw)
+		} else {
+			blocks, err = readBlocks(raw)
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", filepath.Base(path), err)
 		}
@@ -171,15 +163,14 @@ func mapBlocks(answers map[string]*block, qNum int, blocks []block, fname string
 
 // answerPath finds the .ans file for query n, preferring the plain file, then
 // the NULLS_LAST variant, then NULLS_FIRST (the variants are multiset-equal).
-func answerPath(in string, n int) (string, bool) {
+func answerPath(root *os.Root, n int) (string, bool) {
 	for _, name := range []string{
 		fmt.Sprintf("%d.ans", n),
 		fmt.Sprintf("%d_NULLS_LAST.ans", n),
 		fmt.Sprintf("%d_NULLS_FIRST.ans", n),
 	} {
-		p := filepath.Join(in, name)
-		if _, err := os.Stat(p); err == nil {
-			return p, true
+		if _, err := root.Stat(name); err == nil {
+			return name, true
 		}
 	}
 

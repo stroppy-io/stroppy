@@ -107,12 +107,12 @@ func runStroppy(t *testing.T, timeout time.Duration, args ...string) string {
 	cmd.Dir = repoRoot
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("stroppy %s failed: %v\n%s", strings.Join(args, " "), err, output)
+		t.Fatalf("stroppy invocation failed: %v\n%s", err, output)
 	}
 
 	text := string(output)
 	if strings.Contains(text, completedErrorsMarker) {
-		t.Fatalf("stroppy %s reported nonfatal errors despite exit 0:\n%s", strings.Join(args, " "), text)
+		t.Fatalf("stroppy invocation reported nonfatal errors despite exit 0:\n%s", text)
 	}
 
 	return text

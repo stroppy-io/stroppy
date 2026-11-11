@@ -98,15 +98,20 @@ integration: # Run mandatory tagged PostgreSQL, MySQL, CSV, and OTEL integration
 
 integration-engines: # Run the borrowed-protocol engines CI provides (CockroachDB, YugabyteDB, TiDB)
 	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
-	go test -tags='integration integration_optional' -count=1 -timeout=30m -run 'TestTpchLoadOn(CockroachDB|Yugabyte|TiDB)|TestRoutineBorrowedProtocolEngines|TestTPCDSGeneratedTiDBAllQueries' ./test/integration
+	go test -tags='integration integration_optional' -count=1 -timeout=30m -run 'TestTpchLoadOn(CockroachDB|Yugabyte|TiDB)|TestRoutineBorrowedProtocolEngines|TestTPCDSGeneratedTiDBAllQueries|TestTPCDSAnswerValidation(TiDB|Yugabyte)' ./test/integration
 
 integration-optional: # Run optional tagged integration tests (Picodata, YDB, CockroachDB, YugabyteDB, TiDB)
 	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
-	go test -tags='integration integration_optional' -count=1 -timeout=30m -run 'TestTpchLoadOn(Picodata|YDB|CockroachDB|Yugabyte|TiDB)|TestTpccPicodataAtomicOrderAllocation|TestRoutineBorrowedProtocolEngines|TestTPCDSGeneratedTiDBAllQueries' ./test/integration
+	go test -tags='integration integration_optional' -count=1 -timeout=30m -run 'TestTpchLoadOn(Picodata|YDB|CockroachDB|Yugabyte|TiDB)|TestTpccPicodataAtomicOrderAllocation|TestRoutineBorrowedProtocolEngines|TestTPCDSGeneratedTiDBAllQueries|TestTPCDSAnswerValidation(TiDB|Yugabyte|YDB)|TestTPCDSYDBQualificationRows' ./test/integration
 
 integration-sf1: # Run the explicit heavy TPC-H SF=1 answer validation
 	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
 	go test -tags='integration integration_sf1' -count=1 -timeout=75m -run TestTpchAnswersSpotCheck ./test/integration
+
+.PHONY: integration-tpcds-sf1
+integration-tpcds-sf1: # Run the complete PostgreSQL TPC-DS qualification answer check
+	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
+	go test -tags='integration integration_sf1' -count=1 -timeout=75m -run '^TestTPCDSQualificationSF1$$' ./test/integration
 
 
 ##
@@ -121,6 +126,11 @@ gen-tpcds-json: # Regenerate workloads/tpcds/distributions.json from upstream .d
 		exit 2; \
 	fi
 	go run ./cmd/dstparse -in $(TPCDS_TOOLS_DIR) -out workloads/tpcds/distributions.json
+
+.PHONY: gen-tpcds-qualification
+gen-tpcds-qualification: # Regenerate baked PostgreSQL and MySQL qualification queries
+	go run ./workloads/tpcds/dsqgen/cmd/dsqgen -qualify -dialect postgres -out workloads/tpcds
+	go run ./workloads/tpcds/dsqgen/cmd/dsqgen -qualify -dialect mysql -out workloads/tpcds
 
 gen-tpcds-streams: # Generate TPC-DS query streams (DIALECT, SCALE, SEED, STREAMS, OUT)
 	go run ./workloads/tpcds/dsqgen/cmd/dsqgen \

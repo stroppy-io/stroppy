@@ -36,6 +36,20 @@ func oracleBin(t *testing.T) (bin, toolsDir string) {
 func runOracleToFile(t *testing.T, bin, toolsDir, genTable, readTable string, scale int) string {
 	t.Helper()
 	out := t.TempDir()
+	if readTable == "reason" || strings.HasSuffix(readTable, "_returns") {
+		cmd := exec.Command(bin, "-table", "reason", "-scale", fmt.Sprint(scale), "-force", "Y", "-dir", out)
+		cmd.Dir = toolsDir
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("check oracle reason scaling: %v\n%s", err, output)
+		}
+		data, err := os.ReadFile(filepath.Join(out, "reason.dat"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := bytes.Count(data, []byte{'\n'}), int(Reason.RowCount(float64(scale))); got != want {
+			t.Fatalf("oracle reason SF=%d: got %d rows, specification 4.0.0 requires %d; correct reason counts in scaling.dst before building DSDGEN_BIN", scale, got, want)
+		}
+	}
 	cmd := exec.Command(bin,
 		"-table", genTable,
 		"-scale", fmt.Sprint(scale),

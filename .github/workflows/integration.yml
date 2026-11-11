@@ -23,6 +23,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+          --shm-size 1g
 
       mysql:
         image: mysql:8.0
@@ -186,6 +187,12 @@ jobs:
           STROPPY_YUGABYTE_URL: postgres://yugabyte@127.0.0.1:5433/yugabyte?sslmode=disable
           STROPPY_TIDB_URL: root:@tcp(127.0.0.1:4000)/test?parseTime=true&multiStatements=true
         run: make integration-engines
+
+      - name: Validate TPC-DS SF1 qualification answers
+        env:
+          STROPPY_TMPFS_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
+          STROPPY_PG_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
+        run: make integration-tpcds-sf1
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v7

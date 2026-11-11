@@ -46,8 +46,8 @@ func TestDimensionPartitionContract(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if g.Units() != 75 || g.TotalRows() != 75 {
-		t.Fatalf("reason units/rows = %d/%d, want 75/75", g.Units(), g.TotalRows())
+	if g.Units() != 35 || g.TotalRows() != 35 {
+		t.Fatalf("reason units/rows = %d/%d, want 35/35", g.Units(), g.TotalRows())
 	}
 
 	whole, err := g.Partition(0, -1)
@@ -60,14 +60,14 @@ func TestDimensionPartitionContract(t *testing.T) {
 	}
 
 	full := drain(t, whole)
-	if len(full) != 75 {
-		t.Fatalf("drained %d rows, want 75", len(full))
+	if len(full) != 35 {
+		t.Fatalf("drained %d rows, want 35", len(full))
 	}
 
 	// Two disjoint partitions must concatenate to the whole, byte-identical:
 	// this is the parallel-worker contract.
-	a, _ := g.Partition(0, 40)
-	b, _ := g.Partition(40, -1)
+	a, _ := g.Partition(0, 20)
+	b, _ := g.Partition(20, -1)
 
 	split := append(drain(t, a), drain(t, b)...)
 	if len(split) != len(full) {

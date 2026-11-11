@@ -58,8 +58,12 @@ make tmpfs-all-down
 ```
 
 The large TPC-H SF=1 answer check is separate as `make integration-sf1` and uses
-the baseline PostgreSQL service. CI builds once, runs both smoke tiers and
-`make integration`, then uploads that same tested binary.
+the baseline PostgreSQL service. TPC-DS qualification is `make integration-tpcds-sf1`:
+it reloads SF=1 and requires all 103 reference answers, with no skips or differences.
+CI builds once, runs both smoke tiers, `make integration`, and the TPC-DS qualification
+check, then uploads that same tested binary. Regenerate baked PostgreSQL/MySQL
+qualification queries with `make gen-tpcds-qualification`; fixed values come from
+TPC-DS 4.0.0 Appendix B, not a query-generator seed.
 
 Application configuration is plain Go under `pkg/config`; `config.Unmarshal` owns
 strict JSON/ProtoJSON compatibility. Regenerate the committed file-envelope schema
