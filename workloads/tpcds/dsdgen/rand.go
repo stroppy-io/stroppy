@@ -2,7 +2,8 @@
 // (dsdgen, v4.0.0). It is derived from the Apache-2.0 Java port maintained by
 // the Trino project (github.com/trinodb/tpcds), which is itself a port of the
 // reference C dsdgen distributed by the TPC. Output is validated byte-for-byte
-// against the reference C binary (see golden_test.go).
+// against the reference C binary with specification-correct reason cardinalities
+// (see golden_test.go).
 //
 // The generator is built around per-column pseudo-random number streams. Every
 // generated column owns its own Lehmer LCG stream; a row advances each stream by

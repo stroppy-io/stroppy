@@ -20,6 +20,7 @@ func main() {
 	scale := flag.Float64("scale", 1, "scale factor for rowcount-dependent ranges")
 	seed := flag.Int64("seed", 19620718, "base RNG seed")
 	streams := flag.Int("streams", 1, "number of query streams to generate")
+	qualify := flag.Bool("qualify", false, "render fixed specification qualification substitutions")
 	outDir := flag.String("out", ".", "output directory")
 	flag.Parse()
 
@@ -27,6 +28,25 @@ func main() {
 	if !ok {
 		fmt.Fprintf(os.Stderr, "unknown dialect %q\n", *dialectName)
 		os.Exit(2)
+	}
+
+	if *qualify {
+		result, err := dsqgen.Qualification(dialect)
+		if err == nil {
+			err = os.MkdirAll(*outDir, 0o755)
+		}
+		if err == nil {
+			name := "pg.sql"
+			if dialect.Name == "mysql" {
+				name = "mysql.sql"
+			}
+			err = os.WriteFile(filepath.Join(*outDir, name), []byte(dsqgen.QualificationSQL(dialect, result)), 0o644)
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	if err := os.MkdirAll(*outDir, 0o755); err != nil {

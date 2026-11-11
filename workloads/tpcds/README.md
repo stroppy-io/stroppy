@@ -94,6 +94,30 @@ YDB supports only the baked power-test query set; generated streams are
 rejected. Answer comparison is available only on PostgreSQL and MySQL and uses
 the SF=1 reference set by default.
 
+## Qualification provenance
+
+`dsqgen/qualification.json` contains the fixed substitutions from Appendix B of
+the TPC-DS 4.0.0 specification, including its PDF SHA-256. Qualification is not
+an RNG seed: the kit's `dsqgen -QUALIFY` selects ascending query order but does
+not apply Appendix B values. Random query streams remain independently seeded.
+
+`make gen-tpcds-qualification` renders `pg.sql` and `mysql.sql` from that manifest
+through the shared dialect transforms, retaining grouped-average rewrites and
+numeric/date portability fixes. Contract tests require the embedded files to
+match this output. Picodata and YDB retain their existing SQL ports with the
+same fixed substitutions; this does not expand their supported query features.
+
+Reference rows are imported from the kit's `answer_sets` with
+`go run ./cmd/tpcds-answers -in PATH/answer_sets -out workloads/tpcds/answers_sf1.json`.
+The importer removes terminal formatting, normalizes NULL markers and source
+encoding, and preserves both result blocks for multipart queries. No expected
+rows are generated from Stroppy execution.
+
+`make integration-tpcds-sf1` loads a fresh PostgreSQL SF=1 database and requires
+all 103 reference comparisons to pass, with no skips, errors, or differences.
+The integration workflow runs this check before publishing its tested binary.
+Use a disposable database: this target resets its schema.
+
 ## Dialect status
 
 - **PostgreSQL:** all 103 baked statements, generated streams, and answer

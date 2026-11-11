@@ -18,6 +18,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 ### Fixed
 
 - TPC-DS reason rows and return-reason foreign keys now follow specification scaling (35 reasons at SF=1), rather than the kit 4.0.0 generator's fixed 75; reload existing TPC-DS data before qualification checks.
+- TPC-DS baked queries use the specification's fixed qualification substitutions, and SF=1 reference validation covers all 103 statements without importing display artifacts as data.
 - TPC-DS generated query streams now include queries 51 and 97 on MySQL and TiDB, enabling explicit query streams and concurrent throughput runs without falling back to the baked query set. ([#265](https://github.com/stroppy-io/stroppy/pull/265))
 - TPC-DS generated streams use distinct, reproducible parameters per stream, and MySQL query 66 preserves generated carrier labels as text. ([#265](https://github.com/stroppy-io/stroppy/pull/265))
 - PostgreSQL, CockroachDB, and YugabyteDB routines share the main connection pool instead of doubling warm connections, while preserving per-operation isolation and ordinary session defaults. ([#261](https://github.com/stroppy-io/stroppy/pull/261))
