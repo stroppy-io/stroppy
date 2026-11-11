@@ -128,9 +128,10 @@ gen-tpcds-json: # Regenerate workloads/tpcds/distributions.json from upstream .d
 	go run ./cmd/dstparse -in $(TPCDS_TOOLS_DIR) -out workloads/tpcds/distributions.json
 
 .PHONY: gen-tpcds-qualification
-gen-tpcds-qualification: # Regenerate baked PostgreSQL and MySQL qualification queries
+gen-tpcds-qualification: # Regenerate baked PostgreSQL, MySQL, and MariaDB qualification queries
 	go run ./workloads/tpcds/dsqgen/cmd/dsqgen -qualify -dialect postgres -out workloads/tpcds
 	go run ./workloads/tpcds/dsqgen/cmd/dsqgen -qualify -dialect mysql -out workloads/tpcds
+	go run ./workloads/tpcds/dsqgen/cmd/dsqgen -qualify -dialect mariadb -out workloads/tpcds
 
 gen-tpcds-streams: # Generate TPC-DS query streams (DIALECT, SCALE, SEED, STREAMS, OUT)
 	go run ./workloads/tpcds/dsqgen/cmd/dsqgen \

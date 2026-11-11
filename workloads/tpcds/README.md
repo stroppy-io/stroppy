@@ -40,10 +40,12 @@ Typed workload parameters are listed by `stroppy run tpcds --help`:
   checked-in canonical query set is used.
 - `--query-seed` seeds generated streams.
 - `--schema-file` and `--sql-file` override the dialect schema and query files.
-- `--sql-dialect` selects a built-in dialect: `pg` or `gp`; empty picks by driver.
+- `--sql-dialect` selects a built-in dialect: `pg`, `gp`, or `mariadb`; empty picks by driver.
   `pg` and `gp` need the pg driver. `gp` is for Greenplum-family MPP servers and
   cannot be combined with `--schema-file` or `--pg-unlogged`; `--sql-file` works
-  with it and runs your queries on the gp schema.
+  with it and runs your queries on the gp schema. `mariadb` needs the mysql driver,
+  uses the MySQL schema and `mariadb.sql`, and applies to generated streams too.
+  Schema/query file overrides still take precedence.
 - `--validate-force` compares reference answers outside SF=1 on supported baked
   query dialects; comparison remains diagnostic.
 
@@ -105,7 +107,7 @@ the TPC-DS 4.0.0 specification, including its PDF SHA-256. Qualification is not
 an RNG seed: the kit's `dsqgen -QUALIFY` selects ascending query order but does
 not apply Appendix B values. Random query streams remain independently seeded.
 
-`make gen-tpcds-qualification` renders `pg.sql` and `mysql.sql` from that manifest
+`make gen-tpcds-qualification` renders `pg.sql`, `mysql.sql`, and `mariadb.sql` from that manifest
 through the shared dialect transforms, retaining grouped-average rewrites and
 numeric/date portability fixes. Contract tests require the embedded files to
 match this output. Picodata and YDB retain their existing SQL ports with the
@@ -145,6 +147,11 @@ Use a disposable database: this target resets its schema.
 - **MySQL:** all 103 baked statements, generated streams and answer comparison
   are supported. Generated queries 51 and 97 emulate FULL OUTER JOIN with
   LEFT JOIN UNION ALL an anti-matched RIGHT JOIN.
+- **MariaDB 11.8 (`-d mysql --sql-dialect mariadb`):** uses dedicated `mariadb.sql`
+  and the MySQL schema. Rollup rows are sorted and limited in an outer query;
+  explicit grouping levels replace MySQL-only `GROUPING()` while preserving real
+  NULL keys and hierarchy ranks. Baked queries, generated streams, and diagnostic
+  answer comparison use this dialect; the default MySQL dialect is unchanged.
 - **TiDB:** uses the MySQL baked queries, generated streams, and shared answer comparison.
 - **YugabyteDB:** uses PostgreSQL baked queries, generated streams, and shared answer comparison.
 - **YDB:** all 103 baked statements run on the YQL port, with shared answer comparison.

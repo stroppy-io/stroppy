@@ -107,7 +107,7 @@ func qualificationTransforms(dialect, query, sql string) string {
 		// Oracle qualification output preserves the fixed-width surname before concatenation.
 		sql = strings.ReplaceAll(sql, "coalesce(c_last_name,'')", "rpad(coalesce(c_last_name,''),30,' ')")
 	}
-	if query == "query72" && dialect == "mysql" {
+	if query == "query72" && (dialect == "mysql" || dialect == "mariadb") {
 		sql = strings.ReplaceAll(sql, "d1.d_date + 5", "d1.d_date + interval 5 day")
 	}
 	return sql

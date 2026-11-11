@@ -20,6 +20,7 @@ type Dialect struct {
 var (
 	Postgres = Dialect{Name: "postgres", transform: pgTransform}
 	MySQL    = Dialect{Name: "mysql", transform: mysqlTransform}
+	MariaDB  = Dialect{Name: "mariadb", transform: mariaDBTransform}
 )
 
 func DialectByName(name string) (Dialect, bool) {
@@ -28,6 +29,8 @@ func DialectByName(name string) (Dialect, bool) {
 		return Postgres, true
 	case "mysql":
 		return MySQL, true
+	case "mariadb":
+		return MariaDB, true
 	default:
 		return Dialect{}, false
 	}

@@ -21,6 +21,7 @@ var (
 	// blocker, one an asset could fix; the queries cannot be.
 	errCockroachUnsupported = errors.New("[tpcds] CockroachDB does not implement ROLLUP/CUBE/GROUPING SETS " +
 		"(crdb#46280), which 11 of the 103 queries use, so TPC-DS is not supported there")
+	errMariaDBDriver               = errors.New("sql-dialect mariadb requires the mysql driver")
 	errScaleFactorMustBePositive   = errors.New("SCALE_FACTOR must be positive")
 	errUnknownDialect              = errors.New("dsqgen: unknown dialect")
 	errIncompleteQuerySet          = errors.New("tpcds: generated query set is incomplete")
@@ -30,10 +31,11 @@ var (
 )
 
 type workload struct {
-	schemaSQL *bench.SQL
-	querySQL  *bench.SQL
-	driver    bench.DriverTypeName
-	ydbColumn bool
+	schemaSQL  *bench.SQL
+	querySQL   *bench.SQL
+	driver     bench.DriverTypeName
+	ydbColumn  bool
+	sqlDialect string
 
 	scaleFactor   float64
 	loadWorkers   int
@@ -88,8 +90,8 @@ func define(d *bench.Def) error {
 	w.schemaFile, _ = d.Param.String("schema-file", "", "Schema SQL file override.")
 	w.sqlFile, _ = d.Param.String("sql-file", "", "Query SQL file override.")
 	dialect, _ := d.Param.String("sql-dialect", "",
-		"Built-in SQL dialect: pg, or gp for Greenplum-family MPP servers; empty selects by driver.",
-		bench.OneOf("", "pg", mpp.Dialect))
+		"Built-in SQL dialect: pg, gp (Greenplum family), mariadb (mysql driver); empty selects by driver.",
+		bench.OneOf("", "pg", mpp.Dialect, "mariadb"))
 
 	w.validateForce, _ = d.Param.Bool("validate-force", false, "Validate outside scale factor 1.")
 	if w.scaleFactor <= 0 {
@@ -104,6 +106,15 @@ func define(d *bench.Def) error {
 	}
 
 	w.ydbColumn = w.driver == bench.DriverYDB && w.ydbStoreMode == "column"
+
+	w.sqlDialect = dialect
+	if dialect == "mariadb" {
+		if w.driver != bench.DriverMySQL && w.driver != bench.DriverNoop && w.driver != bench.DriverRecording {
+			return errMariaDBDriver
+		}
+
+		dialect = ""
+	}
 
 	dialectChoice, err := mpp.Select(mpp.Request{
 		Dialect: dialect, Driver: w.driver, OwnSchema: w.schemaFile != "", Unlogged: w.useUnlogged,
@@ -133,6 +144,15 @@ func define(d *bench.Def) error {
 	}
 
 	schemaFile, queryFile := dialectFiles(w.driver, dialectChoice.GP(), w.schemaFile, w.sqlFile)
+	if w.sqlDialect == "mariadb" {
+		if w.schemaFile == "" {
+			schemaFile = "schema.mysql.sql"
+		}
+
+		if w.sqlFile == "" {
+			queryFile = "mariadb.sql"
+		}
+	}
 
 	if w.schemaFile != "" {
 		w.schemaSQL, err = d.Queries.Override(schemaFile)
@@ -309,7 +329,12 @@ func (w *workload) resolveQueries(b *bench.Bench) ([]namedQuery, error) {
 // site and the kind itself passed at the other, so a run that reached only the second
 // failed on a dialect dsqgen has never heard of.
 func (w *workload) streamQueries(stream int) ([]namedQuery, error) {
-	return generateStream(dsqgenDialect(w.driver), w.scaleFactor, w.seed, stream)
+	dialect := dsqgenDialect(w.driver)
+	if w.sqlDialect == "mariadb" {
+		dialect = "mariadb"
+	}
+
+	return generateStream(dialect, w.scaleFactor, w.seed, stream)
 }
 
 // dsqgenDialect maps a driver kind to the dialect name dsqgen knows. The borrowed

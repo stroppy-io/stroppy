@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	dialectName := flag.String("dialect", "postgres", "target dialect: postgres|mysql")
+	dialectName := flag.String("dialect", "postgres", "target dialect: postgres|mysql|mariadb")
 	scale := flag.Float64("scale", 1, "scale factor for rowcount-dependent ranges")
 	seed := flag.Int64("seed", 19620718, "base RNG seed")
 	streams := flag.Int("streams", 1, "number of query streams to generate")
@@ -37,8 +37,8 @@ func main() {
 		}
 		if err == nil {
 			name := "pg.sql"
-			if dialect.Name == "mysql" {
-				name = "mysql.sql"
+			if dialect.Name != "postgres" {
+				name = dialect.Name + ".sql"
 			}
 			err = os.WriteFile(filepath.Join(*outDir, name), []byte(dsqgen.QualificationSQL(dialect, result)), 0o644)
 		}
