@@ -27,6 +27,7 @@ func TestTPCDSGeneratedPostgresAllQueries(t *testing.T) {
 		"--executor", "shared-iterations", "--iterations", "1", "--vus", "1",
 		"--report-file", reportFile,
 	)
+	assertTPCDSCompleteMetrics(t, reportFile, 1)
 
 	matches := regexp.MustCompile(`query completed\s+\{[^\n]*"query": "query_(\d+)(?:_[abc])?"`).
 		FindAllStringSubmatch(out, -1)
@@ -249,7 +250,10 @@ func testTPCDSGeneratedMySQLDialect(t *testing.T, driver, url string) {
 				want *= 2
 			}
 
+			reportFile := filepath.Join(t.TempDir(), "report.json")
+			args = append(args, "--report-file", reportFile)
 			out := runStroppy(t, 10*time.Minute, args...)
+			assertTPCDSCompleteMetrics(t, reportFile, uint64(want/103))
 
 			matches := regexp.MustCompile(`query completed\s+\{[^\n]*"query": "query_(\d+)(?:_[abc])?"`).
 				FindAllStringSubmatch(out, -1)
