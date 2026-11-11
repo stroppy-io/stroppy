@@ -27,7 +27,9 @@ func TestQueryParametersMatchDialectSQL(t *testing.T) {
 			}
 
 			sql := bench.ParseSQL(string(text))
-			w := &workload{isPicodata: dialect == "pico.sql", needsEndDates: dialect == "pico.sql" || dialect == "ydb.sql"}
+			w := &workload{
+				sql: sql, isPicodata: dialect == "pico.sql", needsEndDates: dialect == "pico.sql" || dialect == "ydb.sql",
+			}
 
 			for _, base := range []map[string]map[string]any{queryParams(1), generated} {
 				before := w.prepareParams(base)
@@ -57,7 +59,12 @@ func TestQueryParametersMatchDialectSQL(t *testing.T) {
 func TestEndDateIntervals(t *testing.T) {
 	t.Parallel()
 
-	w := &workload{isPicodata: true, needsEndDates: true}
+	text, err := files.ReadFile("pico.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := &workload{sql: bench.ParseSQL(string(text)), isPicodata: true, needsEndDates: true}
 
 	params := w.buildParams()
 	for name, expected := range map[string]map[string]any{
@@ -83,13 +90,81 @@ func TestPicodataQueryOptions(t *testing.T) {
 		want          string
 	}{
 		{0, 0, ""},
-		{10000000, 0, "\nOPTION (sql_motion_row_max = 10000000)"},
-		{0, 10000000000, "\nOPTION (sql_vdbe_opcode_max = 10000000000)"},
-		{10000000, 10000000000, "\nOPTION (sql_motion_row_max = 10000000, sql_vdbe_opcode_max = 10000000000)"},
+		{10000000, 0, "sql_motion_row_max = 10000000"},
+		{0, 10000000000, "sql_vdbe_opcode_max = 10000000000"},
+		{10000000, 10000000000, "sql_motion_row_max = 10000000, sql_vdbe_opcode_max = 10000000000"},
 	} {
 		if got := picodataQueryOptions(test.rows, test.opcodes); got != test.want {
 			t.Errorf("options(%d, %d) = %q, want %q", test.rows, test.opcodes, got, test.want)
 		}
+	}
+}
+
+func TestPicodataSQLMergesOptions(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		body, options, want string
+	}{
+		{"SELECT 1;", "", "SELECT 1;"},
+		{
+			"SELECT 1 -- OPTION (sql_motion_row_max = 1)", "sql_motion_row_max = 2",
+			"SELECT 1\nOPTION (sql_motion_row_max = 2) -- OPTION (sql_motion_row_max = 1)",
+		},
+		{
+			"SELECT 1 /* OPTION (sql_motion_row_max = 1) */;", "sql_motion_row_max = 2",
+			"SELECT 1\nOPTION (sql_motion_row_max = 2) /* OPTION (sql_motion_row_max = 1) */;",
+		},
+		{
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42); -- trailing comment", "sql_motion_row_max = 2",
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42, sql_motion_row_max = 2); -- trailing comment",
+		},
+		{"SELECT 1;", "sql_motion_row_max = 2", "SELECT 1\nOPTION (sql_motion_row_max = 2);"},
+		{
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42);", "sql_motion_row_max = 2",
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42, sql_motion_row_max = 2);",
+		},
+		{
+			"SELECT 1 oPtIoN (SQL_MOTION_ROW_MAX = :delta, read_preference = replica, forward = off);",
+			"sql_motion_row_max = 2",
+			"SELECT 1 oPtIoN (read_preference = replica, forward = off, sql_motion_row_max = 2);",
+		},
+		{
+			"SELECT 'OPTION (not_an_option)' AS text;", "sql_motion_row_max = 2",
+			"SELECT 'OPTION (not_an_option)' AS text\nOPTION (sql_motion_row_max = 2);",
+		},
+	} {
+		if got := picodataSQL(test.body, test.options); got != test.want {
+			t.Errorf("picodataSQL(%q, %q) = %q, want %q", test.body, test.options, got, test.want)
+		}
+	}
+}
+
+func TestOverrideQueryParameters(t *testing.T) {
+	t.Parallel()
+
+	for _, picodata := range []bool{true, false} {
+		w := &workload{
+			sql: bench.ParseSQL("--+ q1\n--= body\nSELECT :delta AS configured_delta\n" +
+				"--+ q3\n--= body\nSELECT :date_1m, :date_3m, :date_1y\n"),
+			isPicodata: picodata, needsEndDates: true,
+		}
+
+		params := w.buildParams()
+		if !reflect.DeepEqual(params["q1"], map[string]any{"delta": 90}) ||
+			!reflect.DeepEqual(params["q3"], map[string]any{
+				"date_1m": "1995-04-15", "date_3m": "1995-06-15", "date_1y": "1996-03-15",
+			}) {
+			t.Fatalf("override parameters: q1=%v, q3=%v", params["q1"], params["q3"])
+		}
+	}
+
+	w := &workload{
+		sql:        bench.ParseSQL("--+ q1\n--= body\nSELECT 1 OPTION (sql_motion_row_max = :delta)"),
+		isPicodata: true, needsEndDates: true, queryOptions: picodataQueryOptions(2, 0),
+	}
+	if params := w.buildParams(); len(params["q1"]) != 0 {
+		t.Fatalf("overridden option retains unused parameters: %v", params["q1"])
 	}
 }
 

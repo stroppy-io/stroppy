@@ -124,6 +124,21 @@ func parseQueryTemplate(dialect queries.Dialect, sqlStr string) *parsedQuery {
 	}
 }
 
+// ReferencedArgs uses the same parameter-token rules as ProcessArgs so callers
+// can adapt shared parameter sets without hiding missing bindings.
+func ReferencedArgs(sqlStr string, args map[string]any) map[string]any {
+	filtered := make(map[string]any)
+
+	for _, match := range argsRe.FindAllStringSubmatch(sqlStr, -1) {
+		name := match[2][1:]
+		if value, ok := args[name]; ok {
+			filtered[name] = value
+		}
+	}
+
+	return filtered
+}
+
 // StatementTimeout returns a child context bounded by timeout, or ctx unchanged
 // (with a no-op cancel) when timeout is non-positive. Callers release the child
 // once the statement and any result-row iteration complete.

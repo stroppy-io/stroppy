@@ -6,6 +6,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -63,6 +65,42 @@ func TestTpchPicodataMotionLimit(t *testing.T) {
 
 	if rows.Err() != nil || count != 2 {
 		t.Fatalf("rows = %d, error = %v", count, rows.Err())
+	}
+}
+
+func TestTpchPicodataSQLOverride(t *testing.T) {
+	NewPicodata(t)
+	path := filepath.Join(t.TempDir(), "queries.sql")
+	const sql = `--+ q1
+--= body
+SELECT :delta AS configured_delta OPTION (sql_vdbe_opcode_max = 10000000000);
+--+ q3
+--= body
+SELECT :date_1m AS one_month, :date_3m AS three_months, :date_1y AS one_year;
+--+ q4
+--= body
+SELECT * FROM (SELECT 1 UNION ALL SELECT 2) AS rows
+OPTION (sql_motion_row_max = 1, sql_vdbe_opcode_max = 10000000000);
+--+ q5
+--= body
+SELECT 'OPTION (not_an_option)' AS text;
+`
+	if err := os.WriteFile(path, []byte(sql), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	out := runStroppy(t, time.Minute, "run", "tpch/tx", "-d", "pico",
+		"-D", "url="+envOr(envPicoAllURL, defaultPicoAllURL),
+		"--sql-file", path, "--steps", "workload", "--iterations", "1",
+		"--pico-motion-row-max", "2")
+	for _, query := range []string{"q1", "q3", "q4", "q5"} {
+		if !strings.Contains(out, `"query": "`+query+`"`) {
+			t.Errorf("override query %s did not complete", query)
+		}
+	}
+
+	if strings.Contains(out, "extra arguments provided") {
+		t.Error("override supplied unused arguments")
 	}
 }
 

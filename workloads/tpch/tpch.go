@@ -9,11 +9,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 	"github.com/stroppy-io/stroppy/v6/pkg/bench/mpp"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/v6/workloads/tpch/tpchgen"
 )
 
@@ -239,11 +239,16 @@ func (w *workload) prepareParams(base map[string]map[string]any) map[string]map[
 			p[k] = v
 		}
 
-		p = withEndDates(name, p, w.needsEndDates)
+		p = withEndDates(p, w.needsEndDates)
 		if name == "q1" && w.isPicodata {
 			delta, _ := p["delta"].(int)
 			p["shipdate_cutoff"] = shiftDate("1998-12-01", -delta, 0, 0)
-			delete(p, "delta")
+		}
+
+		if w.sql != nil {
+			if body, ok := w.sql.Query(name, "body"); ok {
+				p = sqldriver.ReferencedArgs(picodataSQL(body, w.queryOptions), p)
+			}
 		}
 
 		params[name] = p
@@ -268,7 +273,7 @@ func (w *workload) runQueries(ctx context.Context, b *bench.Bench) error {
 		start := time.Now()
 
 		if w.queryOptions != "" {
-			body = strings.TrimSuffix(strings.TrimSpace(body), ";") + w.queryOptions
+			body = picodataSQL(body, w.queryOptions)
 		}
 
 		_, err := b.RawRows(ctx, body, w.params[name])

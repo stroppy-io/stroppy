@@ -85,7 +85,8 @@ Use workload-local limits without changing cluster-wide settings:
 
 Both flags default to 0, which leaves the server's setting unchanged. Positive
 values become SQL `OPTION` clauses on each measured query, including SQL file
-overrides; they do not affect setup or other clients. Other drivers reject
+overrides. Existing clauses are merged: explicit flags replace matching limits
+and preserve other options. They do not affect setup or other clients. Other drivers reject
 nonzero values. The example limits cover the SF=0.01 smoke test, not every scale
 or cluster: choose finite limits appropriate for available memory and query cost.
 `--query-timeout` bounds statement time independently.

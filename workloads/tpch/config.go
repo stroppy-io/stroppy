@@ -3,6 +3,7 @@ package tpch
 import (
 	"fmt"
 	"io/fs"
+	"regexp"
 	"strings"
 	"time"
 
@@ -61,7 +62,50 @@ func picodataQueryOptions(motionRows, opcodes uint64) string {
 		return ""
 	}
 
-	return "\nOPTION (" + strings.Join(options, ", ") + ")"
+	return strings.Join(options, ", ")
+}
+
+var picodataSQLTokens = regexp.MustCompile(
+	`(?is)'(?:''|[^'])*'|"(?:""|[^"])*"|(--[^\n]*|/\*.*?\*/)|(\boption\s*\(([^()]*)\))|\S`,
+)
+
+func picodataSQL(body, options string) string {
+	if options == "" {
+		return body
+	}
+
+	end := 0
+
+	for _, token := range picodataSQLTokens.FindAllStringSubmatchIndex(body, -1) {
+		if token[2] >= 0 {
+			continue
+		}
+
+		if token[4] >= 0 {
+			return body[:token[6]] + mergePicodataOptions(body[token[6]:token[7]], options) + body[token[7]:]
+		}
+
+		if body[token[0]:token[1]] != ";" {
+			end = token[1]
+		}
+	}
+
+	return body[:end] + "\nOPTION (" + options + ")" + body[end:]
+}
+
+func mergePicodataOptions(existing, requested string) string {
+	var retained []string
+
+	for _, option := range strings.Split(existing, ",") {
+		name, _, _ := strings.Cut(option, "=")
+
+		name = strings.ToLower(strings.TrimSpace(name))
+		if !strings.Contains(requested, name+" =") {
+			retained = append(retained, strings.TrimSpace(option))
+		}
+	}
+
+	return strings.Join(append(retained, requested), ", ")
 }
 
 // shiftDate shifts an ISO date by (days, months, years) in UTC. Picodata and
@@ -108,7 +152,7 @@ func queryParams(scaleFactor float64) map[string]map[string]any {
 	return m
 }
 
-func withEndDates(name string, p map[string]any, needsEndDates bool) map[string]any {
+func withEndDates(p map[string]any, needsEndDates bool) map[string]any {
 	if !needsEndDates {
 		return p
 	}
@@ -118,14 +162,9 @@ func withEndDates(name string, p map[string]any, needsEndDates bool) map[string]
 		return p
 	}
 
-	switch name {
-	case "q14":
-		p["date_1m"] = shiftDate(d, 0, 1, 0)
-	case "q4", "q10", "q15":
-		p["date_3m"] = shiftDate(d, 0, 3, 0)
-	case "q5", "q6", "q12", "q20":
-		p["date_1y"] = shiftDate(d, 0, 0, 1)
-	}
+	p["date_1m"] = shiftDate(d, 0, 1, 0)
+	p["date_3m"] = shiftDate(d, 0, 3, 0)
+	p["date_1y"] = shiftDate(d, 0, 0, 1)
 
 	return p
 }

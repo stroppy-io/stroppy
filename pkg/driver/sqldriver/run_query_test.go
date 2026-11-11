@@ -150,6 +150,30 @@ func TestRunQueryUnusedArgumentsContinue(t *testing.T) {
 	}
 }
 
+func TestReferencedArgsMatchesBinding(t *testing.T) {
+	t.Parallel()
+
+	const sql = "SELECT :used, :used::int, :missing"
+
+	input := map[string]any{"used": 42, "unused": 99}
+
+	got := ReferencedArgs(sql, input)
+	if !reflect.DeepEqual(got, map[string]any{"used": 42}) {
+		t.Fatalf("ReferencedArgs() = %v", got)
+	}
+
+	_, _, err := ProcessArgs(testDialect{}, sql, got)
+	if !errors.Is(err, ErrMissedArgument) {
+		t.Fatalf("missing binding was hidden: %v", err)
+	}
+
+	got["used"] = 1
+
+	if input["used"] != 42 {
+		t.Fatal("filtered map shares input storage")
+	}
+}
+
 func TestRunQueryMissingArgumentsStop(t *testing.T) {
 	t.Parallel()
 
