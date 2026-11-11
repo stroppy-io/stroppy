@@ -113,6 +113,11 @@ integration-tpcds-sf1: # Run the complete PostgreSQL TPC-DS qualification answer
 	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
 	go test -tags='integration integration_sf1' -count=1 -timeout=75m -run '^TestTPCDSQualificationSF1$$' ./test/integration
 
+.PHONY: integration-tpcds-mariadb
+integration-tpcds-mariadb: # Run MariaDB TPC-DS queries and compare rollups against MySQL
+	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
+	go test -tags='integration integration_optional' -count=1 -timeout=30m -run '^TestTPCDSMariaDB' ./test/integration
+
 
 ##
 ## Reference-data JSON regeneration (build-time, run with upstream inputs)
@@ -128,9 +133,10 @@ gen-tpcds-json: # Regenerate workloads/tpcds/distributions.json from upstream .d
 	go run ./cmd/dstparse -in $(TPCDS_TOOLS_DIR) -out workloads/tpcds/distributions.json
 
 .PHONY: gen-tpcds-qualification
-gen-tpcds-qualification: # Regenerate baked PostgreSQL and MySQL qualification queries
+gen-tpcds-qualification: # Regenerate baked PostgreSQL, MySQL, and MariaDB qualification queries
 	go run ./workloads/tpcds/dsqgen/cmd/dsqgen -qualify -dialect postgres -out workloads/tpcds
 	go run ./workloads/tpcds/dsqgen/cmd/dsqgen -qualify -dialect mysql -out workloads/tpcds
+	go run ./workloads/tpcds/dsqgen/cmd/dsqgen -qualify -dialect mariadb -out workloads/tpcds
 
 gen-tpcds-streams: # Generate TPC-DS query streams (DIALECT, SCALE, SEED, STREAMS, OUT)
 	go run ./workloads/tpcds/dsqgen/cmd/dsqgen \

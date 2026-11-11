@@ -44,7 +44,7 @@ func TestBuiltInWorkloadParameterSchemas(t *testing.T) {
 			param("query-stream", bench.ParamTypeInt, 0, "QUERY_STREAM", "queryStream"),
 			param("scale-factor", bench.ParamTypeFloat64, float64(1), "SCALE_FACTOR", "scaleFactor"),
 			param("schema-file", bench.ParamTypeString, "", "SCHEMA_FILE", "schemaFile"),
-			mppDialectParam(),
+			mppDialectParam("mariadb"),
 			param("sql-file", bench.ParamTypeString, "", "SQL_FILE", "sqlFile"),
 			param("streams", bench.ParamTypeInt, 1, "STREAMS", "streams"),
 			param("validate-force", bench.ParamTypeBool, false, "VALIDATE_FORCE", "validateForce"),
@@ -158,9 +158,9 @@ func boundedIntParam(name string, fallback int, env, config string, minimum int)
 }
 
 // mppDialectParam is the sql-dialect knob of the workloads that ship a Greenplum-family schema.
-func mppDialectParam() bench.ParamSchema {
+func mppDialectParam(extra ...string) bench.ParamSchema {
 	dialect := param("sql-dialect", bench.ParamTypeString, "", "SQL_DIALECT", "sqlDialect")
-	dialect.Constraints = []bench.Constraint{{Kind: "one-of", Value: []string{"", "pg", "gp"}}}
+	dialect.Constraints = []bench.Constraint{{Kind: "one-of", Value: append([]string{"", "pg", "gp"}, extra...)}}
 
 	return dialect
 }

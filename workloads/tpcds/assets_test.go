@@ -10,7 +10,9 @@ import (
 )
 
 func TestQualificationAssetsMatchGenerator(t *testing.T) {
-	for name, dialect := range map[string]dsqgen.Dialect{"pg.sql": dsqgen.Postgres, "mysql.sql": dsqgen.MySQL} {
+	for name, dialect := range map[string]dsqgen.Dialect{
+		"pg.sql": dsqgen.Postgres, "mysql.sql": dsqgen.MySQL, "mariadb.sql": dsqgen.MariaDB,
+	} {
 		result, err := dsqgen.Qualification(dialect)
 		if err != nil {
 			t.Fatal(err)
@@ -62,6 +64,7 @@ func TestEmbeddedAssetContract(t *testing.T) {
 		"answers_sf1.json",
 		"pg.sql",
 		"mysql.sql",
+		"mariadb.sql",
 		"pico.sql",
 		"ydb.sql",
 		"schema.pg.sql",
@@ -97,7 +100,7 @@ func TestEmbeddedAssetContract(t *testing.T) {
 		86: true,
 	})
 
-	for _, name := range []string{"pg.sql", "mysql.sql", "pico.sql", "ydb.sql"} {
+	for _, name := range []string{"pg.sql", "mysql.sql", "mariadb.sql", "pico.sql", "ydb.sql"} {
 		t.Run(name, func(t *testing.T) {
 			required := queries
 			if name == "pico.sql" {
