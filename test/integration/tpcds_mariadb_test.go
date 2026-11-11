@@ -4,6 +4,7 @@ package integration
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,13 +39,38 @@ func TestTPCDSMariaDBAllQueries(t *testing.T) {
 			case "generated":
 				args = append(args, "--steps", "workload", "--query-stream", "0", "--iterations", "1", "--vus", "1")
 			case "throughput":
-				args = append(args, "--steps", "workload", "--streams", "2", "--iterations", "2", "--vus", "2")
+				args = append(args, "--steps", "workload", "--streams", "2", "--vus", "2",
+					"--executor", "constant-vus", "--duration", "1s", "--drain-timeout", "none", "--log-mode", "production")
 				want = 206
 			}
 
 			output := runStroppy(t, 10*time.Minute, args...)
 			if got := strings.Count(output, "query completed"); got != want {
 				t.Fatalf("successful statements=%d, want %d", got, want)
+			}
+
+			if mode == "throughput" {
+				completed := make(map[int]int)
+
+				for _, line := range strings.Split(output, "\n") {
+					if !strings.Contains(line, "query completed") {
+						continue
+					}
+
+					var entry struct {
+						Worker int `json:"worker"`
+					}
+
+					if err := json.Unmarshal([]byte(line), &entry); err != nil {
+						t.Fatal(err)
+					}
+
+					completed[entry.Worker]++
+				}
+
+				if completed[0] != 103 || completed[1] != 103 {
+					t.Fatalf("per-worker statement counts=%v, want 103 each", completed)
+				}
 			}
 		})
 	}
@@ -60,10 +86,13 @@ func TestTPCDSMariaDBRollupMatchesMySQL(t *testing.T) {
 	}
 
 	fixtures := []string{
-		`INSERT INTO date_dim(d_date_sk,d_year,d_moy,d_month_seq) VALUES(1,2000,1,1200),(2,2001,1,1201),(3,2002,1,1202)`,
-		`INSERT INTO item(i_item_sk,i_item_id,i_category,i_class,i_brand,i_product_name) VALUES
- (1,'item1','Books','Class','Brand','Product'),(2,'item2','Books',NULL,'Brand','Product'),
- (3,NULL,NULL,NULL,NULL,NULL),(4,'item4','Music','Class','Brand','Product')`,
+		`INSERT INTO date_dim(d_date_sk,d_year,d_moy,d_month_seq,d_date) VALUES
+ (1,2000,8,1200,'2000-08-23'),(2,2001,1,1201,'2001-01-01'),(3,2002,1,1202,'2002-01-01'),
+ (4,2001,11,1203,'2001-11-01'),(5,1998,1,1204,'1998-01-01')`,
+		`INSERT INTO item(i_item_sk,i_item_id,i_category,i_class,i_brand,i_product_name,
+ i_brand_id,i_class_id,i_category_id,i_current_price) VALUES
+ (1,'item1','Books','Class','Brand','Product',1,1,1,60),(2,'item2','Books',NULL,'Brand','Product',1,1,1,60),
+ (3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,60),(4,'item4','Music','Class','Brand','Product',2,2,2,60)`,
 		`INSERT INTO store(s_store_sk,s_store_id,s_state,s_county) VALUES(1,'store1','TN','County'),(2,'store2','TN',NULL)`,
 		`INSERT INTO customer_demographics(cd_demo_sk,cd_gender,cd_marital_status,cd_education_status)
  VALUES(1,'M','S','College')`,
@@ -72,7 +101,19 @@ func TestTPCDSMariaDBRollupMatchesMySQL(t *testing.T) {
  (1,1,1,1,2,10,1,20,2,20),(1,2,1,1,2,10,1,20,2,20),(1,3,1,1,2,10,1,20,2,20),
  (2,2,2,1,3,20,2,30,6,30),(3,2,2,1,4,30,3,40,12,40),(4,2,1,1,5,40,4,50,20,50),
  (3,3,2,1,4,30,3,40,12,40)`,
-		`INSERT INTO web_sales(ws_item_sk,ws_sold_date_sk,ws_net_paid) VALUES(1,1,10),(2,1,20),(3,1,30),(4,1,40)`,
+		`INSERT INTO web_sales(ws_item_sk,ws_sold_date_sk,ws_net_paid) VALUES(1,1,10),(2,1,25),(3,1,30),(4,1,40)`,
+		`INSERT INTO inventory(inv_date_sk,inv_item_sk,inv_warehouse_sk,inv_quantity_on_hand) VALUES(1,1,1,10)`,
+		`INSERT INTO store_sales(ss_item_sk,ss_sold_date_sk,ss_store_sk,ss_quantity,ss_list_price)
+ VALUES(1,4,1,10,20)`,
+		`INSERT INTO catalog_sales(cs_item_sk,cs_sold_date_sk,cs_quantity,cs_list_price,cs_bill_cdemo_sk,
+ cs_bill_customer_sk) VALUES(1,4,10,20,1,1),(1,5,2,10,2,1)`,
+		`INSERT INTO web_sales(ws_item_sk,ws_sold_date_sk,ws_quantity,ws_list_price) VALUES(1,4,10,20)`,
+		`INSERT INTO customer_demographics(cd_demo_sk,cd_gender,cd_education_status) VALUES(2,'F','Unknown')`,
+		`INSERT INTO customer(c_customer_sk,c_current_cdemo_sk,c_current_addr_sk,c_birth_month,c_birth_year)
+ VALUES(1,2,1,1,1970)`,
+		`INSERT INTO customer_address(ca_address_sk,ca_country,ca_state,ca_county) VALUES(1,'US','MS','County')`,
+		`INSERT INTO promotion(p_promo_sk,p_channel_tv) VALUES(1,'N')`,
+		`UPDATE store_sales SET ss_promo_sk=1`,
 	}
 	for _, db := range []*sql.DB{maria, mysql} {
 		for _, fixture := range fixtures {
@@ -106,15 +147,17 @@ func TestTPCDSMariaDBRollupMatchesMySQL(t *testing.T) {
 			}
 
 			got, want := tpcdsComparableRows(t, maria, left), tpcdsComparableRows(t, mysql, right)
+			if name != "query_86" {
+				sort.Strings(got)
+				sort.Strings(want)
+			}
+
 			if !reflect.DeepEqual(got, want) {
 				t.Fatalf("MariaDB rows=%v\nMySQL rows=%v", got, want)
 			}
 
-			switch name {
-			case "query_27", "query_36", "query_70", "query_86":
-				if len(got) == 0 {
-					t.Fatal("grouping-level fixture returned no rows")
-				}
+			if len(got) == 0 {
+				t.Fatal("rollup fixture returned no rows")
 			}
 		})
 	}
@@ -263,8 +306,6 @@ func tpcdsComparableRows(t *testing.T, db *sql.DB, query string) []string {
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
-
-	sort.Strings(result)
 
 	return result
 }
