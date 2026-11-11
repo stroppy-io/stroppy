@@ -21,8 +21,7 @@ import (
 // rounded key before a positional compare, so legitimate row-ordering
 // differences (NULLS FIRST vs LAST, tie order) never read as mismatches. Numeric cells
 // compare within a small tolerance; everything else compares exact. Best-effort: deltas
-// are logged, not thrown. The generated data is byte-identical to the C dsdgen oracle,
-// so the kit answers validate both postgres and mysql.
+// are logged, not thrown. Every supported SQL port uses the same qualification answers.
 
 type answerBlock struct {
 	Columns []string   `json:"columns"`
@@ -175,6 +174,9 @@ type compareResult struct {
 	errMsg   string
 }
 
+const qualificationWarning = "Qualification differences or query errors may come from generated data, " +
+	"SQL-port semantics, collation, or numeric behavior; they do not by themselves establish a database defect."
+
 type validationReport struct {
 	Status  string            `json:"status"`
 	Reason  string            `json:"reason,omitempty"`
@@ -285,19 +287,26 @@ func cellDeltas(i int, g, w []string) []string {
 	return nil
 }
 
-// validateAnswers runs every query against the SF=1 reference answers and logs a summary.
-// No-op unless SF=1 and postgres/mysql (the engines the answers were generated to validate).
-//
-// The queries run inside one transaction so the schema's set_timeout / preconfigure_db
-// session SETs (statement cap; enable_nestloop=off + jit=off for pg) bind to the same
-// pinned connection as the queries. Without them pg picks nested-loop plans over the
-// statistic-less year_total CTE self-joins and individual queries run for tens of minutes.
-//
-// Each query runs in its own transaction with the SETs re-applied on its pinned
-// connection: the driver backs each call with a fresh pooled connection, so session
-// SETs do not persist across calls, and a single transaction would let one query's
-// error abort every following query (25P02 "transaction is aborted"). Per-query tx
-// keeps errors isolated and the planner setup bound to the connection that runs the query.
+func answerValidationSupported(dt bench.DriverTypeName) bool {
+	switch dt {
+	case bench.DriverPostgres, bench.DriverMySQL, bench.DriverTiDB, bench.DriverYugabyte, bench.DriverYDB:
+		return true
+	default:
+		return false
+	}
+}
+
+func validationIsolation(dt bench.DriverTypeName) bench.TxIsolationName {
+	if dt == bench.DriverYDB {
+		// YQL query bodies are complete requests; a pinned connection avoids imposing SQL isolation on them.
+		return bench.IsoConn
+	}
+
+	return bench.IsoReadCommitted
+}
+
+// Per-query transactions pin planner/session settings without letting one query
+// error abort all following queries. YDB runs its complete YQL requests on a pinned connection.
 func validateAnswers(
 	ctx context.Context, b *bench.Bench,
 	schema, queries *bench.SQL, names []string,
@@ -305,8 +314,8 @@ func validateAnswers(
 ) validationReport {
 	lg := b.Log
 
-	if dt != bench.DriverPostgres && dt != bench.DriverMySQL {
-		reason := fmt.Sprintf("answers_sf1 validates postgres/mysql only; driverType=%s", dt)
+	if !answerValidationSupported(dt) {
+		reason := fmt.Sprintf("answers_sf1 requires a supported baked query dialect; driverType=%s", dt)
 		lg.Info("[tpcds_validate] skipped: " + reason)
 
 		return validationReport{Status: "skipped", Reason: reason, Queries: []validationQuery{}}
@@ -331,10 +340,7 @@ func validateAnswers(
 		sets = append(sets, schema.Section(section)...)
 	}
 
-	iso := bench.IsoReadCommitted
-	if dt == bench.DriverPicodata {
-		iso = bench.IsoNone // picodata Begin() always errors
-	}
+	iso := validationIsolation(dt)
 
 	results := make([]compareResult, 0, len(names))
 	for _, name := range names {
@@ -412,6 +418,7 @@ func newValidationReport(results []compareResult) validationReport {
 	switch {
 	case validation.Totals.Diff > 0 || validation.Totals.Error > 0:
 		validation.Status = "failed"
+		validation.Reason = qualificationWarning
 	case validation.Totals.OK == 0:
 		validation.Status = "skipped"
 	}
@@ -455,4 +462,8 @@ func logSummary(b *bench.Bench, results []compareResult) {
 		len(results), ok, mismatch, skipped, errN),
 	)
 	b.Log.Info(strings.Join(lines, "\n"))
+
+	if mismatch > 0 || errN > 0 {
+		b.Log.Warn(qualificationWarning)
+	}
 }

@@ -44,8 +44,8 @@ Typed workload parameters are listed by `stroppy run tpcds --help`:
   `pg` and `gp` need the pg driver. `gp` is for Greenplum-family MPP servers and
   cannot be combined with `--schema-file` or `--pg-unlogged`; `--sql-file` works
   with it and runs your queries on the gp schema.
-- `--validate-force` compares reference answers outside SF=1 on PostgreSQL or
-  MySQL; comparison remains diagnostic.
+- `--validate-force` compares reference answers outside SF=1 on supported baked
+  query dialects; comparison remains diagnostic.
 
 Reason cardinality follows specification 4.0.0 Table 3-2: 35 rows at SF=1,
 65 at SF=1000, and 75 at SF=100000. The kit 4.0.0 C generator instead fixes
@@ -69,7 +69,7 @@ Setup runs these gatable steps in order:
 5. `create_indexes`
 6. `set_logged` when unlogged loading was enabled
 7. `analyze`
-8. `validate_answers` for the baked query set on PostgreSQL or MySQL
+8. `validate_answers` for the baked query set on PostgreSQL, MySQL, TiDB, YugabyteDB, or YDB
 
 On supported query dialects, each `workload` iteration resolves the selected
 stream and executes every query in order. The default is the checked-in
@@ -91,8 +91,12 @@ unsupported queries, rather than a successful partial run. Load-only runs that
 exclude the workload step do not require query generation.
 
 YDB supports only the baked power-test query set; generated streams are
-rejected. Answer comparison is available only on PostgreSQL and MySQL and uses
-the SF=1 reference set by default.
+rejected. PostgreSQL, MySQL, TiDB, YugabyteDB, and YDB compare the same SF=1
+reference answers. YDB submits complete YQL requests on pinned connections.
+Differences and query errors remain visible as failed validation results; a
+warning explains that data generation, SQL-port semantics, collation, or numeric
+behavior may be responsible rather than a database defect. Cross-engine answer
+comparison is diagnostic, not certification of the SQL port.
 
 ## Qualification provenance
 
@@ -141,11 +145,11 @@ Use a disposable database: this target resets its schema.
 - **MySQL:** all 103 baked statements, generated streams and answer comparison
   are supported. Generated queries 51 and 97 emulate FULL OUTER JOIN with
   LEFT JOIN UNION ALL an anti-matched RIGHT JOIN.
-- **TiDB:** uses the MySQL baked queries and generated streams.
-- **YDB:** all 103 baked statements run on the YQL port. Column storage is the
-  default; row storage is optional. Dates are ISO text because TPC-DS spans
-  years outside YDB's date epoch. Generated streams and answer comparison are
-  not supported.
+- **TiDB:** uses the MySQL baked queries, generated streams, and shared answer comparison.
+- **YugabyteDB:** uses PostgreSQL baked queries, generated streams, and shared answer comparison.
+- **YDB:** all 103 baked statements run on the YQL port, with shared answer comparison.
+  Column storage is the default; row storage is optional. Dates are ISO text
+  because TPC-DS spans years outside YDB's date epoch. Generated streams are not supported.
 - **Picodata:** loading is supported. Query execution is not supported yet;
   use `--no-steps workload` for load-only runs.
 

@@ -1,8 +1,7 @@
 // Package tpcds owns Stroppy's TPC-DS implementation, tests, dialect SQL, and
 // answer data. It loads 24 tables through the canonical generator and runs the
 // 99 business queries from the baked qualification set or an in-process stream.
-// SF=1 answer validation on PostgreSQL and MySQL uses a multiset comparison
-// against answers_sf1.json.
+// Supported baked dialects share SF=1 multiset comparison against answers_sf1.json.
 package tpcds
 
 import "github.com/stroppy-io/stroppy/v6/pkg/bench"

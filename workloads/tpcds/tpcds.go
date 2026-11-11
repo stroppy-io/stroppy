@@ -33,7 +33,6 @@ type workload struct {
 	schemaSQL *bench.SQL
 	querySQL  *bench.SQL
 	driver    bench.DriverTypeName
-	isPgOrMs  bool
 	ydbColumn bool
 
 	scaleFactor   float64
@@ -104,7 +103,6 @@ func define(d *bench.Def) error {
 		return errCockroachUnsupported
 	}
 
-	w.isPgOrMs = w.driver == bench.DriverPostgres || w.driver == bench.DriverMySQL
 	w.ydbColumn = w.driver == bench.DriverYDB && w.ydbStoreMode == "column"
 
 	dialectChoice, err := mpp.Select(mpp.Request{
@@ -173,7 +171,7 @@ func define(d *bench.Def) error {
 
 	step("analyze", w.analyzeAction)
 
-	if !w.throughput && w.genStream < 0 && w.isPgOrMs {
+	if !w.throughput && w.genStream < 0 && answerValidationSupported(w.driver) {
 		step("validate_answers", w.validate)
 	}
 
