@@ -309,7 +309,7 @@ func (w *workload) resolveQueries(b *bench.Bench) ([]namedQuery, error) {
 		out := make([]namedQuery, 0, len(names))
 		for _, name := range names {
 			if body, ok := w.querySQL.Query("", name); ok {
-				out = append(out, namedQuery{canonicalQueryName(name), body})
+				out = append(out, namedQuery{name, body})
 			}
 		}
 

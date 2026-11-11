@@ -106,7 +106,12 @@ Every attempted workload statement records `tpcds_query_<N>_duration` in
 milliseconds, plus `_runs`, `_errors`, and `_elapsed_total` counters. Multipart
 queries use `_a` and `_b` before the metric suffix, for example
 `tpcds_query_14_a_duration`. Baked queries and generated streams use the same
-names. Setup and answer validation do not enter these measurements.
+names. SQL overrides retain their original query labels. Labels containing
+characters other than ASCII letters, digits, and underscores, or exceeding
+200 bytes, use the metric suffix `custom_<SHA-256 of the original label>`.
+Labels already beginning with `custom_` are hashed too, so literal labels cannot
+impersonate an encoded label. Setup and answer validation do not enter these
+measurements.
 
 Duration covers the complete `Bench.Exec` call, including cursor closure and
 error detection. SQL failures, statement timeouts, and canceled in-flight

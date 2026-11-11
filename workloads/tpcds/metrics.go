@@ -2,7 +2,9 @@ package tpcds
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -34,6 +36,17 @@ func canonicalQueryName(name string) string {
 	return name
 }
 
+var plainQueryMetricName = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+
+func queryMetricName(name string) string {
+	// Hashing bounds names below OTLP's limit; reserving the prefix prevents literal-label collisions.
+	if len(name) <= 200 && !strings.HasPrefix(name, "custom_") && plainQueryMetricName.MatchString(name) {
+		return name
+	}
+
+	return fmt.Sprintf("custom_%x", sha256.Sum256([]byte(name)))
+}
+
 func declareQueryMetrics(declarations *bench.MetricDeclarations, names []string) map[string]*queryMetrics {
 	unique := make(map[string]bool)
 
@@ -48,7 +61,7 @@ func declareQueryMetrics(declarations *bench.MetricDeclarations, names []string)
 	}
 
 	for _, name := range names {
-		unique[canonicalQueryName(name)] = true
+		unique[name] = true
 	}
 
 	names = make([]string, 0, len(unique))
@@ -60,7 +73,7 @@ func declareQueryMetrics(declarations *bench.MetricDeclarations, names []string)
 	metrics := make(map[string]*queryMetrics, len(names))
 
 	for _, name := range names {
-		prefix := "tpcds_" + name
+		prefix := "tpcds_" + queryMetricName(name)
 		metrics[name] = &queryMetrics{
 			duration: declarations.Histogram(prefix+"_duration", bench.Unit("ms"),
 				bench.Bounds(queryDurationBounds...), bench.LabelValues("outcome", "success", "error")),

@@ -5,8 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -146,6 +149,46 @@ func TestQueryMetricsDoNotCountUnstartedQueries(t *testing.T) {
 
 	if _, exists := run.Metrics["tpcds_query_1_runs"]; exists {
 		t.Fatal("unstarted query counted as attempted")
+	}
+}
+
+func TestCustomQueryMetricNamesPreserveIdentity(t *testing.T) {
+	names := []string{
+		"query-1", "query_1", "query1", queryMetricName("query-1"), "custom_", "отчёт 1", "9", strings.Repeat("x", 300),
+	}
+
+	var sql strings.Builder
+	for _, name := range names {
+		fmt.Fprintf(&sql, "--= %s\nSELECT 1;\n", name)
+	}
+
+	path := filepath.Join(t.TempDir(), "queries.sql")
+	if err := os.WriteFile(path, []byte(sql.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	run, err := testkit.Run(t.Context(), Test, bench.RunOptions{
+		Params: bench.ParamInputs{CLI: map[string]string{"sql-file": path}},
+		Steps:  []string{"workload"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	seen := make(map[string]bool)
+
+	for _, name := range names {
+		metric := "tpcds_" + queryMetricName(name) + "_runs"
+		if seen[metric] {
+			t.Fatalf("query %q collides at %s", name, metric)
+		}
+
+		seen[metric] = true
+
+		value, exists := run.Metrics[metric]
+		if !exists || value.Total == nil || *value.Total != 1 {
+			t.Fatalf("query %q metric=%+v", name, value)
+		}
 	}
 }
 
