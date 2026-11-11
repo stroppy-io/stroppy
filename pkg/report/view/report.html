@@ -305,6 +305,7 @@
 </section>
 <nav class="section-nav" aria-label="Report sections">
 <a href="#execution">Execution</a>
+{{if .Pools}}<a href="#pools">Connection pools</a>{{end}}
 {{if .Capture}}<a href="#capture">Recording</a>{{if .Capture.LogsEnabled}}<a href="#captured-logs">Logs</a>{{end}}{{end}}
 <a href="#metrics">Metrics <span>{{len .Metrics}}
 </span>
@@ -326,6 +327,19 @@
 </div>
 </details>
 </section>
+{{if .Pools}}<section class="section" id="pools">
+<div class="section-heading"><h2>Connection pools</h2><p>Client-side pool diagnostics, separate from database execution time.</p></div>
+<p class="scope-note">Counters are per-step deltas, including worker initialization and drain; connection gauges freeze at step completion. Concurrent wait seconds may exceed wall time. Backend wait definitions differ and must not be compared as equivalent queue time.</p>
+{{range .Pools}}<details class="panel" open>
+<summary>{{.Step}}{{if .Execution}} #{{.Execution}}{{end}} · {{.Database}} · {{.Driver}} · {{.Status}}</summary>
+<div class="details-body">
+<p>{{.Backend}} · {{.Scope}}</p>{{if .Reason}}<p class="notice">{{.Reason}}</p>{{end}}
+{{if eq .Status "Supported"}}<div class="table-scroll"><table>
+<thead><tr><th>Open / opening</th><th>In use</th><th>Idle</th><th>Maximum</th><th>Native wait count</th><th>Native wait seconds</th><th>Canceled acquisitions</th></tr></thead>
+<tbody><tr><td>{{.Open}}</td><td>{{.InUse}}</td><td>{{.Idle}}</td><td>{{.Maximum}}</td><td>{{.Waits}}</td><td>{{.Seconds}}</td><td>{{.Canceled}}</td></tr></tbody>
+</table></div><p class="scope-note">{{.Semantics}}</p>{{else}}<p class="empty">Unavailable does not mean zero wait.</p>{{end}}
+</div></details>{{end}}
+</section>{{end}}
 <section class="section" id="metrics">
 <div class="section-heading">
 <h2>Metrics</h2>
