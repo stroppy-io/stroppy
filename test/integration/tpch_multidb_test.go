@@ -59,12 +59,12 @@ func TestTpchLoadOnMySQL(t *testing.T) {
 	assertTpchQueriesLogged(t, out)
 }
 
-func runTpchStroppy(t *testing.T, driverType, url string, budget time.Duration) string {
+func runTpchStroppy(t *testing.T, driverType, url string, budget time.Duration, extra ...string) string {
 	t.Helper()
 
 	start := time.Now()
 	scaleFactor := strconv.FormatFloat(tpchMultiSF, 'g', -1, 64)
-	out := runStroppy(t, 5*time.Minute,
+	args := []string{
 		"run", "tpch/tx",
 		"-D", "url="+url,
 		"-D", "driverType="+driverType,
@@ -73,7 +73,8 @@ func runTpchStroppy(t *testing.T, driverType, url string, budget time.Duration) 
 		"--executor", "shared-iterations",
 		"--iterations", "1",
 		"--steps", "drop_schema,create_schema,load_data,create_indexes,analyze,workload",
-	)
+	}
+	out := runStroppy(t, 5*time.Minute, append(args, extra...)...)
 	elapsed := time.Since(start)
 	t.Logf("stroppy TPC-H run on %s completed in %s", driverType, elapsed)
 

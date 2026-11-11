@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,12 +20,50 @@ func TestTpchLoadOnPicodata(t *testing.T) {
 	ResetPico(t, pool, tpchTables)
 
 	url := envOr(envPicoAllURL, defaultPicoAllURL)
-	out := runTpchStroppy(t, "picodata", url, 3*time.Minute)
+	out := runTpchStroppy(t, "picodata", url, 3*time.Minute,
+		"--pico-motion-row-max", "10000000", "--pico-vdbe-opcode-max", "10000000000")
+
+	if strings.Contains(out, "extra arguments provided") {
+		t.Error("TPC-H supplied unused Picodata query arguments")
+	}
+
+	checksConfig := pool.Config()
+	checksConfig.ConnConfig.RuntimeParams["options"] = "sql_vdbe_opcode_max=10000000000,sql_motion_row_max=10000000"
+	checks, err := pgxpool.NewWithConfig(t.Context(), checksConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer checks.Close()
 
 	assertTpchLoadMarkers(t, out)
-	assertTpchRowCountsPG(t, pool)
-	assertTpchFKIntegrityPico(t, pool)
+	assertTpchRowCountsPG(t, checks)
+	assertTpchFKIntegrityPico(t, checks)
 	assertTpchQueriesLogged(t, out)
+}
+
+func TestTpchPicodataMotionLimit(t *testing.T) {
+	pool := NewPicodata(t)
+	const query = "SELECT * FROM (SELECT 1 UNION ALL SELECT 2) AS rows"
+
+	_, err := pool.Exec(t.Context(), query+" OPTION (sql_motion_row_max = 1, sql_vdbe_opcode_max = 10000000000)")
+	if err == nil || !strings.Contains(err.Error(), "Exceeded maximum number of rows (1) in virtual table") {
+		t.Fatalf("motion limit error = %v", err)
+	}
+
+	rows, err := pool.Query(t.Context(), query+" OPTION (sql_motion_row_max = 2, sql_vdbe_opcode_max = 10000000000)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+		count++
+	}
+
+	if rows.Err() != nil || count != 2 {
+		t.Fatalf("rows = %d, error = %v", count, rows.Err())
+	}
 }
 
 // TestTpchLoadOnYDB exercises the optional YDB dialect end to end.
@@ -34,6 +73,10 @@ func TestTpchLoadOnYDB(t *testing.T) {
 
 	url := envOr(envYDBAllURL, defaultYDBAllURL)
 	out := runTpchStroppy(t, "ydb", url, 3*time.Minute)
+
+	if strings.Contains(out, "extra arguments provided") {
+		t.Error("TPC-H supplied unused YDB query arguments")
+	}
 
 	assertTpchLoadMarkers(t, out)
 	assertTpchRowCountsYDB(t, drv)

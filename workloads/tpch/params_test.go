@@ -75,6 +75,43 @@ func TestEndDateIntervals(t *testing.T) {
 	}
 }
 
+func TestPicodataQueryOptions(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		rows, opcodes uint64
+		want          string
+	}{
+		{0, 0, ""},
+		{10000000, 0, "\nOPTION (sql_motion_row_max = 10000000)"},
+		{0, 10000000000, "\nOPTION (sql_vdbe_opcode_max = 10000000000)"},
+		{10000000, 10000000000, "\nOPTION (sql_motion_row_max = 10000000, sql_vdbe_opcode_max = 10000000000)"},
+	} {
+		if got := picodataQueryOptions(test.rows, test.opcodes); got != test.want {
+			t.Errorf("options(%d, %d) = %q, want %q", test.rows, test.opcodes, got, test.want)
+		}
+	}
+}
+
+func TestPicodataQueryLimitsRequirePicodata(t *testing.T) {
+	t.Parallel()
+
+	catalog, err := bench.NewCatalog(Test)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, driver := range []bench.DriverTypeName{bench.DriverPostgres, bench.DriverPicodata, bench.DriverYDB} {
+		for _, flag := range []string{"pico-motion-row-max", "pico-vdbe-opcode-max"} {
+			_, resolveErr := catalog.Resolve("tpch/tx", bench.ParamInputs{CLI: map[string]string{flag: "10000000"}},
+				map[string]bench.DriverConfig{"": {Kind: driver}})
+			if (resolveErr == nil) != (driver == bench.DriverPicodata) {
+				t.Errorf("driver %s, %s: unexpected limit support: %v", driver, flag, resolveErr)
+			}
+		}
+	}
+}
+
 func TestSQLFileDefaults(t *testing.T) {
 	tests := []struct {
 		driver bench.DriverTypeName

@@ -3,6 +3,7 @@ package tpch
 import (
 	"fmt"
 	"io/fs"
+	"strings"
 	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
@@ -44,6 +45,23 @@ func sqlFile(dt bench.DriverTypeName, override string) string {
 		// postgres, and the engines that speak its protocol.
 		return "pg.sql"
 	}
+}
+
+func picodataQueryOptions(motionRows, opcodes uint64) string {
+	var options []string
+	if motionRows > 0 {
+		options = append(options, fmt.Sprintf("sql_motion_row_max = %d", motionRows))
+	}
+
+	if opcodes > 0 {
+		options = append(options, fmt.Sprintf("sql_vdbe_opcode_max = %d", opcodes))
+	}
+
+	if len(options) == 0 {
+		return ""
+	}
+
+	return "\nOPTION (" + strings.Join(options, ", ") + ")"
 }
 
 // shiftDate shifts an ISO date by (days, months, years) in UTC. Picodata and

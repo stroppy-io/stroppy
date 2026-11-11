@@ -70,6 +70,26 @@ parameter values, drains each result set, and records per-query duration,
 run, and error metrics. Picodata and YDB date bounds are computed in Go for
 SQL dialects without the required interval expressions.
 
+## Picodata query limits
+
+Picodata's opcode and intermediate-row caps can stop analytical queries before
+completion. These are server execution failures, not unused-argument warnings.
+Use workload-local limits without changing cluster-wide settings:
+
+```bash
+./build/stroppy run tpch/tx -d pico \
+  -D url=postgres://admin:password@localhost:1331/admin \
+  --scale-factor 0.01 \
+  --pico-motion-row-max 10000000 --pico-vdbe-opcode-max 10000000000
+```
+
+Both flags default to 0, which leaves the server's setting unchanged. Positive
+values become SQL `OPTION` clauses on each measured query, including SQL file
+overrides; they do not affect setup or other clients. Other drivers reject
+nonzero values. The example limits cover the SF=0.01 smoke test, not every scale
+or cluster: choose finite limits appropriate for available memory and query cost.
+`--query-timeout` bounds statement time independently.
+
 ## Query streams
 
 `--streams S` executes streams 1 through S concurrently, each running all 22 queries
