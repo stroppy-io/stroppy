@@ -90,9 +90,7 @@ func queryParams(scaleFactor float64) map[string]map[string]any {
 	return m
 }
 
-// withEndDates adds date_1m/date_3m/date_1y derived from `date` for picodata/ydb
-// (which lack date+interval expressions). No-op on pg/mysql or when no `date` param.
-func withEndDates(p map[string]any, needsEndDates bool) map[string]any {
+func withEndDates(name string, p map[string]any, needsEndDates bool) map[string]any {
 	if !needsEndDates {
 		return p
 	}
@@ -102,9 +100,14 @@ func withEndDates(p map[string]any, needsEndDates bool) map[string]any {
 		return p
 	}
 
-	p["date_1m"] = shiftDate(d, 0, 1, 0)
-	p["date_3m"] = shiftDate(d, 0, 3, 0)
-	p["date_1y"] = shiftDate(d, 0, 0, 1)
+	switch name {
+	case "q14":
+		p["date_1m"] = shiftDate(d, 0, 1, 0)
+	case "q4", "q10", "q15":
+		p["date_3m"] = shiftDate(d, 0, 3, 0)
+	case "q5", "q6", "q12", "q20":
+		p["date_1y"] = shiftDate(d, 0, 0, 1)
+	}
 
 	return p
 }

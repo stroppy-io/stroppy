@@ -1,10 +1,79 @@
 package tpch
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/postgres"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver"
 )
+
+func TestQueryParametersMatchDialectSQL(t *testing.T) {
+	t.Parallel()
+
+	generated, err := streamParams(1, 19620719)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, dialect := range []string{"pg.sql", "crdb.sql", "mysql.sql", "pico.sql", "ydb.sql"} {
+		t.Run(dialect, func(t *testing.T) {
+			t.Parallel()
+
+			text, readErr := files.ReadFile(dialect)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+
+			sql := bench.ParseSQL(string(text))
+			w := &workload{isPicodata: dialect == "pico.sql", needsEndDates: dialect == "pico.sql" || dialect == "ydb.sql"}
+
+			for _, base := range []map[string]map[string]any{queryParams(1), generated} {
+				before := w.prepareParams(base)
+				params := w.prepareParams(base)
+
+				for _, name := range queryNames {
+					body, ok := sql.Query(name, "body")
+					if !ok {
+						t.Fatalf("missing query %s", name)
+					}
+
+					if _, _, bindErr := sqldriver.ProcessArgs(postgres.PgxDialect{}, body, params[name]); bindErr != nil {
+						t.Errorf("%s: %v", name, bindErr)
+					}
+
+					params[name]["mutation"] = true
+				}
+
+				if !reflect.DeepEqual(before, w.prepareParams(base)) {
+					t.Fatal("prepared parameters share mutable input maps")
+				}
+			}
+		})
+	}
+}
+
+func TestEndDateIntervals(t *testing.T) {
+	t.Parallel()
+
+	w := &workload{isPicodata: true, needsEndDates: true}
+
+	params := w.buildParams()
+	for name, expected := range map[string]map[string]any{
+		"q1":  {"shipdate_cutoff": "1998-09-02"},
+		"q3":  {"segment": "BUILDING", "date": "1995-03-15"},
+		"q4":  {"date": "1993-07-01", "date_3m": "1993-10-01"},
+		"q5":  {"region": "ASIA", "date": "1994-01-01", "date_1y": "1995-01-01"},
+		"q12": {"shipmode1": "MAIL", "shipmode2": "SHIP", "date": "1994-01-01", "date_1y": "1995-01-01"},
+		"q14": {"date": "1995-09-01", "date_1m": "1995-10-01"},
+		"q15": {"date": "1996-01-01", "date_3m": "1996-04-01"},
+	} {
+		if !reflect.DeepEqual(params[name], expected) {
+			t.Errorf("%s parameters = %v, want %v", name, params[name], expected)
+		}
+	}
+}
 
 func TestSQLFileDefaults(t *testing.T) {
 	tests := []struct {

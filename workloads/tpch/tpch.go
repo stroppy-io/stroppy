@@ -224,10 +224,11 @@ func (w *workload) prepareParams(base map[string]map[string]any) map[string]map[
 			p[k] = v
 		}
 
-		p = withEndDates(p, w.needsEndDates)
+		p = withEndDates(name, p, w.needsEndDates)
 		if name == "q1" && w.isPicodata {
 			delta, _ := p["delta"].(int)
 			p["shipdate_cutoff"] = shiftDate("1998-12-01", -delta, 0, 0)
+			delete(p, "delta")
 		}
 
 		params[name] = p
