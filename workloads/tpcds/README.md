@@ -100,6 +100,33 @@ warning explains that data generation, SQL-port semantics, collation, or numeric
 behavior may be responsible rather than a database defect. Cross-engine answer
 comparison is diagnostic, not certification of the SQL port.
 
+## Per-query measurements
+
+Every attempted workload statement records `tpcds_query_<N>_duration` in
+milliseconds, plus `_runs`, `_errors`, and `_elapsed_total` counters. Multipart
+queries use `_a` and `_b` before the metric suffix, for example
+`tpcds_query_14_a_duration`. Baked queries and generated streams use the same
+names. Setup and answer validation do not enter these measurements.
+
+Duration covers the complete `Bench.Exec` call, including cursor closure and
+error detection. SQL failures, statement timeouts, and canceled in-flight
+attempts retain their elapsed time; queries not started after cancellation do
+not count. `_runs` counts all attempts, `_elapsed_total` sums all attempt times,
+and `_errors` counts failed attempts. Histogram series carry
+`outcome=success|error`, so successful timings remain separable for scoring.
+The metric-level count, sum, and average combine both outcomes; use successful
+series and reject incomplete/error-containing runs for a complete-suite score.
+These are 103 statement measurements, not a computed 99-query TPC-DS score.
+
+Histograms store a fixed number of bucket counts, not a bounded list of samples:
+run length and observation count do not consume additional sample storage.
+Buckets span sub-millisecond timings through hours and days, ending at the
+largest Go duration. Counts and sums preserve long observations; percentiles
+are approximate bucket upper bounds, not exact timings. Repeated iterations and
+concurrent streams aggregate by query/outcome rather than retaining each pass.
+Summary, JSON report, and OTLP expose the same measurements. Abrupt process
+termination or unavailable telemetry transport cannot guarantee remote delivery.
+
 ## Qualification provenance
 
 `dsqgen/qualification.json` contains the fixed substitutions from Appendix B of

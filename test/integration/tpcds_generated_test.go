@@ -28,7 +28,7 @@ func TestTPCDSGeneratedPostgresAllQueries(t *testing.T) {
 		"--report-file", reportFile,
 	)
 
-	matches := regexp.MustCompile(`query completed\s+\{[^\n]*"query": "query(\d+)(?:_[abc])?"`).
+	matches := regexp.MustCompile(`query completed\s+\{[^\n]*"query": "query_(\d+)(?:_[abc])?"`).
 		FindAllStringSubmatch(out, -1)
 	if len(matches) != 103 {
 		t.Fatalf("got %d successful SQL statements, want 103\n%s", len(matches), out)
@@ -251,7 +251,7 @@ func testTPCDSGeneratedMySQLDialect(t *testing.T, driver, url string) {
 
 			out := runStroppy(t, 10*time.Minute, args...)
 
-			matches := regexp.MustCompile(`query completed\s+\{[^\n]*"query": "query(\d+)(?:_[abc])?"`).
+			matches := regexp.MustCompile(`query completed\s+\{[^\n]*"query": "query_(\d+)(?:_[abc])?"`).
 				FindAllStringSubmatch(out, -1)
 			if len(matches) != want {
 				t.Fatalf("got %d successful SQL statements, want %d\n%s", len(matches), want, out)

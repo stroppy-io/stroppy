@@ -51,6 +51,7 @@ type workload struct {
 	genStream  int // QUERY_STREAM value (<0 = unset → baked)
 
 	validation validationReport
+	metrics    map[string]*queryMetrics
 }
 
 type namedQuery struct {
@@ -174,6 +175,8 @@ func define(d *bench.Def) error {
 		return err
 	}
 
+	w.metrics = declareQueryMetrics(&d.Metrics, w.querySQL.Names(""))
+
 	step("drop_schema", w.drop)
 	step("create_schema", w.create)
 
@@ -272,9 +275,16 @@ func (w *workload) work(ctx context.Context, b *bench.Bench) error {
 	}
 
 	for _, q := range queries {
-		start := time.Now()
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 
-		if err := b.Exec(ctx, q.sql, nil); err != nil {
+		start := time.Now()
+		err := b.Exec(ctx, q.sql, nil)
+		elapsed := time.Since(start)
+		w.metrics[q.name].record(ctx, elapsed, err != nil)
+
+		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -284,13 +294,7 @@ func (w *workload) work(ctx context.Context, b *bench.Bench) error {
 			continue
 		}
 
-		b.Log.Info(
-			"query completed",
-			"query",
-			q.name,
-			"elapsed",
-			time.Since(start),
-		)
+		b.Log.Info("query completed", "query", q.name, "elapsed", elapsed)
 	}
 
 	return nil
@@ -305,7 +309,7 @@ func (w *workload) resolveQueries(b *bench.Bench) ([]namedQuery, error) {
 		out := make([]namedQuery, 0, len(names))
 		for _, name := range names {
 			if body, ok := w.querySQL.Query("", name); ok {
-				out = append(out, namedQuery{name, body})
+				out = append(out, namedQuery{canonicalQueryName(name), body})
 			}
 		}
 
@@ -381,7 +385,7 @@ func generateStream(dialect string, scale float64, seed int64, stream int) ([]na
 
 	out := make([]namedQuery, 0, len(res.Queries))
 	for _, q := range res.Queries {
-		stmts := strings.Split(q.SQL, ";")
+		stmts := strings.Split(strings.TrimRight(strings.TrimSpace(q.SQL), ";"), ";")
 
 		var n int
 
@@ -391,7 +395,7 @@ func generateStream(dialect string, scale float64, seed int64, stream int) ([]na
 				continue
 			}
 
-			name := q.Name
+			name := canonicalQueryName(q.Name)
 			if len(stmts) > 1 && n < len(suffix) {
 				name += suffix[n]
 			}

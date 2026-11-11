@@ -2,6 +2,7 @@ package tpcds
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -24,7 +25,7 @@ func TestGeneratedQuerySetIsComplete(t *testing.T) {
 						seen := make(map[string]bool)
 
 						for _, q := range queries {
-							name, _, _ := strings.Cut(q.name, "_")
+							name, _, _ := strings.Cut(strings.TrimPrefix(q.name, "query_"), "_")
 
 							seen[name] = true
 							if q.sql == "" {
@@ -37,7 +38,7 @@ func TestGeneratedQuerySetIsComplete(t *testing.T) {
 						}
 
 						for i := 1; i <= 99; i++ {
-							if !seen[fmt.Sprintf("query%d", i)] {
+							if !seen[strconv.Itoa(i)] {
 								t.Errorf("query%d missing", i)
 							}
 						}
