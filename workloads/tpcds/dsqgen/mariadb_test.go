@@ -35,6 +35,9 @@ func assertMariaDBQuerySet(t *testing.T, result *Result) {
 		if strings.Contains(strings.ToLower(query.SQL), "grouping(") {
 			t.Fatalf("%s retains unsupported GROUPING function", query.Name)
 		}
+		if query.Name == "query72" && !strings.Contains(query.SQL, "d3.d_date > d1.d_date + interval 5 day") {
+			t.Fatalf("query72 lost calendar-date arithmetic: %s", query.SQL)
+		}
 		for _, statement := range strings.Split(query.SQL, ";") {
 			clauses := topLevelClauses(statement)
 			group, hasGroup := clauses["group by"]

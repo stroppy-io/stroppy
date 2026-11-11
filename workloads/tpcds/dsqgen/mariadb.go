@@ -7,6 +7,9 @@ import (
 
 func mariaDBTransform(query, sql string) string {
 	sql = mysqlTransform(query, sql)
+	if query == "query72" {
+		sql = strings.ReplaceAll(sql, "d1.d_date + 5", "d1.d_date + interval 5 day")
+	}
 	if query == "query27" {
 		return mariaDBGrouping(sql, "i_item_id", "s_state", "", "")
 	}

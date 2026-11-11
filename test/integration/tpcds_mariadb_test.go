@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/workloads/tpcds/dsqgen"
 )
 
 const defaultMariaDBURL = "myuser:mypassword@tcp(localhost:3368)/mydb?parseTime=true&multiStatements=true"
@@ -155,6 +156,54 @@ func TestTPCDSMariaDBRollupMatchesMySQL(t *testing.T) {
 		got, want := tpcdsComparableRows(t, maria, left), tpcdsComparableRows(t, mysql, right)
 		if !reflect.DeepEqual(got, want) {
 			t.Fatalf("%s empty rollup differs: %v / %v", name, got, want)
+		}
+	}
+}
+
+func TestTPCDSMariaDBGeneratedDateArithmetic(t *testing.T) {
+	db := newSQLDB(t, "mariadb", "STROPPY_MARIADB_URL", defaultMariaDBURL)
+
+	result, err := dsqgen.Generate(dsqgen.MariaDB, 0.01, 19620718, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var predicate string
+
+	for _, query := range result.Queries {
+		if query.Name != "query72" {
+			continue
+		}
+
+		for _, line := range strings.Split(query.SQL, "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "and d3.d_date >") {
+				predicate = strings.TrimPrefix(line, "and ")
+			}
+		}
+	}
+
+	if predicate == "" {
+		t.Fatal("generated query72 has no shipping-date predicate")
+	}
+
+	for _, test := range []struct {
+		ship string
+		want bool
+	}{
+		{"2001-02-01", false}, {"2001-02-05", false}, {"2001-02-06", true},
+	} {
+		var got bool
+
+		err := db.QueryRowContext(t.Context(), "SELECT "+predicate+
+			" FROM (SELECT CAST('2001-01-31' AS DATE) d_date) d1"+
+			" CROSS JOIN (SELECT CAST(? AS DATE) d_date) d3", test.ship).Scan(&got)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got != test.want {
+			t.Fatalf("ship=%s: generated predicate=%t, want %t", test.ship, got, test.want)
 		}
 	}
 }
