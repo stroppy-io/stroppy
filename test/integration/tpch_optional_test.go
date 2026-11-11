@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -101,8 +102,9 @@ SELECT 1 OPTION (sql_vdbe_opcode_max = 42 -- opcode cap (max), reserved
 		"--sql-file", path, "--steps", "workload", "--iterations", "1",
 		"--pico-motion-row-max", "2")
 	for _, query := range []string{"q1", "q3", "q4", "q5", "q6", "q7"} {
-		if !strings.Contains(out, `"query": "`+query+`"`) {
-			t.Errorf("override query %s did not complete", query)
+		completed := regexp.MustCompile(`query completed\s+\{[^\n]*"query": "` + regexp.QuoteMeta(query) + `"`)
+		if count := len(completed.FindAllStringIndex(out, -1)); count != 1 {
+			t.Errorf("override query %s completion markers = %d, want 1", query, count)
 		}
 	}
 
