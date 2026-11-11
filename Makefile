@@ -113,6 +113,11 @@ integration-tpcds-sf1: # Run the complete PostgreSQL TPC-DS qualification answer
 	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
 	go test -tags='integration integration_sf1' -count=1 -timeout=75m -run '^TestTPCDSQualificationSF1$$' ./test/integration
 
+.PHONY: integration-tpcds-mariadb
+integration-tpcds-mariadb: # Run MariaDB TPC-DS queries and compare rollups against MySQL
+	@test -x $(STROPPY_OUT_FILE) || { echo "error: $(STROPPY_OUT_FILE) is missing; run 'make build' first"; exit 1; }
+	go test -tags='integration integration_optional' -count=1 -timeout=30m -run '^TestTPCDSMariaDB' ./test/integration
+
 
 ##
 ## Reference-data JSON regeneration (build-time, run with upstream inputs)

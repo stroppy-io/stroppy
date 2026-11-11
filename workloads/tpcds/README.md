@@ -152,6 +152,10 @@ Use a disposable database: this target resets its schema.
   explicit grouping levels replace MySQL-only `GROUPING()` while preserving real
   NULL keys and hierarchy ranks. Baked queries, generated streams, and diagnostic
   answer comparison use this dialect; the default MySQL dialect is unchanged.
+  `make integration-tpcds-mariadb` checks all statements in baked, generated, and
+  two-stream modes at SF=0.01, then compares rollup results with MySQL fixtures.
+  Set `STROPPY_MARIADB_URL` and `STROPPY_MYSQL_URL` to disposable databases; this
+  target resets both schemas. MariaDB defaults to localhost:3368, MySQL to localhost:3307.
 - **TiDB:** uses the MySQL baked queries, generated streams, and shared answer comparison.
 - **YugabyteDB:** uses PostgreSQL baked queries, generated streams, and shared answer comparison.
 - **YDB:** all 103 baked statements run on the YQL port, with shared answer comparison.
