@@ -124,6 +124,21 @@ func parseQueryTemplate(dialect queries.Dialect, sqlStr string) *parsedQuery {
 	}
 }
 
+// ReferencedArgs uses the same parameter-token rules as ProcessArgs so callers
+// can adapt shared parameter sets without hiding missing bindings.
+func ReferencedArgs(sqlStr string, args map[string]any) map[string]any {
+	filtered := make(map[string]any)
+
+	for _, match := range argsRe.FindAllStringSubmatch(sqlStr, -1) {
+		name := match[2][1:]
+		if value, ok := args[name]; ok {
+			filtered[name] = value
+		}
+	}
+
+	return filtered
+}
+
 // StatementTimeout returns a child context bounded by timeout, or ctx unchanged
 // (with a no-op cancel) when timeout is non-positive. Callers release the child
 // once the statement and any result-row iteration complete.
@@ -185,7 +200,7 @@ func RunQuery[R any](
 	processedSQL, argsArr, err := ProcessArgs(dialect, sqlStr, args)
 	if err != nil {
 		if errors.Is(err, ErrExtraArgument) {
-			lg.Warn(err.Error(), zap.String("sql", sqlStr))
+			lg.Warn("unused query arguments ignored; query execution continues", zap.Error(err), zap.String("sql", sqlStr))
 		} else {
 			lg.Error("arguments processing error", zap.String("sql", sqlStr), zap.Error(err))
 

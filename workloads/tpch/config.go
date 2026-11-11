@@ -3,6 +3,8 @@ package tpch
 import (
 	"fmt"
 	"io/fs"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
@@ -44,6 +46,71 @@ func sqlFile(dt bench.DriverTypeName, override string) string {
 		// postgres, and the engines that speak its protocol.
 		return "pg.sql"
 	}
+}
+
+func picodataQueryOptions(motionRows, opcodes uint64) string {
+	var options []string
+	if motionRows > 0 {
+		options = append(options, fmt.Sprintf("sql_motion_row_max = %d", motionRows))
+	}
+
+	if opcodes > 0 {
+		options = append(options, fmt.Sprintf("sql_vdbe_opcode_max = %d", opcodes))
+	}
+
+	if len(options) == 0 {
+		return ""
+	}
+
+	return strings.Join(options, ", ")
+}
+
+var (
+	picodataOptionComments = regexp.MustCompile(`(?s)--[^\n]*|/\*.*?\*/`)
+	picodataSQLTokens      = regexp.MustCompile(
+		`(?is)'(?:''|[^'])*'|"(?:""|[^"])*"|(--[^\n]*|/\*.*?\*/)|` +
+			`(\boption\s*\(((?:--[^\n]*|/\*.*?\*/|[^()])*)\))|\S`,
+	)
+)
+
+func picodataSQL(body, options string) string {
+	if options == "" {
+		return body
+	}
+
+	end := 0
+
+	for _, token := range picodataSQLTokens.FindAllStringSubmatchIndex(body, -1) {
+		if token[2] >= 0 {
+			continue
+		}
+
+		if token[4] >= 0 {
+			return body[:token[6]] + mergePicodataOptions(body[token[6]:token[7]], options) + body[token[7]:]
+		}
+
+		if body[token[0]:token[1]] != ";" {
+			end = token[1]
+		}
+	}
+
+	return body[:end] + "\nOPTION (" + options + ")" + body[end:]
+}
+
+func mergePicodataOptions(existing, requested string) string {
+	var retained []string
+
+	existing = picodataOptionComments.ReplaceAllString(existing, " ")
+	for _, option := range strings.Split(existing, ",") {
+		name, _, _ := strings.Cut(option, "=")
+
+		name = strings.ToLower(strings.TrimSpace(name))
+		if !strings.Contains(requested, name+" =") {
+			retained = append(retained, strings.TrimSpace(option))
+		}
+	}
+
+	return strings.Join(append(retained, requested), ", ")
 }
 
 // shiftDate shifts an ISO date by (days, months, years) in UTC. Picodata and
@@ -90,8 +157,6 @@ func queryParams(scaleFactor float64) map[string]map[string]any {
 	return m
 }
 
-// withEndDates adds date_1m/date_3m/date_1y derived from `date` for picodata/ydb
-// (which lack date+interval expressions). No-op on pg/mysql or when no `date` param.
 func withEndDates(p map[string]any, needsEndDates bool) map[string]any {
 	if !needsEndDates {
 		return p

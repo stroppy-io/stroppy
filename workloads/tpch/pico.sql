@@ -28,8 +28,8 @@
 --
 -- sbroad resource caps: the multi-join aggregates (q3, q10, q21) fan out
 -- large intermediate rows and need sql_vdbe_opcode_max and
--- sql_motion_row_max raised well above sbroad defaults; the tmpfs-all
--- compose init does both before this workload runs.
+-- sql_motion_row_max raised well above sbroad defaults. Workload-local
+-- --pico-vdbe-opcode-max and --pico-motion-row-max avoid cluster-wide changes.
 
 --+ drop_schema
 --= drop_lineitem

@@ -1,10 +1,204 @@
 package tpch
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/postgres"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver"
 )
+
+func TestQueryParametersMatchDialectSQL(t *testing.T) {
+	t.Parallel()
+
+	generated, err := streamParams(1, 19620719)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, dialect := range []string{"pg.sql", "crdb.sql", "mysql.sql", "pico.sql", "ydb.sql"} {
+		t.Run(dialect, func(t *testing.T) {
+			t.Parallel()
+
+			text, readErr := files.ReadFile(dialect)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+
+			sql := bench.ParseSQL(string(text))
+			w := &workload{
+				sql: sql, isPicodata: dialect == "pico.sql", needsEndDates: dialect == "pico.sql" || dialect == "ydb.sql",
+			}
+
+			for _, base := range []map[string]map[string]any{queryParams(1), generated} {
+				before := w.prepareParams(base)
+				params := w.prepareParams(base)
+
+				for _, name := range queryNames {
+					body, ok := sql.Query(name, "body")
+					if !ok {
+						t.Fatalf("missing query %s", name)
+					}
+
+					if _, _, bindErr := sqldriver.ProcessArgs(postgres.PgxDialect{}, body, params[name]); bindErr != nil {
+						t.Errorf("%s: %v", name, bindErr)
+					}
+
+					params[name]["mutation"] = true
+				}
+
+				if !reflect.DeepEqual(before, w.prepareParams(base)) {
+					t.Fatal("prepared parameters share mutable input maps")
+				}
+			}
+		})
+	}
+}
+
+func TestEndDateIntervals(t *testing.T) {
+	t.Parallel()
+
+	text, err := files.ReadFile("pico.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := &workload{sql: bench.ParseSQL(string(text)), isPicodata: true, needsEndDates: true}
+
+	params := w.buildParams()
+	for name, expected := range map[string]map[string]any{
+		"q1":  {"shipdate_cutoff": "1998-09-02"},
+		"q3":  {"segment": "BUILDING", "date": "1995-03-15"},
+		"q4":  {"date": "1993-07-01", "date_3m": "1993-10-01"},
+		"q5":  {"region": "ASIA", "date": "1994-01-01", "date_1y": "1995-01-01"},
+		"q12": {"shipmode1": "MAIL", "shipmode2": "SHIP", "date": "1994-01-01", "date_1y": "1995-01-01"},
+		"q14": {"date": "1995-09-01", "date_1m": "1995-10-01"},
+		"q15": {"date": "1996-01-01", "date_3m": "1996-04-01"},
+	} {
+		if !reflect.DeepEqual(params[name], expected) {
+			t.Errorf("%s parameters = %v, want %v", name, params[name], expected)
+		}
+	}
+}
+
+func TestPicodataQueryOptions(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		rows, opcodes uint64
+		want          string
+	}{
+		{0, 0, ""},
+		{10000000, 0, "sql_motion_row_max = 10000000"},
+		{0, 10000000000, "sql_vdbe_opcode_max = 10000000000"},
+		{10000000, 10000000000, "sql_motion_row_max = 10000000, sql_vdbe_opcode_max = 10000000000"},
+	} {
+		if got := picodataQueryOptions(test.rows, test.opcodes); got != test.want {
+			t.Errorf("options(%d, %d) = %q, want %q", test.rows, test.opcodes, got, test.want)
+		}
+	}
+}
+
+func TestPicodataSQLMergesOptions(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		body, options, want string
+	}{
+		{"SELECT 1;", "", "SELECT 1;"},
+		{
+			"SELECT 1 -- OPTION (sql_motion_row_max = 1)", "sql_motion_row_max = 2",
+			"SELECT 1\nOPTION (sql_motion_row_max = 2) -- OPTION (sql_motion_row_max = 1)",
+		},
+		{
+			"SELECT 1 /* OPTION (sql_motion_row_max = 1) */;", "sql_motion_row_max = 2",
+			"SELECT 1\nOPTION (sql_motion_row_max = 2) /* OPTION (sql_motion_row_max = 1) */;",
+		},
+		{
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42); -- trailing comment", "sql_motion_row_max = 2",
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42, sql_motion_row_max = 2); -- trailing comment",
+		},
+		{
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42 /* cap (opcodes), reserved */);", "sql_motion_row_max = 2",
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42, sql_motion_row_max = 2);",
+		},
+		{
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42 -- opcode cap (max), reserved\n);", "sql_motion_row_max = 2",
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42, sql_motion_row_max = 2);",
+		},
+		{
+			"SELECT 1 OPTION (sql_motion_row_max /* (rows), max */ = 1, sql_vdbe_opcode_max = 42);",
+			"sql_motion_row_max = 2",
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42, sql_motion_row_max = 2);",
+		},
+		{"SELECT 1;", "sql_motion_row_max = 2", "SELECT 1\nOPTION (sql_motion_row_max = 2);"},
+		{
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42);", "sql_motion_row_max = 2",
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42, sql_motion_row_max = 2);",
+		},
+		{
+			"SELECT 1 oPtIoN (SQL_MOTION_ROW_MAX = :delta, read_preference = replica, forward = off);",
+			"sql_motion_row_max = 2",
+			"SELECT 1 oPtIoN (read_preference = replica, forward = off, sql_motion_row_max = 2);",
+		},
+		{
+			"SELECT 'OPTION (not_an_option)' AS text;", "sql_motion_row_max = 2",
+			"SELECT 'OPTION (not_an_option)' AS text\nOPTION (sql_motion_row_max = 2);",
+		},
+	} {
+		if got := picodataSQL(test.body, test.options); got != test.want {
+			t.Errorf("picodataSQL(%q, %q) = %q, want %q", test.body, test.options, got, test.want)
+		}
+	}
+}
+
+func TestOverrideQueryParameters(t *testing.T) {
+	t.Parallel()
+
+	for _, picodata := range []bool{true, false} {
+		w := &workload{
+			sql: bench.ParseSQL("--+ q1\n--= body\nSELECT :delta AS configured_delta\n" +
+				"--+ q3\n--= body\nSELECT :date_1m, :date_3m, :date_1y\n"),
+			isPicodata: picodata, needsEndDates: true,
+		}
+
+		params := w.buildParams()
+		if !reflect.DeepEqual(params["q1"], map[string]any{"delta": 90}) ||
+			!reflect.DeepEqual(params["q3"], map[string]any{
+				"date_1m": "1995-04-15", "date_3m": "1995-06-15", "date_1y": "1996-03-15",
+			}) {
+			t.Fatalf("override parameters: q1=%v, q3=%v", params["q1"], params["q3"])
+		}
+	}
+
+	w := &workload{
+		sql:        bench.ParseSQL("--+ q1\n--= body\nSELECT 1 OPTION (sql_motion_row_max = :delta)"),
+		isPicodata: true, needsEndDates: true, queryOptions: picodataQueryOptions(2, 0),
+	}
+	if params := w.buildParams(); len(params["q1"]) != 0 {
+		t.Fatalf("overridden option retains unused parameters: %v", params["q1"])
+	}
+}
+
+func TestPicodataQueryLimitsRequirePicodata(t *testing.T) {
+	t.Parallel()
+
+	catalog, err := bench.NewCatalog(Test)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, driver := range []bench.DriverTypeName{bench.DriverPostgres, bench.DriverPicodata, bench.DriverYDB} {
+		for _, flag := range []string{"pico-motion-row-max", "pico-vdbe-opcode-max"} {
+			_, resolveErr := catalog.Resolve("tpch/tx", bench.ParamInputs{CLI: map[string]string{flag: "10000000"}},
+				map[string]bench.DriverConfig{"": {Kind: driver}})
+			if (resolveErr == nil) != (driver == bench.DriverPicodata) {
+				t.Errorf("driver %s, %s: unexpected limit support: %v", driver, flag, resolveErr)
+			}
+		}
+	}
+}
 
 func TestSQLFileDefaults(t *testing.T) {
 	tests := []struct {

@@ -3,10 +3,12 @@ package sqldriver
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver/queries"
 )
@@ -114,6 +116,73 @@ func TestRunQueryResultsOwnStats(t *testing.T) {
 	first.Stats.Rows = 42
 	if second.Stats.Rows != 0 {
 		t.Fatal("mutating one result changed another query's statistics")
+	}
+}
+
+func TestRunQueryUnusedArgumentsContinue(t *testing.T) {
+	t.Parallel()
+
+	core, logs := observer.New(zap.WarnLevel)
+	query := &deadlineCaptureQuery{}
+
+	result, err := RunQuery(t.Context(), query, noopWrap, testDialect{}, zap.New(core),
+		"SELECT :used", map[string]any{"used": 42, "unused": 99}, 0)
+	if err != nil || result == nil {
+		t.Fatalf("RunQuery() = %v, %v", result, err)
+	}
+
+	if query.sql != "SELECT ?" {
+		t.Fatalf("executed SQL = %q, want SELECT ?", query.sql)
+	}
+
+	entries := logs.All()
+	if len(entries) != 1 || entries[0].Message != "unused query arguments ignored; query execution continues" {
+		t.Fatalf("warnings = %v", entries)
+	}
+
+	if got := entries[0].ContextMap()["error"]; got != "extra arguments provided: [unused]" {
+		t.Fatalf("warning detail = %v", got)
+	}
+
+	sql, args, err := ProcessArgs(testDialect{}, "SELECT :used", map[string]any{"used": 42, "unused": 99})
+	if sql != "SELECT ?" || !reflect.DeepEqual(args, []any{42}) || !errors.Is(err, ErrExtraArgument) {
+		t.Fatalf("ProcessArgs() = %q, %v, %v", sql, args, err)
+	}
+}
+
+func TestReferencedArgsMatchesBinding(t *testing.T) {
+	t.Parallel()
+
+	const sql = "SELECT :used, :used::int, :missing"
+
+	input := map[string]any{"used": 42, "unused": 99}
+
+	got := ReferencedArgs(sql, input)
+	if !reflect.DeepEqual(got, map[string]any{"used": 42}) {
+		t.Fatalf("ReferencedArgs() = %v", got)
+	}
+
+	_, _, err := ProcessArgs(testDialect{}, sql, got)
+	if !errors.Is(err, ErrMissedArgument) {
+		t.Fatalf("missing binding was hidden: %v", err)
+	}
+
+	got["used"] = 1
+
+	if input["used"] != 42 {
+		t.Fatal("filtered map shares input storage")
+	}
+}
+
+func TestRunQueryMissingArgumentsStop(t *testing.T) {
+	t.Parallel()
+
+	query := &deadlineCaptureQuery{}
+
+	_, err := RunQuery(t.Context(), query, noopWrap, testDialect{}, zap.NewNop(),
+		"SELECT :required", nil, 0)
+	if !errors.Is(err, ErrMissedArgument) || query.sql != "" {
+		t.Fatalf("RunQuery() error = %v, executed SQL = %q", err, query.sql)
 	}
 }
 

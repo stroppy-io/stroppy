@@ -13,10 +13,14 @@ import (
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 	"github.com/stroppy-io/stroppy/v6/pkg/bench/mpp"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver"
 	"github.com/stroppy-io/stroppy/v6/workloads/tpch/tpchgen"
 )
 
-var errScaleFactorMustBePositive = errors.New("SCALE_FACTOR must be positive")
+var (
+	errScaleFactorMustBePositive = errors.New("SCALE_FACTOR must be positive")
+	errPicodataLimitsDriver      = errors.New("picodata query limits require the picodata driver")
+)
 
 type workload struct {
 	sql           *bench.SQL
@@ -30,6 +34,7 @@ type workload struct {
 	ydbColumn     bool
 	ydbStoreMode  string
 	sqlFile       string
+	queryOptions  string
 
 	params     map[string]map[string]any // final per-query params (end dates + q1 cutoff precomputed)
 	m          map[string]*queryMetrics
@@ -134,6 +139,16 @@ func define(d *bench.Def) error {
 }
 
 func (w *workload) loadSQL(d *bench.Def, gp bool) error {
+	motionRows, _ := d.Param.Uint64("pico-motion-row-max", 0,
+		"Picodata per-query intermediate-row limit; 0 keeps the server setting.", bench.Max(uint64(1<<63-1)))
+	opcodes, _ := d.Param.Uint64("pico-vdbe-opcode-max", 0,
+		"Picodata per-query opcode limit; 0 keeps the server setting.", bench.Max(uint64(1<<63-1)))
+
+	w.queryOptions = picodataQueryOptions(motionRows, opcodes)
+	if w.queryOptions != "" && w.driverType != bench.DriverPicodata {
+		return errPicodataLimitsDriver
+	}
+
 	var err error
 	if w.sqlFile != "" {
 		w.sql, err = d.Queries.Override(w.sqlFile)
@@ -230,6 +245,12 @@ func (w *workload) prepareParams(base map[string]map[string]any) map[string]map[
 			p["shipdate_cutoff"] = shiftDate("1998-12-01", -delta, 0, 0)
 		}
 
+		if w.sql != nil {
+			if body, ok := w.sql.Query(name, "body"); ok {
+				p = sqldriver.ReferencedArgs(picodataSQL(body, w.queryOptions), p)
+			}
+		}
+
 		params[name] = p
 	}
 
@@ -250,6 +271,11 @@ func (w *workload) runQueries(ctx context.Context, b *bench.Bench) error {
 		}
 
 		start := time.Now()
+
+		if w.queryOptions != "" {
+			body = picodataSQL(body, w.queryOptions)
+		}
+
 		_, err := b.RawRows(ctx, body, w.params[name])
 		elapsed := time.Since(start).Milliseconds()
 		w.recordAttempt(ctx, name, float64(elapsed), err != nil)

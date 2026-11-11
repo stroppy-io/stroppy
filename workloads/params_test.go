@@ -53,6 +53,8 @@ func TestBuiltInWorkloadParameterSchemas(t *testing.T) {
 		{"tpch/tx", []bench.ParamSchema{
 			param("load-workers", bench.ParamTypeInt, 0, "LOAD_WORKERS", "loadWorkers"),
 			param("pg-unlogged", bench.ParamTypeBool, false, "PG_UNLOGGED", "pgUnlogged"),
+			picodataLimitParam("pico-motion-row-max", "PICO_MOTION_ROW_MAX", "picoMotionRowMax"),
+			picodataLimitParam("pico-vdbe-opcode-max", "PICO_VDBE_OPCODE_MAX", "picoVdbeOpcodeMax"),
 			tpchSeedParam(),
 			boundedIntParam("query-stream", 0, "QUERY_STREAM", "queryStream", 0),
 			param("scale-factor", bench.ParamTypeFloat64, float64(1), "SCALE_FACTOR", "scaleFactor"),
@@ -141,6 +143,13 @@ func TestBuiltInWorkloadsDoNotReadPublicEnvDirectly(t *testing.T) {
 
 func isEnvRead(name string) bool {
 	return name == "Env" || name == "EnvInt" || name == "EnvFloat"
+}
+
+func picodataLimitParam(name, env, config string) bench.ParamSchema {
+	limit := param(name, bench.ParamTypeUint64, uint64(0), env, config)
+	limit.Constraints = []bench.Constraint{{Kind: "max", Value: uint64(1<<63 - 1)}}
+
+	return limit
 }
 
 func tpchSeedParam() bench.ParamSchema {

@@ -237,6 +237,10 @@ jobs:
           exit 1
       - name: Verify concurrent order ID allocation
         run: go test -tags='integration integration_optional' -run '^TestTpccPicodataAtomicOrderAllocation$' -count=1 -timeout=3m ./test/integration
+      - name: Build stroppy for Picodata workload checks
+        run: make build
+      - name: Verify TPC-H Picodata queries and SQL overrides
+        run: go test -tags='integration integration_optional' -run '^Test(TpchLoadOnPicodata|TpchPicodata(MotionLimit|SQLOverride))$' -count=1 -timeout=5m ./test/integration
 
   # The injecting variant is the only part of the suite that needs a C extension inside
   # the server, so it gets its own job. Macavity is built here from the audited fork with
