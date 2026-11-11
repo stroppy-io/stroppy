@@ -3510,7 +3510,7 @@ $year_total = (select customer.c_customer_id AS customer_id,
          and t_w_firstyear.year_total > 0
          and case when t_w_firstyear.year_total > 0 then t_w_secyear.year_total / t_w_firstyear.year_total else null end
            > case when t_s_firstyear.year_total > 0 then t_s_secyear.year_total / t_s_firstyear.year_total else null end
- order by ((customer_id) IS NULL), customer_id, ((customer_last_name) IS NULL), customer_last_name, ((customer_first_name) IS NULL), customer_first_name limit 100;
+ order by ((customer_id) IS NULL), customer_id limit 100;
 
 --= query_75
 PRAGMA AnsiImplicitCrossJoin;
