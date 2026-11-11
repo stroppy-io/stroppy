@@ -181,6 +181,13 @@ func NewScaling(scale float64) *Scaling {
 	s := &Scaling{scale: scale, rowCounts: make(map[TableID]int64, len(baseTableMeta))}
 	for tid, m := range baseTableMeta {
 		base := m.scaling.rowCountForScale(scale)
+		if tid == TReason {
+			// Each reason interval starts at its lower endpoint; other tables retain C-oracle scaling.
+			slot := max(scaleSlot(scale), 1)
+			lower, upper := m.scaling.rowCounts[slot-1], m.scaling.rowCounts[slot]
+			offset := (scale - definedScales[slot-1]) / (definedScales[slot] - definedScales[slot-1])
+			base = max(1, lower+int64(offset*float64(upper-lower)))
+		}
 		mult := int64(1)
 		if m.keepsHistory {
 			mult = 2

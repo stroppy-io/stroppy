@@ -381,86 +381,7 @@ select store.s_store_name AS s_store_name,
       SELECT Unicode::Substring(ca_zip, CAST(0 AS Uint32), CAST(5 AS Uint32)) ca_zip
       FROM customer_address
       WHERE Unicode::Substring(ca_zip, CAST(0 AS Uint32), CAST(5 AS Uint32)) IN (
-                          '24128','76232','35863','28577','55565','17183',
-                          '54601','67897','22752','86284','18376',
-                          '38607','45200','21756','29741','96765',
-                          '23932','89360','29839','25989','28898',
-                          '91068','72550','10390','18845','47770',
-                          '82636','41367','76638','86198','81312',
-                          '37126','39192','88424','72175','81426',
-                          '53672','10445','42666','66864','66708',
-                          '41248','48583','82276','18842','78890',
-                          '49448','14089','38122','34425','79077',
-                          '19849','43285','39861','66162','77610',
-                          '13695','99543','83444','83041','12305',
-                          '57665','68341','25003','57834','62878',
-                          '49130','81096','18840','27700','23470',
-                          '50412','21195','16021','76107','71954',
-                          '68309','18119','98359','64544','10336',
-                          '86379','27068','39736','98569','28915',
-                          '24206','56529','57647','54917','42961',
-                          '91110','63981','14922','36420','23006',
-                          '67467','32754','30903','20260','31671',
-                          '51798','72325','85816','68621','13955',
-                          '36446','41766','68806','16725','15146',
-                          '22744','35850','88086','51649','18270',
-                          '52867','39972','96976','63792','11376',
-                          '94898','13595','10516','90225','58943',
-                          '39371','94945','28587','96576','57855',
-                          '28488','26105','83933','25858','34322',
-                          '44438','73171','30122','34102','22685',
-                          '71256','78451','54364','13354','45375',
-                          '40558','56458','28286','45266','47305',
-                          '69399','83921','26233','11101','15371',
-                          '69913','35942','15882','25631','24610',
-                          '44165','99076','33786','70738','26653',
-                          '14328','72305','62496','22152','10144',
-                          '64147','48425','14663','21076','18799',
-                          '30450','63089','81019','68893','24996',
-                          '51200','51211','45692','92712','70466',
-                          '79994','22437','25280','38935','71791',
-                          '73134','56571','14060','19505','72425',
-                          '56575','74351','68786','51650','20004',
-                          '18383','76614','11634','18906','15765',
-                          '41368','73241','76698','78567','97189',
-                          '28545','76231','75691','22246','51061',
-                          '90578','56691','68014','51103','94167',
-                          '57047','14867','73520','15734','63435',
-                          '25733','35474','24676','94627','53535',
-                          '17879','15559','53268','59166','11928',
-                          '59402','33282','45721','43933','68101',
-                          '33515','36634','71286','19736','58058',
-                          '55253','67473','41918','19515','36495',
-                          '19430','22351','77191','91393','49156',
-                          '50298','87501','18652','53179','18767',
-                          '63193','23968','65164','68880','21286',
-                          '72823','58470','67301','13394','31016',
-                          '70372','67030','40604','24317','45748',
-                          '39127','26065','77721','31029','31880',
-                          '60576','24671','45549','13376','50016',
-                          '33123','19769','22927','97789','46081',
-                          '72151','15723','46136','51949','68100',
-                          '96888','64528','14171','79777','28709',
-                          '11489','25103','32213','78668','22245',
-                          '15798','27156','37930','62971','21337',
-                          '51622','67853','10567','38415','15455',
-                          '58263','42029','60279','37125','56240',
-                          '88190','50308','26859','64457','89091',
-                          '82136','62377','36233','63837','58078',
-                          '17043','30010','60099','28810','98025',
-                          '29178','87343','73273','30469','64034',
-                          '39516','86057','21309','90257','67875',
-                          '40162','11356','73650','61810','72013',
-                          '30431','22461','19512','13375','55307',
-                          '30625','83849','68908','26689','96451',
-                          '38193','46820','88885','84935','69035',
-                          '83144','47537','56616','94983','48033',
-                          '69952','25486','61547','27385','61860',
-                          '58048','56910','16807','17871','35258',
-                          '31387','35458','22815','56600','68730',
-                          '48017','95694','32919','88217','27116',
-                          '28239','58032','18884','16791','21343',
-                          '97462','18569','75660','15475')
+                          '24128','76232','65084','87816','83926','77556','20548','26231','43848','15126','91137','61265','98294','25782','17920','18426','98235','40081','84093','28577','55565','17183','54601','67897','22752','86284','18376','38607','45200','21756','29741','96765','23932','89360','29839','25989','28898','91068','72550','10390','18845','47770','82636','41367','76638','86198','81312','37126','39192','88424','72175','81426','53672','10445','42666','66864','66708','41248','48583','82276','18842','78890','49448','14089','38122','34425','79077','19849','43285','39861','66162','77610','13695','99543','83444','83041','12305','57665','68341','25003','57834','62878','49130','81096','18840','27700','23470','50412','21195','16021','76107','71954','68309','18119','98359','64544','10336','86379','27068','39736','98569','28915','24206','56529','57647','54917','42961','91110','63981','14922','36420','23006','67467','32754','30903','20260','31671','51798','72325','85816','68621','13955','36446','41766','68806','16725','15146','22744','35850','88086','51649','18270','52867','39972','96976','63792','11376','94898','13595','10516','90225','58943','39371','94945','28587','96576','57855','28488','26105','83933','25858','34322','44438','73171','30122','34102','22685','71256','78451','54364','13354','45375','40558','56458','28286','45266','47305','69399','83921','26233','11101','15371','69913','35942','15882','25631','24610','44165','99076','33786','70738','26653','14328','72305','62496','22152','10144','64147','48425','14663','21076','18799','30450','63089','81019','68893','24996','51200','51211','45692','92712','70466','79994','22437','25280','38935','71791','73134','56571','14060','19505','72425','56575','74351','68786','51650','20004','18383','76614','11634','18906','15765','41368','73241','76698','78567','97189','28545','76231','75691','22246','51061','90578','56691','68014','51103','94167','57047','14867','73520','15734','63435','25733','35474','24676','94627','53535','17879','15559','53268','59166','11928','59402','33282','45721','43933','68101','33515','36634','71286','19736','58058','55253','67473','41918','19515','36495','19430','22351','77191','91393','49156','50298','87501','18652','53179','18767','63193','23968','65164','68880','21286','72823','58470','67301','13394','31016','70372','67030','40604','24317','45748','39127','26065','77721','31029','31880','60576','24671','45549','13376','50016','33123','19769','22927','97789','46081','72151','15723','46136','51949','68100','96888','64528','14171','79777','28709','11489','25103','32213','78668','22245','15798','27156','37930','62971','21337','51622','67853','10567','38415','15455','58263','42029','60279','37125','56240','88190','50308','26859','64457','89091','82136','62377','36233','63837','58078','17043','30010','60099','28810','98025','29178','87343','73273','30469','64034','39516','86057','21309','90257','67875','40162','11356','73650','61810','72013','30431','22461','19512','13375','55307','30625','83849','68908','26689','96451','38193','46820','88885','84935','69035','83144','47537','56616','94983','48033','69952','25486','61547','27385','61860','58048','56910','16807','17871','35258','31387','35458','35576')
      intersect
       select ca_zip
       from (SELECT Unicode::Substring(customer_address.ca_zip, CAST(0 AS Uint32), CAST(5 AS Uint32)) AS ca_zip,
@@ -684,17 +605,17 @@ select avg(store_sales.ss_quantity) AS c2,
      ))
  and((ss_addr_sk = ca_address_sk
   and ca_country = 'United States'
-  and ca_state in ('TX', 'OH', 'TX')
+  and ca_state in ('TX','OH','TX')
   and ss_net_profit between 100 and 200
      ) or
      (ss_addr_sk = ca_address_sk
   and ca_country = 'United States'
-  and ca_state in ('OR', 'NM', 'KY')
+  and ca_state in ('OR','NM','KY')
   and ss_net_profit between 150 and 300
      ) or
      (ss_addr_sk = ca_address_sk
   and ca_country = 'United States'
-  and ca_state in ('MS', 'SC', 'IA')
+  and ca_state in ('VA','TX','MS')
   and ss_net_profit between 50 and 250
      ));
 
@@ -1035,8 +956,7 @@ select item.i_item_id AS i_item_id,
        c_current_addr_sk = ca_address_sk and
        c_birth_month in (1,6,8,9,12,2) and
        d_year = 1998 and
-       ca_state in ('AL','MO','TN'
-                   ,'GA','MT','IN','CA')
+       ca_state in ('MS','IN','ND','OK','NM','VA','MS')
  group by  rollup (item.i_item_id, customer_address.ca_country, customer_address.ca_state, customer_address.ca_county)
 
  order by ((ca_country) IS NULL), ca_country, ((ca_state) IS NULL), ca_state, ((ca_county) IS NULL), ca_county, ((i_item_id) IS NULL), i_item_id limit 100;
@@ -1075,7 +995,7 @@ select item.i_item_id AS i_item_id,
      ,item
      ,date_dim
  where cs_item_sk = i_item_sk
-   and i_category in ('Books', 'Music', 'Sports')
+   and i_category in ('Sports','Books','Home')
    and cs_sold_date_sk = d_date_sk
  and d_date between ('1999-02-22')
                 and '1999-03-24'
@@ -1733,17 +1653,17 @@ select ca.ca_state AS ca_state,
   customer_demographics.cd_dep_count AS cd_dep_count,
   count(*) AS cnt1,
   min(customer_demographics.cd_dep_count) AS aggone1,
-  (CASE WHEN Math::IsNaN(max(customer_demographics.cd_dep_count)) THEN NULL ELSE stddev_samp(customer_demographics.cd_dep_count) END) AS aggtwo1,
+  max(customer_demographics.cd_dep_count) AS aggtwo1,
   avg(customer_demographics.cd_dep_count) AS aggthree1,
   customer_demographics.cd_dep_employed_count AS cd_dep_employed_count,
   count(*) AS cnt2,
   min(customer_demographics.cd_dep_employed_count) AS aggone2,
-  (CASE WHEN Math::IsNaN(max(customer_demographics.cd_dep_employed_count)) THEN NULL ELSE stddev_samp(customer_demographics.cd_dep_employed_count) END) AS aggtwo2,
+  max(customer_demographics.cd_dep_employed_count) AS aggtwo2,
   avg(customer_demographics.cd_dep_employed_count) AS aggthree2,
   customer_demographics.cd_dep_college_count AS cd_dep_college_count,
   count(*) AS cnt3,
   min(customer_demographics.cd_dep_college_count) AS aggone3,
-  (CASE WHEN Math::IsNaN(max(customer_demographics.cd_dep_college_count)) THEN NULL ELSE stddev_samp(customer_demographics.cd_dep_college_count) END) AS aggtwo3,
+  max(customer_demographics.cd_dep_college_count) AS aggtwo3,
   avg(customer_demographics.cd_dep_college_count) AS aggthree3
  from
   customer c,customer_address ca,customer_demographics
@@ -2051,7 +1971,7 @@ select  c_last_name
          household_demographics.hd_vehicle_count= 3)
     and date_dim.d_dow in (6,0)
     and date_dim.d_year in (1999,1999+1,1999+2)
-    and store.s_city in ('Midway','Fairview','Fairview','Midway','Fairview')
+    and store.s_city in ('Fairview','Midway','Fairview','Fairview','Fairview')
     group by store_sales.ss_ticket_number, store_sales.ss_customer_sk, store_sales.ss_addr_sk, customer_address.ca_city
  ) dn,customer,customer_address current_addr
     where ss_customer_sk = c_customer_sk
@@ -2086,8 +2006,8 @@ $v1 = (select item.i_category AS i_category,
        )
  group by item.i_category, item.i_brand, store.s_store_name, store.s_company_name, date_dim.d_year, date_dim.d_moy
  );
-$v2 = (select v1.s_store_name AS s_store_name, v1.s_company_name AS s_company_name
-        ,v1.d_year AS d_year
+$v2 = (select v1.i_category AS i_category, v1.i_brand AS i_brand, v1.s_store_name AS s_store_name, v1.s_company_name AS s_company_name
+        ,v1.d_year AS d_year, v1.d_moy AS d_moy
         ,v1.avg_monthly_sales AS avg_monthly_sales
         ,v1.sum_sales AS sum_sales, v1_lag.sum_sales psum, v1_lead.sum_sales nsum
  from $v1 AS v1, $v1 AS v1_lag, $v1 AS v1_lead
@@ -2102,7 +2022,7 @@ $v2 = (select v1.s_store_name AS s_store_name, v1.s_company_name AS s_company_na
        v1.rn = v1_lag.rn + 1 and
        v1.rn = v1_lead.rn - 1);
 
-  select s_store_name, s_company_name, d_year, avg_monthly_sales, sum_sales, psum, nsum from $v2 AS v2
+  select i_category, i_brand, s_store_name, s_company_name, d_year, d_moy, avg_monthly_sales, sum_sales, psum, nsum from $v2 AS v2
  where  d_year = 1999 and
         avg_monthly_sales > 0 and
         case when avg_monthly_sales > 0 then abs(sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
@@ -2591,7 +2511,7 @@ $v1 = (select item.i_category AS i_category,
  group by item.i_category, item.i_brand, call_center.cc_name, date_dim.d_year, date_dim.d_moy
  );
 $v2 = (select v1.i_category AS i_category, v1.i_brand AS i_brand, v1.cc_name AS cc_name
-        ,v1.d_year AS d_year
+        ,v1.d_year AS d_year, v1.d_moy AS d_moy
         ,v1.avg_monthly_sales AS avg_monthly_sales
         ,v1.sum_sales AS sum_sales, v1_lag.sum_sales psum, v1_lead.sum_sales nsum
  from $v1 AS v1, $v1 AS v1_lag, $v1 AS v1_lead
@@ -2604,7 +2524,7 @@ $v2 = (select v1.i_category AS i_category, v1.i_brand AS i_brand, v1.cc_name AS 
        v1.rn = v1_lag.rn + 1 and
        v1.rn = v1_lead.rn - 1);
 
-  select i_category, i_brand, cc_name, d_year, avg_monthly_sales, sum_sales, psum, nsum from $v2 AS v2
+  select i_category, i_brand, cc_name, d_year, d_moy, avg_monthly_sales, sum_sales, psum, nsum from $v2 AS v2
  where  d_year = 1999 and
         avg_monthly_sales > 0 and
         case when avg_monthly_sales > 0 then abs(sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
@@ -3180,29 +3100,29 @@ select w_warehouse_name AS w_warehouse_name,
   sum(case when date_dim.d_moy = 12
         then catalog_sales.cs_sales_price* catalog_sales.cs_quantity else 0 end) AS dec_sales,
   sum(case when date_dim.d_moy = 1
-        then catalog_sales.cs_net_paid * catalog_sales.cs_quantity else 0 end) AS jan_net,
+        then catalog_sales.cs_net_paid_inc_tax * catalog_sales.cs_quantity else 0 end) AS jan_net,
   sum(case when date_dim.d_moy = 2
-        then catalog_sales.cs_net_paid * catalog_sales.cs_quantity else 0 end) AS feb_net,
+        then catalog_sales.cs_net_paid_inc_tax * catalog_sales.cs_quantity else 0 end) AS feb_net,
   sum(case when date_dim.d_moy = 3
-        then catalog_sales.cs_net_paid * catalog_sales.cs_quantity else 0 end) AS mar_net,
+        then catalog_sales.cs_net_paid_inc_tax * catalog_sales.cs_quantity else 0 end) AS mar_net,
   sum(case when date_dim.d_moy = 4
-        then catalog_sales.cs_net_paid * catalog_sales.cs_quantity else 0 end) AS apr_net,
+        then catalog_sales.cs_net_paid_inc_tax * catalog_sales.cs_quantity else 0 end) AS apr_net,
   sum(case when date_dim.d_moy = 5
-        then catalog_sales.cs_net_paid * catalog_sales.cs_quantity else 0 end) AS may_net,
+        then catalog_sales.cs_net_paid_inc_tax * catalog_sales.cs_quantity else 0 end) AS may_net,
   sum(case when date_dim.d_moy = 6
-        then catalog_sales.cs_net_paid * catalog_sales.cs_quantity else 0 end) AS jun_net,
+        then catalog_sales.cs_net_paid_inc_tax * catalog_sales.cs_quantity else 0 end) AS jun_net,
   sum(case when date_dim.d_moy = 7
-        then catalog_sales.cs_net_paid * catalog_sales.cs_quantity else 0 end) AS jul_net,
+        then catalog_sales.cs_net_paid_inc_tax * catalog_sales.cs_quantity else 0 end) AS jul_net,
   sum(case when date_dim.d_moy = 8
-        then catalog_sales.cs_net_paid * catalog_sales.cs_quantity else 0 end) AS aug_net,
+        then catalog_sales.cs_net_paid_inc_tax * catalog_sales.cs_quantity else 0 end) AS aug_net,
   sum(case when date_dim.d_moy = 9
-        then catalog_sales.cs_net_paid * catalog_sales.cs_quantity else 0 end) AS sep_net,
+        then catalog_sales.cs_net_paid_inc_tax * catalog_sales.cs_quantity else 0 end) AS sep_net,
   sum(case when date_dim.d_moy = 10
-        then catalog_sales.cs_net_paid * catalog_sales.cs_quantity else 0 end) AS oct_net,
+        then catalog_sales.cs_net_paid_inc_tax * catalog_sales.cs_quantity else 0 end) AS oct_net,
   sum(case when date_dim.d_moy = 11
-        then catalog_sales.cs_net_paid * catalog_sales.cs_quantity else 0 end) AS nov_net,
+        then catalog_sales.cs_net_paid_inc_tax * catalog_sales.cs_quantity else 0 end) AS nov_net,
   sum(case when date_dim.d_moy = 12
-        then catalog_sales.cs_net_paid * catalog_sales.cs_quantity else 0 end) AS dec_net
+        then catalog_sales.cs_net_paid_inc_tax * catalog_sales.cs_quantity else 0 end) AS dec_net
  from
           catalog_sales
          ,warehouse
@@ -3757,7 +3677,7 @@ $ss = (select date_dim.d_year AS ss_sold_year,
  );
 
  select
-ss_customer_sk,
+ss_sold_year, ss_item_sk, ss_customer_sk,
 Math::Round(cast(ss_qty as Double)/(coalesce(ws_qty,0)+coalesce(cs_qty,0)), -(2)) ratio,
 ss_qty store_qty, ss_wc store_wholesale_cost, ss_sp store_sales_price,
 coalesce(ws_qty,0)+coalesce(cs_qty,0) other_chan_qty,
@@ -3767,7 +3687,7 @@ from $ss AS ss
 left join $ws AS ws on (ws.ws_sold_year=ss.ss_sold_year and ws.ws_item_sk=ss.ss_item_sk and ws.ws_customer_sk=ss.ss_customer_sk)
 left join $cs AS cs on (cs.cs_sold_year=ss.ss_sold_year and cs.cs_item_sk=ss.ss_item_sk and cs.cs_customer_sk=ss.ss_customer_sk)
 where (coalesce(ws_qty,0)>0 or coalesce(cs_qty, 0)>0) and ss_sold_year=2000
-order by ((ss_customer_sk) IS NULL), ss_customer_sk, ((ss_qty) IS NOT NULL), ss_qty DESC, ((ss_wc) IS NOT NULL), ss_wc DESC, ((ss_sp) IS NOT NULL), ss_sp DESC, ((other_chan_qty) IS NULL), other_chan_qty, ((other_chan_wholesale_cost) IS NULL), other_chan_wholesale_cost, ((other_chan_sales_price) IS NULL), other_chan_sales_price, ((ratio) IS NULL), ratio limit 100;
+order by ((ss_sold_year) IS NULL), ss_sold_year, ((ss_item_sk) IS NULL), ss_item_sk, ((ss_customer_sk) IS NULL), ss_customer_sk, ((ss_qty) IS NOT NULL), ss_qty DESC, ((ss_wc) IS NOT NULL), ss_wc DESC, ((ss_sp) IS NOT NULL), ss_sp DESC, ((other_chan_qty) IS NULL), other_chan_qty, ((other_chan_wholesale_cost) IS NULL), other_chan_wholesale_cost, ((other_chan_sales_price) IS NULL), other_chan_sales_price, ((ratio) IS NULL), ratio limit 100;
 
 --= query_79
 PRAGMA AnsiImplicitCrossJoin;
@@ -3783,7 +3703,7 @@ select
     where store_sales.ss_sold_date_sk = date_dim.d_date_sk
     and store_sales.ss_store_sk = store.s_store_sk
     and store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-    and (household_demographics.hd_dep_count = 6 or household_demographics.hd_vehicle_count > -1)
+    and (household_demographics.hd_dep_count = 6 or household_demographics.hd_vehicle_count > 2)
     and date_dim.d_dow = 1
     and date_dim.d_year in (1999,1999+1,1999+2)
     and store.s_number_employees between 200 and 295
@@ -4003,7 +3923,7 @@ $wr_items = (select item.i_item_id AS item_id,
 --= query_84
 PRAGMA AnsiImplicitCrossJoin;
 select  c_customer_id as customer_id
-       , coalesce(c_last_name,'') || ', ' || coalesce(c_first_name,'') as customername
+       , CAST(String::RightPad(CAST(coalesce(c_last_name,'') AS String), 30ul) AS Utf8) || ', ' || coalesce(c_first_name,'') as customername
  from customer
      ,customer_address
      ,customer_demographics
@@ -4155,7 +4075,7 @@ select h8_30_to_9, h9_to_9_30, h9_30_to_10, h10_to_10_30, h10_30_to_11, h11_to_1
      and time_dim.t_hour = 8
      and time_dim.t_minute >= 30
      and ((household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2) or
           (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2))
      and store.s_store_name = 'ese') s1,
  (select count(*) AS h9_to_9_30
@@ -4166,7 +4086,7 @@ select h8_30_to_9, h9_to_9_30, h9_30_to_10, h10_to_10_30, h10_30_to_11, h11_to_1
      and time_dim.t_hour = 9
      and time_dim.t_minute < 30
      and ((household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2) or
           (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2))
      and store.s_store_name = 'ese') s2,
  (select count(*) AS h9_30_to_10
@@ -4177,7 +4097,7 @@ select h8_30_to_9, h9_to_9_30, h9_30_to_10, h10_to_10_30, h10_30_to_11, h11_to_1
      and time_dim.t_hour = 9
      and time_dim.t_minute >= 30
      and ((household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2) or
           (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2))
      and store.s_store_name = 'ese') s3,
  (select count(*) AS h10_to_10_30
@@ -4188,7 +4108,7 @@ select h8_30_to_9, h9_to_9_30, h9_30_to_10, h10_to_10_30, h10_30_to_11, h11_to_1
      and time_dim.t_hour = 10
      and time_dim.t_minute < 30
      and ((household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2) or
           (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2))
      and store.s_store_name = 'ese') s4,
  (select count(*) AS h10_30_to_11
@@ -4199,7 +4119,7 @@ select h8_30_to_9, h9_to_9_30, h9_30_to_10, h10_to_10_30, h10_30_to_11, h11_to_1
      and time_dim.t_hour = 10
      and time_dim.t_minute >= 30
      and ((household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2) or
           (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2))
      and store.s_store_name = 'ese') s5,
  (select count(*) AS h11_to_11_30
@@ -4210,7 +4130,7 @@ select h8_30_to_9, h9_to_9_30, h9_30_to_10, h10_to_10_30, h10_30_to_11, h11_to_1
      and time_dim.t_hour = 11
      and time_dim.t_minute < 30
      and ((household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2) or
           (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2))
      and store.s_store_name = 'ese') s6,
  (select count(*) AS h11_30_to_12
@@ -4221,7 +4141,7 @@ select h8_30_to_9, h9_to_9_30, h9_30_to_10, h10_to_10_30, h10_30_to_11, h11_to_1
      and time_dim.t_hour = 11
      and time_dim.t_minute >= 30
      and ((household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2) or
           (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2))
      and store.s_store_name = 'ese') s7,
  (select count(*) AS h12_to_12_30
@@ -4232,7 +4152,7 @@ select h8_30_to_9, h9_to_9_30, h9_30_to_10, h10_to_10_30, h10_30_to_11, h11_to_1
      and time_dim.t_hour = 12
      and time_dim.t_minute < 30
      and ((household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2) or
           (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2))
      and store.s_store_name = 'ese') s8;
 
@@ -4455,7 +4375,7 @@ select item.i_item_id AS i_item_id,
         ,date_dim
 where
     ss_item_sk = i_item_sk
-    and i_category in ('Men', 'Sports', 'Jewelry')
+    and i_category in ('Sports','Books','Home')
     and ss_sold_date_sk = d_date_sk
     and d_date between ('1999-02-22')
                 and '1999-03-24'

@@ -26,6 +26,25 @@ func TestReturnReasonsStayWithinSpecification(t *testing.T) {
 	}
 }
 
+func TestReasonIntermediateScaling(t *testing.T) {
+	for _, test := range []struct {
+		scale float64
+		want  int64
+	}{{0.01, 1}, {1, 35}, {5.5, 40}, {10, 45}, {50, 49}, {100, 55}, {101, 55}, {200, 57}, {300, 60}, {650, 62}, {1000, 65}} {
+		if got := Reason.RowCount(test.scale); got != test.want {
+			t.Errorf("reason SF=%g: got %d, want %d", test.scale, got, test.want)
+		}
+	}
+	var previous int64
+	for scale := 1; scale <= 100000; scale++ {
+		got := Reason.RowCount(float64(scale))
+		if got < previous || got > 75 {
+			t.Fatalf("reason cardinality decreased or exceeded 75 at SF=%d: %d after %d", scale, got, previous)
+		}
+		previous = got
+	}
+}
+
 func TestReasonSpecificationCardinality(t *testing.T) {
 	for i, scale := range definedScales[1:] {
 		want := []int64{35, 45, 55, 60, 65, 67, 70, 72, 75}[i]
