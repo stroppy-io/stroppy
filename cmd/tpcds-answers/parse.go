@@ -85,15 +85,19 @@ func collectLines(r io.Reader) ([]string, error) {
 			for _, value := range []byte(raw) {
 				decoded.WriteRune(rune(value))
 			}
+
 			raw = decoded.String()
 		}
+
 		ln := expandTabs(raw)
 
 		ln = strings.TrimRight(ln, " \t\r")
+
 		trimmed := strings.TrimSpace(ln)
 		if strings.HasPrefix(trimmed, "SQL> Disconnected") {
 			break
 		}
+
 		if ln == "" || rowsFooter.MatchString(ln) || outputMarker.MatchString(ln) ||
 			strings.HasPrefix(trimmed, "SQL>") || strings.HasPrefix(trimmed, "Elapsed:") {
 			continue
@@ -187,6 +191,7 @@ func spansOf(dashes string) [][2]int {
 // A line shorter than a span yields an empty cell for that column.
 func sliceBySpans(line string, spans [][2]int) []string {
 	characters := []rune(line)
+
 	out := make([]string, len(spans))
 	for i, sp := range spans {
 		start, end := sp[0], sp[1]
@@ -204,9 +209,11 @@ func sliceBySpans(line string, spans [][2]int) []string {
 		for start > 0 && start < len(characters) && characters[start] != ' ' && characters[start-1] != ' ' {
 			start--
 		}
+
 		for end > start && end < len(characters) && characters[end] != ' ' && characters[end-1] != ' ' {
 			end--
 		}
+
 		out[i] = normalizeAnswerCell(string(characters[start:end]))
 	}
 
@@ -282,21 +289,31 @@ func parseFixedWidth(lines []string) ([]block, error) {
 	return blocks, nil
 }
 
-// parsePipe parses a `|`-delimited file (single block): first line is the
-// header, the rest are rows.
+// Repeated pipe headers delimit multipart query answers in the kit.
 func parsePipe(lines []string) ([]block, error) {
 	if !strings.Contains(lines[0], "|") {
 		return nil, fmt.Errorf("%w: pipe format expected, header has no '|'", errParse)
 	}
 
 	cols := splitPipe(lines[0])
+	blocks := []block{{Columns: cols, Rows: [][]string{}}}
 
-	rows := make([][]string, 0, len(lines)-1)
-	for _, ln := range lines[1:] {
-		rows = append(rows, splitPipe(ln))
+	for _, line := range lines[1:] {
+		if line == lines[0] {
+			blocks = append(blocks, block{Columns: cols, Rows: [][]string{}})
+
+			continue
+		}
+
+		row := splitPipe(line)
+		if len(row) != len(cols) {
+			return nil, fmt.Errorf("%w: pipe row has %d columns, want %d", errParse, len(row), len(cols))
+		}
+
+		blocks[len(blocks)-1].Rows = append(blocks[len(blocks)-1].Rows, row)
 	}
 
-	return []block{{Columns: cols, Rows: rows}}, nil
+	return blocks, nil
 }
 
 func splitPipe(line string) []string {
@@ -315,29 +332,47 @@ func normalizeAnswerCell(value string) string {
 	if value == "%" || value == "[NULL]" || value == "-" {
 		return ""
 	}
+
 	return value
 }
 
 // Query 17's kit answer wraps its final five columns and merges two ruler spans.
 func readWrappedQuery17(raw []byte) ([]block, error) {
+	const (
+		wrappedLines        = 4
+		rulerColumns        = 14
+		continuationColumns = 2
+	)
+
 	lines, err := collectLines(bytes.NewReader(raw))
 	if err != nil {
 		return nil, err
 	}
-	if len(lines) != 4 || !strings.Contains(lines[0], "STORE_RETURNS_QUANTITYAV   STORE_RETURNS_QUANTITYSTDEV") {
+
+	if len(lines) != wrappedLines ||
+		!strings.Contains(lines[0], "STORE_RETURNS_QUANTITYAV   STORE_RETURNS_QUANTITYSTDEV") {
 		return nil, fmt.Errorf("%w: unexpected query 17 wrapped layout", errParse)
 	}
+
 	spans := spansOf(lines[1])
-	if len(spans) != 14 {
+	if len(spans) != rulerColumns {
 		return nil, fmt.Errorf("%w: unexpected query 17 ruler", errParse)
 	}
+
 	first := sliceBySpans(lines[2], spans)
+
 	continuation := strings.Fields(lines[3])
-	if len(continuation) != 2 {
+	if len(continuation) != continuationColumns {
 		return nil, fmt.Errorf("%w: unexpected query 17 continuation", errParse)
 	}
-	columns := append(headerNames(lines[0], spans)[:8], "STORE_RETURNS_QUANTITYAVE", "STORE_RETURNS_QUANTITYSTDEV", "STORE_RETURNS_QUANTITYCOV", "CATALOG_SALES_QUANTITYCOUNT", "CATALOG_SALES_QUANTITYAVE", "CATALOG_SALES_QUANTITYSTDEV", "CATALOG_SALES_QUANTITYCOV")
-	row := append(first[:9], "", "", continuation[0], continuation[1], "", "")
+
+	columns := headerNames(lines[0], spans)[:8]
+	columns = append(columns, "STORE_RETURNS_QUANTITYAVE", "STORE_RETURNS_QUANTITYSTDEV", "STORE_RETURNS_QUANTITYCOV",
+		"CATALOG_SALES_QUANTITYCOUNT", "CATALOG_SALES_QUANTITYAVE",
+		"CATALOG_SALES_QUANTITYSTDEV", "CATALOG_SALES_QUANTITYCOV")
+	row := first[:9]
+	row = append(row, "", "", continuation[0], continuation[1], "", "")
+
 	return []block{{Columns: columns, Rows: [][]string{row}}}, nil
 }
 
