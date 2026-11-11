@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
-- TPC-DS supports MariaDB 11.8 with `-d mysql --sql-dialect mariadb`, using dedicated compatible qualification queries and generated streams without changing the MySQL dialect.
+- TPC-DS supports MariaDB 11.8 with `-d mysql --sql-dialect mariadb`, using dedicated compatible qualification queries and generated streams without changing the MySQL dialect. ([#271](https://github.com/stroppy-io/stroppy/pull/271))
 - TPC-H can execute independent seeded query streams in the specification's prescribed orders, with one session and one query pass per stream and an explicitly query-only throughput report. ([#263](https://github.com/stroppy-io/stroppy/pull/263))
 - TPC-H and TPC-DS run on Greenplum-family MPP servers (Greenplum, Greengage, WarehousePG, Apache Cloudberry) with `--sql-dialect gp`: tables are hash-distributed or replicated, and the large ones are append-optimized column-oriented with zstd. A run against such a server without the flag, or with the flag against plain PostgreSQL, stops before changing the database and says which flag to use. The check is skipped when you supply your own schema. ([#259](https://github.com/stroppy-io/stroppy/pull/259))
 
