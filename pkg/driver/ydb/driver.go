@@ -66,6 +66,13 @@ var _ driver.Driver = (*Driver)(nil)
 
 func (d *Driver) PoolMaxConns() int { return d.db.Stats().MaxOpenConnections }
 
+func (d *Driver) PoolStats() driver.PoolSnapshot {
+	stats := sqldriver.PoolSnapshot(d.db, "SQL operations only")
+	stats.Reason = "native BulkUpsert and SDK session pools are not observed"
+
+	return stats
+}
+
 func NewDriver(
 	ctx context.Context,
 	opts driver.Options,

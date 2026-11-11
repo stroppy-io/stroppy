@@ -69,6 +69,13 @@ type Driver struct {
 	queryTimeout time.Duration
 }
 
+func (*Driver) PoolStats() driver.PoolSnapshot {
+	return driver.PoolSnapshot{
+		Backend: "pgxpool", Scope: "SDK-managed per-instance pools",
+		Reason: "Picodata SDK does not expose per-instance pool statistics",
+	}
+}
+
 func (d *Driver) PoolMaxConns() int {
 	cfg := d.pool.Config()
 	if cfg == nil {

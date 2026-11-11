@@ -33,6 +33,7 @@ type rootState struct {
 	summaryWriter io.Writer
 
 	throughput    throughput
+	pools         *poolTelemetry
 	txMetrics     *txMetrics
 	errorReporter *errorReporter
 
@@ -84,6 +85,14 @@ func newrootState(
 		txMetrics:     &txMetrics{},
 		stepFilter:    newStepFilter(steps, noSteps),
 	}
+
+	state.pools, err = newPoolTelemetry(state.registry.meter, prefix)
+	if err != nil {
+		state.shutdownMetrics()
+
+		return nil, err
+	}
+
 	state.errorReporter = newErrorReporter(lg, errorReportInterval)
 
 	return state, nil

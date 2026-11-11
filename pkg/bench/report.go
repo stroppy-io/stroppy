@@ -240,6 +240,7 @@ func finalizeRunReport(
 	run.Steps = root.stepFilter.snapshot()
 	run.Metrics = reportMetrics(data, root.metricsPrefix)
 	run.Errors = reportErrors(root.errorReporter.snapshot())
+	run.Pools = root.pools.reports()
 
 	measurementMetric := run.Metrics["measurement_seconds"]
 	if seconds := metricTotal(&measurementMetric); seconds > 0 {
