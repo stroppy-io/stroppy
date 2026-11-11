@@ -110,6 +110,7 @@ func TestTPCDSYDBQualificationRows(t *testing.T) {
 	}
 	defer rows.Close()
 
+	qualified := false
 	for rows.Next() {
 		var (
 			last, first, city      any
@@ -123,6 +124,12 @@ func TestTPCDSYDBQualificationRows(t *testing.T) {
 		if fmt.Sprint(ticket) == "7901" {
 			t.Fatal("query79 included household below qualification vehicle threshold")
 		}
+
+		qualified = qualified || fmt.Sprint(ticket) == "7902"
+	}
+
+	if !qualified {
+		t.Fatal("query79 omitted household above qualification vehicle threshold")
 	}
 
 	if err := rows.Err(); err != nil {

@@ -186,7 +186,8 @@ func NewScaling(scale float64) *Scaling {
 			slot := max(scaleSlot(scale), 1)
 			lower, upper := m.scaling.rowCounts[slot-1], m.scaling.rowCounts[slot]
 			offset := (scale - definedScales[slot-1]) / (definedScales[slot] - definedScales[slot-1])
-			base = max(1, lower+int64(offset*float64(upper-lower)))
+			// Baked predicates include reason 28 even for fractional development datasets.
+			base = max(m.scaling.rowCounts[1], lower+int64(offset*float64(upper-lower)))
 		}
 		mult := int64(1)
 		if m.keepsHistory {

@@ -30,7 +30,7 @@ func TestReasonIntermediateScaling(t *testing.T) {
 	for _, test := range []struct {
 		scale float64
 		want  int64
-	}{{0.01, 1}, {1, 35}, {5.5, 40}, {10, 45}, {50, 49}, {100, 55}, {101, 55}, {200, 57}, {300, 60}, {650, 62}, {1000, 65}} {
+	}{{0.01, 35}, {0.5, 35}, {1, 35}, {5.5, 40}, {10, 45}, {50, 49}, {100, 55}, {101, 55}, {200, 57}, {300, 60}, {650, 62}, {1000, 65}} {
 		if got := Reason.RowCount(test.scale); got != test.want {
 			t.Errorf("reason SF=%g: got %d, want %d", test.scale, got, test.want)
 		}
