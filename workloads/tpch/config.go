@@ -65,8 +65,12 @@ func picodataQueryOptions(motionRows, opcodes uint64) string {
 	return strings.Join(options, ", ")
 }
 
-var picodataSQLTokens = regexp.MustCompile(
-	`(?is)'(?:''|[^'])*'|"(?:""|[^"])*"|(--[^\n]*|/\*.*?\*/)|(\boption\s*\(([^()]*)\))|\S`,
+var (
+	picodataOptionComments = regexp.MustCompile(`(?s)--[^\n]*|/\*.*?\*/`)
+	picodataSQLTokens      = regexp.MustCompile(
+		`(?is)'(?:''|[^'])*'|"(?:""|[^"])*"|(--[^\n]*|/\*.*?\*/)|` +
+			`(\boption\s*\(((?:--[^\n]*|/\*.*?\*/|[^()])*)\))|\S`,
+	)
 )
 
 func picodataSQL(body, options string) string {
@@ -96,6 +100,7 @@ func picodataSQL(body, options string) string {
 func mergePicodataOptions(existing, requested string) string {
 	var retained []string
 
+	existing = picodataOptionComments.ReplaceAllString(existing, " ")
 	for _, option := range strings.Split(existing, ",") {
 		name, _, _ := strings.Cut(option, "=")
 

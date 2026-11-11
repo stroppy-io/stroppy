@@ -119,6 +119,19 @@ func TestPicodataSQLMergesOptions(t *testing.T) {
 			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42); -- trailing comment", "sql_motion_row_max = 2",
 			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42, sql_motion_row_max = 2); -- trailing comment",
 		},
+		{
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42 /* cap (opcodes), reserved */);", "sql_motion_row_max = 2",
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42, sql_motion_row_max = 2);",
+		},
+		{
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42 -- opcode cap (max), reserved\n);", "sql_motion_row_max = 2",
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42, sql_motion_row_max = 2);",
+		},
+		{
+			"SELECT 1 OPTION (sql_motion_row_max /* (rows), max */ = 1, sql_vdbe_opcode_max = 42);",
+			"sql_motion_row_max = 2",
+			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42, sql_motion_row_max = 2);",
+		},
 		{"SELECT 1;", "sql_motion_row_max = 2", "SELECT 1\nOPTION (sql_motion_row_max = 2);"},
 		{
 			"SELECT 1 OPTION (sql_vdbe_opcode_max = 42);", "sql_motion_row_max = 2",

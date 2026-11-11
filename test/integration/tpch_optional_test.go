@@ -84,6 +84,13 @@ OPTION (sql_motion_row_max = 1, sql_vdbe_opcode_max = 10000000000);
 --+ q5
 --= body
 SELECT 'OPTION (not_an_option)' AS text;
+--+ q6
+--= body
+SELECT 1 OPTION (sql_vdbe_opcode_max = 42 /* cap (opcodes), reserved */);
+--+ q7
+--= body
+SELECT 1 OPTION (sql_vdbe_opcode_max = 42 -- opcode cap (max), reserved
+);
 `
 	if err := os.WriteFile(path, []byte(sql), 0o600); err != nil {
 		t.Fatal(err)
@@ -93,7 +100,7 @@ SELECT 'OPTION (not_an_option)' AS text;
 		"-D", "url="+envOr(envPicoAllURL, defaultPicoAllURL),
 		"--sql-file", path, "--steps", "workload", "--iterations", "1",
 		"--pico-motion-row-max", "2")
-	for _, query := range []string{"q1", "q3", "q4", "q5"} {
+	for _, query := range []string{"q1", "q3", "q4", "q5", "q6", "q7"} {
 		if !strings.Contains(out, `"query": "`+query+`"`) {
 			t.Errorf("override query %s did not complete", query)
 		}
