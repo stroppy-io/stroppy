@@ -185,7 +185,7 @@ func RunQuery[R any](
 	processedSQL, argsArr, err := ProcessArgs(dialect, sqlStr, args)
 	if err != nil {
 		if errors.Is(err, ErrExtraArgument) {
-			lg.Warn(err.Error(), zap.String("sql", sqlStr))
+			lg.Warn("unused query arguments ignored; query execution continues", zap.Error(err), zap.String("sql", sqlStr))
 		} else {
 			lg.Error("arguments processing error", zap.String("sql", sqlStr), zap.Error(err))
 
