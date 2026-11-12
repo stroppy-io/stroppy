@@ -9,13 +9,11 @@
 -- Storage modes:
 --   - create_schema_column is the default via YDB_STORE_MODE=column and uses
 --     YDB column store for OLAP-oriented TPC-H scans.
---   - create_schema is selected via YDB_STORE_MODE=row and keeps row-store
---     compatibility while pinning the same initial partition counts.
+--   - create_schema is selected via YDB_STORE_MODE=row and lets the database
+--     adapt row-table partitions to data size.
 --
--- Partition counts follow YDB's own TPC-H workload defaults for SF <= 10:
--- 64 partitions for fact/large dimensions, 1 partition for region/nation.
--- YDB switches to 256 partitions above SF=10; add an explicit env override
--- if this workload needs scale-aware DDL later.
+-- Column tables retain 64 hash partitions for large tables and 1 for
+-- region/nation because their partition count is fixed at creation.
 --
 -- Secondary indexes are skipped. TPC-H is a full-scan analytic workload, so
 -- secondary materialization has no query benefit for the benchmark shape.
@@ -93,8 +91,7 @@ CREATE TABLE part (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= create_supplier
 CREATE TABLE supplier (
@@ -109,8 +106,7 @@ CREATE TABLE supplier (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= create_partsupp
 CREATE TABLE partsupp (
@@ -123,8 +119,7 @@ CREATE TABLE partsupp (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= create_customer
 CREATE TABLE customer (
@@ -140,8 +135,7 @@ CREATE TABLE customer (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= create_orders
 CREATE TABLE orders (
@@ -158,8 +152,7 @@ CREATE TABLE orders (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= create_lineitem
 CREATE TABLE lineitem (
@@ -183,8 +176,7 @@ CREATE TABLE lineitem (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 
 --+ create_schema_column

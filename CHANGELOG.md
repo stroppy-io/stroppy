@@ -19,6 +19,9 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Fixed
 
+- YDB TPC-C schemas no longer impose fixed item/index partition counts or warehouse-count growth ceilings; TPC-H/TPC-DS row tables use database partition floors while column layouts remain unchanged. ([#274](https://github.com/stroppy-io/stroppy/pull/274))
+- The simple workload loads YDB through native BulkUpsert instead of compiling SQL bulk inserts. ([#274](https://github.com/stroppy-io/stroppy/pull/274))
+- TPC-C, TPC-H, and TPC-DS setup failures identify the individual statement, driver, and elapsed time while preserving the database error. ([#274](https://github.com/stroppy-io/stroppy/pull/274))
 - TPC-DS reason rows and return-reason foreign keys now follow specification scaling (35 reasons at SF=1, retained for fractional datasets), rather than the kit 4.0.0 generator's fixed 75; reload existing TPC-DS data before qualification checks. ([#269](https://github.com/stroppy-io/stroppy/pull/269))
 - TPC-DS baked queries use the specification's fixed qualification substitutions, and SF=1 reference validation covers all 103 statements without importing display artifacts as data. ([#269](https://github.com/stroppy-io/stroppy/pull/269))
 - TPC-DS answer checks now run on TiDB, YugabyteDB, and YDB using the shared qualification answers; mismatches warn about possible data or SQL-port differences without hiding failed comparisons. ([#269](https://github.com/stroppy-io/stroppy/pull/269))

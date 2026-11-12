@@ -179,9 +179,12 @@ func (s sqlSection) Run(ctx context.Context, b *bench.Bench) error {
 		section = "create_schema_column"
 	}
 
-	for _, q := range s.workload.schema.Section(section) {
+	names := s.workload.schema.Names(section)
+	for i, q := range s.workload.schema.Section(section) {
+		started := time.Now()
 		if err := b.Exec(ctx, q, nil); err != nil {
-			return fmt.Errorf("%s: %w", section, err)
+			return fmt.Errorf("%s: statement %d (%q), driver %s, elapsed %s: %w",
+				section, i+1, names[i], b.DriverTypeName(), time.Since(started), err)
 		}
 	}
 

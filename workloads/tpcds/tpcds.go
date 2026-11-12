@@ -411,9 +411,12 @@ func generateStream(dialect string, scale float64, seed int64, stream int) ([]na
 // --- setup helpers ---
 
 func (w *workload) runSection(ctx context.Context, b *bench.Bench, sql *bench.SQL, section string) error {
-	for _, q := range sql.Section(section) {
+	names := sql.Names(section)
+	for i, q := range sql.Section(section) {
+		started := time.Now()
 		if err := b.Exec(ctx, q, nil); err != nil {
-			return fmt.Errorf("%s: %w", section, err)
+			return fmt.Errorf("%s: statement %d (%q), driver %s, elapsed %s: %w",
+				section, i+1, names[i], b.DriverTypeName(), time.Since(started), err)
 		}
 	}
 

@@ -5,9 +5,30 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 	"github.com/stroppy-io/stroppy/v6/workloads/internal/workloadtest"
 	"github.com/stroppy-io/stroppy/v6/workloads/tpcds/dsqgen"
 )
+
+func TestYDBRowPartitionFloorDoesNotChangeColumnLayout(t *testing.T) {
+	data, err := files.ReadFile("schema.ydb.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sql := bench.ParseSQL(string(data))
+	for _, query := range sql.Section("create_schema") {
+		if strings.Contains(query, "AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64") {
+			t.Fatal("row table retains deployment-sized partition floor")
+		}
+	}
+
+	columns := strings.Join(sql.Section("create_schema_column"), "\n")
+	if strings.Count(columns, "AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64") != 11 ||
+		strings.Count(columns, "AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1,") != 13 {
+		t.Fatal("column table partition layout changed")
+	}
+}
 
 func TestQualificationAssetsMatchGenerator(t *testing.T) {
 	for name, dialect := range map[string]dsqgen.Dialect{

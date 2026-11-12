@@ -249,13 +249,16 @@ type sqlSection struct {
 }
 
 func (s sqlSection) Run(ctx context.Context, b *bench.Bench) error {
-	for _, q := range s.workload.sql.Section(s.name) {
+	names := s.workload.sql.Names(s.name)
+	for i, q := range s.workload.sql.Section(s.name) {
 		if s.name == "create_schema" {
 			q = s.workload.renderDDL(q)
 		}
 
+		started := time.Now()
 		if err := b.Exec(ctx, q, nil); err != nil {
-			return fmt.Errorf("%s: %w", s.name, err)
+			return fmt.Errorf("%s: statement %d (%q), driver %s, elapsed %s: %w",
+				s.name, i+1, names[i], b.DriverTypeName(), time.Since(started), err)
 		}
 	}
 
