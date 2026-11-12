@@ -80,14 +80,14 @@ func (store *Store) Run(ctx context.Context, name string, args []string, process
 		terminateProcessGroup(command)
 
 		select {
-		case <-wait:
+		case _ = <-wait:
 			return ctx.Err()
 		case <-time.After(terminateGrace):
 			killProcessGroup(command)
 		}
 
 		select {
-		case <-wait:
+		case _ = <-wait:
 		case <-time.After(killWait):
 		}
 
