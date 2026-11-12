@@ -29,6 +29,25 @@ func BenchmarkSuccessFiveArgBinding(b *testing.B) {
 	}
 }
 
+func BenchmarkSuccessFiveArgBindingReusable(b *testing.B) {
+	const query = "SELECT :a, :b, :c, :d, :e"
+
+	args := map[string]any{"a": 1, "b": 2, "c": 3, "d": 4, "e": 5}
+
+	buffer := make([]any, 0, 5)
+	if _, _, err := sqldriver.ProcessArgsInto(PgxDialect{}, query, args, buffer); err != nil {
+		b.Fatal(err)
+	}
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if _, _, err := sqldriver.ProcessArgsInto(PgxDialect{}, query, args, buffer); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkSuccessRoutinePostgres(b *testing.B) {
 	url := os.Getenv("STROPPY_PG_BENCH_URL")
 	if url == "" {

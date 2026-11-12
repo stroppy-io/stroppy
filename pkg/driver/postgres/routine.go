@@ -24,11 +24,21 @@ func (d *Driver) RunRoutine(
 	}
 	defer conn.Release()
 
-	result, err := sqldriver.RunQuery(ctx, statementQuery{query: conn.Query}, NewRows,
-		PgxDialect{}, d.logger, query, args, d.queryTimeout)
+	const bufferKey = "stroppy.routineArguments"
+
+	buffer, _ := conn.Conn().PgConn().CustomData()[bufferKey].(*[]any)
+	if buffer == nil {
+		buffer = new([]any)
+		conn.Conn().PgConn().CustomData()[bufferKey] = buffer
+	}
+
+	result, err := sqldriver.RunQueryInto(ctx, statementQuery{query: conn.Query}, NewRows,
+		PgxDialect{}, d.logger, query, args, d.queryTimeout, buffer)
 	if result != nil && result.Rows != nil {
 		err = driver.JoinErrors(err, result.Rows.Close(), result.Rows.Err())
 	}
+
+	clear(*buffer)
 
 	if err != nil {
 		backend, confirmed := errors.AsType[*pgconn.PgError](err)
