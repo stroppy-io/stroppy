@@ -152,7 +152,6 @@ func ParseConfig(
 	}
 
 	cfg.ConnConfig.Tracer = loggerTracer
-	cfg.BeforeClose = func(conn *pgx.Conn) { loggerTracer.queries.Delete(conn) }
 	cfg.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
 		pgxdecimal.Register(conn.TypeMap())
 

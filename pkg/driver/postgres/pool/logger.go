@@ -48,7 +48,7 @@ func (pl *pgxExtLogger) Log(
 	}
 }
 
-func newLoggerTracer(logger *zap.Logger) (*loggerTracer, error) {
+func newLoggerTracer(logger *zap.Logger) (*tracelog.TraceLog, error) {
 	level := tracelog.LogLevelNone
 
 	if logger.Level() <= zap.ErrorLevel {
@@ -60,9 +60,9 @@ func newLoggerTracer(logger *zap.Logger) (*loggerTracer, error) {
 		}
 	}
 
-	return &loggerTracer{TraceLog: tracelog.TraceLog{
+	return &tracelog.TraceLog{
 		Logger:   &pgxExtLogger{logger: logger.WithOptions(zap.AddCallerSkip(1))},
 		LogLevel: level,
 		Config:   tracelog.DefaultTraceLogConfig(),
-	}}, nil
+	}, nil
 }

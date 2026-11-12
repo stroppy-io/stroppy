@@ -13,7 +13,6 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 ### Added
 
 - TPC-B and TPC-C avoid constructing retry policies on successful operations through a failure-lazy retry helper that preserves override snapshots and retry metrics.
-- Error-only PostgreSQL tracing reuses per-connection query state instead of allocating per successful query, while retaining query details and acquisition error timing.
 - Dedicated sessions and PostgreSQL routines reuse exclusively owned positional argument buffers while preserving parameter validation and keeping buffers live until cursors close.
 - PostgreSQL routine calls drain raw results without generic cursor wrappers or column-name copies, while preserving deferred server errors and cancellation.
 - Runs report client connection-pool gauges and backend-specific wait counters, with explicit unsupported, main-pool-only, and SQL-only coverage. ([#273](https://github.com/stroppy-io/stroppy/pull/273))
