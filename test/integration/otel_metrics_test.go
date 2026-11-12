@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	defaultOtelCollectorImage = "otel/opentelemetry-collector-contrib:0.120.0"
+	defaultOtelCollectorImage = "otel/opentelemetry-collector-contrib:0.165.0"
 	envOtelCollectorImage     = "STROPPY_OTEL_COLLECTOR_IMAGE"
 )
 

@@ -39,7 +39,7 @@ func isolationTestConnection(t *testing.T, backend preparedBackend) string {
 
 		parameters := parsed.Query()
 		parameters.Set("default_transaction_isolation", "read committed")
-		parsed.RawQuery = parameters.Encode()
+		parsed.RawQuery = strings.ReplaceAll(parameters.Encode(), "+", "%20")
 
 		return parsed.String()
 	}
