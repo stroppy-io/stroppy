@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "stroppy_version": "nightly-92103a9-78-g5468f22",
+  "time": "2026-11-12T13:13:06.947868Z",
+  "host": {
+    "os": "darwin",
+    "arch": "arm64",
+    "go_version": "go1.27.4",
+    "cpus": 18,
+    "gomaxprocs": 8
+  },
+  "tiers": [
+    {
+      "name": "noop",
+      "load": {
+        "rows": 250000,
+        "rows_per_second": 13534516.156206073,
+        "duration_ms": 18.471292000000002
+      },
+      "tx_single_vu": {
+        "iterations": 2390472,
+        "failed_iterations": 0,
+        "tx_per_second": 796824,
+        "avg_ms": 0.0011117070260776977,
+        "p50_ms": 0.005,
+        "p90_ms": 0.005,
+        "p99_ms": 0.005
+      },
+      "tx_parallel": {
+        "iterations": 12952843,
+        "failed_iterations": 0,
+        "tx_per_second": 4317614.333333333,
+        "avg_ms": 0.001661812296875554,
+        "p50_ms": 0.005,
+        "p90_ms": 0.005,
+        "p99_ms": 0.005
+      },
+      "parallel_vus": 8
+    }
+  ],
+  "verdicts": [
+    {
+      "check": "noop errors",
+      "status": "ok",
+      "detail": "no failed iterations"
+    },
+    {
+      "check": "noop vu scaling",
+      "status": "ok",
+      "detail": "68% of linear at 8 VUs"
+    }
+  ]
+}

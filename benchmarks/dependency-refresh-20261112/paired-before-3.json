@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "stroppy_version": "pr277-a802a39",
+  "pg_noop_version": "v0.2.0",
+  "time": "2026-11-12T13:32:30.326822Z",
+  "host": {
+    "os": "darwin",
+    "arch": "arm64",
+    "go_version": "go1.27.4",
+    "cpus": 18,
+    "gomaxprocs": 8
+  },
+  "tiers": [
+    {
+      "name": "noop",
+      "load": {
+        "rows": 250000,
+        "rows_per_second": 15138936.988655908,
+        "duration_ms": 16.513709000000002
+      },
+      "tx_single_vu": {
+        "iterations": 2486553,
+        "failed_iterations": 0,
+        "tx_per_second": 828851,
+        "avg_ms": 0.0010679309317137887,
+        "p50_ms": 0.005,
+        "p90_ms": 0.005,
+        "p99_ms": 0.005
+      },
+      "tx_parallel": {
+        "iterations": 13915839,
+        "failed_iterations": 0,
+        "tx_per_second": 4638613,
+        "avg_ms": 0.00154824898612983,
+        "p50_ms": 0.005,
+        "p90_ms": 0.005,
+        "p99_ms": 0.005
+      },
+      "parallel_vus": 8
+    },
+    {
+      "name": "wire",
+      "load": {
+        "rows": 250000,
+        "rows_per_second": 10905264.311327325,
+        "duration_ms": 22.924708
+      },
+      "tx_single_vu": {
+        "iterations": 28931,
+        "failed_iterations": 0,
+        "tx_per_second": 9643.666666666666,
+        "avg_ms": 0.10340610155196876,
+        "p50_ms": 0.25,
+        "p90_ms": 0.25,
+        "p99_ms": 0.25
+      },
+      "tx_parallel": {
+        "iterations": 112828,
+        "failed_iterations": 0,
+        "tx_per_second": 37609.333333333336,
+        "avg_ms": 0.212390363314071,
+        "p50_ms": 0.25,
+        "p90_ms": 0.5,
+        "p99_ms": 0.5
+      },
+      "parallel_vus": 8
+    }
+  ],
+  "verdicts": [
+    {
+      "check": "noop errors",
+      "status": "ok",
+      "detail": "no failed iterations"
+    },
+    {
+      "check": "noop vu scaling",
+      "status": "ok",
+      "detail": "70% of linear at 8 VUs"
+    },
+    {
+      "check": "wire errors",
+      "status": "ok",
+      "detail": "no failed iterations"
+    },
+    {
+      "check": "wire vu scaling",
+      "status": "warn",
+      "detail": "scaling 49% below 60% — stroppy metric-pipeline contention or machine limits"
+    },
+    {
+      "check": "loopback latency floor",
+      "status": "ok",
+      "detail": "wire p99 0.50ms"
+    }
+  ]
+}
