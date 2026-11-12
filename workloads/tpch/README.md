@@ -149,12 +149,16 @@ the report. SQL errors, cancellation, or an ambiguous commit stop the phase. Eac
 transaction inserts an order batch and its lineitems together, or deletes matching
 lineitems and old orders together. No automatic write retries are performed.
 
-`--refresh-set` selects the first update set (1..4000). A fresh load requires set 1.
+`--refresh-set` selects the first executable update set (1..999); every pair in a
+throughput phase must fit this range. A fresh load requires set 1. Later sparse-key
+cycles are not supported by execution: C DBGEN's set 1000 delete keys do not match
+the database produced by the preceding pairs. The generator retains the reference
+output, but execution rejects that boundary before writes.
 When reusing data without `load_data`, the set must be explicit: use the successful
-prior `tpch.refresh` report's `next_set`, or 1 only for unmodified data. Failed or
-incomplete phases omit `next_set`; some batches may already be committed, so
-reload or inspect/reconcile the database rather than blindly replaying the set.
-This flag does not automatically persist or discover dataset history.
+prior `tpch.refresh` report's `next_set`, or 1 only for unmodified data. Failed,
+incomplete, or exhausted phases omit `next_set`; some batches may already be
+committed, so reload or inspect/reconcile the database rather than blindly replaying
+a set. This flag does not automatically persist or discover dataset history.
 
 ```bash
 # Fresh data, RF1, one power-order query stream, RF2.

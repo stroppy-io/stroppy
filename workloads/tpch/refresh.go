@@ -191,7 +191,19 @@ func (w *workload) refreshStreamAction(
 	}
 }
 
+func nextRefreshSet(set int64) int64 {
+	if set >= lastExecutableRefreshSet {
+		return 0
+	}
+
+	return set + 1
+}
+
 func (w *workload) runRefresh(ctx context.Context, session *bench.Session, set int64, function string) (err error) {
+	if set < 1 || set > lastExecutableRefreshSet {
+		return errRefreshRange
+	}
+
 	attempt := refreshAttempt{Set: set, Function: function, Status: "running", started: time.Now()}
 	defer func() {
 		attempt.finished = time.Now()
@@ -211,7 +223,7 @@ func (w *workload) runRefresh(ctx context.Context, session *bench.Session, set i
 
 		w.refresh.Attempts = append(w.refresh.Attempts, attempt)
 		if err == nil && function == "rf2" {
-			w.refresh.NextSet = set + 1
+			w.refresh.NextSet = nextRefreshSet(set)
 		}
 	}()
 

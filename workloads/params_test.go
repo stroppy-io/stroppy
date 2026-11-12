@@ -156,7 +156,7 @@ func picodataLimitParam(name, env, config string) bench.ParamSchema {
 
 func tpchRefreshSetParam() bench.ParamSchema {
 	value := param("refresh-set", bench.ParamTypeInt64, int64(1), "REFRESH_SET", "refreshSet")
-	value.Constraints = []bench.Constraint{{Kind: "min", Value: int64(1)}, {Kind: "max", Value: int64(4000)}}
+	value.Constraints = []bench.Constraint{{Kind: "min", Value: int64(1)}, {Kind: "max", Value: int64(999)}}
 
 	return value
 }

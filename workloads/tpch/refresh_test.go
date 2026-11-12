@@ -48,6 +48,24 @@ func TestRefreshSelection(t *testing.T) {
 	if !errors.Is(err, errRefreshExisting) {
 		t.Fatalf("existing data error=%v", err)
 	}
+
+	for _, test := range []struct {
+		set, streams string
+		valid        bool
+	}{
+		{"998", "2", true}, {"999", "1", true}, {"999", "2", false}, {"1000", "1", false},
+	} {
+		_, err := catalog.ResolveRun(Test.Name, bench.RunOptions{
+			Params: bench.ParamInputs{CLI: map[string]string{
+				"refresh-functions": "true", "refresh-set": test.set, "streams": test.streams,
+			}},
+			Steps:   []string{"workload"},
+			Drivers: map[string]bench.DriverConfig{"default": {Kind: bench.DriverPostgres}},
+		})
+		if (err == nil) != test.valid {
+			t.Fatalf("refresh-set=%s streams=%s valid=%t error=%v", test.set, test.streams, test.valid, err)
+		}
+	}
 }
 
 func TestRefreshWindowIncludesLastActivity(t *testing.T) {
@@ -154,6 +172,29 @@ func TestRefreshInsertFailureRollsBack(t *testing.T) {
 
 	if commit != 0 || rollback != 1 {
 		t.Fatalf("commit=%d rollback=%d", commit, rollback)
+	}
+}
+
+func TestRefreshExecutionRange(t *testing.T) {
+	settings := bench.RunSettings{Executor: "shared-iterations", Workers: 2, Iterations: 2}
+
+	selection := streamSelection{enabled: true, refresh: true, count: 2, seed: 42, refreshSet: 998}
+	if err := selection.validate(settings); err != nil {
+		t.Fatal(err)
+	}
+
+	selection.refreshSet = 999
+	if !errors.Is(selection.validate(settings), errRefreshRange) {
+		t.Fatal("throughput range crossed unsupported sparse-key boundary")
+	}
+
+	if nextRefreshSet(998) != 999 || nextRefreshSet(999) != 0 {
+		t.Fatal("exhausted refresh range advertised unsupported continuation")
+	}
+
+	w := &workload{}
+	if !errors.Is(w.runRefresh(t.Context(), nil, 1000, "rf1"), errRefreshRange) {
+		t.Fatal("unsupported set reached database writes")
 	}
 }
 

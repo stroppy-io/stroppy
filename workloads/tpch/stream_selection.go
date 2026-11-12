@@ -7,9 +7,11 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 )
 
+const lastExecutableRefreshSet int64 = 999
+
 var (
 	errRefreshSetFlag = errors.New("refresh-set requires refresh-functions")
-	errRefreshRange   = errors.New("refresh power requires query-stream 0 and refresh sets must end at or before 4000")
+	errRefreshRange   = errors.New("refresh power requires query-stream 0; refresh execution supports sets 1..999")
 	errStreamPolicy   = errors.New("TPC-H streams require one pass per stream using shared-iterations")
 	errStreamCount    = errors.New("query-stream selects one stream and cannot be combined with streams greater than 1")
 	errStreamSeed     = errors.New("query-seed plus stream ID must be less than 2147483647")
@@ -41,7 +43,7 @@ func selectStreams(d *bench.Def) (streamSelection, bench.RunSettings, error) {
 
 	refreshSet, refreshSetInfo := d.Param.Int64("refresh-set", 1,
 		"First DBGEN refresh-set number; continue with the prior report's next set.",
-		bench.Min(int64(1)), bench.Max(int64(4000)))
+		bench.Min(int64(1)), bench.Max(lastExecutableRefreshSet))
 	if refreshSetInfo.Explicit() && !refresh {
 		return streamSelection{}, bench.RunSettings{}, errRefreshSetFlag
 	}
@@ -79,7 +81,8 @@ func (s streamSelection) validate(settings bench.RunSettings) error {
 		return errStreamCount
 	}
 
-	if s.refresh && ((s.count == 1 && s.id != 0) || s.refreshSet+int64(s.count)-1 > 4000) {
+	if s.refresh && ((s.count == 1 && s.id != 0) || s.refreshSet < 1 ||
+		s.refreshSet > lastExecutableRefreshSet-int64(s.count)+1) {
 		return errRefreshRange
 	}
 
