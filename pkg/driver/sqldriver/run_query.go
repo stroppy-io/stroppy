@@ -200,16 +200,6 @@ func RunQuery[R any](
 	return runQuery(ctx, db, wrapRows, dialect, lg, sqlStr, args, timeout, nil)
 }
 
-// RunQueryInto borrows an exclusive argument buffer until its result cursor is
-// closed. Callers must drain or close that cursor before reusing the buffer.
-func RunQueryInto[R any](
-	ctx context.Context, db QueryContext[R], wrapRows func(R) driver.Rows,
-	dialect queries.Dialect, lg *zap.Logger, sqlStr string, args map[string]any,
-	timeout time.Duration, buffer *[]any,
-) (*driver.QueryResult, error) {
-	return runQuery(ctx, db, wrapRows, dialect, lg, sqlStr, args, timeout, buffer)
-}
-
 func runQuery[R any](
 	ctx context.Context,
 	db QueryContext[R],
