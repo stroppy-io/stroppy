@@ -122,6 +122,21 @@ func (g *Generator) SeekRegion(skip int64) {
 func (g *Generator) RowStart(t Table) { g.rowStart(t) }
 func (g *Generator) RowStop(t Table)  { g.rowStop(t) }
 
+// SparseKey preserves DBGEN's gaps between groups of eight order keys.
+func SparseKey(index, sequence int64) int64 {
+	return ((index>>3<<2)+sequence)<<3 | (index & 7)
+}
+
+func (g *Generator) MakeRefreshOrder(index, set int64) *Order {
+	order := g.makeOrder(dssHuge(index))
+	order.OKey = dssHuge(SparseKey(index, 1+set/1000))
+	for i := range order.Lines {
+		order.Lines[i].OKey = order.OKey
+	}
+
+	return order
+}
+
 // Exported per-table makers. idx is 1-based, matching upstream.
 func (g *Generator) MakeOrder(idx int64) *Order   { return g.makeOrder(dssHuge(idx)) }
 func (g *Generator) MakeCust(idx int64) *Cust     { return g.makeCust(dssHuge(idx)) }

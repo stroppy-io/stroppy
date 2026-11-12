@@ -122,14 +122,73 @@ S dedicated sessions. A standalone `--query-stream` uses one worker.
 Reports and summaries expose raw queries/hour over the interval from the first
 query submission to the final result, excluding connection initialization. The rate
 is omitted for incomplete or failed streams. Existing per-query metrics retain their
-names. The result is explicitly **query-only**, not TPC-H Throughput@Size or
-QphH@Size: RF1/RF2, full power/throughput sequencing, official seed selection and
-other benchmark requirements are not implemented. Refresh execution is tracked in
-[#262](https://github.com/stroppy-io/stroppy/issues/262).
+names. Without `--refresh-functions=true`, the result is explicitly **query-only**,
+not TPC-H Throughput@Size or QphH@Size. Full power/throughput sequencing, official
+seed selection, repeated-run data evolution, and canonical scoring remain outside
+this mode.
 
 Without stream options, numeric q1–q22 order and qualification substitutions remain
 unchanged. `validate_answers` applies only to that qualification mode; generated
 streams do not compare randomized results with the qualification answer set.
+
+## Optional refresh functions
+
+`--refresh-functions=true` enables DBGEN RF1 inserts and RF2 deletes. Flag off
+preserves every existing execution path. RF mode selects generated query streams
+and accepts the same one-pass stream policy, not a fixed-duration executor.
+
+- One query stream (default, or `--query-stream 0`): one RF1 completes, stream 0
+  runs all 22 queries, then RF2 completes. Other explicit single stream IDs are rejected.
+- `--streams S` with S greater than 1: S query workers run concurrently with one
+  extra refresh worker executing S serial RF1/RF2 pairs. Each pair completes before
+  the next begins. The extra worker is not another query stream.
+
+The pool must have at least S+1 connections, including two for power mode. All
+workers are joined before the workload completes; refresh writes cannot outlive
+the report. SQL errors, cancellation, or an ambiguous commit stop the phase. Each
+transaction inserts an order batch and its lineitems together, or deletes matching
+lineitems and old orders together. No automatic write retries are performed.
+
+`--refresh-set` selects the first executable update set (1..999); every pair in a
+throughput phase must fit this range. A fresh load requires set 1. Later sparse-key
+cycles are not supported by execution: C DBGEN's set 1000 delete keys do not match
+the database produced by the preceding pairs. The generator retains the reference
+output, but execution rejects that boundary before writes.
+When reusing data without `load_data`, the set must be explicit: use the successful
+prior `tpch.refresh` report's `next_set`, or 1 only for unmodified data. Failed,
+incomplete, or exhausted phases omit `next_set`; some batches may already be
+committed, so reload or inspect/reconcile the database rather than blindly replaying
+a set. This flag does not automatically persist or discover dataset history.
+
+```bash
+# Fresh data, RF1, one power-order query stream, RF2.
+./build/stroppy run tpch/tx -d pg --scale-factor 0.01 --refresh-functions=true
+
+# Continue that database: 2 query streams plus 2 serial refresh pairs, sets 2 and 3.
+./build/stroppy run tpch/tx -d pg --scale-factor 0.01 --refresh-functions=true \
+  --streams 2 --refresh-set 2 --steps workload
+```
+
+RF mode supports transactional retained-session drivers used by generated streams;
+Picodata/YDB/noop are rejected. `--pg-unlogged` is rejected. SQL overrides must
+preserve the canonical writable `orders`/`lineitem` schema and all 22 query bodies.
+Run qualification validation separately on an unmodified database, not after RFs.
+
+At integral specification scales, RF1 inserts 1500 times SF orders with their
+DBGEN lineitems; RF2 removes the prescribed old keys, not the newly inserted rows.
+Fractional scales use DBGEN's rounded update cardinality (10 orders at SF=0.01)
+and are diagnostic. Sets and sparse keys match the C DBGEN update stream.
+
+`tpch.refresh` reports attempted functions, committed row counts, elapsed time,
+completion, and safe next set. `tpch_rf1_*` / `tpch_rf2_*` expose duration in
+milliseconds plus runs/errors/elapsed-total counters. Query/refresh reporting
+spans the earliest activity through the latest query result or refresh commit,
+including waits and refresh-side generation/formatting; it is not a certified Ts.
+Raw queries/hour is omitted for failed or incomplete phases. No Power@Size,
+Throughput@Size, or QphH@Size is claimed: seed derivation, full/two-run sequencing,
+strict scale/stream rules, and canonical score reporting remain tracked by
+[#262](https://github.com/stroppy-io/stroppy/issues/262). Named composable modes and
+general execution dependencies are proposed in [#275](https://github.com/stroppy-io/stroppy/issues/275).
 
 ## Run shapes and two-pass runs
 
