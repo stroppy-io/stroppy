@@ -7,7 +7,9 @@ queue, but a warning is not evidence that any acquisition waited.
 ## Coverage
 
 - PostgreSQL, CockroachDB, and YugabyteDB expose their pgx pool statistics.
-- MySQL and TiDB expose their `database/sql` pool statistics.
+- MySQL and TiDB expose their main `database/sql` pool statistics. Separate
+  backend pools used by isolated routines are not observed; main-pool zero wait
+  does not establish that routine execution is unconstrained.
 - YDB exposes only its SQL pool. Native BulkUpsert and SDK session pools are not
   observed; zero SQL wait does not establish that a native load is unconstrained.
 - Picodata's pinned SDK does not expose its per-instance pgx statistics. Its pool

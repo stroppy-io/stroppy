@@ -58,7 +58,10 @@ var _ driver.Driver = (*Driver)(nil)
 func (d *Driver) PoolMaxConns() int { return d.db.Stats().MaxOpenConnections }
 
 func (d *Driver) PoolStats() driver.PoolSnapshot {
-	return sqldriver.PoolSnapshot(d.db, "all driver operations")
+	stats := sqldriver.PoolSnapshot(d.db, "main SQL pool only")
+	stats.Reason = "isolated routine backend pools are not observed"
+
+	return stats
 }
 
 func NewDriver(

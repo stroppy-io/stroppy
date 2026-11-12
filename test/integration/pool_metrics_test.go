@@ -57,6 +57,11 @@ func TestPoolDiagnostics(t *testing.T) {
 				t.Fatalf("pool diagnostics = %+v", measured)
 			}
 
+			if backend == "mysql" && (measured.Scope != "main SQL pool only" ||
+				measured.Reason != "isolated routine backend pools are not observed") {
+				t.Fatalf("MySQL pool coverage is misleading: %+v", measured)
+			}
+
 			if value := run.Metrics[metric]; value.Total == nil || *value.Total <= 0 {
 				t.Fatalf("missing native wait metric %s: %+v", metric, value)
 			}
