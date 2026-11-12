@@ -14,8 +14,11 @@ func TestCompatibleVersion(t *testing.T) {
 	for version, want := range map[string]bool{
 		"1.25.9": false,
 		"1.26":   false,
-		"1.27":   true,
-		"1.27.1": true,
+		"1.27":   false,
+		"1.27.1": false,
+		"1.27.3": false,
+		"1.27.4": true,
+		"1.28":   true,
 		"2.0.0":  true,
 		"bad":    false,
 	} {

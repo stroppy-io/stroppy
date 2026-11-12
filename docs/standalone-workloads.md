@@ -95,8 +95,8 @@ source snapshots, so original source directories are not required after a
 successful catalog build. Running also uses the published local runtime rather
 than original sources.
 
-Both `build` and `export` prefer system Go 1.27 or newer. If unavailable, Stroppy
-can download verified Go 1.27.1 into `~/.stroppy/toolchains/`. Interactive use
+Both `build` and `export` prefer system Go 1.27.4 or newer. If unavailable, Stroppy
+can download verified Go 1.27.4 into `~/.stroppy/toolchains/`. Interactive use
 prompts before download; pass `-y` for unattended use. Toolchain, module cache,
 build cache, and temporary files stay under `~/.stroppy`; Stroppy does not change
 `PATH` or persistent Go configuration. `--offline` disables network module access

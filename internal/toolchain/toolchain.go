@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	PinnedVersion   = "1.27.1"
+	PinnedVersion   = "1.27.4"
 	minimumMajor    = 1
 	minimumMinor    = 27
+	minimumPatch    = 4
 	privateDirPerm  = 0o700
 	privateFilePerm = 0o600
 )
@@ -205,8 +206,10 @@ func compatible(version string) bool {
 
 	major, _ := strconv.Atoi(match[1])
 	minor, _ := strconv.Atoi(match[2])
+	patch, _ := strconv.Atoi(match[3])
 
-	return major > minimumMajor || major == minimumMajor && minor >= minimumMinor
+	return major > minimumMajor || major == minimumMajor &&
+		(minor > minimumMinor || minor == minimumMinor && patch >= minimumPatch)
 }
 
 func privateCompiler(root string) *Compiler {

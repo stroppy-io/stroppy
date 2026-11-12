@@ -1,6 +1,6 @@
 module github.com/stroppy-io/stroppy/v6
 
-go 1.27
+go 1.27.4
 
 require (
 	github.com/go-sql-driver/mysql v1.10.1
