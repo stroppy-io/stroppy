@@ -25,7 +25,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
-- Updated database drivers, telemetry exporters, and supporting libraries to their current releases.
+- Updated database drivers and supporting libraries while retaining OpenTelemetry 1.44.0 to preserve client throughput.
 - HTML reports use the current Stroppy UI kit while retaining offline charts, static fallbacks, and embedded fonts.
 - Builds and standalone workload compilation require Go 1.27.4 or newer, including the verified private compiler download.
 
