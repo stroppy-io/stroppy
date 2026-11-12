@@ -47,6 +47,24 @@ Typed workload parameters are listed by `stroppy run tpcc/tx --help` and
 - `--tx-isolation` overrides the driver-specific isolation default.
 - `--sql-file` overrides the dialect SQL file.
 
+## YDB setup
+
+Warehouse-keyed tables start with explicit warehouse split boundaries and keep
+that partition floor, while allowing automatic splitting beyond it. Item,
+history, and index tables use database partition-count defaults with size/load
+partitioning enabled. A row-table minimum prevents merges; it does not allocate
+that many partitions initially. Deployment-specific tuning belongs in an explicit
+SQL override rather than a fixed hardware assumption in the built-in schema.
+
+Synchronous indexes are built after native loading: YDB BulkUpsert does not
+support tables with synchronous secondary indexes. Index consistency and loading
+order are unchanged. Setup errors include the failed statement's name/position,
+driver, elapsed time, and original backend error.
+
+These defaults are locally verified on YDB 26.2; they are not a verified fix for
+managed serverless compilation timeouts. Managed schema-operation and request-unit
+quotas still apply. Serverless deployment capabilities must be checked separately.
+
 ## Picodata approximation
 
 Picodata execution uses isolation `none`, not a transaction spanning the

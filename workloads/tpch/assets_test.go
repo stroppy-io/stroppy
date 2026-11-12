@@ -1,10 +1,32 @@
 package tpch
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/stroppy-io/stroppy/v6/pkg/bench"
 	"github.com/stroppy-io/stroppy/v6/workloads/internal/workloadtest"
 )
+
+func TestYDBRowPartitionFloorDoesNotChangeColumnLayout(t *testing.T) {
+	data, err := files.ReadFile("ydb.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sql := bench.ParseSQL(string(data))
+	for _, query := range sql.Section("create_schema") {
+		if strings.Contains(query, "AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64") {
+			t.Fatal("row table retains deployment-sized partition floor")
+		}
+	}
+
+	columns := strings.Join(sql.Section("create_schema_column"), "\n")
+	if strings.Count(columns, "AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64") != 6 ||
+		strings.Count(columns, "AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1") != 2 {
+		t.Fatal("column table partition layout changed")
+	}
+}
 
 func TestEmbeddedAssetContract(t *testing.T) {
 	dialects := []string{"pg.sql", "crdb.sql", "mysql.sql", "pico.sql", "ydb.sql"}

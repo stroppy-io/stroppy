@@ -54,7 +54,7 @@ func (w *workload) drop(ctx context.Context, b *bench.Bench) error {
 func (w *workload) create(ctx context.Context, b *bench.Bench) error {
 	sql := "CREATE TABLE stroppy_demo (id INT PRIMARY KEY, label TEXT, value INT)"
 	if b.DriverTypeName() == bench.DriverYDB {
-		sql = "CREATE TABLE stroppy_demo (id Int64 NOT NULL, label String, value Int64, PRIMARY KEY (id))"
+		sql = "CREATE TABLE stroppy_demo (id Int64 NOT NULL, label Utf8, value Int64, PRIMARY KEY (id))"
 	}
 
 	return b.Exec(ctx, sql, nil)
@@ -62,11 +62,15 @@ func (w *workload) create(ctx context.Context, b *bench.Bench) error {
 
 func (w *workload) load(ctx context.Context, b *bench.Bench) error {
 	request := demoInsertRequest()
+	if b.DriverTypeName() == bench.DriverYDB {
+		request.Method = bench.InsertNative
+	}
+
 	_, err := b.Insert(
 		ctx,
 		request.Table,
 		request.Source,
-		bench.InsertMethod(bench.InsertPlainBulk),
+		bench.InsertMethod(request.Method),
 	)
 
 	return err

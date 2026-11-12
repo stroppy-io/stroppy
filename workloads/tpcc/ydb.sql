@@ -19,13 +19,10 @@ DROP TABLE IF EXISTS warehouse
 DROP TABLE IF EXISTS item
 
 --+ create_schema
-/* Partitioning: warehouse-keyed tables get one tablet per warehouse via
-   PARTITION_AT_KEYS, rendered from {partition_keys}/{partition_count} during
-   workload setup. history is h_id-keyed (uniform) and populated only by
-   transactions, so UNIFORM_PARTITIONS suffices. warehouse and item are small enough
-   to live on a single tablet. Secondary indexes are built post-load (see
-   the create indexes section below) to keep index-write amplification
-   out of the bulk-load path. */
+/* Warehouse split keys keep the initial load distributed by warehouse;
+   the matching minimum prevents those partitions from merging when idle.
+   Other tables and secondary indexes grow with the database's automatic
+   partitioning policy rather than assuming a fixed deployment size. */
 --= warehouse
 CREATE TABLE warehouse (
     w_id Int64 NOT NULL,
@@ -57,8 +54,7 @@ CREATE TABLE district (
     PARTITION_AT_KEYS = ({partition_keys}),
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
     AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count},
-    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = {partition_count}
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
 )
 --= customer
 CREATE TABLE customer (
@@ -88,8 +84,7 @@ CREATE TABLE customer (
     PARTITION_AT_KEYS = ({partition_keys}),
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
     AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count},
-    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = {partition_count}
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
 )
 --= history
 CREATE TABLE history (
@@ -105,9 +100,7 @@ CREATE TABLE history (
     PRIMARY KEY (h_id)
 ) WITH (
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
-    AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count},
-    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = {partition_count}
+    AUTO_PARTITIONING_BY_SIZE = ENABLED
 )
 --= new_order
 CREATE TABLE new_order (
@@ -119,8 +112,7 @@ CREATE TABLE new_order (
     PARTITION_AT_KEYS = ({partition_keys}),
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
     AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count},
-    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = {partition_count}
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
 )
 --= orders
 CREATE TABLE orders (
@@ -137,8 +129,7 @@ CREATE TABLE orders (
     PARTITION_AT_KEYS = ({partition_keys}),
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
     AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count},
-    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = {partition_count}
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
 )
 --= order_line
 CREATE TABLE order_line (
@@ -157,8 +148,7 @@ CREATE TABLE order_line (
     PARTITION_AT_KEYS = ({partition_keys}),
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
     AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count},
-    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = {partition_count}
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
 )
 --= item
 CREATE TABLE item (
@@ -170,9 +160,7 @@ CREATE TABLE item (
     PRIMARY KEY (i_id)
 ) WITH (
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
-    AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 500,
-    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 550
+    AUTO_PARTITIONING_BY_SIZE = ENABLED
 )
 --= stock
 CREATE TABLE stock (
@@ -198,8 +186,7 @@ CREATE TABLE stock (
     PARTITION_AT_KEYS = ({partition_keys}),
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
     AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count},
-    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = {partition_count}
+    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = {partition_count}
 )
 
 --+ create_indexes
@@ -214,20 +201,14 @@ ALTER TABLE customer ADD INDEX idx_customer_name GLOBAL SYNC ON (c_w_id, c_d_id,
 --= idx_customer_name_setup
 ALTER TABLE customer ALTER INDEX idx_customer_name SET (
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
-    AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 500,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1000,
-    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
+    AUTO_PARTITIONING_BY_SIZE = ENABLED
 )
 --= idx_order
 ALTER TABLE orders ADD INDEX idx_order GLOBAL SYNC ON (o_w_id, o_d_id, o_c_id, o_id)
 --= idx_order_setup
 ALTER TABLE orders ALTER INDEX idx_order SET (
     AUTO_PARTITIONING_BY_LOAD = ENABLED,
-    AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 500,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 1000,
-    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = 1000
+    AUTO_PARTITIONING_BY_SIZE = ENABLED
 )
 
 --+ workload_tx_new_order

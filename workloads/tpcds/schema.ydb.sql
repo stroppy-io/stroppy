@@ -13,12 +13,11 @@
 -- nullable, and BulkUpsert must accept the generated nulls.
 --
 -- Two storage sections are selected by --ydb-store-mode:
---   create_schema_column (column store, default)  the OLAP layout for TPC-DS'
---                        scan-heavy queries; auto-partitions by size. The full
---                        query suite (window functions, rollup, grouping sets)
---                        runs on it.
---   create_schema        (row store)              row layout, kept as an option.
--- Fact and large dimension tables start at 64 partitions, small dims at 1.
+--   create_schema_column (column store, default) uses 64 hash partitions for
+--                        large tables and 1 for small dimensions because column
+--                        partition counts are fixed at creation.
+--   create_schema        (row store) lets the database adapt partitions to data
+--                        size instead of retaining a deployment-sized floor.
 -- Secondary indexes are omitted: YDB column tables do not support global
 -- secondary indexes (only local bloom/min-max), and the spec lists indexes as
 -- auxiliary for this full-scan workload, so create_indexes is a noop for ydb.
@@ -142,8 +141,7 @@ CREATE TABLE customer_demographics (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= date_dim
 CREATE TABLE date_dim (
@@ -319,8 +317,7 @@ CREATE TABLE customer_address (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= customer
 CREATE TABLE customer (
@@ -346,8 +343,7 @@ CREATE TABLE customer (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= call_center
 CREATE TABLE call_center (
@@ -483,8 +479,7 @@ CREATE TABLE item (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= inventory
 CREATE TABLE inventory (
@@ -496,8 +491,7 @@ CREATE TABLE inventory (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= store_sales
 CREATE TABLE store_sales (
@@ -528,8 +522,7 @@ CREATE TABLE store_sales (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= store_returns
 CREATE TABLE store_returns (
@@ -557,8 +550,7 @@ CREATE TABLE store_returns (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= catalog_sales
 CREATE TABLE catalog_sales (
@@ -600,8 +592,7 @@ CREATE TABLE catalog_sales (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= catalog_returns
 CREATE TABLE catalog_returns (
@@ -636,8 +627,7 @@ CREATE TABLE catalog_returns (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= web_sales
 CREATE TABLE web_sales (
@@ -679,8 +669,7 @@ CREATE TABLE web_sales (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 --= web_returns
 CREATE TABLE web_returns (
@@ -712,8 +701,7 @@ CREATE TABLE web_returns (
 )
 WITH (
     STORE = ROW,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = 64
+    AUTO_PARTITIONING_PARTITION_SIZE_MB = 2000
 )
 
 --+ create_schema_column
