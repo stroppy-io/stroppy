@@ -26,6 +26,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 ### Changed
 
 - Updated database drivers, telemetry exporters, and supporting libraries to their current releases.
+- HTML reports use the current Stroppy UI kit while retaining offline charts, static fallbacks, and embedded fonts.
 
 ### Fixed
 

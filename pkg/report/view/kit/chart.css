@@ -45,12 +45,247 @@
   align-items: center;
   gap: var(--st-space);
 }
-.st-chart-tooltip-row i {
-  width: 10px;
-  height: 3px;
-  border-radius: 1px;
-}
 .st-chart-tooltip-row b {
   font-family: var(--st-font-mono);
   font-weight: var(--st-font-weight-medium);
+}
+
+/* ---------------------------------------------------------------------------
+   Series identity. Colour and dash per data-series="1".."8": a chart with
+   several series tells them apart by dash too, not by colour alone. The
+   live chart reads the same variables, so a static SVG and the live plot
+   draw a series the same way.
+   ------------------------------------------------------------------------ */
+:root {
+  --st-dash-1: none;
+  --st-dash-2: 6 3;
+  --st-dash-3: 2 2;
+  --st-dash-4: 8 3 2 3;
+  --st-dash-5: 12 4;
+  --st-dash-6: 1 4;
+  --st-dash-7: 8 3 2 3 2 3;
+  --st-dash-8: 4 4;
+}
+[data-series="1"] {
+  --st-series-color: var(--st-series-1);
+  --st-series-dash: var(--st-dash-1);
+}
+[data-series="2"] {
+  --st-series-color: var(--st-series-2);
+  --st-series-dash: var(--st-dash-2);
+}
+[data-series="3"] {
+  --st-series-color: var(--st-series-3);
+  --st-series-dash: var(--st-dash-3);
+}
+[data-series="4"] {
+  --st-series-color: var(--st-series-4);
+  --st-series-dash: var(--st-dash-4);
+}
+[data-series="5"] {
+  --st-series-color: var(--st-series-5);
+  --st-series-dash: var(--st-dash-5);
+}
+[data-series="6"] {
+  --st-series-color: var(--st-series-6);
+  --st-series-dash: var(--st-dash-6);
+}
+[data-series="7"] {
+  --st-series-color: var(--st-series-7);
+  --st-series-dash: var(--st-dash-7);
+}
+[data-series="8"] {
+  --st-series-color: var(--st-series-8);
+  --st-series-dash: var(--st-dash-8);
+}
+
+/* Bars of series 2–8 are hatched (hatch.svg pasted once into the page;
+   without it the plain colour shows). Series 1 is solid. */
+[data-series="2"] {
+  --st-bar-fill: url(#st-hatch-2) var(--st-series-2);
+}
+[data-series="3"] {
+  --st-bar-fill: url(#st-hatch-3) var(--st-series-3);
+}
+[data-series="4"] {
+  --st-bar-fill: url(#st-hatch-4) var(--st-series-4);
+}
+[data-series="5"] {
+  --st-bar-fill: url(#st-hatch-5) var(--st-series-5);
+}
+[data-series="6"] {
+  --st-bar-fill: url(#st-hatch-6) var(--st-series-6);
+}
+[data-series="7"] {
+  --st-bar-fill: url(#st-hatch-7) var(--st-series-7);
+}
+[data-series="8"] {
+  --st-bar-fill: url(#st-hatch-8) var(--st-series-8);
+}
+
+/* The series sample in a legend or tooltip:
+   <svg class="st-swatch" data-series="2" viewBox="0 0 24 10"><line x1="0" y1="5" x2="24" y2="5"/></svg> */
+.st-swatch {
+  width: 24px;
+  height: 10px;
+  flex: none;
+  vertical-align: middle;
+}
+.st-swatch line {
+  stroke: var(--st-series-color, var(--st-muted));
+  stroke-width: 2;
+  stroke-dasharray: var(--st-series-dash, none);
+}
+.st-legend > li:has(> .st-swatch)::before {
+  display: none;
+}
+.st-chart-legend > li {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--st-space) * 0.75);
+  margin-right: calc(var(--st-space) * 2);
+}
+.st-chart-tooltip-row {
+  grid-template-columns: 24px 1fr auto;
+}
+/* A bar series' sample: <svg class="st-swatch-bar" data-series="2" viewBox="0 0 12 12"><rect width="12" height="12" rx="2"/></svg>
+   Filled with its hatch from hatch.svg (falls back to the plain colour without it). */
+.st-swatch-bar {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  vertical-align: middle;
+}
+.st-swatch-bar rect {
+  fill: var(--st-bar-fill, var(--st-series-color, var(--st-muted)));
+}
+.st-legend > li:has(> .st-swatch-bar)::before {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Static charts: the SVG a page draws without JavaScript. Markup the kit
+   styles (all optional, any viewBox):
+
+   <svg class="st-chart-svg" role="img" aria-labelledby="…">
+     <g class="st-chart-grid"><line …/></g>
+     <g class="st-axis st-axis-x"><line …/><text …>12:00</text></g>
+     <g class="st-series" data-series="1">
+       <path class="st-area" d="…"/>            8% fill under a line
+       <path class="st-line" d="M… L… M… L…"/>  a gap is a new M, never a joined segment
+       <circle class="st-point" tabindex="0"><title>12:00 · 1 234 tps</title></circle>
+       <rect class="st-chart-bar" …/>
+     </g>
+     <g class="st-marker" data-tone="warning"><line …/><text …>load</text></g>
+   </svg>
+   ------------------------------------------------------------------------ */
+.st-chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  font-family: var(--st-font-sans);
+  font-size: var(--st-font-size-sm);
+}
+.st-chart-svg .st-chart-grid line,
+.st-chart-svg .st-chart-grid path {
+  stroke: var(--st-line);
+  stroke-width: 1;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.st-chart-svg .st-axis line,
+.st-chart-svg .st-axis path {
+  stroke: var(--st-line);
+  stroke-width: 1;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.st-chart-svg text {
+  fill: var(--st-muted);
+  stroke: none;
+}
+.st-chart-svg .st-line {
+  fill: none;
+  stroke: var(--st-series-color, var(--st-muted));
+  stroke-width: 1.5;
+  stroke-dasharray: var(--st-series-dash, none);
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.st-chart-svg .st-area {
+  fill: var(--st-series-color, var(--st-muted));
+  fill-opacity: 0.08;
+  stroke: none;
+}
+.st-chart-svg .st-point {
+  fill: var(--st-series-color, var(--st-muted));
+  stroke: var(--st-panel);
+  stroke-width: 1;
+}
+.st-chart-svg .st-chart-bar {
+  fill: var(--st-bar-fill, var(--st-series-color, var(--st-muted)));
+}
+.st-chart-svg .st-point:hover,
+.st-chart-svg .st-point:focus-visible,
+.st-chart-svg .st-chart-bar:hover,
+.st-chart-svg .st-chart-bar:focus-visible {
+  outline: none;
+  stroke: var(--st-text);
+  stroke-width: 2;
+}
+.st-chart-svg .st-marker line {
+  stroke: var(--st-tone, var(--st-muted));
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+.st-chart-svg .st-marker text {
+  fill: var(--st-tone, var(--st-muted));
+}
+.st-chart-svg [data-tone="success"] {
+  --st-tone: var(--st-success);
+}
+.st-chart-svg [data-tone="warning"] {
+  --st-tone: var(--st-warning);
+}
+.st-chart-svg [data-tone="error"] {
+  --st-tone: var(--st-error);
+}
+.st-chart-svg [data-tone="info"] {
+  --st-tone: var(--st-info);
+}
+.st-chart-svg [data-tone="primary"] {
+  --st-tone: var(--st-primary);
+}
+.st-chart-svg [data-tone="mark"] {
+  --st-tone: var(--st-mark);
+}
+
+/* ---------------------------------------------------------------------------
+   Progressive charts (enhance()):
+
+   <figure class="st-chart-figure">
+     <div class="st-chart-static"><svg class="st-chart-svg">…</svg></div>
+     <table class="st-chart-data">…the numbers…</table>
+   </figure>
+
+   The static plot shows until enhance() reports data-st-chart="live" on the
+   figure; a failure (data-st-chart="failed") or no script at all leaves it.
+   Print always gets the static plot: it is vector and needs no canvas.
+   The numeric table is the page's to show or fold (<details>); the kit does
+   not hide it.
+   ------------------------------------------------------------------------ */
+.st-chart-figure {
+  margin: 0 0 calc(var(--st-space) * 2);
+}
+@media screen {
+  .st-chart-figure[data-st-chart="live"] > .st-chart-static {
+    display: none;
+  }
+}
+@media print {
+  .st-chart-figure > .st-chart-live {
+    display: none;
+  }
 }
