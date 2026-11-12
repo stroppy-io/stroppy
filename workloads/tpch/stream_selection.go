@@ -8,20 +8,25 @@ import (
 )
 
 var (
-	errStreamPolicy = errors.New("TPC-H streams require one pass per stream using shared-iterations")
-	errStreamCount  = errors.New("query-stream selects one stream and cannot be combined with streams greater than 1")
-	errStreamSeed   = errors.New("query-seed plus stream ID must be less than 2147483647")
-	errStreamQuery  = errors.New("TPC-H generated stream needs all 22 query bodies")
-	errStreamDriver = errors.New("TPC-H generated streams require retained sessions: " +
+	errRefreshSetFlag = errors.New("refresh-set requires refresh-functions")
+	errRefreshRange   = errors.New("refresh power requires query-stream 0 and refresh sets must end at or before 4000")
+	errStreamPolicy   = errors.New("TPC-H streams require one pass per stream using shared-iterations")
+	errStreamCount    = errors.New("query-stream selects one stream and cannot be combined with streams greater than 1")
+	errStreamSeed     = errors.New("query-seed plus stream ID must be less than 2147483647")
+	errStreamQuery    = errors.New("TPC-H generated stream needs all 22 query bodies")
+	errStreamDriver   = errors.New("TPC-H generated streams require retained sessions: " +
 		"use postgres, crdb, yugabyte, mysql or tidb")
 )
 
 type streamSelection struct {
-	enabled bool
-	count   int
-	id      int
-	seed    int64
-	single  bool
+	enabled            bool
+	count              int
+	id                 int
+	seed               int64
+	single             bool
+	refresh            bool
+	refreshSet         int64
+	refreshSetExplicit bool
 }
 
 func selectStreams(d *bench.Def) (streamSelection, bench.RunSettings, error) {
@@ -31,9 +36,23 @@ func selectStreams(d *bench.Def) (streamSelection, bench.RunSettings, error) {
 		"One generated stream; 0 uses the Appendix A power order.", bench.Min(0))
 	seed, seedInfo := d.Param.Int64("query-seed", 19620718,
 		"Base query seed; stream s uses seed+s.", bench.Min(int64(1)), bench.Max(querySeedModulus-1))
+	refresh, _ := d.Param.Bool("refresh-functions", false,
+		"Execute RF1/RF2 with the selected power or throughput query streams.")
+
+	refreshSet, refreshSetInfo := d.Param.Int64("refresh-set", 1,
+		"First DBGEN refresh-set number; continue with the prior report's next set.",
+		bench.Min(int64(1)), bench.Max(int64(4000)))
+	if refreshSetInfo.Explicit() && !refresh {
+		return streamSelection{}, bench.RunSettings{}, errRefreshSetFlag
+	}
+
 	selection := streamSelection{
-		enabled: countInfo.Explicit() || streamInfo.Explicit() || seedInfo.Explicit(),
+		enabled: countInfo.Explicit() || streamInfo.Explicit() || seedInfo.Explicit() || refresh,
 		count:   count, id: id, seed: seed, single: streamInfo.Explicit(),
+		refresh: refresh, refreshSet: refreshSet, refreshSetExplicit: refreshSetInfo.Explicit(),
+	}
+	if refresh && count == 1 && !streamInfo.Explicit() {
+		selection.single = true
 	}
 
 	defaults := bench.RunDefaults{}
@@ -58,6 +77,10 @@ func (s streamSelection) validate(settings bench.RunSettings) error {
 
 	if s.single && s.count != 1 {
 		return errStreamCount
+	}
+
+	if s.refresh && ((s.count == 1 && s.id != 0) || s.refreshSet+int64(s.count)-1 > 4000) {
+		return errRefreshRange
 	}
 
 	last := s.count

@@ -55,8 +55,13 @@ func (w *workload) streamInitializer(dialect *mpp.Selection) bench.WorkerInit {
 func (w *workload) streamAction(session *bench.Session) bench.Action {
 	return func(ctx context.Context, b *bench.Bench) error {
 		stream := &w.streams[b.Worker()]
-		b.Log.Warn("TPC-H query-only stream; RF1/RF2 refresh functions are not executed",
-			"stream", stream.ID, "seed", stream.Seed)
+
+		message := "TPC-H query-only stream; RF1/RF2 refresh functions are not executed"
+		if w.refresh != nil {
+			message = "TPC-H refresh-enabled phase; not a full canonical benchmark"
+		}
+
+		b.Log.Warn(message, "stream", stream.ID, "seed", stream.Seed)
 
 		for _, number := range stream.Order {
 			if ctx.Err() != nil {
@@ -80,8 +85,8 @@ func (w *workload) streamAction(session *bench.Session) bench.Action {
 			if err != nil {
 				stream.Errors++
 
-				if ctx.Err() != nil {
-					return ctx.Err()
+				if failure := w.streamQueryError(ctx, err); failure != nil {
+					return failure
 				}
 
 				b.RecordError(name, err)
@@ -100,6 +105,16 @@ func (w *workload) streamAction(session *bench.Session) bench.Action {
 	}
 }
 
+func (w *workload) streamQueryError(ctx context.Context, err error) error {
+	w.queryFailures.Store(true)
+
+	if w.refresh != nil {
+		return bench.Fatal(err)
+	}
+
+	return ctx.Err()
+}
+
 func (w *workload) streamContribution(snapshot bench.ReportContext) (bench.ReportContribution, error) {
 	if len(w.streams) == 0 {
 		return bench.ReportContribution{
@@ -111,6 +126,11 @@ func (w *workload) streamContribution(snapshot bench.ReportContext) (bench.Repor
 		Status: "complete", Scope: "query-only", Streams: w.streams,
 		Reason: "RF1/RF2 refresh functions and full TPC-H benchmark sequencing are not executed",
 	}
+	if w.refresh != nil {
+		value.Scope = "query-with-refresh"
+		value.Reason = w.refresh.Reason
+	}
+
 	if snapshot.Status != report.StatusCompleted {
 		value.Status = "incomplete"
 	}
@@ -136,6 +156,15 @@ func (w *workload) streamContribution(snapshot bench.ReportContext) (bench.Repor
 		queries += stream.Succeeded
 	}
 
+	if w.refresh != nil {
+		var complete bool
+
+		first, last, complete = w.refreshWindow()
+		if !complete {
+			value.Status = "incomplete"
+		}
+	}
+
 	if !first.IsZero() && !last.IsZero() {
 		value.MeasurementSeconds = last.Sub(first).Seconds()
 	}
@@ -154,8 +183,12 @@ func renderStreams(writer io.Writer, data json.RawMessage) error {
 		return err
 	}
 
-	_, err := fmt.Fprintf(writer,
-		"TPC-H query-only streams: %s; RF1/RF2 absent, not a full TPC-H result\n", value.Status)
+	label := "TPC-H query-only streams: %s; RF1/RF2 absent, not a full TPC-H result\n"
+	if value.Scope == "query-with-refresh" {
+		label = "TPC-H query streams with RF1/RF2: %s; not a full canonical TPC-H result\n"
+	}
+
+	_, err := fmt.Fprintf(writer, label, value.Status)
 	if err != nil {
 		return err
 	}
