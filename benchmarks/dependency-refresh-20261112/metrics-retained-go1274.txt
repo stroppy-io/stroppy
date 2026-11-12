@@ -1,0 +1,24 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/stroppy-io/stroppy/v6/pkg/bench
+cpu: Apple M5 Pro
+BenchmarkMetricAlternatingSeries/parallel=false-8         	 7323670	        48.50 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=false-8         	 7916437	        46.34 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=false-8         	 7848188	        47.45 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=false-8         	 7911609	        46.08 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=false-8         	 7771537	        45.73 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=false-8         	 7858110	        46.90 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=true-8          	 8796721	        47.96 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=true-8          	 9271470	        46.53 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=true-8          	 9297080	        46.32 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=true-8          	 9284941	        46.51 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=true-8          	 9304568	        46.44 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=true-8          	 9277761	        46.53 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTrendRecord-8                                    	 9645192	        36.93 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTrendRecord-8                                    	 9782662	        37.50 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTrendRecord-8                                    	 9721430	        36.71 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTrendRecord-8                                    	 9843696	        36.70 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTrendRecord-8                                    	 9776299	        36.91 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTrendRecord-8                                    	 9445626	        37.32 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/stroppy-io/stroppy/v6/pkg/bench	8.147s
