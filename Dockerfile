@@ -1,4 +1,4 @@
-FROM golang:1.27-alpine3.24 AS builder
+FROM golang:1.27.4-alpine3.24 AS builder
 
 ARG VERSION=unknown
 
@@ -17,7 +17,7 @@ COPY . .
 
 RUN VERSION=${VERSION} make build-pgnoop
 
-FROM alpine:3.22 AS runner
+FROM alpine:3.24 AS runner
 
 # Install runtime dependencies if needed
 RUN apk add --no-cache ca-certificates

@@ -46,7 +46,7 @@ go list -m -versions github.com/stroppy-io/stroppy/v6
 success. `--offline` limits module access to cache; `-y` consents to a verified
 private compiler download if compatible system Go is absent. Private tools remain
 under `~/.stroppy`; no PATH or persistent Go configuration is changed. Direct
-`go run`/`go test` commands require Go 1.27 or newer available to the user. To
+`go run`/`go test` commands require Go 1.27.4 or newer available to the user. To
 work against unpublished SDK changes rather than a pinned version, keep the
 project's own requirement and pass the source tree at build time — see
 [Building against an SDK source tree](#building-against-an-sdk-source-tree).

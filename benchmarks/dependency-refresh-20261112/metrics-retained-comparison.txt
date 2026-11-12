@@ -1,0 +1,28 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/stroppy-io/stroppy/v6/pkg/bench
+cpu: Apple M5 Pro
+                                         │ benchmarks/dependency-refresh-20261112/metrics-otel-control-go1274.txt │ benchmarks/dependency-refresh-20261112/metrics-retained-go1274.txt │
+                                         │                                 sec/op                                 │                    sec/op                     vs base              │
+MetricAlternatingSeries/parallel=false-8                                                              50.18n ± 1%                                    46.62n ± 4%  -7.09% (p=0.002 n=6)
+MetricAlternatingSeries/parallel=true-8                                                               47.65n ± 1%                                    46.52n ± 3%  -2.38% (p=0.022 n=6)
+TrendRecord-8                                                                                         39.34n ± 1%                                    36.92n ± 2%  -6.16% (p=0.002 n=6)
+geomean                                                                                               45.48n                                         43.10n       -5.23%
+
+                                         │ benchmarks/dependency-refresh-20261112/metrics-otel-control-go1274.txt │ benchmarks/dependency-refresh-20261112/metrics-retained-go1274.txt │
+                                         │                                  B/op                                  │                    B/op                     vs base                │
+MetricAlternatingSeries/parallel=false-8                                                             0.000 ± 0%                                     0.000 ± 0%       ~ (p=1.000 n=6) ¹
+MetricAlternatingSeries/parallel=true-8                                                              0.000 ± 0%                                     0.000 ± 0%       ~ (p=1.000 n=6) ¹
+TrendRecord-8                                                                                        0.000 ± 0%                                     0.000 ± 0%       ~ (p=1.000 n=6) ¹
+geomean                                                                                                         ²                                               +0.00%               ²
+¹ all samples are equal
+² summaries must be >0 to compute geomean
+
+                                         │ benchmarks/dependency-refresh-20261112/metrics-otel-control-go1274.txt │ benchmarks/dependency-refresh-20261112/metrics-retained-go1274.txt │
+                                         │                               allocs/op                                │                 allocs/op                   vs base                │
+MetricAlternatingSeries/parallel=false-8                                                             0.000 ± 0%                                     0.000 ± 0%       ~ (p=1.000 n=6) ¹
+MetricAlternatingSeries/parallel=true-8                                                              0.000 ± 0%                                     0.000 ± 0%       ~ (p=1.000 n=6) ¹
+TrendRecord-8                                                                                        0.000 ± 0%                                     0.000 ± 0%       ~ (p=1.000 n=6) ¹
+geomean                                                                                                         ²                                               +0.00%               ²
+¹ all samples are equal
+² summaries must be >0 to compute geomean

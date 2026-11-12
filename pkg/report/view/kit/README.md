@@ -1,9 +1,9 @@
-# Stroppy kit 0.1.0
+# Stroppy kit 0.7.21
 
 Vendored styles, fonts, and mark from:
-https://github.com/stroppy-io/stroppy-cloud/releases/download/v0.1.0/stroppy-kit-0.1.0.tar.gz
+https://github.com/stroppy-io/stroppy-cloud/releases/download/v0.7.21/stroppy-kit-0.7.21.tar.gz
 
-Archive SHA-256: `ba1bd6342e5333aa11e54f4e84810ef6f3e95caf6a96f3de6c4c89787aa57b22`.
+Archive SHA-256: `f0f9552f7d58f73792d9629dc678c500180a345e74e278ce41c28b0a8d1bc634`.
 
 The upstream CSS and assets are kept unchanged. The report adapter in `kit.go`
 inlines font files and adds system-light and print token overrides. Report layout

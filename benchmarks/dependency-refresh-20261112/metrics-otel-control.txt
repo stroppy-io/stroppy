@@ -1,0 +1,18 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/stroppy-io/stroppy/v6/pkg/bench
+cpu: Apple M5 Pro
+BenchmarkMetricTagLookup-8           	11371083	       102.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricTagLookup-8           	11645270	       101.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricTagLookup-8           	11852631	       101.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=false-8         	24825060	        49.34 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=false-8         	24651982	        48.89 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=false-8         	24738675	        49.33 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=true-8          	28534683	        46.78 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=true-8          	29862786	        46.13 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMetricAlternatingSeries/parallel=true-8          	29447070	        46.22 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTrendRecord-8                                    	27895758	        39.67 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTrendRecord-8                                    	31260310	        38.45 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTrendRecord-8                                    	31149345	        38.74 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/stroppy-io/stroppy/v6/pkg/bench	15.895s

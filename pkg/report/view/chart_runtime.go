@@ -19,15 +19,15 @@ var chartScript = compatibleChartScript()
 func compatibleChartScript() string {
 	kit := kitAsset("chart.js")
 	for _, patch := range [][2]string{
-		{"const _=new De({", "let cfg={"},
+		{"const F=new ye({", "let cfg={"},
 		{
-			"},Mf(n),d);if(n.length>1)",
-			"};o.configure?.(cfg,De);const _=new De(cfg,o.data??Mf(n),d);o.mounted?.(_);if(n.length>1)",
+			"plugins:M},a?[v.map((T,b)=>b),...l.map(T=>v.map((b,L)=>T.points.find(x=>x[0]===L)?.[1]??null))]:eo(l,m),z);",
+			"plugins:M};i.configure?.(cfg,ye);const F=new ye(cfg,i.data??eo(l,m),z);i.mounted?.(F);",
 		},
 		{
-			"const c=()=>{s?.destroy(),l.replaceChildren(),s=Af(l,n,o)};",
-			"const c=()=>{try{s?.destroy(),l.replaceChildren(),s=Af(l,n,o)}" +
-				"catch(e){s?.destroy();s=void 0;l.replaceChildren();o.onError?.(e);throw e}};",
+			"const h=()=>{f?.destroy(),f=void 0,o.replaceChildren();const w=a;a=void 0,f=jc(o,l,i,w)};",
+			"const h=()=>{try{f?.destroy(),f=void 0,o.replaceChildren();const w=a;a=void 0,f=jc(o,l,i,w)}" +
+				"catch(e){f?.destroy();f=void 0;o.replaceChildren();i.onError?.(e);throw e}};",
 		},
 	} {
 		if strings.Count(kit, patch[0]) != 1 {

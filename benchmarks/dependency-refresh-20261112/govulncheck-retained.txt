@@ -1,0 +1,36 @@
+=== Symbol Results ===
+
+Vulnerability #1: GO-2026-6505
+    OpenTelemetry-Go: Exporter config logging may leak endpoint URLs in info
+    logs in go.opentelemetry.io/otel/exporters/otlp/otlptrace
+  More info: https://pkg.go.dev/vuln/GO-2026-6505
+  Module: go.opentelemetry.io/otel/sdk
+    Found in: go.opentelemetry.io/otel/sdk@v1.44.0
+    Fixed in: go.opentelemetry.io/otel/sdk@v1.45.0
+    Example traces found:
+      #1: pkg/bench/capture.go:9:2: bench.init calls metricdata.init, which calls instrumentation.init
+      #2: pkg/bench/metrics_provider.go:173:40: bench.metricsResource calls resource.Default
+      #3: workloads/tpcc/tpcc.go:425:25: tpcc.workload.Iterate calls sync.Once.Do, which eventually calls resource.DefaultWithContext
+      #4: pkg/bench/metrics_provider.go:100:35: bench.newMeterProvider calls metric.NewMeterProvider, which eventually calls resource.Empty
+      #5: pkg/bench/metrics_provider.go:100:35: bench.newMeterProvider calls metric.NewMeterProvider, which eventually calls resource.Environment
+      #6: pkg/bench/metrics_provider.go:173:23: bench.metricsResource calls resource.Merge
+      #7: pkg/bench/metrics_provider.go:173:66: bench.metricsResource calls resource.NewSchemaless
+      #8: pkg/bench/metrics_export.go:75:25: bench.mergeMetricAttributes calls attribute.NewSet, which eventually calls resource.NewSchemaless
+      #9: pkg/bench/metrics_export.go:61:26: bench.metadataExporter.Export calls otlpmetrichttp.Exporter.Export, which eventually calls resource.Resource.Iter
+      #10: pkg/driver/sqldriver/tx.go:76:78: sqldriver.SQLTxAdapter.Commit calls sql.Tx.Commit, which eventually calls resource.Resource.MarshalJSON
+      #11: pkg/bench/snapshot.go:28:39: bench.Bench.CollectedMetrics calls metric.ManualReader.Collect, which eventually calls resource.Resource.MarshalLog
+      #12: pkg/bench/metrics_export.go:61:26: bench.metadataExporter.Export calls otlpmetrichttp.Exporter.Export, which eventually calls resource.Resource.SchemaURL
+      #13: internal/capture/log.go:36:18: capture.logCore.With calls zapcore.Field.AddTo, which eventually calls resource.Resource.String
+      #14: pkg/bench/metrics_provider.go:18:2: bench.init calls resource.init
+      #15: run.normalizeStepNames calls strings.splitSeq, which calls resource.read
+      #16: pkg/bench/metrics_provider.go:69:43: bench.newMeterProvider calls metric.NewManualReader, which eventually calls sdk.Version
+      #17: pkg/bench/metrics_provider.go:18:2: bench.init calls resource.init, which calls sdk.init
+      #18: pkg/bench/snapshot.go:28:39: bench.Bench.CollectedMetrics calls metric.ManualReader.Collect, which eventually calls x.Feature[bool].Enabled
+      #19: workloads/tpcc/tpcc.go:425:25: tpcc.workload.Iterate calls sync.Once.Do, which eventually calls x.Feature[string].Enabled
+      #20: pkg/bench/metrics_provider.go:18:2: bench.init calls resource.init, which calls x.init
+
+Your code is affected by 1 vulnerability from 1 module.
+This scan found no other vulnerabilities in packages you import or modules you
+require.
+Use '-show verbose' for more details.
+exit status 3

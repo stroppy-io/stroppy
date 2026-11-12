@@ -528,7 +528,9 @@ td {
   align-items:start
 }
 .report-chart-tooltip .st-chart-tooltip-row i {
-  margin-top:7px
+  margin-top:7px;
+  height:3px;
+  border-radius:1px
 }
 .report-chart-tooltip .st-chart-tooltip-row span {
   overflow-wrap:anywhere

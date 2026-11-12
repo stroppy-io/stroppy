@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	defaultOtelCollectorImage = "otel/opentelemetry-collector-contrib:0.120.0"
+	defaultOtelCollectorImage = "otel/opentelemetry-collector-contrib:0.165.0"
 	envOtelCollectorImage     = "STROPPY_OTEL_COLLECTOR_IMAGE"
 )
 
@@ -415,6 +415,10 @@ func waitForMetrics(t *testing.T, url string, check func(string) error) string {
 }
 
 func requirePrometheusExpectation(samples []prometheusSample, expectation metricExpectation) error {
+	expectation.labels["otel_scope_name"] = "github.com/stroppy-io/stroppy/v6/pkg/bench"
+	expectation.labels["otel_scope_version"] = ""
+	expectation.labels["otel_scope_schema_url"] = ""
+
 	if expectation.exact {
 		return requirePrometheusSampleEqual(
 			samples, expectation.name, expectation.labels, expectation.value,

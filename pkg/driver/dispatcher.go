@@ -70,7 +70,7 @@ type (
 
 var ErrNoRegisteredDriver = errors.New("no registered driver")
 
-var registry = map[config.DriverType]driverConstructor{}
+var registry = make(map[config.DriverType]driverConstructor)
 
 func RegisterDriver(
 	driverType config.DriverType,

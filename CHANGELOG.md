@@ -23,6 +23,12 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 - TPC-H can execute independent seeded query streams in the specification's prescribed orders, with one session and one query pass per stream and an explicitly query-only throughput report. ([#263](https://github.com/stroppy-io/stroppy/pull/263))
 - TPC-H and TPC-DS run on Greenplum-family MPP servers (Greenplum, Greengage, WarehousePG, Apache Cloudberry) with `--sql-dialect gp`: tables are hash-distributed or replicated, and the large ones are append-optimized column-oriented with zstd. A run against such a server without the flag, or with the flag against plain PostgreSQL, stops before changing the database and says which flag to use. The check is skipped when you supply your own schema. ([#259](https://github.com/stroppy-io/stroppy/pull/259))
 
+### Changed
+
+- Updated database drivers and supporting libraries while retaining OpenTelemetry 1.44.0 to preserve client throughput. ([#279](https://github.com/stroppy-io/stroppy/pull/279))
+- HTML reports use the current Stroppy UI kit while retaining offline charts, static fallbacks, and embedded fonts. ([#279](https://github.com/stroppy-io/stroppy/pull/279))
+- Builds and standalone workload compilation require Go 1.27.4 or newer, including the verified private compiler download. ([#279](https://github.com/stroppy-io/stroppy/pull/279))
+
 ### Fixed
 
 - YDB TPC-C schemas no longer impose fixed item/index partition counts or warehouse-count growth ceilings; TPC-H/TPC-DS row tables use database partition floors while column layouts remain unchanged. ([#274](https://github.com/stroppy-io/stroppy/pull/274))

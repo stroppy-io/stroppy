@@ -104,7 +104,7 @@ linters:
     exhaustive:
       check:
         - switch
-        - map
+        - mapliteral
       default-signifies-exhaustive: true
     funlen:
       lines: 200

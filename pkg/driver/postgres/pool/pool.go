@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net"
 	"os"
 	"slices"
 	"strings"
@@ -76,6 +77,32 @@ func NewPool(
 
 func NewWithConfig(ctx context.Context, pgConfig *pgxpool.Config) (*PoolX, error) {
 	warmupCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	pgConfig = pgConfig.Copy()
+	dial := pgConfig.ConnConfig.DialFunc
+	pgConfig.ConnConfig.DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		ctx, release := connectionContext(ctx, warmupCtx)
+		defer release()
+
+		return dial(ctx, network, addr)
+	}
+
+	if before := pgConfig.BeforeConnect; before != nil {
+		pgConfig.BeforeConnect = func(ctx context.Context, cfg *pgx.ConnConfig) error {
+			ctx, release := connectionContext(ctx, warmupCtx)
+			defer release()
+
+			return before(ctx, cfg)
+		}
+	}
+
+	if after := pgConfig.AfterConnect; after != nil {
+		pgConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+			ctx, release := connectionContext(ctx, warmupCtx)
+			defer release()
+
+			return after(ctx, conn)
+		}
+	}
 
 	pool, err := pgxpool.NewWithConfig(warmupCtx, pgConfig)
 	if err != nil {
@@ -85,6 +112,17 @@ func NewWithConfig(ctx context.Context, pgConfig *pgxpool.Config) (*PoolX, error
 	}
 
 	return &PoolX{Pool: pool, cancelWarmup: cancel}, nil
+}
+
+// pgx detaches background connection attempts from the pool creator's cancellation.
+func connectionContext(ctx, lifetime context.Context) (connectionCtx context.Context, release func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(lifetime, cancel)
+
+	return ctx, func() {
+		stop()
+		cancel()
+	}
 }
 
 func ParseConfig(

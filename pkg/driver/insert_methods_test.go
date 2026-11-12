@@ -32,7 +32,7 @@ func TestInsertMethodsValidAndUnique(t *testing.T) {
 	t.Parallel()
 
 	for driverType, methods := range insertMethodsByDriver {
-		seen := map[InsertMethod]bool{}
+		seen := make(map[InsertMethod]bool)
 
 		for _, method := range methods {
 			switch method {

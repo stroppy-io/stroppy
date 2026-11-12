@@ -194,14 +194,17 @@ func (s *Server) Stop() error {
 	}
 
 	select {
-	case <-s.done:
+	case exitErr := <-s.done:
+		_ = exitErr
+
 		return nil
 	default:
 	}
 
 	if err := s.cmd.Process.Signal(syscall.SIGTERM); err != nil {
 		select {
-		case <-s.done:
+		case exitErr := <-s.done:
+			_ = exitErr
 		case <-time.After(stopGrace):
 		}
 
@@ -209,11 +212,13 @@ func (s *Server) Stop() error {
 	}
 
 	select {
-	case <-s.done:
+	case exitErr := <-s.done:
+		_ = exitErr
 	case <-time.After(stopGrace):
 		_ = s.cmd.Process.Kill()
 
-		<-s.done
+		exitErr := <-s.done
+		_ = exitErr
 	}
 
 	return nil
