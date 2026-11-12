@@ -260,7 +260,7 @@ func (w *workload) txBody(ctx context.Context, tx *bench.Tx, aid, tid, bid, delt
 
 func (w *workload) iterateProcs(ctx context.Context, b *bench.Bench, aid, tid, bid, delta int, hid int64) error {
 	return b.LogicalOperation(func() error {
-		return bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+		return b.Retry(ctx, w.retryOptions(ctx), func() error {
 			return b.Routine(ctx, bench.BeginOpts{Isolation: w.iso, Name: "tpcb"}, w.procQuery, map[string]any{
 				"p_aid": aid, "p_tid": tid, "p_bid": bid, "p_delta": delta, "p_hid": hid,
 			})

@@ -48,7 +48,7 @@ func (w *workload) procNewOrder(ctx context.Context, b *bench.Bench, vs *vuState
 		"d_id": dID, "c_id": cID, "ol_cnt": olCnt, "force_rollback": forceRollback,
 	}
 
-	err := bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+	err := b.Retry(ctx, w.retryOptions(ctx), func() error {
 		bodyErr := b.Routine(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"},
 			w.q("workload_procs", "new_order"), args)
 		if forceRollback && isRollbackSentinel(bodyErr) && bench.RoutineRollbackConfirmed(bodyErr) {
@@ -104,7 +104,7 @@ func (w *workload) procPayment(ctx context.Context, b *bench.Bench, vs *vuState)
 		"p_w_id": vs.homeWID, "p_d_id": dID, "p_c_w_id": cWID, "p_c_d_id": cDID,
 		"p_c_id": cIDPick, "byname": bynameInt(isByName), "h_amount": amount, "c_last": cLastPick, "p_h_id": hID,
 	}
-	err = bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+	err = b.Retry(ctx, w.retryOptions(ctx), func() error {
 		return b.Routine(ctx, bench.BeginOpts{Isolation: w.iso, Name: "payment"}, w.q("workload_procs", "payment"), args)
 	})
 
@@ -132,7 +132,7 @@ func (w *workload) procOrderStatus(ctx context.Context, b *bench.Bench, vs *vuSt
 	}
 	bynameObserved := false
 
-	err := bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+	err := b.Retry(ctx, w.retryOptions(ctx), func() error {
 		bynameObserved = false
 
 		bynameObserved = isByName
@@ -153,7 +153,7 @@ func (w *workload) procDelivery(ctx context.Context, b *bench.Bench, vs *vuState
 	carrierID := vs.ri(vs.dCarrier, 1, 10)
 	args := map[string]any{"d_w_id": vs.homeWID, "d_o_carrier_id": carrierID}
 
-	return bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+	return b.Retry(ctx, w.retryOptions(ctx), func() error {
 		return b.Routine(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, w.q("workload_procs", "delivery"), args)
 	})
 }
@@ -169,7 +169,7 @@ func (w *workload) procStockLevel(ctx context.Context, b *bench.Bench, vs *vuSta
 		"threshold": threshold,
 	}
 
-	return bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+	return b.Retry(ctx, w.retryOptions(ctx), func() error {
 		return b.Routine(ctx, bench.BeginOpts{Isolation: w.iso, Name: "stock_level"},
 			w.q("workload_procs", "stock_level"), args)
 	})

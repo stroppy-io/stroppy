@@ -41,6 +41,7 @@ type Session[R any] struct {
 	transaction *sessionTx[R]
 	statements  []*prepared[R]
 	cursor      *sessionRows[R]
+	args        []any
 }
 
 func NewSession[R any](conn SessionConnection[R], wrapRows func(R) driver.Rows,
@@ -68,6 +69,8 @@ func (s *Session[R]) check(transaction *sessionTx[R]) error {
 
 func (s *Session[R]) result(result *driver.QueryResult, err error) (*driver.QueryResult, error) {
 	if err != nil {
+		clear(s.args)
+
 		if !s.conn.Valid() {
 			s.invalid = true
 			err = errors.Join(err, driver.ErrSessionInvalidated)
@@ -80,6 +83,8 @@ func (s *Session[R]) result(result *driver.QueryResult, err error) (*driver.Quer
 		cursor := &sessionRows[R]{Rows: result.Rows, session: s}
 		s.cursor = cursor
 		result.Rows = cursor
+	} else {
+		clear(s.args)
 	}
 
 	return result, nil
@@ -93,7 +98,7 @@ func (s *Session[R]) RunQuery(ctx context.Context, sql string, args map[string]a
 		return nil, err
 	}
 
-	return s.result(RunQuery(ctx, s.conn, s.wrapRows, s.dialect, s.logger, sql, args, s.timeout))
+	return s.result(runQuery(ctx, s.conn, s.wrapRows, s.dialect, s.logger, sql, args, s.timeout, &s.args))
 }
 
 func (s *Session[R]) Prepare(ctx context.Context, _, sql string) (driver.Prepared, error) {
@@ -179,6 +184,8 @@ func (s *Session[R]) Close(ctx context.Context) error {
 	}
 
 	s.statements = nil
+	clear(s.args)
+	s.args = nil
 
 	return driver.JoinErrors(err, s.conn.Close(ctx))
 }
@@ -221,7 +228,7 @@ func (p *prepared[R]) run(ctx context.Context, tx *sessionTx[R], args map[string
 		}
 	}
 
-	return s.result(RunQuery(ctx, executor, s.wrapRows, s.dialect, s.logger, p.sql, args, s.timeout))
+	return s.result(runQuery(ctx, executor, s.wrapRows, s.dialect, s.logger, p.sql, args, s.timeout, &s.args))
 }
 
 type preparedTransactionQuery[R any] struct {
@@ -282,7 +289,7 @@ func (t *sessionTx[R]) RunQuery(ctx context.Context, sql string, args map[string
 		return nil, err
 	}
 
-	return s.result(RunQuery(ctx, t.conn, s.wrapRows, s.dialect, s.logger, sql, args, s.timeout))
+	return s.result(runQuery(ctx, t.conn, s.wrapRows, s.dialect, s.logger, sql, args, s.timeout, &s.args))
 }
 
 func (t *sessionTx[R]) RunPrepared(
@@ -376,6 +383,7 @@ func (r *sessionRows[R]) Close() error {
 		r.err = driver.JoinErrors(r.err, r.Rows.Close())
 		if s.cursor == r {
 			s.cursor = nil
+			clear(s.args)
 		}
 
 		if !s.conn.Valid() {

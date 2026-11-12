@@ -197,7 +197,30 @@ func RunQuery[R any](
 	args map[string]any,
 	timeout time.Duration,
 ) (*driver.QueryResult, error) {
-	processedSQL, argsArr, err := ProcessArgs(dialect, sqlStr, args)
+	return runQuery(ctx, db, wrapRows, dialect, lg, sqlStr, args, timeout, nil)
+}
+
+func runQuery[R any](
+	ctx context.Context,
+	db QueryContext[R],
+	wrapRows func(R) driver.Rows,
+	dialect queries.Dialect,
+	lg *zap.Logger,
+	sqlStr string,
+	args map[string]any,
+	timeout time.Duration,
+	buffer *[]any,
+) (*driver.QueryResult, error) {
+	var destination []any
+	if buffer != nil {
+		destination = *buffer
+	}
+
+	processedSQL, argsArr, err := ProcessArgsInto(dialect, sqlStr, args, destination)
+	if buffer != nil && argsArr != nil {
+		*buffer = argsArr
+	}
+
 	if err != nil {
 		if errors.Is(err, ErrExtraArgument) {
 			lg.Warn("unused query arguments ignored; query execution continues", zap.Error(err), zap.String("sql", sqlStr))
@@ -265,17 +288,36 @@ func RunQuery[R any](
 func ProcessArgs(
 	dialect queries.Dialect, sqlStr string, args map[string]any,
 ) (newSQL string, argsArr []any, err error) {
+	return ProcessArgsInto(dialect, sqlStr, args, nil)
+}
+
+func argumentDestination(destination []any, size int) []any {
+	if size == 0 {
+		return nil
+	}
+
+	if cap(destination) < size {
+		return make([]any, size)
+	}
+
+	destination = destination[:size]
+	clear(destination)
+
+	return destination
+}
+
+// ProcessArgsInto reuses caller-owned storage. The caller must not refill it
+// until the previous query has finished consuming all arguments and rows.
+func ProcessArgsInto(
+	dialect queries.Dialect, sqlStr string, args map[string]any, destination []any,
+) (newSQL string, argsArr []any, err error) {
 	if len(args) == 0 && !strings.Contains(sqlStr, ":") {
 		return sqlStr, nil, nil
 	}
 
 	pq := lookupOrParse(dialect, sqlStr)
 
-	// fill phase: build argsArr from args using cached argOrder
-	var argsSlice []any
-	if len(pq.argOrder) > 0 {
-		argsSlice = make([]any, len(pq.argOrder))
-	}
+	argsSlice := argumentDestination(destination, len(pq.argOrder))
 
 	var missedArgs []string
 
@@ -291,6 +333,8 @@ func ProcessArgs(
 
 		conv, convErr := dialect.Convert(val)
 		if convErr != nil {
+			clear(argsSlice)
+
 			return "", nil, fmt.Errorf("dialect convert arg %q: %w", name, convErr)
 		}
 
@@ -298,6 +342,8 @@ func ProcessArgs(
 	}
 
 	if len(missedArgs) > 0 {
+		clear(argsSlice)
+
 		return "", nil, fmt.Errorf("%w: [%s]", ErrMissedArgument, strings.Join(missedArgs, ", "))
 	}
 

@@ -579,7 +579,7 @@ func (w *workload) newOrder(ctx context.Context, b *bench.Bench, vs *vuState) er
 		lineIID[olCnt-1] = items + 1 // nonexistent item → sentinel rollback
 	}
 
-	if err := bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+	if err := b.Retry(ctx, w.retryOptions(ctx), func() error {
 		tx, err := b.Begin(ctx, bench.BeginOpts{Isolation: w.iso, Name: "new_order"})
 		if err != nil {
 			return err
@@ -890,7 +890,7 @@ func (w *workload) payment(ctx context.Context, b *bench.Bench, vs *vuState) err
 
 	var wasBC bool
 
-	err = bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+	err = b.Retry(ctx, w.retryOptions(ctx), func() error {
 		wasBC = false
 
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "payment"}, func(tx *bench.Tx) error {
@@ -1149,7 +1149,7 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 	}
 
 	bynameObserved := false
-	err := bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+	err := b.Retry(ctx, w.retryOptions(ctx), func() error {
 		bynameObserved = false
 
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "order_status"}, func(tx *bench.Tx) error {
@@ -1239,7 +1239,7 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) er
 	wID := vs.homeWID
 	carrierID := vs.ri(vs.dCarrier, 1, 10)
 
-	return bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+	return b.Retry(ctx, w.retryOptions(ctx), func() error {
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, func(tx *bench.Tx) error {
 			for dID := int64(1); dID <= districtsPerWarehouse; dID++ {
 				minRow, err := tx.RawRow(ctx, w.q("workload_tx_delivery", "get_min_new_order"), map[string]any{
@@ -1319,7 +1319,7 @@ func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) 
 	dID := vs.ri(vs.slDID, 1, districtsPerWarehouse)
 	threshold := vs.ri(vs.slThreshold, 10, 20)
 
-	return bench.Retry0(ctx, b.TxRetryPolicy(w.retryOptions(ctx)), func() error {
+	return b.Retry(ctx, w.retryOptions(ctx), func() error {
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "stock_level"}, func(tx *bench.Tx) error {
 			nextOIDv, err := tx.QueryValue[any](ctx, w.q("workload_tx_stock_level", "get_district"), map[string]any{
 				"w_id": wID, "d_id": dID,

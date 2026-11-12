@@ -3,6 +3,7 @@ package sqldriver
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -59,7 +60,7 @@ type sessionTestStatement struct{ connection *sessionTestConnection }
 
 func (p *sessionTestStatement) QueryContext(_ context.Context, args ...any) (driver.Rows, error) {
 	p.connection.executed++
-	p.connection.args = args
+	p.connection.args = slices.Clone(args)
 
 	return &sessionTestRows{}, nil
 }
@@ -111,6 +112,22 @@ func TestSessionPreparesOnceAcrossTransactions(t *testing.T) {
 	require.NoError(t, s.Close(t.Context()))
 	require.Equal(t, 1, connection.statementClosed)
 	require.Equal(t, 1, connection.released)
+}
+
+func TestSessionArgumentsRemainOwnedUntilCursorClose(t *testing.T) {
+	connection := &sessionTestConnection{valid: true}
+	s := NewSession(connection, func(rows driver.Rows) driver.Rows { return rows }, qmark{}, zap.NewNop(), 0)
+	p, err := s.Prepare(t.Context(), "one", "SELECT :id")
+	require.NoError(t, err)
+	result, err := p.RunQuery(t.Context(), map[string]any{"id": 42})
+	require.NoError(t, err)
+	require.Equal(t, []any{42}, s.args)
+	_, err = p.RunQuery(t.Context(), map[string]any{"id": 99})
+	require.ErrorIs(t, err, driver.ErrSessionBusy)
+	require.Equal(t, []any{42}, s.args)
+	require.NoError(t, result.Rows.Close())
+	require.Equal(t, []any{nil}, s.args)
+	require.NoError(t, s.Close(t.Context()))
 }
 
 func TestSessionCursorAndTransactionCleanup(t *testing.T) {

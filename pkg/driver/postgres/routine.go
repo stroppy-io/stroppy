@@ -3,13 +3,17 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"go.uber.org/zap"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver/postgres/pool"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver/sqldriver"
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/stats"
 )
 
 func (d *Driver) RunRoutine(
@@ -24,11 +28,43 @@ func (d *Driver) RunRoutine(
 	}
 	defer conn.Release()
 
-	result, err := sqldriver.RunQuery(ctx, statementQuery{query: conn.Query}, NewRows,
-		PgxDialect{}, d.logger, query, args, d.queryTimeout)
-	if result != nil && result.Rows != nil {
-		err = driver.JoinErrors(err, result.Rows.Close(), result.Rows.Err())
+	const bufferKey = "stroppy.routineArguments"
+
+	buffer, _ := conn.Conn().PgConn().CustomData()[bufferKey].(*[]any)
+	if buffer == nil {
+		buffer = new([]any)
+		conn.Conn().PgConn().CustomData()[bufferKey] = buffer
 	}
+
+	processed, values, err := sqldriver.ProcessArgsInto(PgxDialect{}, query, args, *buffer)
+	if values != nil {
+		*buffer = values
+	}
+	defer clear(*buffer)
+
+	if err != nil {
+		if !errors.Is(err, sqldriver.ErrExtraArgument) {
+			return nil, &driver.RoutineError{Cause: fmt.Errorf("arguments processing error: %w", err)}
+		}
+
+		d.logger.Warn("unused query arguments ignored; query execution continues", zap.Error(err), zap.String("sql", query))
+	}
+
+	started := time.Now()
+	rows, err := conn.Query(ctx, processed, values...)
+	elapsed := time.Since(started)
+
+	if rows != nil {
+		rows.Close()
+		err = driver.JoinErrors(err, rows.Err())
+	}
+
+	err = statementContextError(ctx, err)
+	result := &struct {
+		driver.QueryResult
+		stats stats.Query
+	}{stats: stats.Query{Elapsed: elapsed}}
+	result.Stats = &result.stats
 
 	if err != nil {
 		backend, confirmed := errors.AsType[*pgconn.PgError](err)
@@ -36,10 +72,10 @@ func (d *Driver) RunRoutine(
 			confirmed = false
 		}
 
-		return result, &driver.RoutineError{
+		return &result.QueryResult, &driver.RoutineError{
 			Cause: err, RollbackConfirmed: confirmed, Ambiguous: !confirmed && !pgconn.SafeToRetry(err),
 		}
 	}
 
-	return result, nil
+	return &result.QueryResult, nil
 }
