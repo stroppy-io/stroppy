@@ -12,8 +12,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
-- Runs report client connection-pool gauges and backend-specific wait counters, with explicit unsupported and SQL-only coverage.
-- Local HTML reports and Grafana dashboards show connection-pool diagnostics with separate backend wait semantics and run/database filters; pool gauges retain labeled snapshots instead of adding step capacities.
+- Runs report client connection-pool gauges and backend-specific wait counters, with explicit unsupported and SQL-only coverage. ([#273](https://github.com/stroppy-io/stroppy/pull/273))
+- Local HTML reports and Grafana dashboards show connection-pool diagnostics with separate backend wait semantics and run/database filters; pool gauges retain labeled snapshots instead of adding step capacities. ([#273](https://github.com/stroppy-io/stroppy/pull/273))
 - TPC-DS exposes per-query timings and attempt/error counters in summaries, reports, and OTLP, with matching baked/generated names, separate success/error timing series, and histogram buckets that retain multi-hour queries. ([#272](https://github.com/stroppy-io/stroppy/pull/272))
 - TPC-DS supports MariaDB 11.8 with `-d mysql --sql-dialect mariadb`, using dedicated compatible qualification queries and generated streams without changing the MySQL dialect. ([#271](https://github.com/stroppy-io/stroppy/pull/271))
 - TPC-H can execute independent seeded query streams in the specification's prescribed orders, with one session and one query pass per stream and an explicitly query-only throughput report. ([#263](https://github.com/stroppy-io/stroppy/pull/263))
