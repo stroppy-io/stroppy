@@ -57,6 +57,8 @@ func TestBuiltInWorkloadParameterSchemas(t *testing.T) {
 			picodataLimitParam("pico-vdbe-opcode-max", "PICO_VDBE_OPCODE_MAX", "picoVdbeOpcodeMax"),
 			tpchSeedParam(),
 			boundedIntParam("query-stream", 0, "QUERY_STREAM", "queryStream", 0),
+			param("refresh-functions", bench.ParamTypeBool, false, "REFRESH_FUNCTIONS", "refreshFunctions"),
+			tpchRefreshSetParam(),
 			param("scale-factor", bench.ParamTypeFloat64, float64(1), "SCALE_FACTOR", "scaleFactor"),
 			mppDialectParam(),
 			param("sql-file", bench.ParamTypeString, "", "SQL_FILE", "sqlFile"),
@@ -150,6 +152,13 @@ func picodataLimitParam(name, env, config string) bench.ParamSchema {
 	limit.Constraints = []bench.Constraint{{Kind: "max", Value: uint64(1<<63 - 1)}}
 
 	return limit
+}
+
+func tpchRefreshSetParam() bench.ParamSchema {
+	value := param("refresh-set", bench.ParamTypeInt64, int64(1), "REFRESH_SET", "refreshSet")
+	value.Constraints = []bench.Constraint{{Kind: "min", Value: int64(1)}, {Kind: "max", Value: int64(999)}}
+
+	return value
 }
 
 func tpchSeedParam() bench.ParamSchema {

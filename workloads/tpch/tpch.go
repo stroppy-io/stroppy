@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
@@ -36,10 +37,13 @@ type workload struct {
 	sqlFile       string
 	queryOptions  string
 
-	params     map[string]map[string]any // final per-query params (end dates + q1 cutoff precomputed)
-	m          map[string]*queryMetrics
-	validation validationReport
-	streams    []queryStream
+	params         map[string]map[string]any // final per-query params (end dates + q1 cutoff precomputed)
+	m              map[string]*queryMetrics
+	validation     validationReport
+	streams        []queryStream
+	refresh        *refreshState
+	refreshMetrics map[string]*queryMetrics
+	queryFailures  atomic.Bool
 }
 
 type queryMetrics struct {
@@ -86,8 +90,8 @@ func define(d *bench.Def) error {
 		return err
 	}
 
-	step := func(name string, action bench.Action, options ...bench.StepOption) {
-		d.Execution.Step(name, dialectChoice.Step(action), options...)
+	step := func(name string, action bench.Action) {
+		d.Execution.Step(name, dialectChoice.Step(action))
 	}
 
 	w.useUnlogged = w.useUnlogged && w.driverType == bench.DriverPostgres
@@ -99,10 +103,7 @@ func define(d *bench.Def) error {
 		return err
 	}
 
-	w.m = w.initMetrics(&d.Metrics)
-
-	w.params = w.buildParams()
-	if err := w.prepareStreams(selection); err != nil {
+	if err := w.prepareExecution(d, selection); err != nil {
 		return err
 	}
 
@@ -128,14 +129,34 @@ func define(d *bench.Def) error {
 	section = sqlSection{w, "analyze"}
 	step(section.name, section.Run)
 
-	if !selection.enabled {
-		step("validate_answers", w.validate)
-		step("workload", w.runQueries, settings.Policy())
-	} else {
-		d.Execution.WorkerStep("workload", w.streamInitializer(dialectChoice), bench.OncePerWorker(selection.count))
-	}
+	w.executeQueries(d, dialectChoice, selection, settings)
 
 	return d.Execution.Err()
+}
+
+func (w *workload) executeQueries(
+	d *bench.Def, dialect *mpp.Selection, selection streamSelection, settings bench.RunSettings,
+) {
+	switch {
+	case !selection.enabled:
+		d.Execution.Step("validate_answers", dialect.Step(w.validate))
+		d.Execution.Step("workload", dialect.Step(w.runQueries), settings.Policy())
+	case selection.refresh:
+		w.executeRefreshStreams(d, dialect, selection)
+	default:
+		d.Execution.WorkerStep("workload", w.streamInitializer(dialect), bench.OncePerWorker(selection.count))
+	}
+}
+
+func (w *workload) prepareExecution(d *bench.Def, selection streamSelection) error {
+	w.m = w.initMetrics(&d.Metrics)
+
+	w.params = w.buildParams()
+	if err := w.prepareStreams(selection); err != nil {
+		return err
+	}
+
+	return w.configureRefresh(d, selection)
 }
 
 func (w *workload) loadSQL(d *bench.Def, gp bool) error {
