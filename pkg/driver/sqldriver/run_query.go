@@ -333,6 +333,8 @@ func ProcessArgsInto(
 
 		conv, convErr := dialect.Convert(val)
 		if convErr != nil {
+			clear(argsSlice)
+
 			return "", nil, fmt.Errorf("dialect convert arg %q: %w", name, convErr)
 		}
 
@@ -340,6 +342,8 @@ func ProcessArgsInto(
 	}
 
 	if len(missedArgs) > 0 {
+		clear(argsSlice)
+
 		return "", nil, fmt.Errorf("%w: [%s]", ErrMissedArgument, strings.Join(missedArgs, ", "))
 	}
 
