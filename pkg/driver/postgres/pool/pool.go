@@ -115,7 +115,7 @@ func NewWithConfig(ctx context.Context, pgConfig *pgxpool.Config) (*PoolX, error
 }
 
 // pgx detaches background connection attempts from the pool creator's cancellation.
-func connectionContext(ctx, lifetime context.Context) (context.Context, func()) {
+func connectionContext(ctx, lifetime context.Context) (connectionCtx context.Context, release func()) {
 	ctx, cancel := context.WithCancel(ctx)
 	stop := context.AfterFunc(lifetime, cancel)
 
