@@ -12,9 +12,9 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
-- TPC-B and TPC-C avoid constructing retry policies on successful operations through a failure-lazy retry helper that preserves override snapshots and retry metrics.
-- Dedicated sessions and PostgreSQL routines reuse exclusively owned positional argument buffers while preserving parameter validation, clearing failed bindings, and keeping buffers live until cursors close.
-- PostgreSQL routine calls drain raw results without generic cursor wrappers or column-name copies, while preserving deferred server errors and cancellation.
+- TPC-B and TPC-C avoid constructing retry policies on successful operations through a failure-lazy retry helper that preserves override snapshots and retry metrics. ([#277](https://github.com/stroppy-io/stroppy/pull/277))
+- Dedicated sessions and PostgreSQL routines reuse exclusively owned positional argument buffers while preserving parameter validation, clearing failed bindings, and keeping buffers live until cursors close. ([#277](https://github.com/stroppy-io/stroppy/pull/277))
+- PostgreSQL routine calls drain raw results without generic cursor wrappers or column-name copies, while preserving deferred server errors and cancellation. ([#277](https://github.com/stroppy-io/stroppy/pull/277))
 - Runs report client connection-pool gauges and backend-specific wait counters, with explicit unsupported, main-pool-only, and SQL-only coverage. ([#273](https://github.com/stroppy-io/stroppy/pull/273))
 - Local HTML reports and Grafana dashboards show connection-pool diagnostics with separate backend wait semantics and run/database filters; pool gauges retain labeled snapshots instead of adding step capacities. ([#273](https://github.com/stroppy-io/stroppy/pull/273))
 - TPC-DS exposes per-query timings and attempt/error counters in summaries, reports, and OTLP, with matching baked/generated names, separate success/error timing series, and histogram buckets that retain multi-hour queries. ([#272](https://github.com/stroppy-io/stroppy/pull/272))
