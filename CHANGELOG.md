@@ -10,6 +10,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+## [6.4.0] - 2026-11-12
+
 ### Added
 
 - Successful TPC-B and TPC-C operations allocate less client memory while keeping the same retry behavior and error reporting. ([#277](https://github.com/stroppy-io/stroppy/pull/277))
