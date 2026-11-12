@@ -61,6 +61,13 @@ func TestPoolDiagnostics(t *testing.T) {
 				t.Fatalf("missing native wait metric %s: %+v", metric, value)
 			}
 
+			for _, name := range []string{"pool_connections_max", "pool_stats_available"} {
+				value := run.Metrics[name]
+				if value.Total != nil || len(value.Series) == 0 {
+					t.Fatalf("pool gauge must retain series without an aggregate: %s = %+v", name, value)
+				}
+			}
+
 			page, err := os.ReadFile(html)
 			if err != nil {
 				t.Fatal(err)

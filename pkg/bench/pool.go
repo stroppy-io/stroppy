@@ -2,15 +2,42 @@ package bench
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
 	otelmetric "go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
+
+// Pool gauges describe snapshots, so adding different steps invents capacity.
+func poolGauge(points []metricdata.DataPoint[float64]) bool {
+	for _, point := range points {
+		if _, exists := point.Attributes.Value("pool_scope"); exists {
+			return true
+		}
+	}
+
+	return false
+}
+
+func poolGaugeSummaries(name string, points []metricdata.DataPoint[float64]) []string {
+	lines := make([]string, 0, len(points))
+	for _, point := range points {
+		labels := make([]string, 0, point.Attributes.Len())
+		for _, value := range point.Attributes.ToSlice() {
+			labels = append(labels, fmt.Sprintf("%s=%q", value.Key, value.Value.String()))
+		}
+
+		lines = append(lines, fmt.Sprintf("  %s{%s} %.3f", name, strings.Join(labels, ","), point.Value))
+	}
+
+	return lines
+}
 
 type poolObservation struct {
 	step, database, kind string

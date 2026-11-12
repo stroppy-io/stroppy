@@ -436,7 +436,9 @@ func reportMetric(metric metricdata.Metrics) (report.Metric, bool) {
 			})
 		}
 
-		result.Total = &total
+		if !poolGauge(aggregation.DataPoints) {
+			result.Total = &total
+		}
 
 		return result, true
 	case metricdata.Histogram[float64]:

@@ -1,6 +1,8 @@
 package bench
 
 import (
+	"bytes"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -90,6 +92,18 @@ func TestPoolTelemetryStepDeltasAndFinalSample(t *testing.T) {
 	require.InDelta(t, 6., *metrics["pool_pgx_empty_acquires_total"].Total, 0)
 	require.InDelta(t, 2.5, *metrics["pool_pgx_empty_acquire_seconds_total"].Total, 0)
 	require.NotContains(t, metrics, "pool_sql_capacity_wait_seconds_total")
+
+	for _, name := range []string{"pool_connections_max", "pool_stats_available"} {
+		require.Nil(t, metrics[name].Total)
+		require.Len(t, metrics[name].Series, 2)
+		require.NotContains(t, aggregateMetricSnapshots(data, root.metricsPrefix), name)
+	}
+
+	var output bytes.Buffer
+	newSummary(root).printDataTo(&output, data)
+	require.Equal(t, 2, strings.Count(output.String(), "pool_connections_max{"))
+	require.Contains(t, output.String(), `step_execution="1"`)
+	require.Contains(t, output.String(), `step_execution="2"`)
 }
 
 func TestPoolTelemetryUnsupportedAndUnlimited(t *testing.T) {

@@ -23,6 +23,9 @@ func TestPoolViewPreservesCoverageAndSemantics(t *testing.T) {
 	require.Equal(t, "Unavailable", p.Pools[1].Status)
 	require.Empty(t, p.Pools[1].Seconds)
 
+	stats := metricStats(map[string]any{"type": "gauge", "series": []any{1, 1}}, "")
+	require.Equal(t, "Per series", stats[0].Text)
+
 	var output bytes.Buffer
 	require.NoError(t, templates.ExecuteTemplate(&output, "report", p))
 	require.Contains(t, output.String(), "Connection pools")

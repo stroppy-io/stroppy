@@ -381,7 +381,11 @@ func (s *summary) printDataTo(out io.Writer, data metricdata.ResourceMetrics) {
 
 				lines = append(lines, fmt.Sprintf("  %-40s %.3f", name, total))
 			case metricdata.Gauge[float64]:
-				lines = append(lines, fmt.Sprintf("  %-40s %.3f", name, sumGauge(aggregation.DataPoints)))
+				if poolGauge(aggregation.DataPoints) {
+					lines = append(lines, poolGaugeSummaries(name, aggregation.DataPoints)...)
+				} else {
+					lines = append(lines, fmt.Sprintf("  %-40s %.3f", name, sumGauge(aggregation.DataPoints)))
+				}
 			case metricdata.Histogram[float64]:
 				lines = append(lines, formatHistogramSummary(name, aggregation.DataPoints))
 			}

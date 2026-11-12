@@ -58,7 +58,10 @@ included. OTLP adds the normal configured metric prefix (default `stroppy_`).
 
 JSON reports add an optional `pools` array with one final observation per used
 database and step. Unsupported measurements omit numeric values rather than
-filling them with zero. Reports without this field remain readable.
+filling them with zero. Reports without this field remain readable. Pool gauges
+have only labeled series, not a run-wide total: snapshots from different steps
+must not be added into an invented pool capacity. Text summaries print those
+series separately, and aggregate-only workload snapshots omit pool gauges.
 
 The local HTML report has a **Connection pools** section explaining coverage and
 native counter semantics. Exact metric series remain available under Metrics;
