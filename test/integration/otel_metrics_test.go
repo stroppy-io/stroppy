@@ -118,10 +118,22 @@ func TestOtelStroppyMetrics(t *testing.T) {
 			{name: "stroppy_tx_commits_total", labels: txLabels, value: 1, exact: true},
 			{name: "stroppy_tx_total_duration_milliseconds_count", labels: txLabels, value: 1, exact: true},
 			{name: "stroppy_tx_queries_per_tx_count", labels: txLabels, value: 1, exact: true},
+			{name: "stroppy_pool_stats_available", labels: labels{"job": "stroppy", "step": "workload"}, value: 1, exact: true},
+			{name: "stroppy_pool_connections_max", labels: labels{"job": "stroppy", "step": "workload"}},
+			{name: "stroppy_pool_pgx_empty_acquires_total", labels: labels{"job": "stroppy", "step": "workload"}},
+			{name: "stroppy_pool_pgx_empty_acquire_seconds_total", labels: labels{"job": "stroppy", "step": "workload"}},
 			{name: "stroppy_iterations_total", labels: labels{"job": "stroppy", "step": "workload"}, value: 1, exact: true},
 			{name: "stroppy_iteration_duration_milliseconds_count", labels: labels{"job": "stroppy", "step": "workload"}, value: 1, exact: true},
 		}
 		for _, expectation := range expected {
+			if strings.HasPrefix(expectation.name, "stroppy_pool_") {
+				expectation.labels["database"] = "default"
+				expectation.labels["driver"] = "postgres"
+				expectation.labels["pool_backend"] = "pgxpool"
+				expectation.labels["pool_scope"] = "all driver operations"
+				expectation.labels["step_execution"] = "7"
+			}
+
 			expectation.labels["instance"] = instance
 			if err := requirePrometheusExpectation(samples, expectation); err != nil {
 				return err

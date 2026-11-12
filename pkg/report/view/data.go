@@ -88,6 +88,7 @@ type page struct {
 	Download     string
 	Catalog      string
 	Capture      *captureView
+	Pools        []poolView
 }
 
 func decode(data []byte) (map[string]any, error) {
@@ -121,7 +122,7 @@ func reportPage(data []byte, id string) (page, error) {
 		Title: text(document["workload"]), ID: id, Status: text(document["status"]),
 		Started: text(document["started_at"]), Driver: text(document["driver"]), Original: string(data),
 		Steps: tree(document["steps"]), Errors: tree(document["errors"]),
-		StepChart: stepDurations(document["steps"]),
+		StepChart: stepDurations(document["steps"]), Pools: poolViews(document["pools"]),
 	}
 	if p.ID == "" {
 		p.ID = text(document["id"])

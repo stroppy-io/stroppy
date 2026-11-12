@@ -53,6 +53,10 @@ func snapshotMetric(metric metricdata.Metrics) (MetricSnapshot, bool) {
 	case metricdata.Sum[float64]:
 		return MetricSnapshot{Total: sumPoints(aggregation.DataPoints)}, true
 	case metricdata.Gauge[float64]:
+		if poolGauge(aggregation.DataPoints) {
+			return MetricSnapshot{}, false
+		}
+
 		return MetricSnapshot{Total: sumPoints(aggregation.DataPoints)}, true
 	case metricdata.Histogram[float64]:
 		return histogramSnapshot(aggregation.DataPoints), true

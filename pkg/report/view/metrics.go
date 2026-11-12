@@ -64,6 +64,10 @@ func metricUnit(value any) string {
 
 func metricStats(metric map[string]any, unit string) []metricStat {
 	if metric["type"] != "histogram" {
+		if metric["type"] == "gauge" && metric["total"] == nil {
+			return []metricStat{{Label: "Value", Text: "Per series", Exact: "See labeled series"}}
+		}
+
 		return []metricStat{previewStat("Value", metric["total"], unit)}
 	}
 

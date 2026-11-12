@@ -174,6 +174,9 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 	e.phase = name
 	e.workers = opts.policy.workers
 
+	e.startPoolTelemetry(name)
+	defer e.root.pools.stop()
+
 	before := e.root.errorReporter.snapshot().terminalErrors
 	if e.root.capture != nil {
 		e.root.capture.writer.Event("step_start", name, "running", opts.policy.workers,
@@ -214,6 +217,8 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 	}
 
 	err = errors.Join(err, closeStepWorkers(ctx, workers))
+
+	e.root.pools.stop()
 
 	elapsed := time.Since(started)
 

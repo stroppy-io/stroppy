@@ -60,6 +60,7 @@ type Run struct {
 	MeasurementSeconds float64              `json:"measurement_seconds"`
 	Metrics            map[string]Metric    `json:"metrics"`
 	Errors             ErrorSummary         `json:"errors"`
+	Pools              []Pool               `json:"pools,omitempty"`
 	Failure            *Failure             `json:"failure,omitempty"`
 	WorkloadReports    []WorkloadReport     `json:"workload_reports"`
 	Capture            *Capture             `json:"capture,omitempty"`

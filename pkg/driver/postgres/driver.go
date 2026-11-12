@@ -120,6 +120,23 @@ func NewDriver(
 	return d, nil
 }
 
+func (d *Driver) PoolStats() driver.PoolSnapshot {
+	provider, ok := d.pool.(interface{ Stat() *pgxpool.Stat })
+	if !ok {
+		return driver.PoolSnapshot{Reason: "executor does not expose pgx pool statistics"}
+	}
+
+	stats := provider.Stat()
+
+	return driver.PoolSnapshot{
+		Backend: "pgxpool", Scope: "all driver operations", Supported: true,
+		MaxConnections: int64(stats.MaxConns()), Open: int64(stats.TotalConns()),
+		InUse: int64(stats.AcquiredConns()), Idle: int64(stats.IdleConns()),
+		WaitCount: stats.EmptyAcquireCount(), WaitDuration: stats.EmptyAcquireWaitTime(),
+		Canceled: stats.CanceledAcquireCount(),
+	}
+}
+
 func (d *Driver) PoolMaxConns() int {
 	cfg := d.pool.Config()
 	if cfg == nil {

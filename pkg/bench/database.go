@@ -300,6 +300,7 @@ func (e *Execution) database(ctx context.Context, name string) (driver.Driver, *
 
 	if slot := e.databases[name]; slot != nil {
 		e.warnPoolCapacity(name, slot)
+		e.root.pools.use(name, slot)
 
 		return slot.drv, slot.cfg, nil
 	}
@@ -322,6 +323,7 @@ func (e *Execution) database(ctx context.Context, name string) (driver.Driver, *
 	slot := &databaseSlot{drv: drv, cfg: cfg}
 	e.databases[name] = slot
 	e.warnPoolCapacity(name, slot)
+	e.root.pools.use(name, slot)
 
 	return drv, cfg, nil
 }
