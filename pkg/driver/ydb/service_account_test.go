@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
 	iam "github.com/yandex-cloud/go-genproto/yandex/cloud/iam/v1"
 	ycauth "github.com/ydb-platform/ydb-go-yc"
@@ -46,9 +46,9 @@ func (s *testIAM) Create(_ context.Context, req *iam.CreateIamTokenRequest) (*ia
 
 	token, err := jwt.ParseWithClaims(req.GetJwt(), claims, func(token *jwt.Token) (any, error) {
 		return s.key, nil
-	}, jwt.WithValidMethods([]string{"PS256"}))
-	if err != nil || !token.Valid || claims.Issuer != "test-service-account" ||
-		!claims.VerifyAudience("https://iam.api.cloud.yandex.net/iam/v1/tokens", true) || token.Header["kid"] != "test-key" {
+	}, jwt.WithValidMethods([]string{"PS256"}), jwt.WithIssuedAt(),
+		jwt.WithIssuer("test-service-account"), jwt.WithAudience("https://iam.api.cloud.yandex.net/iam/v1/tokens"))
+	if err != nil || !token.Valid || token.Header["kid"] != "test-key" {
 		return nil, status.Error(codes.Unauthenticated, "invalid test identity")
 	}
 
