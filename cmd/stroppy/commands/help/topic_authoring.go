@@ -14,7 +14,7 @@ func init() {
 
   Init creates root main/module files and an importable workload/ package with
   a small Test definition, noop default, explicit source embedding and recording
-  test. Go 1.27 or newer is required. --module sets module identity; --sdk-version
+  test. Go 1.27.4 or newer is required. --module sets module identity; --sdk-version
   supplies a release or pseudo-version for development binaries.
 
   Build checks the provided directory first, then its workload/ child. No manifest
