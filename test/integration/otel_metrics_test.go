@@ -415,6 +415,10 @@ func waitForMetrics(t *testing.T, url string, check func(string) error) string {
 }
 
 func requirePrometheusExpectation(samples []prometheusSample, expectation metricExpectation) error {
+	expectation.labels["otel_scope_name"] = "github.com/stroppy-io/stroppy/v6/pkg/bench"
+	expectation.labels["otel_scope_version"] = ""
+	expectation.labels["otel_scope_schema_url"] = ""
+
 	if expectation.exact {
 		return requirePrometheusSampleEqual(
 			samples, expectation.name, expectation.labels, expectation.value,

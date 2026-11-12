@@ -194,7 +194,7 @@ func Project(
 		return nil, err
 	}
 
-	if err := moduleFile.AddGoStmt("1.27"); err != nil {
+	if err := moduleFile.AddGoStmt("1.27.4"); err != nil {
 		return nil, err
 	}
 
@@ -209,7 +209,7 @@ func Project(
 
 	files["go.mod"] = moduleData
 
-	files["README.md"] = []byte(fmt.Sprintf("# %s\n\nRequires Go 1.27 or newer.\n\n"+
+	files["README.md"] = []byte(fmt.Sprintf("# %s\n\nRequires Go 1.27.4 or newer.\n\n"+
 		"```sh\ngo run .\ngo test ./...\nstroppy build .\n```\n\n"+
 		"Published files are restored under workload/. Dependencies declared by those files\n"+
 		"are resolved through Go modules. Custom workloads are trusted native code, not sandboxed.\n", name))
