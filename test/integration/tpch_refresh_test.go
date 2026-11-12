@@ -26,7 +26,7 @@ import (
 type tpchRefreshReport struct {
 	Mode               string  `json:"mode"`
 	Status             string  `json:"status"`
-	NextSet            int64   `json:"next_set"`
+	NextSet            *int64  `json:"next_set"`
 	MeasurementSeconds float64 `json:"measurement_seconds"`
 	Attempts           []struct {
 		Set       int64  `json:"set"`
@@ -76,7 +76,7 @@ func TestTpchRefreshPowerAndThroughput(t *testing.T) {
 		"--scale-factor", "0.01", "--refresh-functions=true", "--report-file", powerPath)
 
 	power := readTPCHRefreshReport(t, powerPath)
-	if power.Status != "complete" || power.NextSet != 2 || len(power.Attempts) != 2 {
+	if power.Status != "complete" || power.NextSet == nil || *power.NextSet != 2 || len(power.Attempts) != 2 {
 		t.Fatalf("power=%+v", power)
 	}
 
@@ -100,7 +100,7 @@ func assertTPCHRefreshThroughput(t *testing.T, path string) {
 	t.Helper()
 
 	value := readTPCHRefreshReport(t, path)
-	if value.Status != "complete" || value.NextSet != 4 || len(value.Attempts) != 4 {
+	if value.Status != "complete" || value.NextSet == nil || *value.NextSet != 4 || len(value.Attempts) != 4 {
 		t.Fatalf("throughput=%+v", value)
 	}
 
@@ -205,7 +205,7 @@ func TestTpchRefreshAtomicFailure(t *testing.T) {
 	}
 
 	value := readTPCHRefreshReport(t, path)
-	if value.Status != "incomplete" || value.NextSet != 0 || len(value.Attempts) != 1 || value.Attempts[0].Orders != 0 {
+	if value.Status != "incomplete" || value.NextSet != nil || len(value.Attempts) != 1 || value.Attempts[0].Orders != 0 {
 		t.Fatalf("failed refresh=%+v", value)
 	}
 
@@ -266,7 +266,7 @@ CREATE TRIGGER slow_rf BEFORE INSERT ON orders FOR EACH ROW EXECUTE FUNCTION slo
 			t.Fatal(err)
 		}
 
-		if value.Status != "incomplete" || value.NextSet != 0 {
+		if value.Status != "incomplete" || value.NextSet != nil {
 			t.Fatalf("cancellation advertised completion: %+v", value)
 		}
 

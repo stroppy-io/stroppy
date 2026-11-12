@@ -3,6 +3,7 @@ package tpch
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -117,43 +118,30 @@ func TestRefreshWindowIncludesLastActivity(t *testing.T) {
 }
 
 func TestRefreshInsertFailureRollsBack(t *testing.T) {
-	generator, err := tpchgen.NewRefreshGenerator(0.01, 1)
-	if err != nil {
+	success := &record.Recorder{}
+	if _, err := recordRefreshInsert(t, success); err != nil {
 		t.Fatal(err)
 	}
 
-	order, _ := generator.Next()
-	rows, lines := refreshRows(order)
+	var lineSQL string
+
+	for _, operation := range success.Operations() {
+		if strings.HasPrefix(operation.SQL, "INSERT INTO lineitem ") {
+			lineSQL = operation.SQL
+
+			break
+		}
+	}
+
+	if lineSQL == "" {
+		t.Fatal("refresh did not insert lineitems")
+	}
+
 	backend := errors.New("line insert failed")
 	recorder := &record.Recorder{}
-	test := bench.Test{Name: "refresh-rollback", Define: func(d *bench.Def) error {
-		d.Execution.WorkerStep("workload", func(ctx context.Context, b *bench.Bench) (bench.Action, error) {
-			session, err := b.Session(ctx)
-			if err != nil {
-				return nil, err
-			}
+	recorder.Reply(lineSQL, record.Response{Err: backend})
 
-			return func(ctx context.Context, _ *bench.Bench) error {
-				err := session.BeginTx(ctx, bench.BeginOpts{Isolation: bench.IsoSerializable}, func(tx *bench.Tx) error {
-					if err := insertRefreshRows(ctx, tx, "orders", refreshOrderColumns, [][]any{rows}); err != nil {
-						return err
-					}
-
-					if err := insertRefreshRows(ctx, tx, "lineitem", refreshLineColumns, lines); err != nil {
-						return err
-					}
-
-					return backend
-				})
-
-				return bench.Fatal(err)
-			}, nil
-		}, bench.OncePerWorker(1))
-
-		return d.Execution.Err()
-	}}
-
-	_, err = testkit.Record(t.Context(), test, recorder, bench.RunOptions{})
+	attempt, err := recordRefreshInsert(t, recorder)
 	if !errors.Is(err, backend) {
 		t.Fatalf("error=%v", err)
 	}
@@ -170,9 +158,37 @@ func TestRefreshInsertFailureRollsBack(t *testing.T) {
 		}
 	}
 
-	if commit != 0 || rollback != 1 {
-		t.Fatalf("commit=%d rollback=%d", commit, rollback)
+	if commit != 0 || rollback != 1 || attempt.Orders != 0 || attempt.Lineitems != 0 {
+		t.Fatalf("commit=%d rollback=%d attempt=%+v", commit, rollback, attempt)
 	}
+}
+
+func recordRefreshInsert(t *testing.T, recorder *record.Recorder) (*refreshAttempt, error) {
+	t.Helper()
+
+	attempt := &refreshAttempt{Set: 1}
+	test := bench.Test{Name: "refresh-rollback", Define: func(d *bench.Def) error {
+		d.Execution.WorkerStep("workload", func(ctx context.Context, b *bench.Bench) (bench.Action, error) {
+			session, err := b.Session(ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			return func(ctx context.Context, _ *bench.Bench) error {
+				generator, err := tpchgen.NewRefreshGenerator(0.01, 1)
+				if err != nil {
+					return bench.Fatal(err)
+				}
+
+				return bench.Fatal(insertRefresh(ctx, session, generator, attempt))
+			}, nil
+		}, bench.OncePerWorker(1))
+
+		return d.Execution.Err()
+	}}
+	_, err := testkit.Record(t.Context(), test, recorder, bench.RunOptions{})
+
+	return attempt, err
 }
 
 func TestRefreshExecutionRange(t *testing.T) {
