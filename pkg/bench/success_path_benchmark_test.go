@@ -13,7 +13,7 @@ func BenchmarkSuccessRetryPolicy(b *testing.B) {
 	b.ReportAllocs()
 
 	for b.Loop() {
-		if err := Retry0(ctx, worker.TxRetryPolicy(options), func() error { return nil }); err != nil {
+		if err := worker.Retry(ctx, options, func() error { return nil }); err != nil {
 			b.Fatal(err)
 		}
 	}

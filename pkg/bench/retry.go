@@ -202,6 +202,35 @@ type TxRetryPolicyOptions struct {
 	OnRetry          func(attempt int, err error, decision RetryDecision)
 }
 
+// Retry defers default policy construction until an operation fails. Explicit
+// action overrides are snapshotted before the operation can mutate them.
+func (b *Bench) Retry(ctx context.Context, opts TxRetryPolicyOptions, operation func() error) error {
+	var policy RetryPolicy
+	if opts.Actions != nil {
+		policy = b.TxRetryPolicy(opts)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	err := operation()
+	if err == nil {
+		return nil
+	}
+
+	if opts.Actions == nil {
+		policy = b.TxRetryPolicy(opts)
+	}
+
+	done, result := applyRetryDecision(ctx, policy, 1, max(policy.MaxAttempts, 1), err, policy.decision(err))
+	if done {
+		return result
+	}
+
+	return retryFrom(ctx, policy, operation, 1)
+}
+
 // TxRetryPolicy builds a policy from this bench's driver classifier and
 // workload overrides.
 func (b *Bench) TxRetryPolicy(opts TxRetryPolicyOptions) RetryPolicy {
