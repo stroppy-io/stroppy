@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
-- PostgreSQL COPY loads use less client CPU when generated integer and decimal values arrive as text, including TPC-DS and TPC-H loads.
+- TPC-DS loads through PostgreSQL COPY use less client CPU by encoding integer and decimal text directly for numeric columns.
 
 ## [6.4.0] - 2026-11-12
 

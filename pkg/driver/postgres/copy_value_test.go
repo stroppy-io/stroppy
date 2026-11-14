@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 )
@@ -68,7 +69,11 @@ func TestCopyRowSourceValues(t *testing.T) {
 	t.Parallel()
 
 	row := []any{"000123", int64(42), nil, []byte("bytes")}
-	src := &rowSource{src: &fakeSource{cols: []string{"text", "number", "null", "bytes"}, rows: [][]any{row}}}
+	src := &rowSource{
+		src:            &fakeSource{cols: []string{"text", "number", "null", "bytes"}, rows: [][]any{row}},
+		columnCount:    len(row),
+		numericColumns: []int{0, 1, 2},
+	}
 	require.True(t, src.Next())
 	values, err := src.Values()
 	require.NoError(t, err)
@@ -79,6 +84,33 @@ func TestCopyRowSourceValues(t *testing.T) {
 	require.Equal(t, values, again)
 	require.False(t, src.Next())
 	require.NoError(t, src.Err())
+}
+
+func TestCopyNumericColumns(t *testing.T) {
+	t.Parallel()
+
+	fields := []pgconn.FieldDescription{
+		{DataTypeOID: pgtype.TextOID},
+		{DataTypeOID: pgtype.Int2OID},
+		{DataTypeOID: pgtype.Int4OID},
+		{DataTypeOID: pgtype.Int8OID},
+		{DataTypeOID: pgtype.NumericOID},
+		{DataTypeOID: pgtype.Float4OID},
+		{DataTypeOID: pgtype.Float8OID},
+		{DataTypeOID: pgtype.VarcharOID},
+	}
+	require.Equal(t, []int{1, 2, 3, 4}, copyNumericColumns(fields))
+
+	row := []any{"00123", "123", int64(42), nil, "1.25", "-0", "-000", "0001"}
+	src := &rowSource{row: row, columnCount: len(fields), numericColumns: copyNumericColumns(fields)}
+	values, err := src.Values()
+	require.NoError(t, err)
+	require.Equal(t, []any{"00123", copyText("123"), int64(42), nil, copyText("1.25"), "-0", "-000", "0001"}, values)
+
+	src.row = []any{"short"}
+	values, err = src.Values()
+	require.NoError(t, err)
+	require.Equal(t, []any{"short"}, values)
 }
 
 func TestCopyTextInvalidValues(t *testing.T) {
