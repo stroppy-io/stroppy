@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Changed
+
+- TPC-DS loads through PostgreSQL COPY use less client CPU by encoding integer and decimal text directly for numeric columns. ([#284](https://github.com/stroppy-io/stroppy/pull/284))
+
 ## [6.4.0] - 2026-11-12
 
 ### Added

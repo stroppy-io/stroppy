@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
@@ -108,16 +110,33 @@ func (d *Driver) copyFromRuntime(
 	src source.RowSource,
 ) error {
 	insertprogress.SetStage(ctx, insertprogress.StagePostgresCopyFrom)
-	copySrc := &rowSource{
-		src:      src,
-		progress: insertprogress.NewGeneratedRowCounter(ctx),
-	}
 
 	stmtCtx, cancel := d.statementCtx(ctx)
 	defer cancel()
 
 	start := time.Now()
-	rowsCopied, err := d.pool.CopyFrom(stmtCtx, pgx.Identifier{table}, src.Columns(), copySrc)
+
+	conn, err := d.pool.Acquire(stmtCtx)
+	if err != nil {
+		return fmt.Errorf("postgres: acquire conn for COPY %q: %w", table, statementContextError(stmtCtx, err))
+	}
+	defer conn.Release()
+
+	columns := src.Columns()
+
+	fields, err := describeColumns(stmtCtx, conn.Conn(), table, columns)
+	if err != nil {
+		return err
+	}
+
+	copySrc := &rowSource{
+		src:            src,
+		progress:       insertprogress.NewGeneratedRowCounter(ctx),
+		columnCount:    len(columns),
+		numericColumns: copyNumericColumns(fields),
+	}
+
+	rowsCopied, err := conn.Conn().CopyFrom(stmtCtx, pgx.Identifier{table}, columns, copySrc)
 	copySrc.progress.Flush()
 
 	if err != nil {
@@ -471,6 +490,34 @@ func (d *Driver) describeColumnCastTypes(
 	}
 	defer conn.Release()
 
+	fields, err := describeColumns(stmtCtx, conn.Conn(), table, columns)
+	if err != nil {
+		return nil, err
+	}
+
+	typeMap := conn.Conn().TypeMap()
+	casts := make([]string, len(fields))
+
+	for i, field := range fields {
+		pgType, ok := typeMap.TypeForOID(field.DataTypeOID)
+		if !ok {
+			column := columns[i] //nolint:gosec // field and column counts are checked above
+
+			return nil, fmt.Errorf(
+				"%w: table %q column %q OID %d",
+				ErrUnregisteredColumnType, table, column, field.DataTypeOID,
+			)
+		}
+
+		casts[i] = pgType.Name
+	}
+
+	return casts, nil
+}
+
+func describeColumns(
+	ctx context.Context, conn *pgx.Conn, table string, columns []string,
+) ([]pgconn.FieldDescription, error) {
 	var sb strings.Builder
 
 	sb.WriteString("SELECT ")
@@ -486,40 +533,31 @@ func (d *Driver) describeColumnCastTypes(
 	sb.WriteString(" FROM ")
 	sb.WriteString(pgx.Identifier{table}.Sanitize())
 
-	sd, err := conn.Conn().Prepare(stmtCtx, "", sb.String())
+	sd, err := conn.Prepare(ctx, "", sb.String())
 	if err != nil {
-		return nil, fmt.Errorf(
-			"postgres: describe columns of %q: %w",
-			table,
-			statementContextError(stmtCtx, err),
-		)
+		return nil, fmt.Errorf("postgres: describe columns of %q: %w", table, statementContextError(ctx, err))
 	}
 
 	if len(sd.Fields) != len(columns) {
 		return nil, fmt.Errorf(
-			"%w: table %q returned %d, want %d",
-			ErrColumnCountMismatch, table, len(sd.Fields), len(columns),
+			"%w: table %q returned %d, want %d", ErrColumnCountMismatch, table, len(sd.Fields), len(columns),
 		)
 	}
 
-	typeMap := conn.Conn().TypeMap()
-	casts := make([]string, len(sd.Fields))
+	return sd.Fields, nil
+}
 
-	for i, field := range sd.Fields {
-		pgType, ok := typeMap.TypeForOID(field.DataTypeOID)
-		if !ok {
-			column := columns[i] //nolint:gosec // field and column counts are checked above
+func copyNumericColumns(fields []pgconn.FieldDescription) []int {
+	var columns []int
 
-			return nil, fmt.Errorf(
-				"%w: table %q column %q OID %d",
-				ErrUnregisteredColumnType, table, column, field.DataTypeOID,
-			)
+	for i, field := range fields {
+		switch field.DataTypeOID {
+		case pgtype.Int2OID, pgtype.Int4OID, pgtype.Int8OID, pgtype.NumericOID:
+			columns = append(columns, i)
 		}
-
-		casts[i] = pgType.Name
 	}
 
-	return casts, nil
+	return columns
 }
 
 // buildColumnarInsert returns the unnest-based INSERT statement. Each column
@@ -559,10 +597,12 @@ func buildColumnarInsert(table string, columns, castTypes []string) string {
 // call pulls one row from src; emission stops at EOF. Errors are stored
 // and surfaced via Err().
 type rowSource struct {
-	src      source.RowSource
-	progress insertprogress.RowCounter
-	row      []any
-	err      error
+	src            source.RowSource
+	progress       insertprogress.RowCounter
+	row            []any
+	err            error
+	columnCount    int
+	numericColumns []int
 }
 
 // Next advances the source cursor. Returns false at EOF or on error.
@@ -591,7 +631,19 @@ func (s *rowSource) Next() bool {
 // Values returns the current row. pgx calls Values once per successful
 // Next, so the source's scratch slice is safe to return directly —
 // pgx.CopyFrom serializes each row before advancing.
-func (s *rowSource) Values() ([]any, error) { return s.row, nil }
+func (s *rowSource) Values() ([]any, error) {
+	if len(s.row) != s.columnCount {
+		return s.row, nil
+	}
+
+	for _, i := range s.numericColumns {
+		if text, ok := s.row[i].(string); ok {
+			s.row[i] = copyText(text)
+		}
+	}
+
+	return s.row, nil
+}
 
 // Err reports any source error encountered during iteration. pgx
 // aborts the COPY transaction when Err is non-nil.
