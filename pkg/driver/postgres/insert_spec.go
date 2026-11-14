@@ -591,7 +591,15 @@ func (s *rowSource) Next() bool {
 // Values returns the current row. pgx calls Values once per successful
 // Next, so the source's scratch slice is safe to return directly —
 // pgx.CopyFrom serializes each row before advancing.
-func (s *rowSource) Values() ([]any, error) { return s.row, nil }
+func (s *rowSource) Values() ([]any, error) {
+	for i, value := range s.row {
+		if text, ok := value.(string); ok {
+			s.row[i] = copyText(text)
+		}
+	}
+
+	return s.row, nil
+}
 
 // Err reports any source error encountered during iteration. pgx
 // aborts the COPY transaction when Err is non-nil.
