@@ -246,14 +246,14 @@ func webGenerateOrderInfo(orderNumber int64, sss *streamSet, sc *Scaling) webOrd
 }
 
 // newWebLineGen builds the shared per-stream line generator for the web channel.
-func newWebLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
+func newWebLineGen(sss, srs *streamSet, sc *Scaling) factLineGen {
 	itemCount := int(sc.IDCount(TItem))
 	var itemPermutation []int
 	var remainingLineItems int
 	var order webOrderInfo
 	var itemIndex int
 
-	return func(ticket int64) ([]any, []any, bool) {
+	return func(ticket int64, salesBuffer, returnsBuffer []any) ([]any, []any, bool) {
 		if itemPermutation == nil {
 			itemPermutation = MakePermutation(itemCount, sss.at(wslPermutation))
 		}
@@ -283,11 +283,11 @@ func newWebLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
 		promoSk := GenerateJoinKey(TWebSales, JCNone, sss.at(wslPromoSk), TPromotion, 1, sc)
 		pricing := GeneratePricingForSales(WebPricingLimits, sss.at(wslPricing))
 
-		sales := buildWebSalesRow(nullBitMap, order, shipDateSk, itemSk, webPageSk, webSiteSk, shipModeSk, warehouseSk, promoSk, pricing)
+		sales := buildWebSalesRow(salesBuffer, nullBitMap, order, shipDateSk, itemSk, webPageSk, webSiteSk, shipModeSk, warehouseSk, promoSk, pricing)
 
 		var returns []any
 		if GenerateUniformRandomInt(0, 99, sss.at(wslIsReturned)) < webReturnPercent {
-			returns = buildWebReturnsRow(srs, sc, order, itemSk, webPageSk, shipDateSk, pricing)
+			returns = buildWebReturnsRow(returnsBuffer, srs, sc, order, itemSk, webPageSk, shipDateSk, pricing)
 		}
 
 		remainingLineItems--
@@ -297,11 +297,11 @@ func newWebLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
 }
 
 // buildWebSalesRow renders one web_sales row in WebSalesRow.getValues order.
-func buildWebSalesRow(nb int64, order webOrderInfo, shipDateSk, itemSk, webPageSk, webSiteSk, shipModeSk, warehouseSk, promoSk int64, p Pricing) []any {
+func buildWebSalesRow(dst []any, nb int64, order webOrderInfo, shipDateSk, itemSk, webPageSk, webSiteSk, shipModeSk, warehouseSk, promoSk int64, p Pricing) []any {
 	k := func(globalCol int, v int64) any { return webKeyOrNull(wslNullAt, nb, globalCol, v) }
 	d := func(globalCol int, v Decimal) any { return webValOrNull(wslNullAt, nb, globalCol, v) }
 
-	return []any{
+	return append(dst,
 		k(409, order.soldDateSk),
 		k(410, order.soldTimeSk),
 		k(411, shipDateSk),
@@ -336,12 +336,12 @@ func buildWebSalesRow(nb int64, order webOrderInfo, shipDateSk, itemSk, webPageS
 		d(440, p.NetPaidIncludingShipping),
 		d(441, p.NetPaidIncludingShippingAndTax),
 		d(442, p.NetProfit),
-	}
+	)
 }
 
 // buildWebReturnsRow ports WebReturnsRowGenerator.generateRow: it draws on the
 // returns streamSet (srs) and reuses the sales row's keys/pricing.
-func buildWebReturnsRow(srs *streamSet, sc *Scaling, order webOrderInfo, itemSk, webPageSk, shipDateSk int64, salesPricing Pricing) []any {
+func buildWebReturnsRow(dst []any, srs *streamSet, sc *Scaling, order webOrderInfo, itemSk, webPageSk, shipDateSk int64, salesPricing Pricing) []any {
 	nb := CreateNullBitMap(webReturnsNullBasis, webReturnsNotNullBitMap, srs.at(wrtNulls))
 
 	returnedDateSk := GenerateJoinKey(TWebReturns, JCNone, srs.at(wrtReturnedDateSk), TDateDim, shipDateSk, sc)
@@ -371,7 +371,7 @@ func buildWebReturnsRow(srs *streamSet, sc *Scaling, order webOrderInfo, itemSk,
 	k := func(globalCol int, v int64) any { return webKeyOrNull(wrtNullAt, nb, globalCol, v) }
 	d := func(globalCol int, v Decimal) any { return webValOrNull(wrtNullAt, nb, globalCol, v) }
 
-	return []any{
+	return append(dst,
 		k(383, returnedDateSk),
 		k(384, returnedTimeSk),
 		k(385, itemSk),
@@ -396,7 +396,7 @@ func buildWebReturnsRow(srs *streamSet, sc *Scaling, order webOrderInfo, itemSk,
 		d(404, p.ReversedCharge),
 		d(405, p.StoreCredit),
 		d(406, p.NetLoss),
-	}
+	)
 }
 
 // WebSales is the TPC-DS web_sales fact table (the order/parent side).

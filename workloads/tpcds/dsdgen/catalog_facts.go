@@ -216,7 +216,7 @@ func catalogIsNull(globalCol int, nullBitMap int64, firstCol int) bool {
 
 // newCatalogLineGen builds the shared per-stream line generator for the catalog
 // channel. It mirrors CatalogSalesRowGenerator.generateRowAndChildRows.
-func newCatalogLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
+func newCatalogLineGen(sss, srs *streamSet, sc *Scaling) factLineGen {
 	itemCount := int(sc.IDCount(TItem))
 
 	var (
@@ -228,7 +228,7 @@ func newCatalogLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
 		order           catalogOrderInfo
 	)
 
-	return func(ticket int64) ([]any, []any, bool) {
+	return func(ticket int64, salesBuffer, returnsBuffer []any) ([]any, []any, bool) {
 		if itemPermutation == nil {
 			itemPermutation = MakePermutation(itemCount, sss.at(csPermute))
 			// skipDaysUntilFirstRowOfChunk for the full-table (chunk 1) start:
@@ -274,7 +274,7 @@ func newCatalogLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
 
 		nb := nullBitMap
 		fc := catalogSalesFirstColumn
-		sales := []any{
+		sales := append(salesBuffer,
 			catKeyOrNull(order.soldDateSk, 75, nb, fc),
 			catKeyOrNull(order.soldTimeSk, 76, nb, fc),
 			catKeyOrNull(shipDateSk, 77, nb, fc),
@@ -309,7 +309,7 @@ func newCatalogLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
 			catValOrNull(pricing.NetPaidIncludingShipping, 106, nb, fc),
 			catValOrNull(pricing.NetPaidIncludingShippingAndTax, 107, nb, fc),
 			catValOrNull(pricing.NetProfit, 108, nb, fc),
-		}
+		)
 
 		// Build the sales row record for the returns side.
 		salesRow := catalogSalesRecord{
@@ -330,7 +330,7 @@ func newCatalogLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
 
 		var returns []any
 		if GenerateUniformRandomInt(0, 99, sss.at(crIsReturned)) < crReturnPercent {
-			returns = generateCatalogReturnsRow(srs, sc, salesRow)
+			returns = generateCatalogReturnsRow(returnsBuffer, srs, sc, salesRow)
 		}
 
 		remainingItems--
@@ -409,7 +409,7 @@ func generateCatalogOrderInfo(rowNumber int64, sss *streamSet, sc *Scaling, juli
 
 // generateCatalogReturnsRow ports CatalogReturnsRowGenerator.generateRow, drawing
 // on the returns streamSet (srs) and reusing the sales row's keys/pricing.
-func generateCatalogReturnsRow(srs *streamSet, sc *Scaling, sales catalogSalesRecord) []any {
+func generateCatalogReturnsRow(dst []any, srs *streamSet, sc *Scaling, sales catalogSalesRecord) []any {
 	nullBitMap := CreateNullBitMap(catalogReturnsNullBasis, catalogReturnsNotNullBitMp, srs.at(crNulls))
 
 	returningCustomerSk := GenerateJoinKey(TCatalogReturns, JCNone, srs.at(crReturningCustomerSk), TCustomer, 2, sc)
@@ -438,7 +438,7 @@ func generateCatalogReturnsRow(srs *streamSet, sc *Scaling, sales catalogSalesRe
 	nb := nullBitMap
 	fc := catalogReturnsFirstColumn
 
-	return []any{
+	return append(dst,
 		catKeyOrNull(returnedDateSk, 46, nb, fc),
 		catKeyOrNull(returnedTimeSk, 47, nb, fc),
 		catKeyOrNull(sales.soldItemSk, 48, nb, fc),
@@ -466,7 +466,7 @@ func generateCatalogReturnsRow(srs *streamSet, sc *Scaling, sales catalogSalesRe
 		catValOrNull(pricing.ReversedCharge, 70, nb, fc),
 		catValOrNull(pricing.StoreCredit, 71, nb, fc),
 		catValOrNull(pricing.NetLoss, 72, nb, fc),
-	}
+	)
 }
 
 var catalogTicketCount = func(sf float64) int64 { return NewScaling(sf).RowCount(TCatalogSales) }

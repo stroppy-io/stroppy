@@ -77,7 +77,8 @@ func TestCopyRowSourceValues(t *testing.T) {
 	require.True(t, src.Next())
 	values, err := src.Values()
 	require.NoError(t, err)
-	require.Equal(t, []any{copyText("000123"), int64(42), nil, []byte("bytes")}, values)
+	require.Equal(t, []any{&src.numericValues[0], int64(42), nil, []byte("bytes")}, values)
+	require.Equal(t, copyText("000123"), src.numericValues[0])
 
 	again, err := src.Values()
 	require.NoError(t, err)
@@ -105,7 +106,11 @@ func TestCopyNumericColumns(t *testing.T) {
 	src := &rowSource{row: row, columnCount: len(fields), numericColumns: copyNumericColumns(fields)}
 	values, err := src.Values()
 	require.NoError(t, err)
-	require.Equal(t, []any{"00123", copyText("123"), int64(42), nil, copyText("1.25"), "-0", "-000", "0001"}, values)
+
+	want := []any{"00123", &src.numericValues[1], int64(42), nil, &src.numericValues[4], "-0", "-000", "0001"}
+	require.Equal(t, want, values)
+	require.Equal(t, copyText("123"), src.numericValues[1])
+	require.Equal(t, copyText("1.25"), src.numericValues[4])
 
 	src.row = []any{"short"}
 	values, err = src.Values()

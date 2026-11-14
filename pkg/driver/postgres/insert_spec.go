@@ -137,11 +137,17 @@ func (d *Driver) copyFromRuntime(
 	})
 	defer typeMap.RegisterType(numericType)
 
+	if batch, ok := src.(*common.BatchRowSource); ok {
+		release := borrowCopyBytes(batch, fields, typeMap)
+		defer release()
+	}
+
 	copySrc := &rowSource{
 		src:            src,
 		progress:       insertprogress.NewGeneratedRowCounter(ctx),
 		columnCount:    len(columns),
 		numericColumns: copyNumericColumns(fields),
+		numericValues:  make([]copyText, len(columns)),
 	}
 
 	rowsCopied, err := conn.Conn().CopyFrom(stmtCtx, pgx.Identifier{table}, columns, copySrc)
@@ -611,6 +617,7 @@ type rowSource struct {
 	err            error
 	columnCount    int
 	numericColumns []int
+	numericValues  []copyText
 }
 
 // Next advances the source cursor. Returns false at EOF or on error.
@@ -644,9 +651,14 @@ func (s *rowSource) Values() ([]any, error) {
 		return s.row, nil
 	}
 
+	if s.numericValues == nil {
+		s.numericValues = make([]copyText, s.columnCount)
+	}
+
 	for _, i := range s.numericColumns {
 		if text, ok := s.row[i].(string); ok {
-			s.row[i] = copyText(text)
+			s.numericValues[i] = copyText(text)
+			s.row[i] = &s.numericValues[i]
 		}
 	}
 

@@ -19,6 +19,8 @@ package dsdgen
 // whether this line completes the ticket.
 type FactLineGen func(ticket int64) (sales []any, returns []any, endOrder bool)
 
+type factLineGen func(ticket int64, salesBuffer, returnsBuffer []any) (sales []any, returns []any, endOrder bool)
+
 // FactTable is one side (sales or returns) of a fan-out fact channel. Both sides
 // share a channel's generation; emitReturns selects which rows this table emits.
 type FactTable struct {
@@ -32,7 +34,7 @@ type FactTable struct {
 	TicketCount func(sf float64) int64
 	// newLineGen builds a fresh, stateful line generator bound to this stream's
 	// private sales/returns streamSets and scaling.
-	newLineGen func(sss, srs *streamSet, sc *Scaling) FactLineGen
+	newLineGen func(sss, srs *streamSet, sc *Scaling) factLineGen
 }
 
 // FactStream emits the line-item rows for ticket range [start, start+count)
@@ -41,9 +43,12 @@ type FactStream struct {
 	tbl    *FactTable
 	sss    *streamSet
 	srs    *streamSet
-	gen    FactLineGen
+	gen    factLineGen
 	ticket int64
 	end    int64
+	salesBuffer []any
+	returnsBuffer []any
+	reuse bool
 }
 
 // NewStream builds a fact row source over ticket range [start, start+count) at
@@ -69,6 +74,10 @@ func (t *FactTable) NewStream(sf float64, start, count int64) *FactStream {
 	}
 }
 
+// ReuseRows allows a synchronous consumer to reuse output storage. Returned
+// rows are valid only until the next Next call; the default keeps rows owned.
+func (s *FactStream) ReuseRows() { s.reuse = true }
+
 // Next returns the next emitted row (sales or returns depending on the table),
 // or false at end of range. Returns rows that are not produced for a line (no
 // return) are skipped transparently.
@@ -78,8 +87,13 @@ func (s *FactStream) Next() ([]any, bool) {
 			return nil, false
 		}
 
-		sales, returns, endOrder := s.gen(s.ticket)
-
+		sales, returns, endOrder := s.gen(s.ticket, s.salesBuffer, s.returnsBuffer)
+		if s.reuse {
+			s.salesBuffer = sales[:0]
+			if returns != nil {
+				s.returnsBuffer = returns[:0]
+			}
+		}
 		out := sales
 		if s.tbl.emitReturns {
 			out = returns

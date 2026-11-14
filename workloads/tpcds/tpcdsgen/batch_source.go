@@ -106,8 +106,11 @@ func (s *factBatchSource) Prepare(start, count int64, batchRows int) (gen.Cursor
 		batchRows = 256
 	}
 
+	stream := s.spec.tbl.NewStream(s.sf, start+1, count)
+	stream.ReuseRows()
+
 	return &tpcdsCursor{
-		stream: s.spec.tbl.NewStream(s.sf, start+1, count),
+		stream: stream,
 		batch:  gen.NewBatch(s.schema, batchRows), cols: s.cols,
 	}, nil
 }

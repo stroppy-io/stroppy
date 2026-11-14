@@ -11,6 +11,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
+
+	"github.com/stroppy-io/stroppy/v6/pkg/driver/common"
+	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
 
 func TestCopyTextRealPostgres(t *testing.T) {
@@ -94,6 +97,54 @@ func TestCopyNumericRealPostgres(t *testing.T) {
 	restored, ok := conn.Conn().TypeMap().TypeForOID(pgtype.NumericOID)
 	require.True(t, ok)
 	require.Same(t, original, restored)
+}
+
+func TestCopyBorrowedBatchRealPostgres(t *testing.T) {
+	d := realPGDriver(t, 2)
+	execSQL(t, d, `CREATE TEMP TABLE copy_borrowed (id integer, label text, amount numeric(10,2), day date, value real)`)
+
+	builder := gen.NewSchemaBuilder()
+	id := builder.Bytes("id", 8)
+	label := builder.Bytes("label", 8)
+	amount := builder.Bytes("amount", 8)
+	day := builder.Bytes("day", 10)
+	value := builder.Bytes("value", 8)
+	schema := builder.Build()
+	source := gen.NewIndexedSource(schema, gen.New(1), "copy-test", 5, 1, func(row gen.Row, entity uint64) error {
+		values := []string{"1", "first", "12.34", "2000-02-29", "-0"}
+		if entity%2 == 1 {
+			values = []string{"2", "second", "0.00", "2001-01-01", "1.25"}
+		}
+
+		for i, column := range []gen.Column{id, label, amount, day, value} {
+			if entity == 4 && i == 2 {
+				row.SetNull(column)
+
+				continue
+			}
+
+			bytes, err := row.Bytes(column, len(values[i]))
+			if err != nil {
+				return err
+			}
+
+			copy(bytes, values[i])
+		}
+
+		return nil
+	})
+	cursor, err := source.Prepare(0, 5, 1)
+	require.NoError(t, err)
+
+	src := common.NewBatchRowSource(cursor, schema.ColumnNames(), schema.Columns())
+	require.NoError(t, d.copyFromRuntime(t.Context(), "copy_borrowed", src))
+
+	var valid bool
+	queryOneRow(t, d, `SELECT count(*) = 5 AND count(amount) = 4
+		AND count(*) FILTER (WHERE label = 'first' AND day = DATE '2000-02-29'
+		AND encode(float4send(value), 'hex') = '80000000') = 3
+		AND count(*) FILTER (WHERE label = 'second' AND amount = 0.00) = 2 FROM copy_borrowed`, &valid)
+	require.True(t, valid)
 }
 
 func TestCopyTextNegativeZero(t *testing.T) {

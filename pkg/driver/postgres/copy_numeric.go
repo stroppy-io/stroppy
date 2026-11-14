@@ -17,8 +17,11 @@ type copyNumericCodec struct{ pgtype.Codec }
 
 func (c copyNumericCodec) PlanEncode(m *pgtype.Map, oid uint32, format int16, value any) pgtype.EncodePlan {
 	plan := c.Codec.PlanEncode(m, oid, format, value)
-	if _, ok := value.(copyText); ok && format == pgtype.BinaryFormatCode && plan != nil {
-		return copyNumericPlan{fallback: plan}
+	if format == pgtype.BinaryFormatCode && plan != nil {
+		switch value.(type) {
+		case copyText, *copyText, *copyBytes:
+			return copyNumericPlan{fallback: plan}
+		}
 	}
 
 	return plan
@@ -27,10 +30,23 @@ func (c copyNumericCodec) PlanEncode(m *pgtype.Map, oid uint32, format int16, va
 type copyNumericPlan struct{ fallback pgtype.EncodePlan }
 
 func (p copyNumericPlan) Encode(value any, buf []byte) ([]byte, error) {
-	if text, ok := value.(copyText); ok {
-		if encoded, supported := appendCopyNumeric(buf, string(text)); supported {
-			return encoded, nil
+	var text copyText
+
+	switch value := value.(type) {
+	case *copyText:
+		if value != nil {
+			text = *value
 		}
+	case *copyBytes:
+		if value != nil {
+			text = copyText(value.data)
+		}
+	case copyText:
+		text = value
+	}
+
+	if encoded, supported := appendCopyNumeric(buf, string(text)); supported {
+		return encoded, nil
 	}
 
 	return p.fallback.Encode(value, buf)

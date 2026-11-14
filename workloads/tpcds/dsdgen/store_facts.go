@@ -179,7 +179,7 @@ type storeOrderInfo struct {
 // channel. sss drives the sales/order draws, srs the returns draws; the two
 // streamSets are independent so emitting one table never perturbs the other's
 // bytes. Each call produces one line item of the given ticket.
-func newStoreLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
+func newStoreLineGen(sss, srs *streamSet, sc *Scaling) factLineGen {
 	var (
 		itemPermutation    []int
 		remainingLineItems int
@@ -188,7 +188,7 @@ func newStoreLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
 	)
 	itemCount := int(sc.IDCount(TItem))
 
-	return func(ticket int64) (sales []any, returns []any, endOrder bool) {
+	return func(ticket int64, salesBuffer, returnsBuffer []any) (sales []any, returns []any, endOrder bool) {
 		// Item permutation is built lazily once; its column has 0 seeds/row so it
 		// is partition-invariant.
 		if itemPermutation == nil {
@@ -213,14 +213,14 @@ func newStoreLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
 		soldPromoSk := GenerateJoinKey(TStoreSales, JCNone, sss.at(ssSoldPromoSk), TPromotion, 1, sc)
 		pricing := GeneratePricingForSales(StorePricingLimits, sss.at(ssPricing))
 
-		sales = buildStoreSalesRow(nullBitMap, &order, soldItemSk, soldPromoSk, pricing)
+		sales = buildStoreSalesRow(salesBuffer, nullBitMap, &order, soldItemSk, soldPromoSk, pricing)
 
 		// 10% of sales are returned. Always compute the return when it occurs (so
 		// the store_returns table gets the row); drawing srs leaves the sales
 		// bytes untouched since the streamSets are separate.
 		isReturned := GenerateUniformRandomInt(0, 99, sss.at(srIsReturned)) < storeReturnPct
 		if isReturned {
-			returns = buildStoreReturnsRow(srs, sc, &order, soldItemSk, pricing)
+			returns = buildStoreReturnsRow(returnsBuffer, srs, sc, &order, soldItemSk, pricing)
 		}
 
 		remainingLineItems--
@@ -246,10 +246,10 @@ func generateStoreOrderInfo(ticket int64, sss *streamSet, sc *Scaling) storeOrde
 }
 
 // buildStoreSalesRow renders the store_sales row in StoreSalesRow.getValues order.
-func buildStoreSalesRow(nb int64, order *storeOrderInfo, soldItemSk, soldPromoSk int64, p Pricing) []any {
+func buildStoreSalesRow(dst []any, nb int64, order *storeOrderInfo, soldItemSk, soldPromoSk int64, p Pricing) []any {
 	const f = ssFirstColumnGlobal
 
-	return []any{
+	return append(dst,
 		keyOrNull(nb, 314, f, order.soldDateSk),
 		keyOrNull(nb, 315, f, order.soldTimeSk),
 		keyOrNull(nb, 316, f, soldItemSk),
@@ -273,13 +273,15 @@ func buildStoreSalesRow(nb int64, order *storeOrderInfo, soldItemSk, soldPromoSk
 		valOrNull(nb, 333, f, p.NetPaid),
 		valOrNull(nb, 334, f, p.NetPaidIncludingTax),
 		valOrNull(nb, 335, f, p.NetProfit),
-	}
+	)
 }
 
 // buildStoreReturnsRow ports StoreReturnsRowGenerator.generateRow: it draws on
 // the returns streamSet srs (in enum order) and reuses the sale's ticket, item,
 // and pricing. The customer is the sale's 80% of the time.
-func buildStoreReturnsRow(srs *streamSet, sc *Scaling, order *storeOrderInfo, soldItemSk int64, salesPricing Pricing) []any {
+func buildStoreReturnsRow(
+	dst []any, srs *streamSet, sc *Scaling, order *storeOrderInfo, soldItemSk int64, salesPricing Pricing,
+) []any {
 	nb := CreateNullBitMap(storeReturnsNullBasis, storeFactNotNullBitMap, srs.at(srNulls))
 
 	ticketNumber := order.ticketNumber
@@ -303,7 +305,7 @@ func buildStoreReturnsRow(srs *streamSet, sc *Scaling, order *storeOrderInfo, so
 
 	const f = srFirstColumnGlobal
 
-	return []any{
+	return append(dst,
 		keyOrNull(nb, 292, f, returnedDateSk),
 		keyOrNull(nb, 293, f, returnedTimeSk),
 		keyOrNull(nb, 294, f, itemSk),
@@ -324,7 +326,7 @@ func buildStoreReturnsRow(srs *streamSet, sc *Scaling, order *storeOrderInfo, so
 		valOrNull(nb, 309, f, p.ReversedCharge),
 		valOrNull(nb, 310, f, p.StoreCredit),
 		valOrNull(nb, 311, f, p.NetLoss),
-	}
+	)
 }
 
 // StoreSales is the store_sales fact table (the sales/parent side of the store
