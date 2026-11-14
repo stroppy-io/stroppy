@@ -129,6 +129,14 @@ func (d *Driver) copyFromRuntime(
 		return err
 	}
 
+	typeMap := conn.Conn().TypeMap()
+	numericType, _ := typeMap.TypeForOID(pgtype.NumericOID)
+
+	typeMap.RegisterType(&pgtype.Type{
+		Name: numericType.Name, OID: numericType.OID, Codec: copyNumericCodec{Codec: numericType.Codec},
+	})
+	defer typeMap.RegisterType(numericType)
+
 	copySrc := &rowSource{
 		src:            src,
 		progress:       insertprogress.NewGeneratedRowCounter(ctx),

@@ -6,34 +6,20 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/stroppy-io/stroppy/v6/pkg/datagen/source"
 	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 	"github.com/stroppy-io/stroppy/v6/workloads/tpcds/dsdgen"
 )
 
-// tpcdsBytesBudget is the per-row byte budget for every TPC-DS column. dsdgen's
-// normalize renders each non-null cell as canonical text; the widest observed
-// cell is 200 bytes (item), so 256 covers every column with headroom.
+// The widest canonical cell is 200 bytes (item); 256 leaves formatting headroom.
 const (
 	tpcdsBytesBudget = 256
 	decimalBase      = 10
 	floatBits        = 64
 )
 
-// NewBatchSource returns a [gen.BatchSource] over `table` at scale `sf`, the
-// typed successor to [New]. It wraps the same dsdgen streams, per-partition
-// private RNG, seeking, and entity/ticket fan-out as the legacy Partitionable;
-// the only seam that changes is the contract (BatchSource/Cursor filling a
-// typed columnar batch instead of source.RowSource yielding []any).
-//
-// Every column is a bytes column: dsdgen's normalize renders each non-null cell
-// as its canonical text (the exact bytes the reference generator emits), and
-// SQL nulls pass through. MaterializeRow reproduces the exact []any the legacy
-// streamSource/factSource yield, so driver output is byte-identical.
-//
-// dsdgen allocates []any per row internally (Stream.Next builds the row), so
-// generation here is not allocation-free; the typed batch fill itself allocates
-// nothing after Prepare. The allocation boundary is dsdgen, not the adapter.
+// NewBatchSource preserves canonical text cells for every driver and SQL override.
+// Raw generator values are formatted directly into batch storage, avoiding the
+// intermediate strings produced by the legacy normalized row source.
 func NewBatchSource(table string, sf float64) (gen.BatchSource, error) {
 	if sf <= 0 {
 		return nil, fmt.Errorf("%w: %g", ErrNonPositiveScale, sf)
@@ -54,9 +40,6 @@ func NewBatchSource(table string, sf float64) (gen.BatchSource, error) {
 	return nil, fmt.Errorf("%w: %q", ErrUnknownTable, table)
 }
 
-// textSchema builds an all-bytes schema + bound column handles for the given
-// column names. TPC-DS loads as canonical text (see normalize), so every column
-// is a bytes column regardless of its declared dsdgen type.
 func textSchema(cols []string) (gen.Schema, []gen.Column) {
 	b := gen.NewSchemaBuilder()
 	handles := make([]gen.Column, len(cols))
@@ -91,14 +74,10 @@ func (s *dimBatchSource) Prepare(start, count int64, batchRows int) (gen.Cursor,
 		batchRows = 256
 	}
 
-	// Reuse the legacy dimGen.Partition: dsdgen row numbers are 1-based, so it
-	// shifts the 0-based unit offset by one and builds a private Stream.
-	part, err := (&dimGen{tbl: s.tbl, sf: s.sf}).Partition(start, count)
-	if err != nil {
-		return nil, err
-	}
-
-	return &tpcdsCursor{stream: part, batch: gen.NewBatch(s.schema, batchRows), cols: s.cols}, nil
+	return &tpcdsCursor{
+		stream: s.tbl.NewStream(s.sf, start+1, count),
+		batch:  gen.NewBatch(s.schema, batchRows), cols: s.cols,
+	}, nil
 }
 
 // factBatchSource adapts a fan-out dsdgen fact table to gen.BatchSource. The
@@ -127,18 +106,18 @@ func (s *factBatchSource) Prepare(start, count int64, batchRows int) (gen.Cursor
 		batchRows = 256
 	}
 
-	// Reuse the legacy factGen.Partition: ticket numbers are 1-based.
-	part, err := (&factGen{spec: s.spec, sf: s.sf}).Partition(start, count)
-	if err != nil {
-		return nil, err
-	}
-
-	return &tpcdsCursor{stream: part, batch: gen.NewBatch(s.schema, batchRows), cols: s.cols}, nil
+	return &tpcdsCursor{
+		stream: s.spec.tbl.NewStream(s.sf, start+1, count),
+		batch:  gen.NewBatch(s.schema, batchRows), cols: s.cols,
+	}, nil
 }
 
-// tpcdsCursor drains a legacy dsdgen RowSource into a reusable typed batch.
+type rowStream interface {
+	Next() ([]any, bool)
+}
+
 type tpcdsCursor struct {
-	stream source.RowSource
+	stream rowStream
 	batch  *gen.Batch
 	cols   []gen.Column
 }
@@ -147,13 +126,9 @@ func (c *tpcdsCursor) Next() (*gen.Batch, error) {
 	c.batch.Reset()
 
 	for c.batch.Len() < c.batch.Cap() {
-		row, err := c.stream.Next()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-
-			return nil, err
+		row, ok := c.stream.Next()
+		if !ok {
+			break
 		}
 
 		if err := fillTpcdsRow(c.batch.AddRow(), row, c.cols); err != nil {
@@ -170,10 +145,6 @@ func (c *tpcdsCursor) Next() (*gen.Batch, error) {
 
 var errRowWidthMismatch = errors.New("tpcds: row width does not match schema")
 
-// fillTpcdsRow copies one dsdgen []any row into a typed batch row. Non-null
-// cells are rendered as canonical text (matching the legacy normalize); nulls
-// become SQL NULL. MaterializeRow reproduces the exact []any the legacy
-// streamSource emitted.
 func appendTpcdsCell(dst []byte, v any) []byte {
 	switch value := v.(type) {
 	case string:

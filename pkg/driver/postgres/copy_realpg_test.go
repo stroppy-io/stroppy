@@ -3,10 +3,12 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )
@@ -45,6 +47,53 @@ func TestCopyTextRealPostgres(t *testing.T) {
 		AND real_value = '1.0000000596046448'::real AND double_value = '-1.25e10'::double precision
 		FROM copy_text_values`, &valid)
 	require.True(t, valid)
+}
+
+func TestCopyNumericRealPostgres(t *testing.T) {
+	d := realPGDriver(t, 2)
+	execSQL(t, d, `CREATE TEMP TABLE copy_numeric_values (position integer, amount numeric)`)
+	conn, err := d.pool.Acquire(t.Context())
+	require.NoError(t, err)
+
+	original, ok := conn.Conn().TypeMap().TypeForOID(pgtype.NumericOID)
+	require.True(t, ok)
+	conn.Release()
+
+	texts := []string{"0.00", "-0.00", "0.0001", "-123.4500", "9223372036854775807.99", "1e10", strings.Repeat("9", 80)}
+	for i, text := range texts {
+		src := &fakeSource{cols: []string{"position", "amount"}, rows: [][]any{{i, text}}}
+		require.NoError(t, d.copyFromRuntime(t.Context(), "copy_numeric_values", src), text)
+	}
+
+	rows, err := d.pool.Query(t.Context(), "SELECT amount::text FROM copy_numeric_values ORDER BY position")
+	require.NoError(t, err)
+
+	var got []string
+
+	for rows.Next() {
+		var text string
+		require.NoError(t, rows.Scan(&text))
+		got = append(got, text)
+	}
+
+	require.NoError(t, rows.Err())
+	rows.Close()
+
+	want := []string{
+		"0.00", "0.00", "0.0001", "-123.4500", "9223372036854775807.99", "10000000000", strings.Repeat("9", 80),
+	}
+	require.Equal(t, want, got)
+
+	src := &fakeSource{cols: []string{"position", "amount"}, rows: [][]any{{0, "invalid"}}}
+	require.Error(t, d.copyFromRuntime(t.Context(), "copy_numeric_values", src))
+	conn, err = d.pool.Acquire(t.Context())
+	require.NoError(t, err)
+
+	defer conn.Release()
+
+	restored, ok := conn.Conn().TypeMap().TypeForOID(pgtype.NumericOID)
+	require.True(t, ok)
+	require.Same(t, original, restored)
 }
 
 func TestCopyTextNegativeZero(t *testing.T) {
