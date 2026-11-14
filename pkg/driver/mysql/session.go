@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	sqldriverapi "database/sql/driver"
+	"errors"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
@@ -47,7 +48,16 @@ func (c *sessionConnection) Begin(
 
 	return &sqldriver.SQLTxAdapter{Tx: tx}, nil
 }
-func (c *sessionConnection) Close(context.Context) error { return c.Conn.Close() }
+
+func (c *sessionConnection) Close(context.Context) error {
+	err := c.Conn.Close()
+	if errors.Is(err, sql.ErrConnDone) {
+		return nil
+	}
+
+	return err
+}
+
 func (c *sessionConnection) Valid() bool {
 	return c.Raw(func(conn any) error {
 		if validator, ok := conn.(sqldriverapi.Validator); ok && !validator.IsValid() {

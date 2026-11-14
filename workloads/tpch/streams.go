@@ -3,6 +3,7 @@ package tpch
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -43,16 +44,15 @@ func (w *workload) streamInitializer(dialect *mpp.Selection) bench.WorkerInit {
 			return nil, err
 		}
 
-		session, err := b.Session(ctx)
-		if err != nil {
+		if _, err := b.Session(ctx); err != nil {
 			return nil, err
 		}
 
-		return w.streamAction(session), nil
+		return w.streamAction(), nil
 	}
 }
 
-func (w *workload) streamAction(session *bench.Session) bench.Action {
+func (w *workload) streamAction() bench.Action {
 	return func(ctx context.Context, b *bench.Bench) error {
 		stream := &w.streams[b.Worker()]
 
@@ -68,6 +68,11 @@ func (w *workload) streamAction(session *bench.Session) bench.Action {
 				return ctx.Err()
 			}
 
+			session, err := b.Session(ctx)
+			if err != nil {
+				return fmt.Errorf("open TPC-H stream session: %w", err)
+			}
+
 			name := queryNames[number-1]
 			body, _ := w.sql.Query(name, "body")
 
@@ -76,7 +81,7 @@ func (w *workload) streamAction(session *bench.Session) bench.Action {
 				stream.started = start
 			}
 
-			_, err := session.RawRows(ctx, body, stream.Parameters[name])
+			_, err = session.RawRows(ctx, body, stream.Parameters[name])
 			stream.finished = time.Now()
 			elapsed := stream.finished.Sub(start).Seconds() * 1000
 			w.recordAttempt(ctx, name, elapsed, err != nil)
@@ -85,11 +90,9 @@ func (w *workload) streamAction(session *bench.Session) bench.Action {
 			if err != nil {
 				stream.Errors++
 
-				if failure := w.streamQueryError(ctx, err); failure != nil {
+				if failure := w.streamQueryError(ctx, b, session, name, err); failure != nil {
 					return failure
 				}
-
-				b.RecordError(name, err)
 
 				continue
 			}
@@ -105,14 +108,28 @@ func (w *workload) streamAction(session *bench.Session) bench.Action {
 	}
 }
 
-func (w *workload) streamQueryError(ctx context.Context, err error) error {
+func (w *workload) streamQueryError(
+	ctx context.Context, b *bench.Bench, session *bench.Session, name string, err error,
+) error {
 	w.queryFailures.Store(true)
 
 	if w.refresh != nil {
 		return bench.Fatal(err)
 	}
 
-	return ctx.Err()
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	b.RecordError(name, err)
+
+	if errors.Is(err, bench.ErrSessionInvalidated) {
+		if err := session.Close(ctx); err != nil {
+			return fmt.Errorf("close invalidated TPC-H stream session: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (w *workload) streamContribution(snapshot bench.ReportContext) (bench.ReportContribution, error) {

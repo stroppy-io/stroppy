@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Fixed
+
+- TPC-H query-only streams replace lost sessions before running later queries, keeping the original query failure without reporting unexecuted queries as database errors. ([#283](https://github.com/stroppy-io/stroppy/pull/283))
+
 ## [6.4.0] - 2026-11-12
 
 ### Added
