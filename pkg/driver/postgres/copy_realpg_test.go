@@ -47,6 +47,24 @@ func TestCopyTextRealPostgres(t *testing.T) {
 	require.True(t, valid)
 }
 
+func TestCopyTextNegativeZero(t *testing.T) {
+	d := realPGDriver(t, 2)
+	execSQL(t, d, `CREATE TEMP TABLE copy_negative_zero (r real, d double precision, i integer)`)
+
+	src := &fakeSource{
+		cols: []string{"r", "d", "i"},
+		rows: [][]any{{"-0", "-0", "-0"}, {"-000", "-000", "-000"}},
+	}
+	require.NoError(t, d.copyFromRuntime(t.Context(), "copy_negative_zero", src))
+
+	var valid bool
+	queryOneRow(t, d, `SELECT count(*) = 2 AND bool_and(
+		encode(float4send(r), 'hex') = '80000000'
+		AND encode(float8send(d), 'hex') = '8000000000000000' AND i = 0)
+		FROM copy_negative_zero`, &valid)
+	require.True(t, valid)
+}
+
 func TestCopyTextFailureRollsBack(t *testing.T) {
 	d := realPGDriver(t, 2)
 	execSQL(t, d, `CREATE TEMP TABLE copy_text_failure (amount integer)`)

@@ -45,6 +45,25 @@ func TestCopyTextBinaryEncoding(t *testing.T) {
 	}
 }
 
+func TestCopyTextNegativeZeroFallback(t *testing.T) {
+	t.Parallel()
+
+	for _, text := range []string{"-0", "-000"} {
+		value := copyText(text)
+		_, err := value.Int64Value()
+		require.ErrorIs(t, err, errCopyNegativeZero)
+
+		for _, oid := range []uint32{pgtype.Float4OID, pgtype.Float8OID} {
+			m := pgtype.NewMap()
+			_, err := m.Encode(oid, pgtype.BinaryFormatCode, value, nil)
+			require.ErrorIs(t, err, errCopyNegativeZero)
+			buf, err := m.Encode(oid, pgtype.TextFormatCode, value, nil)
+			require.NoError(t, err)
+			require.Equal(t, text, string(buf))
+		}
+	}
+}
+
 func TestCopyRowSourceValues(t *testing.T) {
 	t.Parallel()
 
