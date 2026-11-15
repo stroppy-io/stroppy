@@ -202,9 +202,74 @@ checked-in dialect files for the exact rewrites.
 
 ## Benchmark coverage
 
-This workload provides the database load, serial power-query, and concurrent
-query-stream building blocks. It does not implement the TPC-DS data-maintenance
-phases or compute QphDS@SF.
+Ordinary runs retain the load and query-only behavior above. Opt into the complete
+execution sequence on PostgreSQL, Greenplum-family servers (`--sql-dialect gp`),
+MySQL, or MariaDB (`--sql-dialect mariadb`):
+
+```bash
+./build/stroppy run tpcds -d pg -D url=postgres://... \
+  --benchmark=true --scale-factor 1 --streams 4
+```
+
+`--benchmark=true` uses one power stream, then `Sq` concurrent streams,
+maintenance test 1, another `Sq` streams, and maintenance test 2, without reloading
+or changing the selected database. `--streams` defaults to 4 in this mode and must
+be even and at least 4. Each query stream runs all 99 query IDs (103 statements)
+once on its own retained session, in Appendix D order. The normal executor,
+iteration, and VU settings must remain at their single-iteration defaults.
+Custom schema/query files, explicit `--query-stream`, and unlogged loading are
+rejected before setup. Query substitutions use the existing reproducible
+`--query-seed` generator, not certified reference-dsqgen substitutions.
+
+The native dsdgen implementation generates refresh flat files before database
+loading. Generation is not timed as maintenance; reading/loading staging files,
+SQL transformations, deletes, and commits are timed. Each maintenance test applies
+`Sq/2` distinct numbered sets serially. All four delete functions precede the seven
+load functions, and each function has its own transaction. `tpcds.benchmark` in the
+JSON report records each attempted function's set, committed rows, elapsed seconds,
+and failure status, plus per-phase/per-stream query measurements.
+
+The generator follows kit 4.0.0 source-schema values, with specification-correct
+reason cardinalities. It corrects the kit's reused order IDs: refresh ticket/order
+ranges start after initial data and all earlier refresh sets, preserving
+sales/returns relationships and avoiding duplicate warehouse keys. Oracle tests
+normalize only these corrected IDs before comparing every remaining byte.
+
+**Maintenance permanently changes the dataset.** A database-side
+`stroppy_tpcds_refresh` marker rejects replay, wrong scale, and continuation after
+an incomplete or ambiguous set. Fresh loads start at set 1. Continue existing data
+only with explicit `--refresh-set` from the preceding successful report:
+
+```bash
+./build/stroppy run tpcds -d pg -D url=postgres://... \
+  --benchmark=true --scale-factor 1 --streams 4 --refresh-set 5 \
+  --steps generate_maintenance,prepare_maintenance,maintenance_1,maintenance_2
+```
+
+`next_set` is omitted after a failed run. Earlier successful functions can remain
+committed; reload or reconcile rather than replaying a failed set. A fresh benchmark
+load resets the marker. Do not drop the marker while retaining maintained data.
+
+The report includes `sq`, `scale_factor`, `t_ld`, `t_pt`, `t_tt`, and `t_dm` in
+**decimal hours**, with `qphds_at_sf` calculated as:
+
+```text
+Q = Sq * 99
+T_PT = T_Power * Sq
+T_TT = T_Throughput1 + T_Throughput2
+T_DM = T_Maintenance1 + T_Maintenance2
+T_LD = 0.01 * Sq * T_Load
+QphDS@SF = floor(SF * Q / (T_PT * T_TT * T_DM * T_LD)^(1/4))
+```
+
+`sequence_valid` is true only for a complete successful fresh-load sequence.
+Filtering phases, continuing an existing dataset, query errors/timeouts,
+maintenance failures, and cancellation withhold the score. A score is an execution
+measurement, **not a certified TPC result**: `tpc_compliant` remains false. Fractional
+scales are development measurements; pricing, audit, accessibility testing, and
+reference-generator substitution compliance are not established. Cloud consumers
+must require `sequence_valid` and a present score, and retain the scale factor when
+comparing results.
 
 ## Run shapes and two-pass runs
 

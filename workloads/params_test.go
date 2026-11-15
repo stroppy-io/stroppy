@@ -38,15 +38,17 @@ func TestBuiltInWorkloadParameterSchemas(t *testing.T) {
 		{"tpcc/procs", tpccParamSchema()},
 		{"tpcc/tx", tpccParamSchema()},
 		{"tpcds", []bench.ParamSchema{
+			param("benchmark", bench.ParamTypeBool, false, "BENCHMARK", "benchmark"),
 			param("load-workers", bench.ParamTypeInt, 0, "LOAD_WORKERS", "loadWorkers"),
 			param("pg-unlogged", bench.ParamTypeBool, false, "PG_UNLOGGED", "pgUnlogged"),
 			param("query-seed", bench.ParamTypeInt64, int64(19620718), "QUERY_SEED", "querySeed"),
 			param("query-stream", bench.ParamTypeInt, 0, "QUERY_STREAM", "queryStream"),
+			tpcDSRefreshSetParam(),
 			param("scale-factor", bench.ParamTypeFloat64, float64(1), "SCALE_FACTOR", "scaleFactor"),
 			param("schema-file", bench.ParamTypeString, "", "SCHEMA_FILE", "schemaFile"),
 			mppDialectParam("mariadb"),
 			param("sql-file", bench.ParamTypeString, "", "SQL_FILE", "sqlFile"),
-			param("streams", bench.ParamTypeInt, 1, "STREAMS", "streams"),
+			boundedIntParam("streams", 1, "STREAMS", "streams", 1),
 			param("validate-force", bench.ParamTypeBool, false, "VALIDATE_FORCE", "validateForce"),
 			param("ydb-store-mode", bench.ParamTypeString, "column", "YDB_STORE_MODE", "ydbStoreMode"),
 		}},
@@ -152,6 +154,13 @@ func picodataLimitParam(name, env, config string) bench.ParamSchema {
 	limit.Constraints = []bench.Constraint{{Kind: "max", Value: uint64(1<<63 - 1)}}
 
 	return limit
+}
+
+func tpcDSRefreshSetParam() bench.ParamSchema {
+	value := param("refresh-set", bench.ParamTypeInt64, int64(1), "REFRESH_SET", "refreshSet")
+	value.Constraints = []bench.Constraint{{Kind: "min", Value: int64(1)}}
+
+	return value
 }
 
 func tpchRefreshSetParam() bench.ParamSchema {
