@@ -10,6 +10,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+## [6.4.1] - 2026-11-15
+
 ### Added
 
 - TPC-DS can run transactional data maintenance and the full load/power/throughput sequence with `--benchmark=true`, reporting QphDS@SF and its timing terms only for complete successful runs. ([#287](https://github.com/stroppy-io/stroppy/pull/287))
