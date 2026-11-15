@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -50,8 +51,10 @@ type workload struct {
 	seed       int64
 	genStream  int // QUERY_STREAM value (<0 = unset → baked)
 
-	validation validationReport
-	metrics    map[string]*queryMetrics
+	validation     validationReport
+	metrics        map[string]*queryMetrics
+	benchmark      *benchmarkState
+	maintenanceSQL *bench.SQL
 }
 
 type namedQuery struct {
@@ -74,12 +77,18 @@ func tpcdsSupported(dt bench.DriverTypeName) bool { return dt != bench.DriverCRD
 func define(d *bench.Def) error {
 	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
 	w := &workload{}
+	benchmark, _ := d.Param.Bool("benchmark", false,
+		"Run load, power, two throughput tests and data maintenance; report QphDS@SF.")
+	refreshSet, refreshInfo := d.Param.Int64("refresh-set", 1,
+		"First maintenance set; required when continuing existing data.", bench.Min(int64(1)))
+	streamDefault := benchmarkStreamDefault(benchmark)
+
 	d.Report.Contribute("tpcds.validation", 1, w.validationContribution)
 	w.scaleFactor, _ = d.Param.Float64("scale-factor", 1, "TPC-DS scale factor.")
 	w.loadWorkers, _ = d.Param.Int("load-workers", 0, "Workers used to load each table.")
 	w.useUnlogged, _ = d.Param.Bool("pg-unlogged", false, "Use unlogged tables while loading.")
 	w.ydbStoreMode, _ = d.Param.String("ydb-store-mode", "column", "YDB table store mode.")
-	w.streams, _ = d.Param.Int("streams", 1, "Number of query streams.")
+	w.streams, _ = d.Param.Int("streams", streamDefault, "Number of query streams.", bench.Min(1))
 	w.seed, _ = d.Param.Int64("query-seed", 19620718, "Query generator seed.")
 	stream, streamInfo := d.Param.Int("query-stream", 0, "Query stream to generate.")
 
@@ -138,7 +147,7 @@ func define(d *bench.Def) error {
 		return errGeneratedStreamsUnsupported
 	}
 
-	if streamsWanted {
+	if streamsWanted && !benchmark {
 		if _, err := w.streamQueries(max(w.genStream, 0)); err != nil {
 			return err
 		}
@@ -176,36 +185,75 @@ func define(d *bench.Def) error {
 	}
 
 	w.metrics = declareQueryMetrics(&d.Metrics, w.querySQL.Names(""))
+	if benchmark {
+		if err := w.configureBenchmark(d, settings, refreshSet, refreshInfo.Explicit()); err != nil {
+			return err
+		}
+	}
+
+	if benchmark {
+		step("generate_maintenance", w.generateMaintenance)
+
+		if w.benchmark.directory != "" {
+			defer os.RemoveAll(w.benchmark.directory)
+		}
+	}
 
 	step("drop_schema", w.drop)
 	step("create_schema", w.create)
 
-	if w.useUnlogged {
-		step("set_unlogged", w.unlogged)
+	w.executeLoad(d, dialectChoice.Step)
+
+	if benchmark {
+		w.executeBenchmark(d, dialectChoice.Step)
+	} else {
+		step("workload", w.work, settings.Policy())
 	}
-
-	step("load_data", w.load)
-	section := schemaSection{w, "create_indexes"}
-	step(section.name, section.Run)
-
-	if w.useUnlogged {
-		step("set_logged", w.logged)
-	}
-
-	step("analyze", w.analyzeAction)
-
-	if !w.throughput && w.genStream < 0 && answerValidationSupported(w.driver) {
-		step("validate_answers", w.validate)
-	}
-
-	step("workload", w.work, settings.Policy())
 
 	return d.Execution.Err()
 }
 
-func (w *workload) drop(ctx context.Context, b *bench.Bench) error { return w.dropSchema(ctx, b)() }
+func (w *workload) executeLoad(d *bench.Def, wrap func(bench.Action) bench.Action) {
+	if w.useUnlogged {
+		d.Execution.Step("set_unlogged", wrap(w.unlogged))
+	}
 
-func (w *workload) create(ctx context.Context, b *bench.Bench) error { return w.createSchema(ctx, b)() }
+	d.Execution.Step("load_data", wrap(w.load))
+	section := schemaSection{w, "create_indexes"}
+	d.Execution.Step(section.name, wrap(section.Run))
+
+	if w.useUnlogged {
+		d.Execution.Step("set_logged", wrap(w.logged))
+	}
+
+	d.Execution.Step("analyze", wrap(w.analyzeAction))
+
+	if !w.throughput && w.genStream < 0 && answerValidationSupported(w.driver) {
+		d.Execution.Step("validate_answers", wrap(w.validate))
+	}
+}
+
+func (w *workload) drop(ctx context.Context, b *bench.Bench) error {
+	if w.benchmark != nil {
+		if err := b.Exec(ctx, "DROP TABLE IF EXISTS stroppy_tpcds_refresh", nil); err != nil {
+			return err
+		}
+	}
+
+	return w.dropSchema(ctx, b)()
+}
+
+func (w *workload) create(ctx context.Context, b *bench.Bench) error {
+	if err := w.createSchema(ctx, b)(); err != nil {
+		return err
+	}
+
+	if w.benchmark != nil {
+		return b.Exec(ctx, "DROP TABLE IF EXISTS stroppy_tpcds_refresh", nil)
+	}
+
+	return nil
+}
 
 func (w *workload) unlogged(ctx context.Context, b *bench.Bench) error {
 	return w.setUnlogged(ctx, b, "UNLOGGED")()
