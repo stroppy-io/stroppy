@@ -238,7 +238,8 @@ normalize only these corrected IDs before comparing every remaining byte.
 **Maintenance permanently changes the dataset.** A database-side
 `stroppy_tpcds_refresh` marker rejects replay, wrong scale, and continuation after
 an incomplete or ambiguous set. Fresh loads start at set 1. Continue existing data
-only with explicit `--refresh-set` from the preceding successful report:
+only with explicit `--refresh-set` from the preceding successful report and both
+`drop_schema` and `create_schema` disabled; inconsistent selections fail before setup:
 
 ```bash
 ./build/stroppy run tpcds -d pg -D url=postgres://... \

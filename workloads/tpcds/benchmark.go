@@ -23,7 +23,8 @@ var (
 	errBenchmarkOptions = errors.New("tpcds: benchmark needs pg/mysql, logged built-in schemas/queries, " +
 		"an even streams count >=4, and default single-iteration executor settings")
 	errBenchmarkFresh    = errors.New("tpcds: a fresh benchmark load requires refresh-set 1")
-	errBenchmarkExisting = errors.New("tpcds: existing data requires explicit refresh-set from prior report")
+	errBenchmarkExisting = errors.New("tpcds: existing data requires explicit refresh-set " +
+		"with drop_schema and create_schema disabled")
 )
 
 const benchmarkDisclaimer = "Execution metric only; pricing, audit and data-accessibility " +
@@ -97,7 +98,8 @@ func (w *workload) configureBenchmark(d *bench.Def, settings bench.RunSettings, 
 		return errBenchmarkFresh
 	}
 
-	if !d.Execution.Enabled("load_data") && !explicit {
+	if !d.Execution.Enabled("load_data") &&
+		(!explicit || d.Execution.Enabled("drop_schema") || d.Execution.Enabled("create_schema")) {
 		return errBenchmarkExisting
 	}
 

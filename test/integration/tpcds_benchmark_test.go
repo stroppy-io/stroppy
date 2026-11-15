@@ -230,6 +230,50 @@ INSERT INTO stroppy_tpcds_refresh VALUES (1, '0.01', 5, `+strconv.Itoa(active)+`
 	}
 }
 
+func TestTPCDSBenchmarkDeleteRollback(t *testing.T) {
+	pool := NewTmpfsPG(t)
+	ResetSchema(t, pool)
+
+	url := envOr(envTmpfsURL, defaultTmpfsURL)
+	runStroppy(t, time.Minute, "run", "tpcds", "-d", "pg", "-D", "url="+url, "--steps", "create_schema")
+
+	_, err := pool.Exec(t.Context(), `
+INSERT INTO date_dim (d_date_sk,d_date) VALUES (1,'2000-05-20');
+INSERT INTO catalog_sales (cs_item_sk,cs_order_number,cs_sold_date_sk) VALUES (1,1,1);
+INSERT INTO catalog_returns (cr_item_sk,cr_order_number) VALUES (1,1);
+CREATE FUNCTION reject_delete() RETURNS trigger AS $$ BEGIN
+ RAISE EXCEPTION 'sales delete rejected after returns deletion';
+END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER reject_delete BEFORE DELETE ON catalog_sales FOR EACH ROW EXECUTE FUNCTION reject_delete();`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	run, err := bench.RunTest(t.Context(), tpcds.Test, bench.RunOptions{
+		Drivers: map[string]bench.DriverConfig{"default": {Kind: bench.DriverPostgres, URL: url}},
+		Params: bench.ParamInputs{CLI: map[string]string{
+			"benchmark": "true", "scale-factor": "0.01", "refresh-set": "1",
+		}},
+		Steps:   []string{"generate_maintenance", "prepare_maintenance", "maintenance_1"},
+		Metrics: &bench.MetricsConfig{Quiet: true}, Report: &bench.ReportOptions{},
+	})
+	if err == nil || !strings.Contains(err.Error(), "sales delete rejected after returns deletion") {
+		t.Fatalf("delete failure: %v", err)
+	}
+
+	value := tpcdsBenchmarkData(t, run)
+	if value.Score != nil || value.NextSet != nil || len(value.Maintenance) != 1 ||
+		value.Maintenance[0].Function != "DF_CS" || value.Maintenance[0].Rows != 0 {
+		t.Fatalf("failed delete report: %+v", value)
+	}
+
+	for _, table := range []string{"catalog_sales", "catalog_returns"} {
+		if count := CountRows(t, pool, table); count != 1 {
+			t.Fatalf("%s rows after rollback: %d", table, count)
+		}
+	}
+}
+
 func TestTPCDSBenchmarkRefreshFailure(t *testing.T) {
 	for _, cancelRun := range []bool{false, true} {
 		t.Run(fmt.Sprintf("cancel=%v", cancelRun), func(t *testing.T) {

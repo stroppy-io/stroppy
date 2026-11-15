@@ -82,6 +82,34 @@ func TestBenchmarkInvalidSelection(t *testing.T) {
 	}
 }
 
+func TestBenchmarkContinuationSelection(t *testing.T) {
+	catalog, err := bench.NewCatalog(Test)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, selection := range []struct {
+		noSteps []string
+		valid   bool
+	}{
+		{[]string{"load_data"}, false},
+		{[]string{"load_data", "drop_schema"}, false},
+		{[]string{"load_data", "create_schema"}, false},
+		{[]string{"load_data", "drop_schema", "create_schema"}, true},
+	} {
+		_, err := catalog.ResolveRun("tpcds", bench.RunOptions{
+			Drivers: map[string]bench.DriverConfig{"": {Kind: bench.DriverPostgres}},
+			Params: bench.ParamInputs{CLI: map[string]string{
+				"benchmark": "true", "refresh-set": "3",
+			}},
+			NoSteps: selection.noSteps,
+		})
+		if (err == nil) != selection.valid {
+			t.Fatalf("no-steps %v: %v", selection.noSteps, err)
+		}
+	}
+}
+
 func benchmarkReportFixture() (*workload, bench.ReportContext) {
 	w := &workload{streams: 4, benchmark: &benchmarkState{ScaleFactor: 1, Sq: 4, FirstSet: 1, NextSet: 5}}
 
