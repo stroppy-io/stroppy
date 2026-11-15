@@ -70,44 +70,49 @@ var CustomerDemographics = &Table{
 	},
 	Cols:     customerDemographicsCols,
 	RowCount: func(float64) int64 { return 1920800 },
-	Row: func(rowNumber int64, ss *streamSet, _ *Scaling) []any {
-		CreateNullBitMap(0, 0x1, ss.at(cdNulls))
-
-		index := rowNumber - 1
-
-		gender := cdGenderDist.ValueForIndexModSize(index, 0)
-		index /= int64(cdGenderDist.Size())
-
-		maritalStatus := cdMaritalStatusDist.ValueForIndexModSize(index, 0)
-		index /= int64(cdMaritalStatusDist.Size())
-
-		educationStatus := cdEducationDist.ValueForIndexModSize(index, 0)
-		index /= int64(cdEducationDist.Size())
-
-		purchaseEstimate, _ := strconv.ParseInt(cdPurchaseBandDist.ValueForIndexModSize(index, 0), 10, 64)
-		index /= int64(cdPurchaseBandDist.Size())
-
-		creditRating := cdCreditRatingDist.ValueForIndexModSize(index, 0)
-		index /= int64(cdCreditRatingDist.Size())
-
-		depCount := index % cdMaxChildren
-		index /= cdMaxChildren
-
-		depEmployedCount := index % cdMaxEmployed
-		index /= cdMaxEmployed
-
-		depCollegeCount := index % cdMaxCollege
-
-		return []any{
-			rowNumber, // cd_demo_sk
-			gender,
-			maritalStatus,
-			educationStatus,
-			purchaseEstimate,
-			creditRating,
-			depCount,
-			depEmployedCount,
-			depCollegeCount,
-		}
+	Row: func(rowNumber int64, ss *streamSet, sc *Scaling) []any {
+		return customerDemographicsRow(nil, rowNumber, ss, sc)
 	},
+	borrowedRow: customerDemographicsRow,
+}
+
+func customerDemographicsRow(dst []any, rowNumber int64, ss *streamSet, _ *Scaling) []any {
+	CreateNullBitMap(0, 0x1, ss.at(cdNulls))
+
+	index := rowNumber - 1
+
+	gender := cdGenderDist.ValueForIndexModSize(index, 0)
+	index /= int64(cdGenderDist.Size())
+
+	maritalStatus := cdMaritalStatusDist.ValueForIndexModSize(index, 0)
+	index /= int64(cdMaritalStatusDist.Size())
+
+	educationStatus := cdEducationDist.ValueForIndexModSize(index, 0)
+	index /= int64(cdEducationDist.Size())
+
+	purchaseEstimate, _ := strconv.ParseInt(cdPurchaseBandDist.ValueForIndexModSize(index, 0), 10, 64)
+	index /= int64(cdPurchaseBandDist.Size())
+
+	creditRating := cdCreditRatingDist.ValueForIndexModSize(index, 0)
+	index /= int64(cdCreditRatingDist.Size())
+
+	depCount := index % cdMaxChildren
+	index /= cdMaxChildren
+
+	depEmployedCount := index % cdMaxEmployed
+	index /= cdMaxEmployed
+
+	depCollegeCount := index % cdMaxCollege
+
+	return append(dst,
+		rowValue(ss.values, rowNumber),
+		rowValue(ss.values, gender),
+		rowValue(ss.values, maritalStatus),
+		rowValue(ss.values, educationStatus),
+		rowValue(ss.values, purchaseEstimate),
+		rowValue(ss.values, creditRating),
+		rowValue(ss.values, depCount),
+		rowValue(ss.values, depEmployedCount),
+		rowValue(ss.values, depCollegeCount),
+	)
 }

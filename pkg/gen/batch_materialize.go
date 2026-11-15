@@ -16,6 +16,14 @@ package gen
 // i must be a valid row index in [0, b.Len()); the caller (the driver
 // adapter) guarantees this by draining the cursor in order.
 func (b *Batch) MaterializeRow(i int, dst []any) {
+	b.MaterializeRowWithBytes(i, dst, nil)
+}
+
+// MaterializeRowWithBytes lets a synchronous consumer borrow byte cells without
+// copying them. Values passed to bytes remain valid only until the next fill or
+// reset of this batch; consumers retaining them must copy. A nil callback uses
+// the owning string representation of MaterializeRow.
+func (b *Batch) MaterializeRowWithBytes(i int, dst []any, bytes func(int, []byte) any) {
 	for c := range b.cols {
 		col := &b.cols[c]
 		if col.nulls[i] {
@@ -35,8 +43,13 @@ func (b *Batch) MaterializeRow(i int, dst []any) {
 			dst[c] = col.times[i] //nolint:gosec // G602: i is caller-bounded to [0,b.Len())
 		case KindBytes:
 			start := int(col.boff[i])
+
 			end := start + int(col.blens[i])
-			dst[c] = string(col.bytes[start:end]) //nolint:gosec // G602: dst len >= Schema.Columns() by caller contract
+			if bytes != nil {
+				dst[c] = bytes(c, col.bytes[start:end]) //nolint:gosec // dst and row indices are caller-bounded.
+			} else {
+				dst[c] = string(col.bytes[start:end]) //nolint:gosec // dst and row indices are caller-bounded.
+			}
 		}
 	}
 }

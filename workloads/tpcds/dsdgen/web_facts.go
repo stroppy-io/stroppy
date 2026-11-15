@@ -197,22 +197,22 @@ func wrtNullAt(nullBitMap int64, globalCol int) bool {
 
 // webKeyOrNull renders a surrogate-key value, suppressed to nil when the column is
 // nulled or the key is -1 (getStringOrNullForKey).
-func webKeyOrNull(nullAt func(int64, int) bool, nb int64, globalCol int, v int64) any {
+func webKeyOrNull(values *rowValues, nullAt func(int64, int) bool, nb int64, globalCol int, v int64) any {
 	if nullAt(nb, globalCol) || v == -1 {
 		return nil
 	}
 
-	return v
+	return rowValue(values, v)
 }
 
 // webValOrNull renders a non-key value, suppressed to nil when the column is nulled
 // (getStringOrNull).
-func webValOrNull(nullAt func(int64, int) bool, nb int64, globalCol int, v any) any {
+func webValOrNull[T rowScalar](values *rowValues, nullAt func(int64, int) bool, nb int64, globalCol int, v T) any {
 	if nullAt(nb, globalCol) {
 		return nil
 	}
 
-	return v
+	return rowValue(values, v)
 }
 
 // webGenerateOrderInfo draws all order-level join keys for a new web order, in
@@ -246,14 +246,14 @@ func webGenerateOrderInfo(orderNumber int64, sss *streamSet, sc *Scaling) webOrd
 }
 
 // newWebLineGen builds the shared per-stream line generator for the web channel.
-func newWebLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
+func newWebLineGen(sss, srs *streamSet, sc *Scaling) factLineGen {
 	itemCount := int(sc.IDCount(TItem))
 	var itemPermutation []int
 	var remainingLineItems int
 	var order webOrderInfo
 	var itemIndex int
 
-	return func(ticket int64) ([]any, []any, bool) {
+	return func(ticket int64, salesBuffer, returnsBuffer []any) ([]any, []any, bool) {
 		if itemPermutation == nil {
 			itemPermutation = MakePermutation(itemCount, sss.at(wslPermutation))
 		}
@@ -283,11 +283,11 @@ func newWebLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
 		promoSk := GenerateJoinKey(TWebSales, JCNone, sss.at(wslPromoSk), TPromotion, 1, sc)
 		pricing := GeneratePricingForSales(WebPricingLimits, sss.at(wslPricing))
 
-		sales := buildWebSalesRow(nullBitMap, order, shipDateSk, itemSk, webPageSk, webSiteSk, shipModeSk, warehouseSk, promoSk, pricing)
+		sales := buildWebSalesRow(salesBuffer, sss.values, nullBitMap, order, shipDateSk, itemSk, webPageSk, webSiteSk, shipModeSk, warehouseSk, promoSk, pricing)
 
 		var returns []any
 		if GenerateUniformRandomInt(0, 99, sss.at(wslIsReturned)) < webReturnPercent {
-			returns = buildWebReturnsRow(srs, sc, order, itemSk, webPageSk, shipDateSk, pricing)
+			returns = buildWebReturnsRow(returnsBuffer, srs, sc, order, itemSk, webPageSk, shipDateSk, pricing)
 		}
 
 		remainingLineItems--
@@ -297,11 +297,11 @@ func newWebLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
 }
 
 // buildWebSalesRow renders one web_sales row in WebSalesRow.getValues order.
-func buildWebSalesRow(nb int64, order webOrderInfo, shipDateSk, itemSk, webPageSk, webSiteSk, shipModeSk, warehouseSk, promoSk int64, p Pricing) []any {
-	k := func(globalCol int, v int64) any { return webKeyOrNull(wslNullAt, nb, globalCol, v) }
-	d := func(globalCol int, v Decimal) any { return webValOrNull(wslNullAt, nb, globalCol, v) }
+func buildWebSalesRow(dst []any, values *rowValues, nb int64, order webOrderInfo, shipDateSk, itemSk, webPageSk, webSiteSk, shipModeSk, warehouseSk, promoSk int64, p Pricing) []any {
+	k := func(globalCol int, v int64) any { return webKeyOrNull(values, wslNullAt, nb, globalCol, v) }
+	d := func(globalCol int, v Decimal) any { return webValOrNull(values, wslNullAt, nb, globalCol, v) }
 
-	return []any{
+	return append(dst,
 		k(409, order.soldDateSk),
 		k(410, order.soldTimeSk),
 		k(411, shipDateSk),
@@ -320,7 +320,7 @@ func buildWebSalesRow(nb int64, order webOrderInfo, shipDateSk, itemSk, webPageS
 		k(424, warehouseSk),
 		k(425, promoSk),
 		k(426, order.orderNumber),
-		webValOrNull(wslNullAt, nb, 427, int64(p.Quantity)),
+		webValOrNull(values, wslNullAt, nb, 427, int64(p.Quantity)),
 		d(428, p.WholesaleCost),
 		d(429, p.ListPrice),
 		d(430, p.SalesPrice),
@@ -336,12 +336,12 @@ func buildWebSalesRow(nb int64, order webOrderInfo, shipDateSk, itemSk, webPageS
 		d(440, p.NetPaidIncludingShipping),
 		d(441, p.NetPaidIncludingShippingAndTax),
 		d(442, p.NetProfit),
-	}
+	)
 }
 
 // buildWebReturnsRow ports WebReturnsRowGenerator.generateRow: it draws on the
 // returns streamSet (srs) and reuses the sales row's keys/pricing.
-func buildWebReturnsRow(srs *streamSet, sc *Scaling, order webOrderInfo, itemSk, webPageSk, shipDateSk int64, salesPricing Pricing) []any {
+func buildWebReturnsRow(dst []any, srs *streamSet, sc *Scaling, order webOrderInfo, itemSk, webPageSk, shipDateSk int64, salesPricing Pricing) []any {
 	nb := CreateNullBitMap(webReturnsNullBasis, webReturnsNotNullBitMap, srs.at(wrtNulls))
 
 	returnedDateSk := GenerateJoinKey(TWebReturns, JCNone, srs.at(wrtReturnedDateSk), TDateDim, shipDateSk, sc)
@@ -368,10 +368,11 @@ func buildWebReturnsRow(srs *streamSet, sc *Scaling, order webOrderInfo, itemSk,
 	quantity := GenerateUniformRandomInt(1, salesPricing.Quantity, srs.at(wrtPricing))
 	p := GeneratePricingForReturns(srs.at(wrtPricing), quantity, salesPricing)
 
-	k := func(globalCol int, v int64) any { return webKeyOrNull(wrtNullAt, nb, globalCol, v) }
-	d := func(globalCol int, v Decimal) any { return webValOrNull(wrtNullAt, nb, globalCol, v) }
+	values := srs.values
+	k := func(globalCol int, v int64) any { return webKeyOrNull(values, wrtNullAt, nb, globalCol, v) }
+	d := func(globalCol int, v Decimal) any { return webValOrNull(values, wrtNullAt, nb, globalCol, v) }
 
-	return []any{
+	return append(dst,
 		k(383, returnedDateSk),
 		k(384, returnedTimeSk),
 		k(385, itemSk),
@@ -386,7 +387,7 @@ func buildWebReturnsRow(srs *streamSet, sc *Scaling, order webOrderInfo, itemSk,
 		k(394, webPageSk),
 		k(395, reasonSk),
 		k(396, order.orderNumber),
-		webValOrNull(wrtNullAt, nb, 397, int64(p.Quantity)),
+		webValOrNull(values, wrtNullAt, nb, 397, int64(p.Quantity)),
 		d(398, p.NetPaid),
 		d(399, p.ExtTax),
 		d(400, p.NetPaidIncludingTax),
@@ -396,7 +397,7 @@ func buildWebReturnsRow(srs *streamSet, sc *Scaling, order webOrderInfo, itemSk,
 		d(404, p.ReversedCharge),
 		d(405, p.StoreCredit),
 		d(406, p.NetLoss),
-	}
+	)
 }
 
 // WebSales is the TPC-DS web_sales fact table (the order/parent side).

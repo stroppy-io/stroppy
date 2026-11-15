@@ -191,21 +191,21 @@ type catalogOrderInfo struct {
 }
 
 // catKeyOrNull renders a join-key surrogate column: empty for null or -1.
-func catKeyOrNull(value int64, globalCol int, nullBitMap int64, firstCol int) any {
+func catKeyOrNull(values *rowValues, value int64, globalCol int, nullBitMap int64, firstCol int) any {
 	if catalogIsNull(globalCol, nullBitMap, firstCol) || value == -1 {
 		return nil
 	}
 
-	return value
+	return rowValue(values, value)
 }
 
 // catValOrNull renders a non-key column (kept regardless of -1): empty if nulled.
-func catValOrNull(value any, globalCol int, nullBitMap int64, firstCol int) any {
+func catValOrNull[T rowScalar](values *rowValues, value T, globalCol int, nullBitMap int64, firstCol int) any {
 	if catalogIsNull(globalCol, nullBitMap, firstCol) {
 		return nil
 	}
 
-	return value
+	return rowValue(values, value)
 }
 
 func catalogIsNull(globalCol int, nullBitMap int64, firstCol int) bool {
@@ -216,7 +216,7 @@ func catalogIsNull(globalCol int, nullBitMap int64, firstCol int) bool {
 
 // newCatalogLineGen builds the shared per-stream line generator for the catalog
 // channel. It mirrors CatalogSalesRowGenerator.generateRowAndChildRows.
-func newCatalogLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
+func newCatalogLineGen(sss, srs *streamSet, sc *Scaling) factLineGen {
 	itemCount := int(sc.IDCount(TItem))
 
 	var (
@@ -228,7 +228,7 @@ func newCatalogLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
 		order           catalogOrderInfo
 	)
 
-	return func(ticket int64) ([]any, []any, bool) {
+	return func(ticket int64, salesBuffer, returnsBuffer []any) ([]any, []any, bool) {
 		if itemPermutation == nil {
 			itemPermutation = MakePermutation(itemCount, sss.at(csPermute))
 			// skipDaysUntilFirstRowOfChunk for the full-table (chunk 1) start:
@@ -274,42 +274,42 @@ func newCatalogLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
 
 		nb := nullBitMap
 		fc := catalogSalesFirstColumn
-		sales := []any{
-			catKeyOrNull(order.soldDateSk, 75, nb, fc),
-			catKeyOrNull(order.soldTimeSk, 76, nb, fc),
-			catKeyOrNull(shipDateSk, 77, nb, fc),
-			catKeyOrNull(order.billCustomerSk, 78, nb, fc),
-			catKeyOrNull(order.billCdemoSk, 79, nb, fc),
-			catKeyOrNull(order.billHdemoSk, 80, nb, fc),
-			catKeyOrNull(order.billAddrSk, 81, nb, fc),
-			catKeyOrNull(order.shipCustomerSk, 82, nb, fc),
-			catKeyOrNull(order.shipCdemoSk, 83, nb, fc),
-			catKeyOrNull(order.shipHdemoSk, 84, nb, fc),
-			catKeyOrNull(order.shipAddrSk, 85, nb, fc),
-			catKeyOrNull(order.callCenterSk, 86, nb, fc),
-			catKeyOrNull(catalogPageSk, 87, nb, fc),
-			catKeyOrNull(shipModeSk, 88, nb, fc),
-			catValOrNull(warehouseSk, 89, nb, fc),
-			catKeyOrNull(soldItemSk, 90, nb, fc),
-			catKeyOrNull(promoSk, 91, nb, fc),
-			catValOrNull(order.orderNumber, 92, nb, fc),
-			catValOrNull(pricing.Quantity, 93, nb, fc),
-			catValOrNull(pricing.WholesaleCost, 94, nb, fc),
-			catValOrNull(pricing.ListPrice, 95, nb, fc),
-			catValOrNull(pricing.SalesPrice, 96, nb, fc),
-			catValOrNull(pricing.ExtDiscountAmount, 99, nb, fc),
-			catValOrNull(pricing.ExtSalesPrice, 98, nb, fc),
-			catValOrNull(pricing.ExtWholesaleCost, 100, nb, fc),
-			catValOrNull(pricing.ExtListPrice, 101, nb, fc),
-			catValOrNull(pricing.ExtTax, 102, nb, fc),
-			catValOrNull(pricing.CouponAmount, 97, nb, fc),
-			catValOrNull(pricing.ExtShipCost, 103, nb, fc),
-			catValOrNull(pricing.NetPaid, 104, nb, fc),
-			catValOrNull(pricing.NetPaidIncludingTax, 105, nb, fc),
-			catValOrNull(pricing.NetPaidIncludingShipping, 106, nb, fc),
-			catValOrNull(pricing.NetPaidIncludingShippingAndTax, 107, nb, fc),
-			catValOrNull(pricing.NetProfit, 108, nb, fc),
-		}
+		sales := append(salesBuffer,
+			catKeyOrNull(sss.values, order.soldDateSk, 75, nb, fc),
+			catKeyOrNull(sss.values, order.soldTimeSk, 76, nb, fc),
+			catKeyOrNull(sss.values, shipDateSk, 77, nb, fc),
+			catKeyOrNull(sss.values, order.billCustomerSk, 78, nb, fc),
+			catKeyOrNull(sss.values, order.billCdemoSk, 79, nb, fc),
+			catKeyOrNull(sss.values, order.billHdemoSk, 80, nb, fc),
+			catKeyOrNull(sss.values, order.billAddrSk, 81, nb, fc),
+			catKeyOrNull(sss.values, order.shipCustomerSk, 82, nb, fc),
+			catKeyOrNull(sss.values, order.shipCdemoSk, 83, nb, fc),
+			catKeyOrNull(sss.values, order.shipHdemoSk, 84, nb, fc),
+			catKeyOrNull(sss.values, order.shipAddrSk, 85, nb, fc),
+			catKeyOrNull(sss.values, order.callCenterSk, 86, nb, fc),
+			catKeyOrNull(sss.values, catalogPageSk, 87, nb, fc),
+			catKeyOrNull(sss.values, shipModeSk, 88, nb, fc),
+			catValOrNull(sss.values, warehouseSk, 89, nb, fc),
+			catKeyOrNull(sss.values, soldItemSk, 90, nb, fc),
+			catKeyOrNull(sss.values, promoSk, 91, nb, fc),
+			catValOrNull(sss.values, order.orderNumber, 92, nb, fc),
+			catValOrNull(sss.values, pricing.Quantity, 93, nb, fc),
+			catValOrNull(sss.values, pricing.WholesaleCost, 94, nb, fc),
+			catValOrNull(sss.values, pricing.ListPrice, 95, nb, fc),
+			catValOrNull(sss.values, pricing.SalesPrice, 96, nb, fc),
+			catValOrNull(sss.values, pricing.ExtDiscountAmount, 99, nb, fc),
+			catValOrNull(sss.values, pricing.ExtSalesPrice, 98, nb, fc),
+			catValOrNull(sss.values, pricing.ExtWholesaleCost, 100, nb, fc),
+			catValOrNull(sss.values, pricing.ExtListPrice, 101, nb, fc),
+			catValOrNull(sss.values, pricing.ExtTax, 102, nb, fc),
+			catValOrNull(sss.values, pricing.CouponAmount, 97, nb, fc),
+			catValOrNull(sss.values, pricing.ExtShipCost, 103, nb, fc),
+			catValOrNull(sss.values, pricing.NetPaid, 104, nb, fc),
+			catValOrNull(sss.values, pricing.NetPaidIncludingTax, 105, nb, fc),
+			catValOrNull(sss.values, pricing.NetPaidIncludingShipping, 106, nb, fc),
+			catValOrNull(sss.values, pricing.NetPaidIncludingShippingAndTax, 107, nb, fc),
+			catValOrNull(sss.values, pricing.NetProfit, 108, nb, fc),
+		)
 
 		// Build the sales row record for the returns side.
 		salesRow := catalogSalesRecord{
@@ -330,7 +330,7 @@ func newCatalogLineGen(sss, srs *streamSet, sc *Scaling) FactLineGen {
 
 		var returns []any
 		if GenerateUniformRandomInt(0, 99, sss.at(crIsReturned)) < crReturnPercent {
-			returns = generateCatalogReturnsRow(srs, sc, salesRow)
+			returns = generateCatalogReturnsRow(returnsBuffer, srs, sc, salesRow)
 		}
 
 		remainingItems--
@@ -409,7 +409,7 @@ func generateCatalogOrderInfo(rowNumber int64, sss *streamSet, sc *Scaling, juli
 
 // generateCatalogReturnsRow ports CatalogReturnsRowGenerator.generateRow, drawing
 // on the returns streamSet (srs) and reusing the sales row's keys/pricing.
-func generateCatalogReturnsRow(srs *streamSet, sc *Scaling, sales catalogSalesRecord) []any {
+func generateCatalogReturnsRow(dst []any, srs *streamSet, sc *Scaling, sales catalogSalesRecord) []any {
 	nullBitMap := CreateNullBitMap(catalogReturnsNullBasis, catalogReturnsNotNullBitMp, srs.at(crNulls))
 
 	returningCustomerSk := GenerateJoinKey(TCatalogReturns, JCNone, srs.at(crReturningCustomerSk), TCustomer, 2, sc)
@@ -438,35 +438,35 @@ func generateCatalogReturnsRow(srs *streamSet, sc *Scaling, sales catalogSalesRe
 	nb := nullBitMap
 	fc := catalogReturnsFirstColumn
 
-	return []any{
-		catKeyOrNull(returnedDateSk, 46, nb, fc),
-		catKeyOrNull(returnedTimeSk, 47, nb, fc),
-		catKeyOrNull(sales.soldItemSk, 48, nb, fc),
-		catKeyOrNull(sales.billCustomerSk, 49, nb, fc),
-		catKeyOrNull(sales.billCdemoSk, 50, nb, fc),
-		catKeyOrNull(sales.billHdemoSk, 51, nb, fc),
-		catKeyOrNull(sales.billAddrSk, 52, nb, fc),
-		catKeyOrNull(returningCustomerSk, 53, nb, fc),
-		catKeyOrNull(returningCdemoSk, 54, nb, fc),
-		catKeyOrNull(returningHdemoSk, 55, nb, fc),
-		catKeyOrNull(returningAddrSk, 56, nb, fc),
-		catKeyOrNull(sales.callCenterSk, 57, nb, fc),
-		catKeyOrNull(sales.catalogPageSk, 58, nb, fc),
-		catKeyOrNull(shipModeSk, 59, nb, fc),
-		catKeyOrNull(warehouseSk, 60, nb, fc),
-		catKeyOrNull(reasonSk, 61, nb, fc),
-		catValOrNull(sales.orderNumber, 62, nb, fc),
-		catValOrNull(pricing.Quantity, 63, nb, fc),
-		catValOrNull(pricing.NetPaid, 64, nb, fc),
-		catValOrNull(pricing.ExtTax, 65, nb, fc),
-		catValOrNull(pricing.NetPaidIncludingTax, 66, nb, fc),
-		catValOrNull(pricing.Fee, 67, nb, fc),
-		catValOrNull(pricing.ExtShipCost, 68, nb, fc),
-		catValOrNull(pricing.RefundedCash, 69, nb, fc),
-		catValOrNull(pricing.ReversedCharge, 70, nb, fc),
-		catValOrNull(pricing.StoreCredit, 71, nb, fc),
-		catValOrNull(pricing.NetLoss, 72, nb, fc),
-	}
+	return append(dst,
+		catKeyOrNull(srs.values, returnedDateSk, 46, nb, fc),
+		catKeyOrNull(srs.values, returnedTimeSk, 47, nb, fc),
+		catKeyOrNull(srs.values, sales.soldItemSk, 48, nb, fc),
+		catKeyOrNull(srs.values, sales.billCustomerSk, 49, nb, fc),
+		catKeyOrNull(srs.values, sales.billCdemoSk, 50, nb, fc),
+		catKeyOrNull(srs.values, sales.billHdemoSk, 51, nb, fc),
+		catKeyOrNull(srs.values, sales.billAddrSk, 52, nb, fc),
+		catKeyOrNull(srs.values, returningCustomerSk, 53, nb, fc),
+		catKeyOrNull(srs.values, returningCdemoSk, 54, nb, fc),
+		catKeyOrNull(srs.values, returningHdemoSk, 55, nb, fc),
+		catKeyOrNull(srs.values, returningAddrSk, 56, nb, fc),
+		catKeyOrNull(srs.values, sales.callCenterSk, 57, nb, fc),
+		catKeyOrNull(srs.values, sales.catalogPageSk, 58, nb, fc),
+		catKeyOrNull(srs.values, shipModeSk, 59, nb, fc),
+		catKeyOrNull(srs.values, warehouseSk, 60, nb, fc),
+		catKeyOrNull(srs.values, reasonSk, 61, nb, fc),
+		catValOrNull(srs.values, sales.orderNumber, 62, nb, fc),
+		catValOrNull(srs.values, pricing.Quantity, 63, nb, fc),
+		catValOrNull(srs.values, pricing.NetPaid, 64, nb, fc),
+		catValOrNull(srs.values, pricing.ExtTax, 65, nb, fc),
+		catValOrNull(srs.values, pricing.NetPaidIncludingTax, 66, nb, fc),
+		catValOrNull(srs.values, pricing.Fee, 67, nb, fc),
+		catValOrNull(srs.values, pricing.ExtShipCost, 68, nb, fc),
+		catValOrNull(srs.values, pricing.RefundedCash, 69, nb, fc),
+		catValOrNull(srs.values, pricing.ReversedCharge, 70, nb, fc),
+		catValOrNull(srs.values, pricing.StoreCredit, 71, nb, fc),
+		catValOrNull(srs.values, pricing.NetLoss, 72, nb, fc),
+	)
 }
 
 var catalogTicketCount = func(sf float64) int64 { return NewScaling(sf).RowCount(TCatalogSales) }
