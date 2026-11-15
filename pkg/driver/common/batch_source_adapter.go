@@ -31,6 +31,7 @@ type BatchRowSource struct {
 	batch   *gen.Batch
 	pos     int
 	scratch []any
+	bytes   func(int, []byte) any
 }
 
 // NewBatchRowSource returns a RowSource backed by cur. columns is the
@@ -43,6 +44,11 @@ func NewBatchRowSource(cur gen.Cursor, columns []string, nCols int) *BatchRowSou
 		scratch: make([]any, nCols),
 	}
 }
+
+// BorrowBytes replaces byte-cell copying for consumers that finish encoding
+// each row before advancing the source. Returned values must not outlive the
+// next batch refill; consumers retaining them must copy.
+func (s *BatchRowSource) BorrowBytes(bytes func(int, []byte) any) { s.bytes = bytes }
 
 // Columns returns the emission-order column names.
 func (s *BatchRowSource) Columns() []string { return s.columns }
@@ -69,7 +75,7 @@ func (s *BatchRowSource) Next() ([]any, error) {
 		}
 	}
 
-	s.batch.MaterializeRow(s.pos, s.scratch)
+	s.batch.MaterializeRowWithBytes(s.pos, s.scratch, s.bytes)
 	s.pos++
 
 	return s.scratch, nil

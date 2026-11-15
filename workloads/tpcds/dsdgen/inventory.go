@@ -41,30 +41,35 @@ var Inventory = &Table{
 	Cols:     inventoryCols,
 	RowCount: func(sf float64) int64 { return NewScaling(sf).RowCount(TInventory) },
 	Row: func(rowNumber int64, ss *streamSet, sc *Scaling) []any {
-		nullBitMap := CreateNullBitMap(inventoryNullBasis, inventoryNotNullBitMap, ss.at(invNulls))
-
-		index := rowNumber - 1
-		itemCount := sc.IDCount(TItem)
-		itemSk := index%itemCount + 1
-		index /= itemCount
-
-		warehouseCount := sc.IDCount(TWarehouse)
-		warehouseSk := index%warehouseCount + 1
-		index /= warehouseCount
-
-		dateSk := int64(JulianDateMinimum) + index*7 // inventory is updated weekly
-		itemSk = MatchSurrogateKey(itemSk, dateSk, TItem, sc)
-
-		qty := GenerateUniformRandomInt(0, 1000, ss.at(invQuantityOnHand))
-
-		vals := []any{dateSk, itemSk, warehouseSk, int64(qty)}
-		// inv_date_sk, inv_item_sk, inv_warehouse_sk are key columns (nil on -1).
-		for i, key := range []bool{true, true, true, false} {
-			if invIsNull(nullBitMap, i) || (key && vals[i] == int64(-1)) {
-				vals[i] = nil
-			}
-		}
-
-		return vals
+		return inventoryRow(nil, rowNumber, ss, sc)
 	},
+	borrowedRow: inventoryRow,
+}
+
+func inventoryRow(dst []any, rowNumber int64, ss *streamSet, sc *Scaling) []any {
+	nullBitMap := CreateNullBitMap(inventoryNullBasis, inventoryNotNullBitMap, ss.at(invNulls))
+
+	index := rowNumber - 1
+	itemCount := sc.IDCount(TItem)
+	itemSk := index%itemCount + 1
+	index /= itemCount
+
+	warehouseCount := sc.IDCount(TWarehouse)
+	warehouseSk := index%warehouseCount + 1
+	index /= warehouseCount
+
+	dateSk := int64(JulianDateMinimum) + index*7 // inventory is updated weekly
+	itemSk = MatchSurrogateKey(itemSk, dateSk, TItem, sc)
+
+	qty := GenerateUniformRandomInt(0, 1000, ss.at(invQuantityOnHand))
+
+	for i, value := range [4]int64{dateSk, itemSk, warehouseSk, int64(qty)} {
+		if invIsNull(nullBitMap, i) || (i < 3 && value == -1) {
+			dst = append(dst, nil)
+		} else {
+			dst = append(dst, rowValue(ss.values, value))
+		}
+	}
+
+	return dst
 }
