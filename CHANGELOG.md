@@ -12,7 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
-- TPC-DS can run transactional data maintenance and the full load/power/throughput sequence with `--benchmark=true`, reporting QphDS@SF and its timing terms only for complete successful runs.
+- TPC-DS can run transactional data maintenance and the full load/power/throughput sequence with `--benchmark=true`, reporting QphDS@SF and its timing terms only for complete successful runs. ([#287](https://github.com/stroppy-io/stroppy/pull/287))
 
 ### Fixed
 
