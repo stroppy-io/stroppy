@@ -96,9 +96,41 @@ func NegateDecimal(d Decimal) Decimal { return Decimal{Precision: d.Precision, N
 // DecimalFromInteger wraps an int as a precision-0 decimal.
 func DecimalFromInteger(n int) Decimal { return Decimal{Precision: 0, Number: int64(n)} }
 
-// String renders the decimal the way print_decimal in print.c does: divide the
-// unscaled number by 10^precision in floating point, then format with the fixed
-// number of fractional digits.
+// AppendText preserves canonical rounding while avoiding float formatting when
+// the fixed-point coefficient is small enough to round exactly.
+func (d Decimal) AppendText(dst []byte) []byte {
+	// This bound keeps floating-point formatting's rounding below half an
+	// unscaled unit, so integer formatting preserves the canonical output.
+	const exactLimit = 1 << 40
+	if d.Precision >= 0 && d.Precision <= 6 && d.Number >= -exactLimit && d.Number <= exactLimit {
+		number := d.Number
+		if number < 0 {
+			dst = append(dst, '-')
+			number = -number
+		}
+		divisor := int64(1)
+		for range d.Precision {
+			divisor *= 10
+		}
+		dst = strconv.AppendInt(dst, number/divisor, 10)
+		if d.Precision == 0 {
+			return dst
+		}
+		dst = append(dst, '.')
+		for divisor /= 10; divisor > 0; divisor /= 10 {
+			dst = append(dst, byte(number/divisor%10)+'0')
+		}
+		return dst
+	}
+
+	temp := float64(d.Number)
+	for range d.Precision {
+		temp /= 10
+	}
+	return strconv.AppendFloat(dst, temp, 'f', d.Precision, 64)
+}
+
+// String matches print_decimal's floating-point division and fixed precision.
 func (d Decimal) String() string {
 	temp := float64(d.Number)
 	for i := 0; i < d.Precision; i++ {

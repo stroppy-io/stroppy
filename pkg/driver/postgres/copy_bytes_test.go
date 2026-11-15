@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"math/rand/v2"
+	"strconv"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -10,6 +12,37 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/driver/common"
 	"github.com/stroppy-io/stroppy/v6/pkg/gen"
 )
+
+func TestCopyBytesInt64Parity(t *testing.T) {
+	t.Parallel()
+
+	texts := []string{
+		"", "0", "-0", "+0", "-000", "123", "-123", "9223372036854775807", "-9223372036854775808",
+		"9223372036854775808", "1.5", " 1", "+", "0000000000000000000000001",
+	}
+
+	cases := make([]string, len(texts), len(texts)+10000)
+	copy(cases, texts)
+	texts = cases
+
+	rng := rand.New(rand.NewPCG(30, 40))
+	for range 10000 {
+		texts = append(texts, strconv.FormatInt(rng.Int64(), 10))
+	}
+
+	for _, text := range texts {
+		cell := copyBytes{data: []byte(text)}
+		got, err := cell.Int64Value()
+
+		want, wantErr := copyText(text).Int64Value()
+		if wantErr != nil {
+			require.EqualError(t, err, wantErr.Error(), text)
+		} else {
+			require.NoError(t, err, text)
+			require.Equal(t, want, got, text)
+		}
+	}
+}
 
 func TestBorrowCopyBytesMultipleTextColumns(t *testing.T) {
 	t.Parallel()

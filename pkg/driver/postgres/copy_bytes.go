@@ -18,6 +18,36 @@ func (v *copyBytes) TextValue() (pgtype.Text, error) {
 }
 
 func (v *copyBytes) Int64Value() (pgtype.Int8, error) {
+	data := v.data
+
+	negative := len(data) > 0 && data[0] == '-'
+	if negative || (len(data) > 0 && data[0] == '+') {
+		data = data[1:]
+	}
+	// Eighteen digits fit int64 without overflow checks; longer inputs retain
+	// strconv's range handling and diagnostics through the original conversion.
+	if len(data) > 0 && len(data) <= 18 {
+		var number int64
+
+		for _, digit := range data {
+			if digit < '0' || digit > '9' {
+				return copyText(v.data).Int64Value()
+			}
+
+			number = number*copyNumericDecimalBase + int64(digit-'0')
+		}
+
+		if negative {
+			if number == 0 {
+				return pgtype.Int8{}, errCopyNegativeZero
+			}
+
+			number = -number
+		}
+
+		return pgtype.Int8{Int64: number, Valid: true}, nil
+	}
+
 	return copyText(v.data).Int64Value()
 }
 

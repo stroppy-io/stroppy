@@ -144,22 +144,22 @@ func factIsNull(nullBitMap int64, globalColumnNumber, firstColumnGlobal int) boo
 
 // keyOrNull renders a surrogate/foreign key the way getStringOrNullForKey does:
 // nil (empty field) when the column is nulled or the key is the -1 sentinel.
-func keyOrNull(nullBitMap int64, globalColumnNumber, firstColumnGlobal int, value int64) any {
+func keyOrNull(values *rowValues, nullBitMap int64, globalColumnNumber, firstColumnGlobal int, value int64) any {
 	if factIsNull(nullBitMap, globalColumnNumber, firstColumnGlobal) || value == -1 {
 		return nil
 	}
 
-	return value
+	return rowValue(values, value)
 }
 
 // valOrNull renders a non-key value the way getStringOrNull does: nil when the
 // column is nulled, else the value itself.
-func valOrNull(nullBitMap int64, globalColumnNumber, firstColumnGlobal int, value any) any {
+func valOrNull[T rowScalar](values *rowValues, nullBitMap int64, globalColumnNumber, firstColumnGlobal int, value T) any {
 	if factIsNull(nullBitMap, globalColumnNumber, firstColumnGlobal) {
 		return nil
 	}
 
-	return value
+	return rowValue(values, value)
 }
 
 // storeOrderInfo carries the order-level join keys drawn once per ticket, shared
@@ -213,7 +213,7 @@ func newStoreLineGen(sss, srs *streamSet, sc *Scaling) factLineGen {
 		soldPromoSk := GenerateJoinKey(TStoreSales, JCNone, sss.at(ssSoldPromoSk), TPromotion, 1, sc)
 		pricing := GeneratePricingForSales(StorePricingLimits, sss.at(ssPricing))
 
-		sales = buildStoreSalesRow(salesBuffer, nullBitMap, &order, soldItemSk, soldPromoSk, pricing)
+		sales = buildStoreSalesRow(salesBuffer, sss.values, nullBitMap, &order, soldItemSk, soldPromoSk, pricing)
 
 		// 10% of sales are returned. Always compute the return when it occurs (so
 		// the store_returns table gets the row); drawing srs leaves the sales
@@ -246,33 +246,33 @@ func generateStoreOrderInfo(ticket int64, sss *streamSet, sc *Scaling) storeOrde
 }
 
 // buildStoreSalesRow renders the store_sales row in StoreSalesRow.getValues order.
-func buildStoreSalesRow(dst []any, nb int64, order *storeOrderInfo, soldItemSk, soldPromoSk int64, p Pricing) []any {
+func buildStoreSalesRow(dst []any, values *rowValues, nb int64, order *storeOrderInfo, soldItemSk, soldPromoSk int64, p Pricing) []any {
 	const f = ssFirstColumnGlobal
 
 	return append(dst,
-		keyOrNull(nb, 314, f, order.soldDateSk),
-		keyOrNull(nb, 315, f, order.soldTimeSk),
-		keyOrNull(nb, 316, f, soldItemSk),
-		keyOrNull(nb, 317, f, order.soldCustomerSk),
-		keyOrNull(nb, 318, f, order.soldCdemoSk),
-		keyOrNull(nb, 319, f, order.soldHdemoSk),
-		keyOrNull(nb, 320, f, order.soldAddrSk),
-		keyOrNull(nb, 321, f, order.soldStoreSk),
-		keyOrNull(nb, 322, f, soldPromoSk),
-		keyOrNull(nb, 323, f, order.ticketNumber),
-		valOrNull(nb, 324, f, int64(p.Quantity)),
-		valOrNull(nb, 325, f, p.WholesaleCost),
-		valOrNull(nb, 326, f, p.ListPrice),
-		valOrNull(nb, 327, f, p.SalesPrice),
-		valOrNull(nb, 328, f, p.CouponAmount),
-		valOrNull(nb, 329, f, p.ExtSalesPrice),
-		valOrNull(nb, 330, f, p.ExtWholesaleCost),
-		valOrNull(nb, 331, f, p.ExtListPrice),
-		valOrNull(nb, 332, f, p.ExtTax),
-		valOrNull(nb, 328, f, p.CouponAmount),
-		valOrNull(nb, 333, f, p.NetPaid),
-		valOrNull(nb, 334, f, p.NetPaidIncludingTax),
-		valOrNull(nb, 335, f, p.NetProfit),
+		keyOrNull(values, nb, 314, f, order.soldDateSk),
+		keyOrNull(values, nb, 315, f, order.soldTimeSk),
+		keyOrNull(values, nb, 316, f, soldItemSk),
+		keyOrNull(values, nb, 317, f, order.soldCustomerSk),
+		keyOrNull(values, nb, 318, f, order.soldCdemoSk),
+		keyOrNull(values, nb, 319, f, order.soldHdemoSk),
+		keyOrNull(values, nb, 320, f, order.soldAddrSk),
+		keyOrNull(values, nb, 321, f, order.soldStoreSk),
+		keyOrNull(values, nb, 322, f, soldPromoSk),
+		keyOrNull(values, nb, 323, f, order.ticketNumber),
+		valOrNull(values, nb, 324, f, int64(p.Quantity)),
+		valOrNull(values, nb, 325, f, p.WholesaleCost),
+		valOrNull(values, nb, 326, f, p.ListPrice),
+		valOrNull(values, nb, 327, f, p.SalesPrice),
+		valOrNull(values, nb, 328, f, p.CouponAmount),
+		valOrNull(values, nb, 329, f, p.ExtSalesPrice),
+		valOrNull(values, nb, 330, f, p.ExtWholesaleCost),
+		valOrNull(values, nb, 331, f, p.ExtListPrice),
+		valOrNull(values, nb, 332, f, p.ExtTax),
+		valOrNull(values, nb, 328, f, p.CouponAmount),
+		valOrNull(values, nb, 333, f, p.NetPaid),
+		valOrNull(values, nb, 334, f, p.NetPaidIncludingTax),
+		valOrNull(values, nb, 335, f, p.NetProfit),
 	)
 }
 
@@ -304,28 +304,29 @@ func buildStoreReturnsRow(
 	p := GeneratePricingForReturns(srs.at(srPricing), quantity, salesPricing)
 
 	const f = srFirstColumnGlobal
+	values := srs.values
 
 	return append(dst,
-		keyOrNull(nb, 292, f, returnedDateSk),
-		keyOrNull(nb, 293, f, returnedTimeSk),
-		keyOrNull(nb, 294, f, itemSk),
-		keyOrNull(nb, 295, f, customerSk),
-		keyOrNull(nb, 296, f, cdemoSk),
-		keyOrNull(nb, 297, f, hdemoSk),
-		keyOrNull(nb, 298, f, addrSk),
-		keyOrNull(nb, 299, f, storeSk),
-		keyOrNull(nb, 300, f, reasonSk),
-		keyOrNull(nb, 301, f, ticketNumber),
-		valOrNull(nb, 302, f, int64(p.Quantity)),
-		valOrNull(nb, 303, f, p.NetPaid),
-		valOrNull(nb, 304, f, p.ExtTax),
-		valOrNull(nb, 305, f, p.NetPaidIncludingTax),
-		valOrNull(nb, 306, f, p.Fee),
-		valOrNull(nb, 307, f, p.ExtShipCost),
-		valOrNull(nb, 308, f, p.RefundedCash),
-		valOrNull(nb, 309, f, p.ReversedCharge),
-		valOrNull(nb, 310, f, p.StoreCredit),
-		valOrNull(nb, 311, f, p.NetLoss),
+		keyOrNull(values, nb, 292, f, returnedDateSk),
+		keyOrNull(values, nb, 293, f, returnedTimeSk),
+		keyOrNull(values, nb, 294, f, itemSk),
+		keyOrNull(values, nb, 295, f, customerSk),
+		keyOrNull(values, nb, 296, f, cdemoSk),
+		keyOrNull(values, nb, 297, f, hdemoSk),
+		keyOrNull(values, nb, 298, f, addrSk),
+		keyOrNull(values, nb, 299, f, storeSk),
+		keyOrNull(values, nb, 300, f, reasonSk),
+		keyOrNull(values, nb, 301, f, ticketNumber),
+		valOrNull(values, nb, 302, f, int64(p.Quantity)),
+		valOrNull(values, nb, 303, f, p.NetPaid),
+		valOrNull(values, nb, 304, f, p.ExtTax),
+		valOrNull(values, nb, 305, f, p.NetPaidIncludingTax),
+		valOrNull(values, nb, 306, f, p.Fee),
+		valOrNull(values, nb, 307, f, p.ExtShipCost),
+		valOrNull(values, nb, 308, f, p.RefundedCash),
+		valOrNull(values, nb, 309, f, p.ReversedCharge),
+		valOrNull(values, nb, 310, f, p.StoreCredit),
+		valOrNull(values, nb, 311, f, p.NetLoss),
 	)
 }
 

@@ -40,15 +40,15 @@ type FactTable struct {
 // FactStream emits the line-item rows for ticket range [start, start+count)
 // (1-based; count<0 runs to the end). It buffers at most one pending row.
 type FactStream struct {
-	tbl    *FactTable
-	sss    *streamSet
-	srs    *streamSet
-	gen    factLineGen
-	ticket int64
-	end    int64
-	salesBuffer []any
+	tbl           *FactTable
+	sss           *streamSet
+	srs           *streamSet
+	gen           factLineGen
+	ticket        int64
+	end           int64
+	salesBuffer   []any
 	returnsBuffer []any
-	reuse bool
+	reuse         bool
 }
 
 // NewStream builds a fact row source over ticket range [start, start+count) at
@@ -78,6 +78,14 @@ func (t *FactTable) NewStream(sf float64, start, count int64) *FactStream {
 // rows are valid only until the next Next call; the default keeps rows owned.
 func (s *FactStream) ReuseRows() { s.reuse = true }
 
+// BorrowValues avoids scalar boxing for consumers that use AppendText. Cells
+// and rows are valid only until the next Next call; owned streams are unchanged.
+func (s *FactStream) BorrowValues() {
+	s.ReuseRows()
+	s.sss.values = &rowValues{}
+	s.srs.values = &rowValues{}
+}
+
 // Next returns the next emitted row (sales or returns depending on the table),
 // or false at end of range. Returns rows that are not produced for a line (no
 // return) are skipped transparently.
@@ -87,6 +95,10 @@ func (s *FactStream) Next() ([]any, bool) {
 			return nil, false
 		}
 
+		if s.sss.values != nil {
+			s.sss.values.next = 0
+			s.srs.values.next = 0
+		}
 		sales, returns, endOrder := s.gen(s.ticket, s.salesBuffer, s.returnsBuffer)
 		if s.reuse {
 			s.salesBuffer = sales[:0]

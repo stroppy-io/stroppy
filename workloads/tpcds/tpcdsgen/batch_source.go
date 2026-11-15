@@ -26,13 +26,13 @@ func NewBatchSource(table string, sf float64) (gen.BatchSource, error) {
 	}
 
 	if t, ok := dimTables[table]; ok {
-		schema, cols := textSchema(t.Columns)
+		schema, cols := textSchema(table, t.Columns)
 
 		return &dimBatchSource{tbl: t, sf: sf, schema: schema, cols: cols}, nil
 	}
 
 	if f, ok := factTables[table]; ok {
-		schema, cols := textSchema(f.tbl.Columns)
+		schema, cols := textSchema(table, f.tbl.Columns)
 
 		return &factBatchSource{spec: f, sf: sf, schema: schema, cols: cols}, nil
 	}
@@ -40,12 +40,21 @@ func NewBatchSource(table string, sf float64) (gen.BatchSource, error) {
 	return nil, fmt.Errorf("%w: %q", ErrUnknownTable, table)
 }
 
-func textSchema(cols []string) (gen.Schema, []gen.Column) {
+func textSchema(table string, cols []string) (gen.Schema, []gen.Column) {
+	budget := tpcdsBytesBudget
+
+	switch table {
+	case "inventory", "customer_demographics", "store_sales", "store_returns",
+		"catalog_sales", "catalog_returns", "web_sales", "web_returns":
+		// These tables contain bounded keys, short demographic labels, and prices.
+		budget = 64
+	}
+
 	b := gen.NewSchemaBuilder()
 	handles := make([]gen.Column, len(cols))
 
 	for i, name := range cols {
-		handles[i] = b.Bytes(name, tpcdsBytesBudget)
+		handles[i] = b.Bytes(name, budget)
 	}
 
 	return b.Build(), handles
@@ -74,8 +83,11 @@ func (s *dimBatchSource) Prepare(start, count int64, batchRows int) (gen.Cursor,
 		batchRows = 256
 	}
 
+	stream := s.tbl.NewStream(s.sf, start+1, count)
+	stream.BorrowValues()
+
 	return &tpcdsCursor{
-		stream: s.tbl.NewStream(s.sf, start+1, count),
+		stream: stream,
 		batch:  gen.NewBatch(s.schema, batchRows), cols: s.cols,
 	}, nil
 }
@@ -107,7 +119,7 @@ func (s *factBatchSource) Prepare(start, count int64, batchRows int) (gen.Cursor
 	}
 
 	stream := s.spec.tbl.NewStream(s.sf, start+1, count)
-	stream.ReuseRows()
+	stream.BorrowValues()
 
 	return &tpcdsCursor{
 		stream: stream,
@@ -160,13 +172,10 @@ func appendTpcdsCell(dst []byte, v any) []byte {
 		return strconv.AppendInt(dst, value, decimalBase)
 	case float64:
 		return strconv.AppendFloat(dst, value, 'g', -1, floatBits)
+	case *dsdgen.RowCell:
+		return value.AppendText(dst)
 	case dsdgen.Decimal:
-		number := float64(value.Number)
-		for range value.Precision {
-			number /= 10
-		}
-
-		return strconv.AppendFloat(dst, number, 'f', value.Precision, floatBits)
+		return value.AppendText(dst)
 	case dsdgen.Date:
 		return fmt.Appendf(dst, "%4d-%02d-%02d", value.Year, value.Month, value.Day)
 	default:

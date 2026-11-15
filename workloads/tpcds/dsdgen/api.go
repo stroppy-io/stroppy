@@ -13,6 +13,7 @@ type GeneratorColumn struct {
 // share no mutable state.
 type streamSet struct {
 	streams []*RNStream
+	values  *rowValues
 }
 
 func newStreamSet(cols []GeneratorColumn) *streamSet {
@@ -56,12 +57,13 @@ type RowFunc func(rowNumber int64, ss *streamSet, _ *Scaling) []any
 // Table is a ported TPC-DS base table: its output column names, the RNG column
 // layout, the per-scale row count, and the row generator.
 type Table struct {
-	Name     string
-	ID       TableID // ordinal in the dsdgen table enum (for Scaling/SCD lookups)
-	Columns  []string
-	Cols     []GeneratorColumn
-	RowCount func(sf float64) int64
-	Row      RowFunc
+	Name        string
+	ID          TableID // ordinal in the dsdgen table enum (for Scaling/SCD lookups)
+	Columns     []string
+	Cols        []GeneratorColumn
+	RowCount    func(sf float64) int64
+	Row         RowFunc
+	borrowedRow func(dst []any, rowNumber int64, ss *streamSet, sc *Scaling) []any
 }
 
 // Stream produces rows [start, start+count) (1-based, count<0 means to the end)
@@ -74,6 +76,7 @@ type Stream struct {
 	sc   *Scaling
 	next int64
 	end  int64
+	row  []any
 }
 
 // NewStream builds a streaming row source over [start, start+count) for tbl at
@@ -90,13 +93,29 @@ func (t *Table) NewStream(sf float64, start, count int64) *Stream {
 	return &Stream{tbl: t, ss: ss, sc: NewScaling(sf), next: start, end: end}
 }
 
+// BorrowValues reuses supported table output for consumers that finish reading
+// each row before Next. Other tables keep their owned-value representation.
+func (s *Stream) BorrowValues() {
+	if s.tbl.borrowedRow != nil {
+		s.ss.values = &rowValues{}
+		s.row = make([]any, 0, len(s.tbl.Columns))
+	}
+}
+
 // Next returns the next row's values, or false at end of range.
 func (s *Stream) Next() ([]any, bool) {
 	if s.next >= s.end {
 		return nil, false
 	}
 
-	row := s.tbl.Row(s.next, s.ss, s.sc)
+	var row []any
+	if s.ss.values != nil {
+		s.ss.values.next = 0
+		row = s.tbl.borrowedRow(s.row[:0], s.next, s.ss, s.sc)
+		s.row = row
+	} else {
+		row = s.tbl.Row(s.next, s.ss, s.sc)
+	}
 	s.ss.consumeRemaining()
 	s.next++
 
