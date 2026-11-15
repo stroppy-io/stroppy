@@ -243,7 +243,17 @@ func (w *workload) drop(ctx context.Context, b *bench.Bench) error {
 	return w.dropSchema(ctx, b)()
 }
 
-func (w *workload) create(ctx context.Context, b *bench.Bench) error { return w.createSchema(ctx, b)() }
+func (w *workload) create(ctx context.Context, b *bench.Bench) error {
+	if err := w.createSchema(ctx, b)(); err != nil {
+		return err
+	}
+
+	if w.benchmark != nil {
+		return b.Exec(ctx, "DROP TABLE IF EXISTS stroppy_tpcds_refresh", nil)
+	}
+
+	return nil
+}
 
 func (w *workload) unlogged(ctx context.Context, b *bench.Bench) error {
 	return w.setUnlogged(ctx, b, "UNLOGGED")()

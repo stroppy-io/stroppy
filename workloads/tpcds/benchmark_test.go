@@ -177,6 +177,17 @@ func TestMaintenanceSQLContract(t *testing.T) {
 	}
 }
 
+func TestMaintenanceDescendingDates(t *testing.T) {
+	for _, table := range []string{"inventory", "store_sales", "catalog_sales", "web_sales"} {
+		statements := maintenanceDeleteStatements(table, []string{"2002-07-25", "2002-07-18"})
+		for _, statement := range statements {
+			if !strings.Contains(statement, "BETWEEN '2002-07-18' AND '2002-07-25'") {
+				t.Fatalf("descending delete range: %s", statement)
+			}
+		}
+	}
+}
+
 func TestBenchmarkQueryWindow(t *testing.T) {
 	start := time.Unix(100, 0)
 

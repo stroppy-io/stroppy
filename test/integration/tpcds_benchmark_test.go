@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -120,6 +121,17 @@ func TestTPCDSBenchmarkSequence(t *testing.T) {
 	}
 
 	testTPCDSMaintenanceContinuation(t)
+
+	var duplicateInventory int64
+	if err := pool.QueryRow(t.Context(), `SELECT COUNT(*) FROM (
+SELECT inv_item_sk,inv_warehouse_sk,inv_date_sk FROM inventory GROUP BY 1,2,3 HAVING COUNT(*)>1
+) duplicates`).Scan(&duplicateInventory); err != nil {
+		t.Fatal(err)
+	}
+
+	if duplicateInventory != 0 {
+		t.Fatalf("inventory duplicate keys after set 8: %d", duplicateInventory)
+	}
 }
 
 func assertTPCDSMaintenanceOrder(t *testing.T, value *tpcdsBenchmarkReport) {
@@ -170,6 +182,51 @@ func testTPCDSMaintenanceContinuation(t *testing.T) {
 	value = tpcdsBenchmarkData(t, run)
 	if value.Score != nil || value.NextSet != nil {
 		t.Fatalf("replay: %+v", value)
+	}
+}
+
+func TestTPCDSBenchmarkRecreateRefreshState(t *testing.T) {
+	pool := NewTmpfsPG(t)
+	ResetSchema(t, pool)
+
+	for _, active := range []int{0, 1} {
+		_, err := pool.Exec(t.Context(), `CREATE TABLE IF NOT EXISTS stroppy_tpcds_refresh (
+id INTEGER PRIMARY KEY, scale_factor VARCHAR(32), next_set BIGINT, active_set BIGINT);
+DELETE FROM stroppy_tpcds_refresh;
+INSERT INTO stroppy_tpcds_refresh VALUES (1, '0.01', 5, `+strconv.Itoa(active)+`)`)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		run, err := bench.RunTest(t.Context(), tpcds.Test, bench.RunOptions{
+			Drivers: map[string]bench.DriverConfig{"default": {
+				Kind: bench.DriverPostgres, URL: envOr(envTmpfsURL, defaultTmpfsURL),
+			}},
+			Params: bench.ParamInputs{CLI: map[string]string{"benchmark": "true", "scale-factor": "0.01"}},
+			NoSteps: []string{
+				"drop_schema", "generate_maintenance", "power", "throughput_1",
+				"maintenance_1", "throughput_2", "maintenance_2",
+			},
+			Metrics: &bench.MetricsConfig{Quiet: true}, Report: &bench.ReportOptions{},
+		})
+		if err != nil {
+			t.Fatalf("recreate with active=%d: %v", active, err)
+		}
+
+		value := tpcdsBenchmarkData(t, run)
+		if value.Score != nil || value.SequenceValid {
+			t.Fatalf("partial recreation score: %+v", value)
+		}
+
+		var next, inProgress int64
+		if err := pool.QueryRow(t.Context(), "SELECT next_set,active_set FROM stroppy_tpcds_refresh").
+			Scan(&next, &inProgress); err != nil {
+			t.Fatal(err)
+		}
+
+		if next != 1 || inProgress != 0 {
+			t.Fatalf("recreated marker: next=%d active=%d", next, inProgress)
+		}
 	}
 }
 

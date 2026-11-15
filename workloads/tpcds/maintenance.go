@@ -280,7 +280,12 @@ func maintenanceMPPAffected(ctx context.Context, tx *bench.Tx, statement string)
 }
 
 func maintenanceDeleteStatements(table string, dates []string) []string {
-	dateRange := "SELECT d_date_sk FROM date_dim WHERE d_date BETWEEN '" + dates[0] + "' AND '" + dates[1] + "'"
+	first, last := dates[0], dates[1]
+	if first > last {
+		first, last = last, first
+	}
+
+	dateRange := "SELECT d_date_sk FROM date_dim WHERE d_date BETWEEN '" + first + "' AND '" + last + "'"
 	if table == "inventory" {
 		return []string{"DELETE FROM inventory WHERE inv_date_sk IN (" + dateRange + ")"}
 	}
