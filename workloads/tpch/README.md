@@ -97,6 +97,10 @@ or cluster: choose finite limits appropriate for available memory and query cost
 exactly once on its own retained database session. `--query-stream K` selects one
 stream instead; explicit stream 0 uses the Appendix A power ordering. All 41
 prescribed orderings wrap by stream ID, without wrapping the stream's seed.
+If a query-only stream loses its session, that query remains failed and is not
+retried; later queries use a replacement session. Failure to open the replacement
+stops the stream without counting the remaining queries as failed. Refresh-enabled
+phases still stop on any query error.
 
 ```bash
 ./build/stroppy run tpch/tx -d pg --scale-factor 0.01 --streams 4
