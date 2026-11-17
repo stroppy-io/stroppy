@@ -105,6 +105,10 @@ func universalTransform(sql string) string {
 	if m := lochierRe.FindStringSubmatch(sql); m != nil {
 		sql = lochUseRe.ReplaceAllString(sql, "when "+m[1]+" = 0")
 	}
+	// Full returns can leave query 75's previous-year group with zero net quantity.
+	sql = strings.ReplaceAll(sql,
+		"CAST(curr_yr.sales_cnt AS DECIMAL(17,2))/CAST(prev_yr.sales_cnt AS DECIMAL(17,2))",
+		"CAST(curr_yr.sales_cnt AS DECIMAL(17,2))/NULLIF(CAST(prev_yr.sales_cnt AS DECIMAL(17,2)),0)")
 	// guard query 90's ratio against an empty denominator.
 	sql = strings.ReplaceAll(sql,
 		"cast(amc as decimal(15,4))/cast(pmc as decimal(15,4))",

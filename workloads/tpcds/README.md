@@ -235,6 +235,12 @@ ranges start after initial data and all earlier refresh sets, preserving
 sales/returns relationships and avoiding duplicate warehouse keys. Oracle tests
 normalize only these corrected IDs before comparing every remaining byte.
 
+Full returns can leave a query 75 previous-year group with zero net quantity;
+this alone does not indicate mismatched refresh keys. PostgreSQL (including the
+Greenplum-family dialect), MySQL, and MariaDB guard that divisor with `NULLIF`,
+excluding undefined ratios while retaining comparisons with nonzero divisors.
+This applies to generated streams and baked qualification queries.
+
 **Maintenance permanently changes the dataset.** A database-side
 `stroppy_tpcds_refresh` marker rejects replay, wrong scale, and continuation after
 an incomplete or ambiguous set. Fresh loads start at set 1. Continue existing data
