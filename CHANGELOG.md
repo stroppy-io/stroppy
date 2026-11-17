@@ -10,6 +10,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+## [6.4.2] - 2026-11-17
+
 ### Fixed
 
 - TPC-DS query 69 on YDB uses semi/anti joins instead of materialized customer-key lists to avoid the server's 48 MiB intermediate-reply limit at larger scale factors. ([#291](https://github.com/stroppy-io/stroppy/pull/291))
