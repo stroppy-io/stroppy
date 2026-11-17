@@ -28,6 +28,36 @@ func TestMySQLCarrierConcatenation(t *testing.T) {
 	}
 }
 
+func TestQuery75GuardsZeroNetSales(t *testing.T) {
+	for _, dialect := range []Dialect{Postgres, MySQL, MariaDB} {
+		t.Run(dialect.Name, func(t *testing.T) {
+			qualification, err := Qualification(dialect)
+			if err != nil {
+				t.Fatal(err)
+			}
+			results := []*Result{qualification}
+			for stream := range 9 {
+				result, err := Generate(dialect, 10, 19620718, stream)
+				if err != nil {
+					t.Fatal(err)
+				}
+				results = append(results, result)
+			}
+			for i, result := range results {
+				var sql string
+				for _, query := range result.Queries {
+					if query.Name == "query75" {
+						sql = strings.ToLower(query.SQL)
+					}
+				}
+				if !strings.Contains(sql, "/nullif(cast(prev_yr.sales_cnt as decimal(17,2)),0)<0.9") {
+					t.Errorf("result %d: query 75 has no zero-divisor guard", i)
+				}
+			}
+		})
+	}
+}
+
 func TestMySQLFullOuterJoinParameters(t *testing.T) {
 	for _, name := range []string{"query51", "query97"} {
 		t.Run(name, func(t *testing.T) {

@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Fixed
+
+- TPC-DS query 75 no longer aborts PostgreSQL or Greenplum-family runs when returned sales leave a previous-year group with zero net quantity, including after benchmark maintenance.
+
 ## [6.4.1] - 2026-11-15
 
 ### Added

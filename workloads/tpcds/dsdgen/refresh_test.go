@@ -135,6 +135,57 @@ func TestRefreshKeyRanges(t *testing.T) {
 	}
 }
 
+func TestRefreshReturnQuantities(t *testing.T) {
+	for set := int64(1); set <= 2; set++ {
+		directory := t.TempDir()
+		if err := GenerateRefresh(t.Context(), 1, set, directory); err != nil {
+			t.Fatal(err)
+		}
+		for _, channel := range []struct{ name, sales, returns string }{
+			{"store", "s_purchase_lineitem", "s_store_returns"},
+			{"catalog", "s_catalog_order_lineitem", "s_catalog_returns"},
+			{"web", "s_web_order_lineitem", "s_web_returns"},
+		} {
+			read := func(name string) [][]string {
+				t.Helper()
+				data, err := os.ReadFile(filepath.Join(directory, name+".dat"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				var rows [][]string
+				for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+					rows = append(rows, strings.Split(line, "|"))
+				}
+				return rows
+			}
+			sales := map[string]int{}
+			for _, row := range read(channel.sales) {
+				quantity, err := strconv.Atoi(row[4])
+				if err != nil {
+					t.Fatal(err)
+				}
+				sales[row[0]+"/"+row[1]+"/"+row[2]] = quantity
+			}
+			fullReturns := 0
+			for _, row := range read(channel.returns) {
+				key := row[1] + "/" + row[2] + "/" + row[3]
+				quantity, err := strconv.Atoi(row[8])
+				if err != nil || quantity < 1 || quantity > sales[key] {
+					t.Fatalf("set %d %s return %s: quantity=%d sale=%d error=%v",
+						set, channel.name, key, quantity, sales[key], err)
+				}
+				if quantity == sales[key] {
+					fullReturns++
+				}
+			}
+			if fullReturns == 0 {
+				t.Fatalf("set %d %s: no full returns", set, channel.name)
+			}
+			t.Logf("set %d %s: %d full returns with matching sales", set, channel.name, fullReturns)
+		}
+	}
+}
+
 func TestRefreshInvalidAndCanceled(t *testing.T) {
 	for _, scale := range []float64{0, -1, math.NaN(), math.Inf(1), 100001} {
 		if err := GenerateRefresh(context.Background(), scale, 1, t.TempDir()); !errors.Is(err, errRefreshInput) {
