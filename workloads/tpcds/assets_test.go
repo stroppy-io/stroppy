@@ -30,6 +30,30 @@ func TestYDBRowPartitionFloorDoesNotChangeColumnLayout(t *testing.T) {
 	}
 }
 
+func TestYDBQuery69UsesSemiAndAntiJoins(t *testing.T) {
+	data, err := files.ReadFile("ydb.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	query, ok := bench.ParseSQL(string(data)).Query("", "query_69")
+	if !ok {
+		t.Fatal("query 69 missing")
+	}
+
+	query = strings.ToLower(query)
+	if strings.Count(query, "left semi join") != 1 || strings.Count(query, "left only join") != 1 ||
+		strings.Count(query, "union all") != 1 {
+		t.Fatal("query 69 must join store customers and exclude the union of web and catalog customers")
+	}
+
+	for _, key := range []string{"ss_customer_sk", "ws_bill_customer_sk", "cs_ship_customer_sk"} {
+		if strings.Contains(query, "in (select "+key) {
+			t.Fatalf("query 69 materializes %s as an IN-subquery result", key)
+		}
+	}
+}
+
 func TestQualificationAssetsMatchGenerator(t *testing.T) {
 	for name, dialect := range map[string]dsqgen.Dialect{
 		"pg.sql": dsqgen.Postgres, "mysql.sql": dsqgen.MySQL, "mariadb.sql": dsqgen.MariaDB,
