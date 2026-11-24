@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Fixed
+
+- TPC-DS call-center square footage now matches the reference generator's signed 32-bit arithmetic, preventing integer overflow during SF1000 loads on PostgreSQL and Greenplum-family databases.
+
 ## [6.4.2] - 2026-11-17
 
 ### Fixed

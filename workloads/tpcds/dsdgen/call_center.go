@@ -193,7 +193,8 @@ func computeCallCenterFields(rowNumber int64, ss *streamSet, sc *Scaling) callCe
 	}
 	fieldChangeFlag >>= 1
 
-	f.sqFt = GenerateUniformRandomInt(100, 700, ss.at(ccSqFt)) * f.employees
+	// The C and Java generators multiply signed 32-bit integers, including overflow.
+	f.sqFt = int(int32(GenerateUniformRandomInt(100, 700, ss.at(ccSqFt))) * int32(f.employees))
 	if hasPrevious {
 		f.sqFt = SCDValue(fieldChangeFlag, isNewBusinessKey, prev.sqFt, f.sqFt)
 	}
