@@ -2,7 +2,9 @@ package tpcc
 
 import (
 	"fmt"
+	"maps"
 	"math"
+	"slices"
 	"time"
 )
 
@@ -17,6 +19,7 @@ type strictObservation struct {
 	WithinLimit uint64  `json:"within_limit"`
 	P90Seconds  float64 `json:"p90_seconds"`
 	buckets     []uint64
+	tail        map[int64]uint64
 }
 
 type strictStatistics struct {
@@ -86,8 +89,16 @@ func (s *strictStatistics) record(idx int, started, completed, measurement, end 
 		o.buckets = make([]uint64, 100001)
 	}
 
-	bucket := min(int(math.Ceil(seconds*1000)), len(o.buckets)-1)
-	o.buckets[max(0, bucket)]++
+	bucket := int64(math.Ceil(seconds * 1000))
+	if bucket < int64(len(o.buckets)) {
+		o.buckets[max(0, bucket)]++
+	} else {
+		if o.tail == nil {
+			o.tail = make(map[int64]uint64)
+		}
+
+		o.tail[bucket]++
+	}
 }
 
 func (o *strictObservation) p90() float64 {
@@ -97,11 +108,14 @@ func (o *strictObservation) p90() float64 {
 	for i, count := range o.buckets {
 		sum += count
 		if sum >= target {
-			if i == len(o.buckets)-1 {
-				return o.MaxSeconds
-			}
-
 			return float64(i) / 1000
+		}
+	}
+
+	for _, bucket := range slices.Sorted(maps.Keys(o.tail)) {
+		sum += o.tail[bucket]
+		if sum >= target {
+			return float64(bucket) / 1000
 		}
 	}
 
@@ -143,11 +157,11 @@ func (m *terminalModel) report() TerminalReport {
 	}
 
 	var total uint64
-	for _, o := range m.stats.Transactions {
+	for _, o := range &m.stats.Transactions {
 		total += o.Count
 	}
 
-	for i, o := range m.stats.Transactions {
+	for i, o := range &m.stats.Transactions {
 		r.Statistics.Transactions[i].P90Seconds = o.p90()
 		if o.Failed > 0 || (i > 0 && float64(o.Count)*100 < float64(total)*complianceTxTable[i].mixMinPct) {
 			r.MixPass = false

@@ -87,7 +87,8 @@ func (w *workload) defineTerminals(d *bench.Def, settings bench.RunSettings) err
 		return nil
 	}
 
-	if settings.Executor != "constant-vus" || w.spreadWarehouses || w.iso == bench.IsoNone || w.iso == bench.IsoConn {
+	if settings.Executor != "constant-vus" || w.spreadWarehouses || w.driverType == bench.DriverPicodata ||
+		w.iso == bench.IsoNone || w.iso == bench.IsoConn {
 		return errStrictTerminals
 	}
 

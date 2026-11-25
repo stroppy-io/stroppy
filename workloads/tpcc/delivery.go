@@ -139,6 +139,10 @@ func (w *workload) procDeliveredOrders(
 		return nil, bench.Fatal(err)
 	}
 
+	if pairs == nil {
+		return nil, bench.Fatal(fmt.Errorf("%w: Delivery routine must return a JSON array", errStrictTerminals))
+	}
+
 	orders := make([]deliveredOrder, 0, len(pairs))
 	seen := map[int64]bool{}
 

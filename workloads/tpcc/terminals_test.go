@@ -31,6 +31,60 @@ func newTestTerminals(t *testing.T) *terminalModel {
 	return m
 }
 
+func TestStrictDeliveryResultArrayContract(t *testing.T) {
+	for _, payload := range []string{"null", "[]"} {
+		t.Run(payload, func(t *testing.T) {
+			test := bench.Test{Name: "delivery-array", Define: func(d *bench.Def) error {
+				sql, err := loadEmbeddedSQL("pg")
+				if err != nil {
+					return err
+				}
+
+				w := &workload{variant: "procs", sql: sql, iso: bench.IsoRepeatableRead, retryAttempts: 1}
+
+				d.Execution.Step("delivery", func(ctx context.Context, b *bench.Bench) error {
+					_, err := w.procDeliveredOrders(ctx, b, 1, 1)
+
+					return err
+				})
+
+				return d.Execution.Err()
+			}}
+			recorder := &record.Recorder{}
+			recorder.Reply("SELECT DELIVERY_RESULTS(:d_w_id, :d_o_carrier_id)::TEXT",
+				record.Response{Rows: [][]any{{payload}}})
+
+			_, err := testkit.Record(t.Context(), test, recorder, bench.RunOptions{})
+			if payload == "null" {
+				require.ErrorIs(t, err, errStrictTerminals)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestStrictPercentilePreservesSlowTail(t *testing.T) {
+	start := time.Now()
+
+	var stats strictStatistics
+	for _, seconds := range []int{1, 1, 1, 1, 1, 1, 1, 1, 101, 1000} {
+		stats.record(0, start, start.Add(time.Duration(seconds)*time.Second), start, start.Add(time.Hour), nil)
+	}
+
+	require.InDelta(t, 101, stats.Transactions[0].p90(), 0)
+	require.False(t, (&terminalModel{stats: stats}).report().ResponsePass)
+}
+
+func TestStrictPicodataRejectsTransactionalOverride(t *testing.T) {
+	catalog, err := bench.NewCatalog(Tx)
+	require.NoError(t, err)
+	_, err = catalog.Resolve("tpcc/tx", bench.ParamInputs{CLI: map[string]string{
+		"terminal-model": "strict", "executor": "constant-vus", "tx-isolation": "serializable",
+	}}, map[string]bench.DriverConfig{"": {Kind: bench.DriverPicodata}})
+	require.ErrorIs(t, err, errStrictTerminals)
+}
+
 func TestStrictDeliveryAcknowledgesBeforeExecution(t *testing.T) {
 	for _, variant := range []string{"tx", "procs"} {
 		t.Run(variant, func(t *testing.T) {

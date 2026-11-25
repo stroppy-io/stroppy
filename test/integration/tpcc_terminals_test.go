@@ -116,6 +116,7 @@ SELECT 1
 			require.NoError(t, queryErr)
 			require.True(t, response.Rows.Next())
 			values := response.Rows.Values()
+			require.Equal(t, fmt.Sprint(10*delivered), strings.TrimSuffix(fmt.Sprint(values[0]), ".00"))
 			require.Equal(t, fmt.Sprint(delivered), strings.TrimSuffix(fmt.Sprint(values[1]), ".00"))
 			require.NoError(t, response.Rows.Close())
 			require.NoError(t, response.Rows.Err())
