@@ -98,6 +98,9 @@ func TestEmbeddedAssetContract(t *testing.T) {
 					"create_procedures",
 					"workload_procs",
 				)
+
+				dialectQueries = append(dialectQueries,
+					workloadtest.Query{Section: "workload_procs", Name: "delivery_results"})
 				for _, name := range txNames {
 					dialectQueries = append(dialectQueries, workloadtest.Query{Section: "workload_procs", Name: name})
 				}

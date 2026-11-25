@@ -198,12 +198,84 @@ processes must not share that history ID space: maximum-based initialization
 does not reserve ranges across processes. Distributed loading of disjoint
 warehouse ranges remains supported.
 
-Pacing is a TPC-C-style stress profile, not an audited TPC-C result. Strict
-terminal/district and deferred Delivery semantics are tracked in
-[#193](https://github.com/stroppy-io/stroppy/issues/193); reusable gradual worker
-activation is tracked in [#194](https://github.com/stroppy-io/stroppy/issues/194).
+Pacing alone is a TPC-C-style stress profile, not an audited TPC-C result.
+Reusable gradual worker activation is tracked in
+[#194](https://github.com/stroppy-io/stroppy/issues/194).
 Environment variables and `-e` remain compatibility inputs; direct flags and
 typed config are preferred.
+
+## Strict terminal model
+
+Both `tpcc/tx` and `tpcc/procs` support `--terminal-model strict`. The default
+`stress` model is unchanged. Strict mode requires `constant-vus`, transactional
+isolation, and fixed home warehouses. It rejects `--spread-warehouses` and
+isolation `none` or `conn`; it does not change retry or isolation policy.
+
+```bash
+# Loaded database; first create the additional procedure used by strict Delivery.
+./build/stroppy run tpcc/procs -d pg -D url=postgres://host/db \
+  --terminal-model strict --executor constant-vus \
+  --steps create_terminal_procedures
+
+# 1,000 terminals, at most 32 executing database operations.
+./build/stroppy run tpcc/procs -d pg -D url=postgres://host/db \
+  --terminal-model strict --executor constant-vus --scale-factor 100 --vus 32 \
+  --warmup 10m --duration 2h --drain-timeout 90s \
+  --steps initialize_terminals,workload,delivery_results \
+  --delivery-results ./delivery-run-1.jsonl
+```
+
+Strict mode derives ten terminals per active warehouse (§4.2.2). Each terminal
+keeps its home warehouse and a unique Stock-Level district (§2.8.1.1); other
+transaction district selections retain their prescribed random behavior.
+`--vus` bounds execution workers, not terminals. A due-time queue keeps keying
+and thinking outside those workers. Queue waiting contributes to response time;
+bounding workers must not hide overload. The database pool remains a separate
+limit configured through driver settings.
+
+Each terminal shuffles a 23-card deck containing ten New-Order, ten Payment,
+and one each of Order-Status, Delivery, and Stock-Level (§5.2.4.2). Keying times
+remain constant at 18/3/2/2/2 seconds. An independent timing stream draws
+exponential think times with means 12/12/10/5/5 seconds, capped at ten times the
+mean (§5.2.5). Strict mode enables this pacing regardless of `--pacing`.
+
+Initialization precedes traffic. `--warmup` is a continuous unmeasured prefix
+inside the strict `workload` step, without resetting terminals, pending Delivery,
+or think/keying cycles at the measurement boundary. `--duration` then measures
+steady-state traffic; warmup does not prove steady state. At measurement end,
+new terminal cycles stop, submitted work and deferred Delivery drain, and the
+configured drain timeout cancels unfinished work. Strict traffic requires `initialize_terminals` before `workload`. Include
+`delivery_results` to make final file synchronization visible as a step; final
+cleanup also closes the file when that step is filtered.
+
+Delivery acknowledges queue acceptance independently of database completion.
+Background execution uses the same bounded workers. The exclusive JSONL result
+file records queue/completion times, warehouse/carrier, committed district/order
+pairs, skipped districts, and failures (§2.7.2). Existing paths are never
+overwritten. The final step flushes and synchronizes the file; final cleanup provides the
+same guarantee when that step is filtered. Abrupt process termination can lose buffered records. For procedures,
+run `create_terminal_procedures` once per database; custom SQL must supply that
+section and `workload_procs/delivery_results`, returning one JSON array of
+`[district, order]` pairs after atomic completion.
+
+The report's `terminal_model` section separates warmup, boundary-crossing,
+measurement, and drain observations. Only responses wholly inside measurement
+enter mix/latency diagnostics (§5.3, §5.6.1). Mix floors are exact: Payment 43%,
+the three smaller transactions 4%, and no New-Order minimum (§5.2.3). Response
+diagnostics check the 90% limits, the mean-versus-p90 rule with its 100 ms
+allowance (§5.2.5), Delivery's 80-second completion bound and skipped deliveries,
+and the minimum uninterrupted 120-minute measurement (§5.5.2.1). Short runs are
+useful diagnostics but cannot pass the measurement requirement. Stress populations
+other than ten per warehouse and warehouse-spread runs are marked non-compliant.
+
+This is a terminal-model mode, **not an audited TPC-C implementation or score**.
+Passing local diagnostics is not certification. Full screen/input/output fidelity,
+input-generation qualification, database population and consistency, ACID and
+recovery tests, sustained steady-state proof, checkpoint requirements, eight-hour
+capacity, required disclosure graphs, pricing/availability, and independent audit
+remain separate obligations under TPC-C 5.11. Transaction SQL and load generation
+retain their existing qualifications; enabling strict terminals does not certify
+them. No software option replaces the specification's audit requirements.
 
 ## Integration test
 

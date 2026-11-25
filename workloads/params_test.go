@@ -200,7 +200,11 @@ func tpccParamSchema() []bench.ParamSchema {
 		"", "pg", "mysql", "pico", "ydb", "ydb_no_indexes", "tidb", "crdb", "crdb24",
 	}}}
 
+	terminalModel := param("terminal-model", bench.ParamTypeString, "stress", "TERMINAL_MODEL", "terminalModel")
+	terminalModel.Constraints = []bench.Constraint{{Kind: "one-of", Value: []string{"stress", "strict"}}}
+
 	return []bench.ParamSchema{
+		param("delivery-results", bench.ParamTypeString, "tpcc-delivery.jsonl", "DELIVERY_RESULTS", "deliveryResults"),
 		derivedParam(
 			"load-items",
 			bench.ParamTypeBool,
@@ -216,6 +220,7 @@ func tpccParamSchema() []bench.ParamSchema {
 		param("spread-warehouses", bench.ParamTypeBool, false, "SPREAD_WAREHOUSES", "spreadWarehouses"),
 		dialect,
 		param("sql-file", bench.ParamTypeString, "", "SQL_FILE", "sqlFile"),
+		terminalModel,
 		param("tx-isolation", bench.ParamTypeString, "", "TX_ISOLATION", "txIsolation"),
 		param("warehouse-start", bench.ParamTypeInt, 1, "WAREHOUSE_START", "warehouseStart"),
 		warmup,
