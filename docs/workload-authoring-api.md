@@ -449,6 +449,13 @@ binary. Atomic MySQL procedures use `_atomic` names, so stale definitions
 fail explicitly instead of silently running without a transaction. Custom SQL
 overrides must follow the same contract.
 
+`rows, err := b.RoutineRows(ctx, options, query, arguments)` follows the same
+atomic contract and returns `[][]any` only after the complete invocation succeeds.
+PostgreSQL and MySQL collect the result before releasing the connection; a late
+server error, cancellation, or unknown commit outcome returns no rows. Drivers
+without a server-owned routine path use a managed transaction. An atomic-routine
+driver that cannot return results is rejected rather than invoked twice.
+
 PostgreSQL, CockroachDB, and YugabyteDB routines share the main connection pool
 and its configured connection limit. Explicit routine isolation is applied to
 the acquired physical connection and cached there; repeated invocations at the

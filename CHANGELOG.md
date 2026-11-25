@@ -10,6 +10,10 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+### Added
+
+- Go workloads can retrieve committed stored-procedure results with `Bench.RoutineRows` without changing existing `Routine` calls.
+
 ## [6.4.3] - 2026-11-24
 
 ### Fixed

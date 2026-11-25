@@ -35,6 +35,27 @@ func TestRoutineDrainPreservesDeferredErrorAndConnection(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestRoutineRowsDrainPreservesDeferredErrorAndConnection(t *testing.T) {
+	d := realPGDriver(t, 1)
+	rows, result, err := d.RunRoutineRows(t.Context(), config.TxIsolationLevelUnspecified,
+		"SELECT i FROM generate_series(1,1000) i", nil)
+	require.NoError(t, err)
+	require.Len(t, rows, 1000)
+	require.Equal(t, int32(1000), rows[999][0])
+	require.NotNil(t, result.Stats)
+
+	rows, _, err = d.RunRoutineRows(t.Context(), config.TxIsolationLevelUnspecified,
+		"SELECT CASE WHEN i = 1000 THEN 1/(i-i) ELSE i END FROM generate_series(1,1000) i", nil)
+	require.Error(t, err)
+	require.Nil(t, rows)
+
+	var routine *driver.RoutineError
+	require.ErrorAs(t, err, &routine)
+	require.True(t, routine.RollbackConfirmed)
+	_, _, err = d.RunRoutineRows(t.Context(), config.TxIsolationLevelUnspecified, "SELECT 1", nil)
+	require.NoError(t, err)
+}
+
 func TestRoutineDrainCancellationReleasesConnection(t *testing.T) {
 	d := realPGDriver(t, 1)
 
