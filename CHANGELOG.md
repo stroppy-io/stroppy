@@ -12,8 +12,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
-- TPC-C offers an explicit strict terminal model for both variants, separating ten terminals per warehouse from execution workers and recording deferred Delivery outcomes with unaudited qualification diagnostics.
-- Go workloads can retrieve committed stored-procedure results with `Bench.RoutineRows` without changing existing `Routine` calls.
+- TPC-C offers an explicit strict terminal model for both variants, separating ten terminals per warehouse from execution workers and recording deferred Delivery outcomes with unaudited qualification diagnostics. ([#296](https://github.com/stroppy-io/stroppy/pull/296))
+- Go workloads can retrieve committed stored-procedure results with `Bench.RoutineRows` without changing existing `Routine` calls. ([#296](https://github.com/stroppy-io/stroppy/pull/296))
 
 ## [6.4.3] - 2026-11-24
 
