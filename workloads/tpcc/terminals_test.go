@@ -111,7 +111,7 @@ func TestStrictDeliverySerializesOnlySameWarehouse(t *testing.T) {
 
 func TestStrictQualificationUsesExactLimits(t *testing.T) {
 	start := time.Now().Add(-2 * time.Hour)
-	m := &terminalModel{duration: 2 * time.Hour, started: start, measurement: start, stopped: start.Add(2 * time.Hour)}
+	m := &terminalModel{duration: 2 * time.Hour, started: start, measurement: start, cutoff: start.Add(2 * time.Hour)}
 
 	counts := [5]uint64{450, 430, 40, 40, 40}
 	for i, count := range counts {
@@ -135,8 +135,21 @@ func TestStrictQualificationUsesExactLimits(t *testing.T) {
 	m.stats.Transactions[1].Count++
 	m.stats.Transactions[0].WithinLimit = 404
 	require.False(t, m.report().ResponsePass)
-	m.stopped = m.stopped.Add(-time.Nanosecond)
+	m.cutoff = m.cutoff.Add(-time.Nanosecond)
 	require.False(t, m.report().MeasurementPass)
+}
+
+func TestStrictMeasurementExcludesInterruptedCleanup(t *testing.T) {
+	start := time.Now().Add(-3 * time.Hour)
+	end := start.Add(2 * time.Hour)
+	m := &terminalModel{duration: 2 * time.Hour, started: start, measurement: start, end: end, cutoff: end}
+	interrupted := end.Add(-time.Second)
+	m.stopMeasurement(interrupted)
+	m.stopMeasurement(end.Add(time.Minute))
+	r := m.report()
+	require.InDelta(t, (2*time.Hour - time.Second).Seconds(), r.MeasurementSeconds, 0)
+	require.False(t, r.MeasurementPass)
+	require.Equal(t, interrupted, m.cutoff)
 }
 
 func TestStrictTerminalPopulationAndDeck(t *testing.T) {

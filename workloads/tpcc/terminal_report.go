@@ -168,7 +168,7 @@ func (m *terminalModel) report() TerminalReport {
 		m.stats.DeliveryWithin80Seconds*10 >= delivery*9 &&
 		m.stats.DeliverySkipped <= max(uint64(1), delivery/100)
 
-	elapsed := m.stopped.Sub(m.measurement)
+	elapsed := m.cutoff.Sub(m.measurement)
 	if m.started.IsZero() {
 		elapsed = 0
 	}

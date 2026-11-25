@@ -33,7 +33,7 @@ type terminalModel struct {
 	results     *deliveryLog
 	deliveries  map[int64][]*terminalJob
 	stats       strictStatistics
-	stopped     time.Time
+	cutoff      time.Time
 }
 
 type terminal struct {
@@ -128,7 +128,6 @@ func (w *workload) runTerminals(d *bench.Def, settings bench.RunSettings) (err e
 	})
 	d.Execution.Step("workload", w.terminalIteration,
 		bench.ConstantWorkers(model.workers, model.warmup+model.duration, settings.Drain))
-	model.stopped = time.Now()
 
 	d.Execution.Step("delivery_results", func(context.Context, *bench.Bench) error {
 		return model.close()
@@ -196,6 +195,10 @@ func (m *terminalModel) start(now time.Time) {
 	m.measurement = now.Add(m.warmup)
 
 	m.end = m.measurement.Add(m.duration)
+	if m.cutoff.IsZero() || m.end.Before(m.cutoff) {
+		m.cutoff = m.end
+	}
+
 	for _, job := range m.ready {
 		job.transaction = job.terminal.selectTransaction()
 
@@ -280,8 +283,24 @@ func (m *terminalModel) reschedule(job *terminalJob, now time.Time) {
 	}
 }
 
-func (w *workload) terminalIteration(ctx context.Context, b *bench.Bench) error {
+func (w *workload) terminalIteration(ctx context.Context, b *bench.Bench) (err error) {
 	m := w.strict
+	canceled := make(chan struct{})
+
+	stop := context.AfterFunc(ctx, func() {
+		m.stopMeasurement(time.Now())
+		close(canceled)
+	})
+	defer func() {
+		if !stop() {
+			<-canceled
+		}
+
+		if bench.IsFatalError(err) {
+			m.stopMeasurement(time.Now())
+		}
+	}()
+
 	if m.results == nil {
 		return bench.Fatal(fmt.Errorf("%w: initialize_terminals must run before strict traffic", errStrictTerminals))
 	}
@@ -329,6 +348,15 @@ func (w *workload) terminalIteration(ctx context.Context, b *bench.Bench) error 
 
 			b.RecordError("tpcc terminal", err)
 		}
+	}
+}
+
+func (m *terminalModel) stopMeasurement(now time.Time) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.cutoff.IsZero() || now.Before(m.cutoff) {
+		m.cutoff = now
 	}
 }
 
