@@ -31,13 +31,13 @@ func newTestBenchFixture(t *testing.T) *testBenchFixture {
 	core, logs := observer.New(zapcore.InfoLevel)
 	lg := zap.New(core)
 
-	provider, reader, prefix, err := newMeterProvider(context.Background(), &MetricsConfig{})
+	provider, reader, registry, prefix, err := newMeterProvider(context.Background(), &MetricsConfig{})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
 
 	rootState := &rootState{
 		lg:         lg,
-		registry:   newmetricRegistry(provider.Meter("test"), prefix),
+		registry:   registry,
 		txMetrics:  &txMetrics{},
 		stepFilter: newStepFilter(nil, nil),
 	}

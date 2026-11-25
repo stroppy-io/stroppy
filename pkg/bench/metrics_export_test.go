@@ -54,10 +54,8 @@ func TestOTLPShutdownExportsIdentityAndMetadataForShortRuns(t *testing.T) {
 			Headers: "Authorization=Bearer%20test-token", RunID: "same-run",
 			ResourceAttributes: map[string]string{"tenant": "test", "stroppy.segment": segment},
 		}
-		provider, _, prefix, err := newMeterProvider(context.Background(), cfg)
+		provider, _, registry, _, err := newMeterProvider(context.Background(), cfg)
 		require.NoError(t, err)
-
-		registry := newmetricRegistry(provider.Meter("test"), prefix)
 		counter, err := registry.NewMetric("iterations_total", Counter)
 		require.NoError(t, err)
 		trend, err := registry.NewMetric("query_duration", Trend)

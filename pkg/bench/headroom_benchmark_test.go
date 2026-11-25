@@ -50,11 +50,11 @@ func BenchmarkQueryScalar(b *testing.B) {
 }
 
 func BenchmarkMetricTagLookup(b *testing.B) {
-	provider, _, prefix, err := newMeterProvider(b.Context(), &MetricsConfig{})
+	provider, _, registry, _, err := newMeterProvider(b.Context(), &MetricsConfig{})
 	require.NoError(b, err)
 	b.Cleanup(func() { require.NoError(b, provider.Shutdown(context.Background())) })
 
-	counter, err := newmetricRegistry(provider.Meter("benchmark"), prefix).NewMetric("events", Counter)
+	counter, err := registry.NewMetric("events", Counter)
 	require.NoError(b, err)
 
 	tags := []string{"operation", "new_order", "step", "workload"}
@@ -70,11 +70,11 @@ func BenchmarkMetricTagLookup(b *testing.B) {
 func BenchmarkMetricAlternatingSeries(b *testing.B) {
 	for _, parallel := range []bool{false, true} {
 		b.Run(fmt.Sprintf("parallel=%t", parallel), func(b *testing.B) {
-			provider, _, prefix, err := newMeterProvider(b.Context(), &MetricsConfig{})
+			provider, _, registry, _, err := newMeterProvider(b.Context(), &MetricsConfig{})
 			require.NoError(b, err)
 			b.Cleanup(func() { require.NoError(b, provider.Shutdown(context.Background())) })
 
-			counter, err := newmetricRegistry(provider.Meter("benchmark"), prefix).NewMetric("events", Counter)
+			counter, err := registry.NewMetric("events", Counter)
 			require.NoError(b, err)
 
 			attrs := []metricAttributes{

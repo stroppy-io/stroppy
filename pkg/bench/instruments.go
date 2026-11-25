@@ -5,7 +5,7 @@ import (
 	"math"
 	"regexp"
 	"slices"
-	"sort"
+	"strings"
 )
 
 // Label is one finite, declared metric dimension.
@@ -178,32 +178,36 @@ func (i *instrument) record(ctx context.Context, value float64, labels []Label) 
 		invalid("metric recording", inputError("value must be finite"))
 	}
 
-	tags := []string{}
+	var pairs [maxCachedTagParts / tagPairSize]Label
+	if len(labels) > len(pairs) {
+		invalid("metric labels", inputError("too many label dimensions"))
+	}
 
-	seen := map[string]bool{}
-	for _, label := range labels {
-		if seen[label.Name] {
+	ordered := pairs[:len(labels)]
+	copy(ordered, labels)
+	slices.SortFunc(ordered, func(a, b Label) int { return strings.Compare(a.Name, b.Name) })
+
+	previous := ""
+	for index, label := range ordered {
+		if index > 0 && label.Name == previous {
 			invalid("metric label", inputError("duplicate recording key"))
 		}
 
-		seen[label.Name] = true
+		previous = label.Name
+
 		if !slices.Contains(i.labels[label.Name], label.Value) {
 			invalid("metric label", inputError("undeclared %s=%s", label.Name, label.Value))
 		}
-
-		tags = append(tags, label.Name, label.Value)
 	}
 
-	if len(seen) != len(i.labels) {
+	if len(ordered) != len(i.labels) {
 		invalid("metric label", inputError("all declared labels are required"))
 	}
 
-	pairs := make([]Label, 0, len(labels))
-	pairs = append(pairs, labels...)
-	sort.Slice(pairs, func(a, b int) bool { return pairs[a].Name < pairs[b].Name })
+	var tagParts [maxCachedTagParts]string
 
-	tags = tags[:0]
-	for _, label := range pairs {
+	tags := tagParts[:0]
+	for _, label := range ordered {
 		tags = append(tags, label.Name, label.Value)
 	}
 

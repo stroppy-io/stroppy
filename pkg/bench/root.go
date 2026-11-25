@@ -51,7 +51,7 @@ func newrootState(
 	steps, noSteps []string,
 	metricsConfig *MetricsConfig,
 ) (*rootState, error) {
-	provider, reader, prefix, err := newMeterProvider(ctx, metricsConfig)
+	provider, reader, registry, prefix, err := newMeterProvider(ctx, metricsConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func newrootState(
 		lg:            lg,
 		ctx:           ctx,
 		dialer:        &net.Dialer{},
-		registry:      newmetricRegistry(provider.Meter("github.com/stroppy-io/stroppy/v6/pkg/bench"), prefix),
+		registry:      registry,
 		meterProvider: provider,
 		manualReader:  reader,
 		metricsPrefix: prefix,

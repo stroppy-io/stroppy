@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -19,10 +20,10 @@ import (
 func TestMetricAggregationMatchesSDK(t *testing.T) {
 	for _, workers := range []int{1, 100, 256} {
 		t.Run(fmt.Sprintf("workers=%d", workers), func(t *testing.T) {
-			provider, reader, prefix, err := newMeterProvider(t.Context(), &MetricsConfig{})
+			provider, reader, registry, prefix, err := newMeterProvider(t.Context(), &MetricsConfig{})
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
-			registry := newmetricRegistry(provider.Meter("parity"), prefix)
+
 			counter, err := registry.newInstrument("count", Counter, "{operation}", "completed operations", nil)
 			require.NoError(t, err)
 			histogram, err := registry.newInstrument("latency", Trend, "ms", "latency", []float64{0, 1, 2, 5})
@@ -34,39 +35,53 @@ func TestMetricAggregationMatchesSDK(t *testing.T) {
 
 			referenceReader := sdkmetric.NewManualReader()
 			reference := sdkmetric.NewMeterProvider(sdkmetric.WithReader(referenceReader))
+
 			t.Cleanup(func() { require.NoError(t, reference.Shutdown(context.Background())) })
+
 			meter := reference.Meter("parity")
-			referenceCounter, err := meter.Float64Counter(prefix+"count", otelmetric.WithUnit("{operation}"), otelmetric.WithDescription("completed operations"))
+			referenceCounter, err := meter.Float64Counter(
+				prefix+"count", otelmetric.WithUnit("{operation}"), otelmetric.WithDescription("completed operations"),
+			)
 			require.NoError(t, err)
-			referenceHistogram, err := meter.Float64Histogram(prefix+"latency", otelmetric.WithUnit("ms"), otelmetric.WithDescription("latency"), otelmetric.WithExplicitBucketBoundaries(0, 1, 2, 5))
+			referenceHistogram, err := meter.Float64Histogram(
+				prefix+"latency", otelmetric.WithUnit("ms"), otelmetric.WithDescription("latency"),
+				otelmetric.WithExplicitBucketBoundaries(0, 1, 2, 5),
+			)
 			require.NoError(t, err)
 			referenceTotal, err := meter.Float64Counter(prefix + "checks_events_total")
 			require.NoError(t, err)
 			referenceTrue, err := meter.Float64Counter(prefix + "checks_true_total")
 			require.NoError(t, err)
-			referenceGauge, err := meter.Float64Gauge(prefix+"latest", otelmetric.WithUnit("By"), otelmetric.WithDescription("last value"))
+			referenceGauge, err := meter.Float64Gauge(
+				prefix+"latest", otelmetric.WithUnit("By"), otelmetric.WithDescription("last value"),
+			)
 			require.NoError(t, err)
 
 			var group sync.WaitGroup
 			for worker := range workers {
 				group.Go(func() {
 					ctx := metricWorkerContext(context.Background(), worker, workers)
-					attrs := attributes("operation", fmt.Sprint(worker%3))
+					attrs := attributes("operation", strconv.Itoa(worker%3))
+
 					for sample := range 64 {
-						value := []float64{-1, 0, 0.125, 1, 1.5, 2, 5, 8}[sample%8]
+						value := []float64{-1, 0, 0.1, 1, 1.5, 2, 5, 8}[sample%8]
+
 						counter.add(ctx, 0.125, attrs)
 						histogram.add(ctx, value, attrs)
 						rate.add(ctx, float64(sample%2), attrs)
 						referenceCounter.Add(ctx, 0.125, attrs.add...)
 						referenceHistogram.Record(ctx, value, attrs.record...)
 						referenceTotal.Add(ctx, 1, attrs.add...)
+
 						if sample%2 != 0 {
 							referenceTrue.Add(ctx, 1, attrs.add...)
 						}
 					}
 				})
 			}
+
 			group.Wait()
+
 			for _, value := range []float64{4, -2, 0, 8} {
 				gauge.add(t.Context(), value, attributes())
 				referenceGauge.Record(t.Context(), value)
@@ -85,22 +100,27 @@ func TestMetricAggregationMatchesSDK(t *testing.T) {
 
 func assertMetricParity(t *testing.T, actual, expected metricdata.ResourceMetrics) {
 	t.Helper()
+
 	flatten := func(data metricdata.ResourceMetrics) map[string]metricdata.Metrics {
 		out := map[string]metricdata.Metrics{}
+
 		for _, scope := range data.ScopeMetrics {
 			for _, metric := range scope.Metrics {
 				out[metric.Name] = metric
 			}
 		}
+
 		return out
 	}
 	got, want := flatten(actual), flatten(expected)
 	require.Len(t, got, len(want))
+
 	for name, expectedMetric := range want {
 		actualMetric, exists := got[name]
 		require.True(t, exists, name)
 		require.Equal(t, expectedMetric.Unit, actualMetric.Unit, name)
 		require.Equal(t, expectedMetric.Description, actualMetric.Description, name)
+
 		switch expectedData := expectedMetric.Data.(type) {
 		case metricdata.Sum[float64]:
 			actualData, ok := actualMetric.Data.(metricdata.Sum[float64])
@@ -116,6 +136,7 @@ func assertMetricParity(t *testing.T, actual, expected metricdata.ResourceMetric
 			actualData, ok := actualMetric.Data.(metricdata.Histogram[float64])
 			require.True(t, ok, name)
 			require.Equal(t, expectedData.Temporality, actualData.Temporality, name)
+
 			sortHistogram := func(points []metricdata.HistogramDataPoint[float64]) {
 				slices.SortFunc(points, func(a, b metricdata.HistogramDataPoint[float64]) int {
 					return compareAttributes(a.Attributes, b.Attributes)
@@ -124,6 +145,7 @@ func assertMetricParity(t *testing.T, actual, expected metricdata.ResourceMetric
 			sortHistogram(actualData.DataPoints)
 			sortHistogram(expectedData.DataPoints)
 			require.Len(t, actualData.DataPoints, len(expectedData.DataPoints), name)
+
 			for index, point := range expectedData.DataPoints {
 				gotPoint := actualData.DataPoints[index]
 				require.Equal(t, point.Attributes, gotPoint.Attributes, name)
@@ -145,12 +167,14 @@ func compareAttributes(a, b attribute.Set) int {
 		if x.Key != y.Key {
 			return strings.Compare(string(x.Key), string(y.Key))
 		}
-		return strings.Compare(x.Value.Emit(), y.Value.Emit())
+
+		return strings.Compare(x.Value.String(), y.Value.String())
 	})
 }
 
 func assertPointParity(t *testing.T, actual, expected []metricdata.DataPoint[float64]) {
 	t.Helper()
+
 	sortPoints := func(points []metricdata.DataPoint[float64]) {
 		slices.SortFunc(points, func(a, b metricdata.DataPoint[float64]) int {
 			return compareAttributes(a.Attributes, b.Attributes)
@@ -159,6 +183,7 @@ func assertPointParity(t *testing.T, actual, expected []metricdata.DataPoint[flo
 	sortPoints(actual)
 	sortPoints(expected)
 	require.Len(t, actual, len(expected))
+
 	for index, point := range expected {
 		require.Equal(t, point.Attributes, actual[index].Attributes)
 		require.InDelta(t, point.Value, actual[index].Value, max(1e-12, math.Abs(point.Value)*1e-12))

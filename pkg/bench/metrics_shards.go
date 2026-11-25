@@ -26,60 +26,62 @@ type metricWriterSeries struct {
 
 type metricWriterBinding struct {
 	original *attribute.Set
-	bound    metricAttributes
+	shard    *metricShard
 }
 
-func (m *metric) bindSeries(id int, attrs metricAttributes) metricAttributes {
+func (m *metric) bindSeries(id int, attrs metricAttributes) *metricWriterBinding {
 	key := metricWriterSeries{id, attrs.set.Equivalent()}
-	if cached, exists := m.bindings.Load(key); exists {
+	if cached, ok := m.bindings.Load(key); ok {
 		binding, _ := cached.(*metricWriterBinding)
 		m.writers[id].Store(binding)
 
-		return binding.bound
+		return binding
 	}
 
-	set := m.admitSeries(*attrs.set)
-	key.attributes = set.Equivalent()
-
-	var binding *metricWriterBinding
-	if cached, exists := m.bindings.Load(key); exists {
-		binding, _ = cached.(*metricWriterBinding)
-	} else {
-		if id < metricWriterLimit {
-			values := append(set.ToSlice(), attribute.Int(metricWriterKey, id))
-			set = attribute.NewSet(values...)
-		}
-
-		binding = &metricWriterBinding{attrs.set, metricAttributesFromSet(set)}
-		stored, _ := m.bindings.LoadOrStore(key, binding)
-		binding, _ = stored.(*metricWriterBinding)
-	}
-
-	m.writers[id].Store(binding)
-
-	return binding.bound
-}
-
-func (m *metric) admitSeries(set attribute.Set) attribute.Set {
 	m.seriesMu.Lock()
 	defer m.seriesMu.Unlock()
 
 	if m.series == nil {
-		m.series = map[attribute.Distinct]struct{}{}
+		m.series = map[attribute.Distinct]*metricSeries{}
 	}
 
-	key := set.Equivalent()
-	if _, exists := m.series[key]; exists {
-		return set
+	set := *attrs.set
+	seriesKey := set.Equivalent()
+
+	series := m.series[seriesKey]
+	if series == nil {
+		if len(m.series) >= metricCardinalityLimit-1 {
+			set = *m.overflow.set
+			seriesKey = set.Equivalent()
+			series = m.series[seriesKey]
+		}
+
+		if series == nil {
+			series = &metricSeries{attrs: set, shards: map[int]*metricShard{}}
+			m.series[seriesKey] = series
+		}
 	}
 
-	if len(m.series) >= metricCardinalityLimit-1 {
-		return attribute.NewSet(attribute.Bool("otel.metric.overflow", true))
+	shard := series.shards[id]
+	if shard == nil {
+		shard = &metricShard{deltas: make([]metricValues, m.deltaReaders)}
+		if m.Type == Trend {
+			shard.value.buckets = make([]uint64, len(m.bounds)+1)
+			for i := range shard.deltas {
+				shard.deltas[i].buckets = make([]uint64, len(m.bounds)+1)
+			}
+		}
+
+		series.shards[id] = shard
 	}
 
-	m.series[key] = struct{}{}
+	key.attributes = seriesKey
+	binding := &metricWriterBinding{original: attrs.set, shard: shard}
+	stored, _ := m.bindings.LoadOrStore(key, binding)
+	binding, _ = stored.(*metricWriterBinding)
+	m.writers[id].Store(binding)
 
-	return set
+	return binding
 }
 
 func metricWorkerContext(ctx context.Context, worker, workers int) context.Context {

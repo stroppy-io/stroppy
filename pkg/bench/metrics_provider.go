@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+	"go.opentelemetry.io/otel/sdk/instrumentation"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
@@ -54,31 +55,36 @@ type MetricsConfig struct {
 func newMeterProvider(
 	ctx context.Context,
 	config *MetricsConfig,
-) (*sdkmetric.MeterProvider, *sdkmetric.ManualReader, string, error) {
+) (*sdkmetric.MeterProvider, *sdkmetric.ManualReader, *metricRegistry, string, error) {
 	if config == nil {
 		config = &MetricsConfig{}
 	}
 
-	limits := sdkmetric.WithCardinalityLimitSelector(func(kind sdkmetric.InstrumentKind) (int, bool) {
-		if kind == sdkmetric.InstrumentKindCounter || kind == sdkmetric.InstrumentKindHistogram {
-			return metricCardinalityLimit*(metricWriterLimit+1) + 1, false
-		}
+	prefix := config.Prefix
+	if prefix == "" {
+		prefix = defaultMetricsPrefix
+	}
 
+	registry := newmetricRegistry(prefix)
+	registry.scope = instrumentation.Scope{Name: "github.com/stroppy-io/stroppy/v6/pkg/bench"}
+	limits := sdkmetric.WithCardinalityLimitSelector(func(sdkmetric.InstrumentKind) (int, bool) {
 		return metricCardinalityLimit, false
 	})
-	manualReader := sdkmetric.NewManualReader(limits)
+	manualReader := sdkmetric.NewManualReader(
+		limits, sdkmetric.WithProducer(registry.producer(sdkmetric.DefaultTemporalitySelector)),
+	)
 	options := []sdkmetric.Option{sdkmetric.WithReader(manualReader)}
 
 	res, err := metricsResource(config)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("create metrics resource: %w", err)
+		return nil, nil, nil, "", fmt.Errorf("create metrics resource: %w", err)
 	}
 
 	options = append(options, sdkmetric.WithResource(res))
 
 	exporter, enabled, err := newMetricExporter(ctx, config)
 	if err != nil {
-		return nil, nil, "", err
+		return nil, nil, nil, "", err
 	}
 
 	if enabled {
@@ -89,15 +95,14 @@ func newMeterProvider(
 			},
 			sdkmetric.WithInterval(metricExportInterval()),
 			limits,
+			sdkmetric.WithProducer(registry.producer(exporter.Temporality)),
 		)))
 	}
 
-	prefix := config.Prefix
-	if prefix == "" {
-		prefix = defaultMetricsPrefix
-	}
+	provider := sdkmetric.NewMeterProvider(options...)
+	registry.meter = provider.Meter(registry.scope.Name)
 
-	return sdkmetric.NewMeterProvider(options...), manualReader, prefix, nil
+	return provider, manualReader, registry, prefix, nil
 }
 
 func newMetricExporter(ctx context.Context, config *MetricsConfig) (sdkmetric.Exporter, bool, error) {
