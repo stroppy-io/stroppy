@@ -481,6 +481,7 @@ func TestGraphRejectsAuxiliaryReadinessJoinCycle(t *testing.T) {
 		g := d.Execution.Graph("test")
 		action := func(context.Context, *Bench) error {
 			actions.Add(1)
+
 			return nil
 		}
 		owner := g.Node("owner", action)
