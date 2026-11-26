@@ -12,8 +12,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Changed
 
-- Metric recording uses worker-local aggregation to reduce client overhead while preserving local reports and OTLP output.
-- Updated OpenTelemetry to 1.47.0 without restoring its per-observation SDK recording overhead.
+- Metric recording uses worker-local aggregation to reduce client overhead while preserving local reports and OTLP output. ([#297](https://github.com/stroppy-io/stroppy/pull/297))
+- Updated OpenTelemetry to 1.47.0 without restoring its per-observation SDK recording overhead. ([#297](https://github.com/stroppy-io/stroppy/pull/297))
 
 ## [6.4.3] - 2026-11-24
 
