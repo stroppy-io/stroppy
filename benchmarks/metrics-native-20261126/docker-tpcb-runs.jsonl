@@ -1,0 +1,4 @@
+{"variant":"base","position":1,"tps":4180.3023773400655,"transactions":125416,"seconds":30.001657459,"errors":{"terminal_errors":0,"failed_iterations":0,"failed_queries":0,"retry_attempts":0,"groups":[]}}
+{"variant":"native-147","position":2,"tps":4134.0564268844455,"transactions":124028,"seconds":30.001525667,"errors":{"terminal_errors":0,"failed_iterations":0,"failed_queries":0,"retry_attempts":0,"groups":[]}}
+{"variant":"native-147","position":3,"tps":4156.93418154492,"transactions":124714,"seconds":30.00143725,"errors":{"terminal_errors":0,"failed_iterations":0,"failed_queries":0,"retry_attempts":0,"groups":[]}}
+{"variant":"base","position":4,"tps":4174.696761845978,"transactions":125247,"seconds":30.0014605,"errors":{"terminal_errors":0,"failed_iterations":0,"failed_queries":0,"retry_attempts":0,"groups":[]}}

@@ -1,0 +1,3 @@
+b7e14e60dbb2ad2a83225d962e09663e711d2ebb49891c149603675ed51b4839  /Users/ariel/opt/2party/arenadata/stroppy/.git/issue-to-pr-process/278-evidence/stroppy-base
+cf4888601ac4a86774b4dd3d93d5c24813574460e6c5d9d0077892df584c46fe  /Users/ariel/opt/2party/arenadata/stroppy/.git/issue-to-pr-process/278-evidence/stroppy-native-144
+08d47a8281ba7e82f9cca98bafb12ae5646bf91c58abad91b53ee7932088b850  /Users/ariel/opt/2party/arenadata/stroppy/.git/issue-to-pr-process/278-evidence/stroppy-native-147
