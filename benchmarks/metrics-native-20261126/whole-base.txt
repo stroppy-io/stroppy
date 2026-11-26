@@ -1,0 +1,16 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/stroppy-io/stroppy/v6/workloads/baseline
+cpu: Apple M5 Pro
+BenchmarkMetricsScaling/workers=1-4         	 2967589	      1192 ns/op	     356 B/op	      10 allocs/op
+BenchmarkMetricsScaling/workers=100-4       	 9676882	       370.9 ns/op	     356 B/op	      10 allocs/op
+BenchmarkMetricsScaling/workers=256-4       	 9589441	       372.6 ns/op	     356 B/op	      10 allocs/op
+PASS
+goos: darwin
+goarch: arm64
+pkg: github.com/stroppy-io/stroppy/v6/workloads/baseline
+cpu: Apple M5 Pro
+BenchmarkMetricsScaling/workers=1-4         	 2990170	      1194 ns/op	     356 B/op	      10 allocs/op
+BenchmarkMetricsScaling/workers=100-4       	 9637448	       378.6 ns/op	     356 B/op	      10 allocs/op
+BenchmarkMetricsScaling/workers=256-4       	 9613056	       371.3 ns/op	     356 B/op	      10 allocs/op
+PASS

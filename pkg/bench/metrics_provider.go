@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+	"go.opentelemetry.io/otel/sdk/instrumentation"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
@@ -54,42 +55,9 @@ type MetricsConfig struct {
 func newMeterProvider(
 	ctx context.Context,
 	config *MetricsConfig,
-) (*sdkmetric.MeterProvider, *sdkmetric.ManualReader, string, error) {
+) (*sdkmetric.MeterProvider, *sdkmetric.ManualReader, *metricRegistry, string, error) {
 	if config == nil {
 		config = &MetricsConfig{}
-	}
-
-	limits := sdkmetric.WithCardinalityLimitSelector(func(kind sdkmetric.InstrumentKind) (int, bool) {
-		if kind == sdkmetric.InstrumentKindCounter || kind == sdkmetric.InstrumentKindHistogram {
-			return metricCardinalityLimit*(metricWriterLimit+1) + 1, false
-		}
-
-		return metricCardinalityLimit, false
-	})
-	manualReader := sdkmetric.NewManualReader(limits)
-	options := []sdkmetric.Option{sdkmetric.WithReader(manualReader)}
-
-	res, err := metricsResource(config)
-	if err != nil {
-		return nil, nil, "", fmt.Errorf("create metrics resource: %w", err)
-	}
-
-	options = append(options, sdkmetric.WithResource(res))
-
-	exporter, enabled, err := newMetricExporter(ctx, config)
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	if enabled {
-		options = append(options, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(
-			&metadataExporter{
-				Exporter:   exporter,
-				attributes: exportedAttributes(config),
-			},
-			sdkmetric.WithInterval(metricExportInterval()),
-			limits,
-		)))
 	}
 
 	prefix := config.Prefix
@@ -97,7 +65,56 @@ func newMeterProvider(
 		prefix = defaultMetricsPrefix
 	}
 
-	return sdkmetric.NewMeterProvider(options...), manualReader, prefix, nil
+	registry := newmetricRegistry(prefix)
+	registry.scope = instrumentation.Scope{Name: "github.com/stroppy-io/stroppy/v6/pkg/bench"}
+	limits := sdkmetric.WithCardinalityLimitSelector(func(sdkmetric.InstrumentKind) (int, bool) {
+		return metricCardinalityLimit, false
+	})
+	// Native snapshots retain explicit buckets even when export requests exponential aggregation.
+	manualReader := sdkmetric.NewManualReader(
+		limits, sdkmetric.WithProducer(registry.producer(sdkmetric.DefaultTemporalitySelector)),
+		sdkmetric.WithAggregationSelector(func(kind sdkmetric.InstrumentKind) sdkmetric.Aggregation {
+			if kind == sdkmetric.InstrumentKindHistogram {
+				return sdkmetric.AggregationDrop{}
+			}
+
+			return sdkmetric.DefaultAggregationSelector(kind)
+		}),
+	)
+	options := []sdkmetric.Option{sdkmetric.WithReader(manualReader)}
+
+	res, err := metricsResource(config)
+	if err != nil {
+		return nil, nil, nil, "", fmt.Errorf("create metrics resource: %w", err)
+	}
+
+	options = append(options, sdkmetric.WithResource(res))
+
+	exporter, enabled, err := newMetricExporter(ctx, config)
+	if err != nil {
+		return nil, nil, nil, "", err
+	}
+
+	if enabled {
+		aggregation := exporter.Aggregation(sdkmetric.InstrumentKindHistogram)
+		_, registry.sdkHistograms = aggregation.(sdkmetric.AggregationBase2ExponentialHistogram)
+		exportProducer := registry.producer(exporter.Temporality)
+		exportProducer.skipHistograms = registry.sdkHistograms
+		options = append(options, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(
+			&metadataExporter{
+				Exporter:   exporter,
+				attributes: exportedAttributes(config),
+			},
+			sdkmetric.WithInterval(metricExportInterval()),
+			limits,
+			sdkmetric.WithProducer(exportProducer),
+		)))
+	}
+
+	provider := sdkmetric.NewMeterProvider(options...)
+	registry.meter = provider.Meter(registry.scope.Name)
+
+	return provider, manualReader, registry, prefix, nil
 }
 
 func newMetricExporter(ctx context.Context, config *MetricsConfig) (sdkmetric.Exporter, bool, error) {

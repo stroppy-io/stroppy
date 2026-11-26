@@ -1,18 +1,23 @@
 # Metric update scaling
 
-Stroppy records counters, fixed-bucket histograms, rates, and gauges through the
-OpenTelemetry Go SDK. Parallel workers previously updated the same SDK series,
-contending on histogram bucket/count/sum updates. Native throughput counters also
-shared atomic cache lines across workers.
+Stroppy records counters, fixed-bucket histograms, rates, and gauges in bounded
+native worker shards. OpenTelemetry collects preaggregated metric data through
+its public `Producer` interface and retains ownership of HTTP/gRPC export,
+authentication, TLS, retries, and shutdown. Throughput and pool observables still
+use SDK collection callbacks; they do not record through the SDK per operation.
+The explicit opt-in exponential-histogram exporter setting retains an SDK-backed
+histogram path alongside native local buckets; default-path gains do not apply to
+that compatibility mode.
 
 ## Aggregation
 
-Counters, histograms, and rates use bounded worker-local SDK series during
-parallel steps. Single-worker steps keep an unsharded series. The private
-`stroppy.internal.metric_writer` dimension is removed before final snapshots,
-report contributors, text summaries, and OTLP export. Sequential steps reuse
+Counters, histograms, and rates bind public attribute sets to worker-local
+aggregation state. Single-worker steps use one shard. Sequential steps reuse
 writer IDs; at most 128 parallel writer IDs exist, with additional workers
-sharing them. This bound is an implementation limit, not a recommended VU count.
+sharing them safely. Shards are allocated only for observed series/writer pairs.
+A padded shard mutex keeps histogram count, sum, extrema, and buckets consistent
+when collection races with recording. No private worker attributes enter SDK
+aggregation. This bound is an implementation limit, not a recommended VU count.
 
 Merging sums counters and histogram counts, sums, and bucket counts; preserves
 histogram bounds and extrema; and retains collection timestamps and temporality.
@@ -29,7 +34,19 @@ separate padded atomic writers, summed at collection over the original measured
 step window. Cancellation, retries, error accounting, and drain behavior are
 unchanged.
 
-## Local measurements
+## Native aggregation measurements
+
+The [2026-11-26 evidence](../benchmarks/metrics-native-20261126/README.md)
+compares unchanged `453639f`/OTel 1.44.0 with native aggregation/OTel 1.47.0.
+At 100 VUs and `GOMAXPROCS=4`, median ABBA-block throughput increased 40.9%
+without OTLP and 88.4% with one-second OTLP export. All 64 measured runs completed
+without errors. This is a macOS Go-parallelism limit, not four-core CPU affinity
+or a real-database throughput claim. The executable gate requires at least 20%
+median throughput improvement for oversubscribed cases and no more than 5%
+serial regression. The evidence records exact settings, block spread, raw reports,
+allocation/collection costs, and a discarded contaminated experiment.
+
+## Earlier SDK-sharding measurements
 
 Measured 2026-10-06 on Apple M5 Pro, macOS/arm64, Go 1.27.1, OpenTelemetry Go
 1.44.0. Original binary was stack tip `a477fcf`; optimized binary included metric

@@ -18,11 +18,10 @@ import (
 )
 
 func BenchmarkMetricWriterCollection(b *testing.B) {
-	provider, reader, prefix, err := newMeterProvider(b.Context(), &MetricsConfig{})
+	provider, reader, registry, _, err := newMeterProvider(b.Context(), &MetricsConfig{})
 	require.NoError(b, err)
 	b.Cleanup(func() { require.NoError(b, provider.Shutdown(context.Background())) })
 
-	registry := newmetricRegistry(provider.Meter("benchmark"), prefix)
 	histogram, err := registry.NewMetric("duration", Trend)
 	require.NoError(b, err)
 	counter, err := registry.NewMetric("count", Counter)
@@ -55,11 +54,11 @@ func BenchmarkMetricWriterCollection(b *testing.B) {
 func BenchmarkMetricWriterRecording(b *testing.B) {
 	for _, sharded := range []bool{false, true} {
 		b.Run(fmt.Sprintf("sharded=%t", sharded), func(b *testing.B) {
-			provider, _, prefix, err := newMeterProvider(b.Context(), &MetricsConfig{})
+			provider, _, registry, _, err := newMeterProvider(b.Context(), &MetricsConfig{})
 			require.NoError(b, err)
 			b.Cleanup(func() { require.NoError(b, provider.Shutdown(context.Background())) })
 
-			histogram, err := newmetricRegistry(provider.Meter("benchmark"), prefix).NewMetric("duration", Trend)
+			histogram, err := registry.NewMetric("duration", Trend)
 			require.NoError(b, err)
 
 			ctx := context.Background()

@@ -3,12 +3,17 @@ package bench
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	otelmetric "go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/sdk/instrumentation"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/exemplar"
 )
 
 const (
@@ -50,21 +55,23 @@ type metricTagKey struct {
 }
 
 type metric struct {
-	Name       string
-	Type       metricType
-	counter    otelmetric.Float64Counter
-	histogram  otelmetric.Float64Histogram
-	gauge      otelmetric.Float64Gauge
-	rateTrue   otelmetric.Float64Counter
-	rateTotal  otelmetric.Float64Counter
-	emptyAttrs metricAttributes
-	overflow   metricAttributes
-	tagAttrs   sync.Map
-	tagCount   atomic.Int64
-	seriesMu   sync.Mutex
-	series     map[attribute.Distinct]struct{}
-	writers    [metricWriterLimit + 1]atomic.Pointer[metricWriterBinding]
-	bindings   sync.Map
+	Name           string
+	Type           metricType
+	unit           string
+	description    string
+	bounds         []float64
+	started        time.Time
+	deltaReaders   int
+	exemplarFilter exemplar.Filter
+	sdkHistogram   otelmetric.Float64Histogram
+	emptyAttrs     metricAttributes
+	overflow       metricAttributes
+	tagAttrs       sync.Map
+	tagCount       atomic.Int64
+	seriesMu       sync.Mutex
+	series         map[attribute.Distinct]*metricSeries
+	writers        [metricWriterLimit + 1]atomic.Pointer[metricWriterBinding]
+	bindings       sync.Map
 }
 
 func (m *metric) add(ctx context.Context, value float64, attrs metricAttributes) {
@@ -73,48 +80,41 @@ func (m *metric) add(ctx context.Context, value float64, attrs metricAttributes)
 }
 
 func (m *metric) addWriter(ctx context.Context, value float64, attrs metricAttributes, writer *metricWriter) {
-	if m.Type != Gauge {
-		if attrs.set == nil {
-			attrs = m.emptyAttrs
-		}
-
-		id := metricWriterLimit
-		if writer != nil {
-			id = writer.id
-		}
-
-		if cached := m.writers[id].Load(); cached != nil && cached.original == attrs.set {
-			attrs = cached.bound
-		} else {
-			attrs = m.bindSeries(id, attrs)
-		}
+	if attrs.set == nil {
+		attrs = m.emptyAttrs
 	}
 
-	switch m.Type {
-	case Counter:
-		m.counter.Add(ctx, value, attrs.add...)
-	case Trend:
-		m.histogram.Record(ctx, value, attrs.record...)
-	case Rate:
-		m.rateTotal.Add(ctx, 1, attrs.add...)
+	id := metricWriterLimit
+	if writer != nil && m.Type != Gauge {
+		id = writer.id
+	}
 
-		if value != 0 {
-			m.rateTrue.Add(ctx, 1, attrs.add...)
-		}
-	case Gauge:
-		m.gauge.Record(ctx, value, attrs.record...)
+	binding := m.writers[id].Load()
+	if binding == nil || binding.original != attrs.set {
+		binding = m.bindSeries(id, attrs)
+	}
+
+	binding.shard.record(ctx, value, m.Type, m.bounds, m.exemplarFilter)
+
+	if m.sdkHistogram != nil {
+		m.sdkHistogram.Record(ctx, value, binding.attributes.record...)
 	}
 }
 
 type metricRegistry struct {
-	mu      sync.Mutex
-	meter   otelmetric.Meter
-	prefix  string
-	metrics map[string]*metric
+	mu            sync.Mutex
+	meter         otelmetric.Meter
+	prefix        string
+	metrics       map[string]*metric
+	aliases       map[string]bool
+	started       time.Time
+	scope         instrumentation.Scope
+	deltaReaders  int
+	sdkHistograms bool
 }
 
-func newmetricRegistry(meter otelmetric.Meter, prefix string) *metricRegistry {
-	return &metricRegistry{meter: meter, prefix: prefix, metrics: map[string]*metric{}}
+func newmetricRegistry(prefix string) *metricRegistry {
+	return &metricRegistry{prefix: prefix, metrics: map[string]*metric{}, started: time.Now()}
 }
 
 func (r *metricRegistry) NewMetric(name string, typ metricType) (*metric, error) {
@@ -130,65 +130,77 @@ func (r *metricRegistry) newInstrument(
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, ok := r.metrics[name]; ok {
+	if _, ok := r.metrics[name]; ok || r.aliases[name] {
 		return nil, fmt.Errorf("%w: %q", errMetricAlreadyRegistered, name)
 	}
 
-	m := &metric{
-		Name:       name,
-		Type:       typ,
-		emptyAttrs: attributes(),
-		overflow:   attributes("otel.metric.overflow", "true"),
+	if typ < Counter || typ > Gauge {
+		return nil, fmt.Errorf("%w: %d", errUnknownMetricType, typ)
 	}
-	exportedName := r.prefix + name
 
-	var err error
-
-	switch typ {
-	case Counter:
-		m.counter, err = r.meter.Float64Counter(
-			exportedName,
-			otelmetric.WithUnit(unit),
-			otelmetric.WithDescription(description),
-		)
-	case Trend:
+	if typ == Trend {
 		if bounds == nil {
 			bounds = histogramBounds(name)
+		} else if len(bounds) == 0 {
+			aggregation := sdkmetric.DefaultAggregationSelector(sdkmetric.InstrumentKindHistogram)
+			defaults, _ := aggregation.(sdkmetric.AggregationExplicitBucketHistogram)
+			bounds = defaults.Boundaries
 		}
 
-		options := []otelmetric.Float64HistogramOption{
-			otelmetric.WithExplicitBucketBoundaries(bounds...),
-			otelmetric.WithDescription(description),
-		}
-		if unit != "" {
-			options = append(options, otelmetric.WithUnit(unit))
-		} else if strings.HasSuffix(name, "_duration") {
-			options = append(options, otelmetric.WithUnit("ms"))
-		}
+		bounds = slices.Clone(bounds)
 
-		m.histogram, err = r.meter.Float64Histogram(exportedName, options...)
-	case Rate:
-		m.rateTotal, err = r.meter.Float64Counter(exportedName + "_events_total")
-		if err == nil {
-			m.rateTrue, err = r.meter.Float64Counter(exportedName + "_true_total")
+		if unit == "" && strings.HasSuffix(name, "_duration") {
+			unit = "ms"
 		}
-	case Gauge:
-		m.gauge, err = r.meter.Float64Gauge(
-			exportedName,
-			otelmetric.WithUnit(unit),
-			otelmetric.WithDescription(description),
-		)
-	default:
-		err = fmt.Errorf("%w: %d", errUnknownMetricType, typ)
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("create metric %q: %w", name, err)
+	if typ == Rate {
+		unit, description = "", ""
+	}
+
+	if existing := r.compatibleInstrument(name, typ, unit, description); existing != nil {
+		return existing, nil
+	}
+
+	m := &metric{
+		Name: name, Type: typ, unit: unit, description: description,
+		bounds: bounds, started: r.started, deltaReaders: r.deltaReaders, exemplarFilter: metricExemplarFilter(),
+		emptyAttrs: attributes(),
+		overflow:   metricAttributesFromSet(attribute.NewSet(attribute.Bool("otel.metric.overflow", true))),
+	}
+
+	if typ == Trend && r.sdkHistograms {
+		var err error
+
+		m.sdkHistogram, err = r.meter.Float64Histogram(r.prefix+name,
+			otelmetric.WithUnit(unit), otelmetric.WithDescription(description),
+			otelmetric.WithExplicitBucketBoundaries(bounds...),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("create metric %q: %w", name, err)
+		}
 	}
 
 	r.metrics[name] = m
 
 	return m, nil
+}
+
+func (r *metricRegistry) compatibleInstrument(name string, typ metricType, unit, description string) *metric {
+	for registeredName, existing := range r.metrics {
+		if strings.EqualFold(registeredName, name) && existing.Type == typ &&
+			existing.unit == unit && existing.description == description {
+			if r.aliases == nil {
+				r.aliases = map[string]bool{}
+			}
+
+			r.aliases[name] = true
+
+			return existing
+		}
+	}
+
+	return nil
 }
 
 func (m *metric) taggedAttributes(tags []string) metricAttributes {

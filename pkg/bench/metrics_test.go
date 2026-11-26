@@ -15,11 +15,10 @@ import (
 func TestTrendUsesBoundedHistogram(t *testing.T) {
 	t.Parallel()
 
-	provider, reader, prefix, err := newMeterProvider(context.Background(), &MetricsConfig{})
+	provider, reader, registry, prefix, err := newMeterProvider(context.Background(), &MetricsConfig{})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
 
-	registry := newmetricRegistry(provider.Meter("test"), prefix)
 	trend, err := registry.NewMetric("run_query_duration", Trend)
 	require.NoError(t, err)
 
@@ -51,11 +50,10 @@ func TestTrendUsesBoundedHistogram(t *testing.T) {
 func TestRateUsesEventCounters(t *testing.T) {
 	t.Parallel()
 
-	provider, reader, prefix, err := newMeterProvider(context.Background(), &MetricsConfig{})
+	provider, reader, registry, prefix, err := newMeterProvider(context.Background(), &MetricsConfig{})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
 
-	registry := newmetricRegistry(provider.Meter("test"), prefix)
 	rate, err := registry.NewMetric("checks", Rate)
 	require.NoError(t, err)
 
@@ -73,7 +71,7 @@ func TestRateUsesEventCounters(t *testing.T) {
 func TestMeterProviderAcceptsNilConfig(t *testing.T) {
 	t.Parallel()
 
-	provider, reader, prefix, err := newMeterProvider(context.Background(), nil)
+	provider, reader, _, prefix, err := newMeterProvider(context.Background(), nil)
 	require.NoError(t, err)
 	require.NotNil(t, reader)
 	require.Equal(t, defaultMetricsPrefix, prefix)
@@ -97,11 +95,10 @@ func TestParseOTLPHeaders(t *testing.T) {
 func TestGenericMetricCachesAttributes(t *testing.T) {
 	t.Parallel()
 
-	provider, _, prefix, err := newMeterProvider(context.Background(), &MetricsConfig{})
+	provider, _, registry, _, err := newMeterProvider(context.Background(), &MetricsConfig{})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
 
-	registry := newmetricRegistry(provider.Meter("test"), prefix)
 	trend, err := registry.NewMetric("custom_duration", Trend)
 	require.NoError(t, err)
 
@@ -116,11 +113,10 @@ func TestGenericMetricCachesAttributes(t *testing.T) {
 func TestGenericMetricUsesOverflowAfterCardinalityLimit(t *testing.T) {
 	t.Parallel()
 
-	provider, _, prefix, err := newMeterProvider(context.Background(), &MetricsConfig{})
+	provider, _, registry, _, err := newMeterProvider(context.Background(), &MetricsConfig{})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
 
-	registry := newmetricRegistry(provider.Meter("test"), prefix)
 	counter, err := registry.NewMetric("custom_total", Counter)
 	require.NoError(t, err)
 	counter.tagCount.Store(metricCardinalityLimit)
@@ -150,11 +146,10 @@ func TestHistogramQuantileUsesBoundedBuckets(t *testing.T) {
 }
 
 func BenchmarkTrendRecord(b *testing.B) {
-	provider, _, prefix, err := newMeterProvider(context.Background(), &MetricsConfig{})
+	provider, _, registry, _, err := newMeterProvider(context.Background(), &MetricsConfig{})
 	require.NoError(b, err)
 	b.Cleanup(func() { require.NoError(b, provider.Shutdown(context.Background())) })
 
-	registry := newmetricRegistry(provider.Meter("benchmark"), prefix)
 	trend, err := registry.NewMetric("run_query_duration", Trend)
 	require.NoError(b, err)
 
@@ -169,12 +164,12 @@ func BenchmarkTrendRecord(b *testing.B) {
 }
 
 func TestTransactionEndKeepsActionAndIsolationAttributes(t *testing.T) {
-	provider, reader, prefix, err := newMeterProvider(context.Background(), &MetricsConfig{})
+	provider, reader, registry, prefix, err := newMeterProvider(context.Background(), &MetricsConfig{})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
 
 	rootState := &rootState{
-		registry:  newmetricRegistry(provider.Meter("test"), prefix),
+		registry:  registry,
 		txMetrics: &txMetrics{},
 	}
 	vu := &VU{root: rootState, ctx: context.Background(), stepTag: "workload"}
@@ -193,11 +188,10 @@ func TestTransactionEndKeepsActionAndIsolationAttributes(t *testing.T) {
 }
 
 func BenchmarkMetricAdd(b *testing.B) {
-	provider, _, prefix, err := newMeterProvider(context.Background(), &MetricsConfig{})
+	provider, _, registry, _, err := newMeterProvider(context.Background(), &MetricsConfig{})
 	require.NoError(b, err)
 	b.Cleanup(func() { require.NoError(b, provider.Shutdown(context.Background())) })
 
-	registry := newmetricRegistry(provider.Meter("benchmark"), prefix)
 	trend, err := registry.NewMetric("custom_duration", Trend)
 	require.NoError(b, err)
 

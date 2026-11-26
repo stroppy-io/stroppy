@@ -17,11 +17,10 @@ import (
 )
 
 func TestMetricWritersCollectWhileRecording(t *testing.T) {
-	provider, reader, prefix, err := newMeterProvider(t.Context(), &MetricsConfig{})
+	provider, reader, registry, prefix, err := newMeterProvider(t.Context(), &MetricsConfig{})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
 
-	registry := newmetricRegistry(provider.Meter("test"), prefix)
 	counter, err := registry.NewMetric("count", Counter)
 	require.NoError(t, err)
 	histogram, err := registry.NewMetric("duration", Trend)
@@ -108,11 +107,10 @@ func TestMetricWriterFinalReportsHaveOnlyPublicSeries(t *testing.T) {
 }
 
 func TestMetricWriterCardinalityAndBindingsStayBounded(t *testing.T) {
-	provider, reader, prefix, err := newMeterProvider(t.Context(), &MetricsConfig{})
+	provider, reader, registry, _, err := newMeterProvider(t.Context(), &MetricsConfig{})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
 
-	registry := newmetricRegistry(provider.Meter("test"), prefix)
 	counter, err := registry.NewMetric("count", Counter)
 	require.NoError(t, err)
 	gauge, err := registry.NewMetric("latest", Gauge)
@@ -159,23 +157,24 @@ func TestMetricWriterCardinalityAndBindingsStayBounded(t *testing.T) {
 	}
 
 	bindings := 0
-	counter.bindings.Range(func(_, _ any) bool {
-		bindings++
+	for _, series := range counter.series {
+		bindings += len(series.shards)
+	}
 
-		return true
-	})
 	require.Equal(t, metricCardinalityLimit*len(contexts), bindings)
-	require.Len(t, counter.series, metricCardinalityLimit-1)
+	require.Len(t, counter.series, metricCardinalityLimit)
 }
 
 func TestMetricWritersMergeDeltaCollectionAndCancelCause(t *testing.T) {
 	selector := func(sdkmetric.InstrumentKind) metricdata.Temporality { return metricdata.DeltaTemporality }
-	reader := sdkmetric.NewManualReader(sdkmetric.WithTemporalitySelector(selector))
+	registry := newmetricRegistry("")
+	reader := sdkmetric.NewManualReader(
+		sdkmetric.WithTemporalitySelector(selector), sdkmetric.WithProducer(registry.producer(selector)),
+	)
 	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
 
 	t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
 
-	registry := newmetricRegistry(provider.Meter("test"), "")
 	counter, err := registry.NewMetric("count", Counter)
 	require.NoError(t, err)
 	histogram, err := registry.NewMetric("duration", Trend)
@@ -206,11 +205,10 @@ func TestMetricWritersMergeDeltaCollectionAndCancelCause(t *testing.T) {
 }
 
 func TestMetricWriterExemplarReservoirsStayBounded(t *testing.T) {
-	provider, reader, prefix, err := newMeterProvider(t.Context(), &MetricsConfig{})
+	provider, reader, registry, prefix, err := newMeterProvider(t.Context(), &MetricsConfig{})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
 
-	registry := newmetricRegistry(provider.Meter("test"), prefix)
 	histogram, err := registry.newInstrument("latency", Trend, "", "", []float64{1, 2})
 	require.NoError(t, err)
 	counter, err := registry.NewMetric("count", Counter)
@@ -246,11 +244,10 @@ func TestMetricWriterExemplarReservoirsStayBounded(t *testing.T) {
 }
 
 func TestMetricWritersMergeCountersHistogramsAndRates(t *testing.T) {
-	provider, reader, prefix, err := newMeterProvider(t.Context(), &MetricsConfig{})
+	provider, reader, registry, prefix, err := newMeterProvider(t.Context(), &MetricsConfig{})
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
 
-	registry := newmetricRegistry(provider.Meter("test"), prefix)
 	counter, err := registry.NewMetric("count", Counter)
 	require.NoError(t, err)
 	histogram, err := registry.newInstrument("latency", Trend, "s", "latency", []float64{1, 2})
@@ -302,12 +299,11 @@ func TestMetricWritersMergeCountersHistogramsAndRates(t *testing.T) {
 }
 
 func TestMetricWriterKeepsSampledExemplars(t *testing.T) {
-	provider, reader, prefix, err := newMeterProvider(t.Context(), &MetricsConfig{})
+	provider, reader, registry, prefix, err := newMeterProvider(t.Context(), &MetricsConfig{})
 	require.NoError(t, err)
 
 	defer provider.Shutdown(context.Background())
 
-	registry := newmetricRegistry(provider.Meter("test"), prefix)
 	histogram, err := registry.NewMetric("duration", Trend)
 	require.NoError(t, err)
 
@@ -342,12 +338,11 @@ func TestMetricMergeTimesAndGaugeSemantics(t *testing.T) {
 	require.Len(t, out, 1)
 	require.Equal(t, start, out[0].StartTime)
 	require.Equal(t, start.Add(2*time.Second), out[0].Time)
-	provider, reader, prefix, err := newMeterProvider(t.Context(), &MetricsConfig{})
+	provider, reader, registry, prefix, err := newMeterProvider(t.Context(), &MetricsConfig{})
 	require.NoError(t, err)
 
 	defer provider.Shutdown(context.Background())
 
-	registry := newmetricRegistry(provider.Meter("test"), prefix)
 	gauge, err := registry.NewMetric("latest", Gauge)
 	require.NoError(t, err)
 

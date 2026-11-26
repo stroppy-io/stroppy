@@ -10,7 +10,7 @@ import (
 
 // BenchmarkMetricsScaling exercises the real transaction and metrics paths without database I/O.
 func BenchmarkMetricsScaling(b *testing.B) {
-	for _, workers := range []int{1, 8, 18, 24} {
+	for _, workers := range []int{1, 4, 8, 18, 24, 100, 256} {
 		b.Run(fmt.Sprintf("workers=%d", workers), func(b *testing.B) {
 			b.ReportAllocs()
 
