@@ -65,6 +65,53 @@ func TestPacingWaitsAndWarehouseAccounting(t *testing.T) {
 	require.Nil(t, report.ResponseAdjustedMaxTpmC)
 }
 
+func TestPacingWaitCrossingCutoffRetainsMeasuredPart(t *testing.T) {
+	fixture := bench.Test{Name: "cutoff-wait", Define: func(d *bench.Def) error {
+		w := &workload{pacing: true, warehouses: 1, warehouseStart: 1}
+		w.initPacing(&d.Metrics, 10)
+		d.Execution.Step("workload", func(ctx context.Context, _ *bench.Bench) error {
+			start := time.Now()
+			w.pace.window(start, start.Add(time.Minute))
+			w.pace.appliedWait(ctx, 0, 1, start.Add(59*time.Second), start.Add(71*time.Second), true)
+			r := w.pacingReport(time.Minute)
+			require.Zero(t, r.Transactions[0].Think.Count)
+			require.Equal(t, uint64(1), r.Transactions[0].Think.Truncated)
+			require.InDelta(t, 1, r.Transactions[0].Think.TruncatedSeconds, 0)
+
+			return nil
+		})
+
+		return d.Execution.Err()
+	}}
+	_, err := testkit.Run(t.Context(), fixture, bench.RunOptions{})
+	require.NoError(t, err)
+}
+
+func TestPacingIsolationApplicability(t *testing.T) {
+	for _, variant := range []string{"tx", "procs"} {
+		for _, isolation := range []bench.TxIsolationName{bench.IsoNone, bench.IsoConn} {
+			w := &workload{
+				variant: variant, iso: isolation, warehouses: 1,
+				pace: &pacing{warehouses: []WarehousePacing{{Warehouse: 1, Terminals: 10}}},
+			}
+
+			r := w.pacingReport(time.Minute)
+			if variant == "tx" {
+				require.False(t, r.Applicable)
+				require.Equal(t, "not_applicable", r.Verdict)
+				require.Equal(t, "not_applicable", r.WarehouseRates[0].Verdict)
+			} else {
+				require.True(t, r.Applicable)
+			}
+		}
+	}
+}
+
+func TestPacingTextIdentifiesSimulation(t *testing.T) {
+	r := PacingReport{Simulated: true, Verdict: "pass"}
+	require.Contains(t, r.text(), "SIMULATED noop results: no database results were validated.")
+}
+
 func TestPacingMetricsAbsentWhenDisabled(t *testing.T) {
 	fixture := bench.Test{Name: "unpaced", Define: func(d *bench.Def) error {
 		w := &workload{warehouses: 1}

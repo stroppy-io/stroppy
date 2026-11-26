@@ -223,11 +223,22 @@ func (p *pacing) appliedWait(ctx context.Context, idx, kind int, start, end time
 
 	p.wait[idx][kind].Record(ctx, seconds, bench.LabelValue("phase", phase), bench.LabelValue("wait_outcome", outcome))
 
-	truncatedMeasured := !complete && !p.start.IsZero() && !start.Before(p.start) &&
-		(p.end.IsZero() || start.Before(p.end))
-	if phase != "measurement" && !truncatedMeasured {
+	if p.start.IsZero() || end.Before(p.start) || (!p.end.IsZero() && !start.Before(p.end)) {
 		return
 	}
+
+	measuredStart, measuredEnd := start, end
+	if measuredStart.Before(p.start) {
+		measuredStart = p.start
+		complete = false
+	}
+
+	if !p.end.IsZero() && measuredEnd.After(p.end) {
+		measuredEnd = p.end
+		complete = false
+	}
+
+	seconds = max(0, measuredEnd.Sub(measuredStart).Seconds())
 
 	summary := &p.transactions[idx].Keying
 	if kind == 1 {
@@ -387,7 +398,9 @@ func (w *workload) pacingReport(elapsed time.Duration) *PacingReport {
 
 	spec := math.Round(terminalCeiling(specWeights, nil)*100) / 100
 	model := terminalCeiling(weights, nil)
-	applicable := !w.spreadWarehouses && !w.isPicodata && (w.strict != nil || !w.terminalPopulationMismatch)
+	nonTransactional := w.variant == "tx" && (w.iso == bench.IsoNone || w.iso == bench.IsoConn)
+	applicable := !w.spreadWarehouses && !w.isPicodata && !nonTransactional &&
+		(w.strict != nil || !w.terminalPopulationMismatch)
 
 	r := &PacingReport{
 		Model: "stress", Applicable: applicable, FixedBinding: !w.spreadWarehouses,
@@ -449,6 +462,10 @@ func (r *PacingReport) text() string {
 		status = "NOT APPLICABLE"
 	} else if r.Verdict != "pass" {
 		status = "FAIL"
+	}
+
+	if r.Simulated {
+		fmt.Fprintln(&out, "SIMULATED noop results: no database results were validated.")
 	}
 
 	fmt.Fprintf(&out, "Terminal ceiling: %s — %s (diagnostic, %s)\n", status, r.Verdict, r.Model)

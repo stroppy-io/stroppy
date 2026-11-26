@@ -301,8 +301,10 @@ and independent ceiling/floor verdict.
 Per-transaction keying and think observations report full-wait count, sum,
 minimum, mean, and maximum in seconds (§8.1.6.3). Interrupted waits have separate
 counts and applied seconds; they never lower the full-wait averages unnoticed.
-Only waits wholly inside measurement enter full-wait summaries; histogram series
-also retain warmup, boundary, and drain observations. Strict scheduler idle time
+Only waits wholly inside measurement enter full-wait summaries; waits crossing
+either boundary retain their measurement-clipped portion as truncated, even if
+they later complete during drain. Histogram series retain the actual complete
+wait and its warmup, boundary, or drain phase. Strict scheduler idle time
 ends at the scheduled deadline; subsequent worker-queue delay belongs to response
 time, not keying or thinking. Unfinished cycles at the measurement cutoff remain
 visible as truncated waits.
