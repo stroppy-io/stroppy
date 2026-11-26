@@ -23,6 +23,8 @@ import (
 
 const defaultCleanupTimeout = 30 * time.Second
 
+var errWorkloadPanic = errors.New("workload panicked")
+
 // Bench is a stable step-worker-scoped set of author capabilities. Workers own
 // separate Bench values; workload state remains ordinary Go state.
 type Bench struct {
@@ -174,6 +176,7 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 				err = errors.Join(err, failure)
 			} else {
 				panicValue = value
+				err = errors.Join(err, errWorkloadPanic)
 			}
 		}
 

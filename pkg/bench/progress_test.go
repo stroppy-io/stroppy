@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -286,6 +288,42 @@ func TestProgressPublicAPIReportsNativeWorkAndOutcome(t *testing.T) {
 			require.Equal(t, "q1", result.Progress.Sources[0].Activity)
 		})
 	}
+}
+
+func TestProgressPanicFinalizesFailedReportAndCapture(t *testing.T) {
+	directory := t.TempDir()
+
+	var snapshot ReportContext
+
+	test := Test{Name: "panic-progress", Define: func(d *Def) error {
+		d.Report.Contribute("panic.snapshot", 1, func(value ReportContext) (ReportContribution, error) {
+			snapshot = value
+
+			return ReportContribution{Status: report.WorkloadReportOK}, nil
+		})
+		d.Execution.Step("work", func(ctx context.Context, b *Bench) error {
+			b.Progress(ctx, ProgressUpdate{Activity: "q1", Unit: "queries"})
+			panic("private panic payload")
+		})
+
+		return d.Execution.Err()
+	}}
+
+	require.PanicsWithValue(t, "private panic payload", func() {
+		_, _ = RunTest(t.Context(), test, RunOptions{
+			Report: &ReportOptions{}, Metrics: &MetricsConfig{Quiet: true},
+			Capture: &CaptureOptions{Directory: directory, Metrics: true, Interval: time.Hour},
+		})
+	})
+	require.Equal(t, report.StatusFailed, snapshot.Status)
+
+	paths, err := filepath.Glob(filepath.Join(directory, "*", "events.jsonl"))
+	require.NoError(t, err)
+	require.Len(t, paths, 1)
+	data, err := os.ReadFile(paths[0])
+	require.NoError(t, err)
+	require.Contains(t, string(data), `"state":"failed"`)
+	require.NotContains(t, string(data), "private panic payload")
 }
 
 func TestProgressOTLPReportAndCaptureAgree(t *testing.T) {
