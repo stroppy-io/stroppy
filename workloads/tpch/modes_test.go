@@ -164,6 +164,31 @@ func TestRefreshModesRejectUnsupportedScalesBeforeActions(t *testing.T) {
 	}
 }
 
+func TestModePreflightRejectsDestructiveContinuationAndMissingSeedProducer(t *testing.T) {
+	for _, test := range []struct {
+		mode     string
+		excluded []string
+		params   map[string]string
+	}{
+		{"power", []string{"load_data"}, map[string]string{"query-seed": "19620718", "refresh-set": "2"}},
+		{"throughput", []string{"load_data"}, map[string]string{"query-seed": "19620718", "refresh-set": "2"}},
+		{"power-query-only", []string{"analyze"}, nil},
+	} {
+		recorder := &record.Recorder{}
+
+		params := map[string]string{"mode": test.mode, "scale-factor": "0.01"}
+		for key, value := range test.params {
+			params[key] = value
+		}
+
+		_, err := testkit.Record(t.Context(), Test, recorder, bench.RunOptions{
+			Params: bench.ParamInputs{CLI: params}, NoSteps: test.excluded,
+		})
+		require.Error(t, err)
+		require.Empty(t, recorder.Operations())
+	}
+}
+
 func TestFullModeRejectsFilteredWorkBeforeActions(t *testing.T) {
 	for _, name := range []string{
 		"drop_schema", "create_schema", "load_data", "create_indexes", "analyze",

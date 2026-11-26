@@ -74,8 +74,10 @@ func visitGraphNode(node *graphNode, byName map[string]*graphNode, visiting, vis
 			return inputError("missing dependency")
 		}
 
-		if err := visitGraphNode(dependency.node, byName, visiting, visited); err != nil {
-			return err
+		if !dependency.beforeAction {
+			if err := visitGraphNode(dependency.node, byName, visiting, visited); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -189,7 +191,9 @@ func (g *Graph) describeNode(node *graphNode, selected bool) NodeDescription {
 	}
 
 	for _, dependency := range node.dependencies {
-		entry.Dependencies = append(entry.Dependencies, DependencyDescription{dependency.node.name, dependency.event})
+		entry.Dependencies = append(entry.Dependencies, DependencyDescription{
+			Node: dependency.node.name, Event: dependency.event, BeforeAction: dependency.beforeAction,
+		})
 	}
 
 	return entry

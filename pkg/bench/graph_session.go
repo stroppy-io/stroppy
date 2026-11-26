@@ -157,6 +157,10 @@ func validateGraphSessions(g *Graph, selected map[*graphNode]bool) error {
 }
 
 func graphCompletionPath(node, prerequisite *graphNode, visited map[*graphNode]bool) bool {
+	return graphResourcePath(node, prerequisite, visited, false)
+}
+
+func graphResourcePath(node, prerequisite *graphNode, visited map[*graphNode]bool, terminal bool) bool {
 	if node == prerequisite {
 		return true
 	}
@@ -167,11 +171,11 @@ func graphCompletionPath(node, prerequisite *graphNode, visited map[*graphNode]b
 
 	visited[node] = true
 	for _, dependency := range node.dependencies {
-		if dependency.event == "started" || dependency.event == "ready" {
+		if (dependency.beforeAction && !terminal) || dependency.event == "started" || dependency.event == "ready" {
 			continue
 		}
 
-		if graphCompletionPath(dependency.node, prerequisite, visited) {
+		if graphResourcePath(dependency.node, prerequisite, visited, true) {
 			return true
 		}
 	}

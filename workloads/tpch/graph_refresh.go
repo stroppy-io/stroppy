@@ -17,9 +17,10 @@ func (w *workload) declareRefreshStreams(
 			rf1 := group.WorkerNode("rf1", w.graphRefreshInitializer(dialect, selection, "rf1"),
 				bench.OncePerWorker(1)).UseSession(session).After(previous...)
 			queries := group.WorkerNode("queries", w.streamInitializer(dialect),
-				bench.OncePerWorker(1), bench.RetainSession()).AfterSuccess(rf1)
+				bench.OncePerWorker(1), bench.RetainSession()).After(previous...).RunAfterSuccess(rf1)
 			rf2 := group.WorkerNode("rf2", w.graphRefreshInitializer(dialect, selection, "rf2"),
 				bench.OncePerWorker(1)).UseSession(session).AfterSuccess(queries)
+			rf1.RunAfterReady(queries)
 			group.Measure("window", rf1, queries, rf2)
 
 			return
@@ -29,7 +30,8 @@ func (w *workload) declareRefreshStreams(
 			bench.OncePerWorker(selection.count), bench.RetainSession()).After(previous...)
 		refresh := group.WorkerNode("refresh", w.graphRefreshInitializer(dialect, selection, ""),
 			bench.OncePerWorker(1), bench.RetainSession()).After(previous...)
-		queries.AfterReady(refresh)
+		queries.RunAfterReady(refresh)
+		refresh.RunAfterReady(queries)
 		group.Measure("window", queries, refresh)
 	})
 }

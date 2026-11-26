@@ -40,8 +40,9 @@ type graphNode struct {
 }
 
 type graphDependency struct {
-	node  *graphNode
-	event string
+	node         *graphNode
+	event        string
+	beforeAction bool
 }
 
 type graphMeasurement struct {
@@ -170,8 +171,9 @@ type NodeDescription struct {
 }
 
 type DependencyDescription struct {
-	Node  string `json:"node"`
-	Event string `json:"event"`
+	Node         string `json:"node"`
+	Event        string `json:"event"`
+	BeforeAction bool   `json:"before_action,omitempty"`
 }
 
 func (e *Execution) Graph(name string) *Graph {
@@ -243,7 +245,7 @@ func (g *Graph) Group(name string, declare func(*Graph)) []NodeRef {
 	return refs
 }
 
-func (n NodeRef) after(event string, predecessors []NodeRef) NodeRef {
+func (n NodeRef) after(event string, beforeAction bool, predecessors []NodeRef) NodeRef {
 	if n.graph == nil || n.node == nil || n.graph.frozen {
 		invalid("graph dependency", inputError("invalid or frozen node"))
 	}
@@ -253,7 +255,7 @@ func (n NodeRef) after(event string, predecessors []NodeRef) NodeRef {
 			invalid("graph dependency", inputError("nodes belong to different graphs"))
 		}
 
-		n.node.dependencies = append(n.node.dependencies, graphDependency{predecessor.node, event})
+		n.node.dependencies = append(n.node.dependencies, graphDependency{predecessor.node, event, beforeAction})
 	}
 
 	return n
@@ -261,12 +263,20 @@ func (n NodeRef) after(event string, predecessors []NodeRef) NodeRef {
 
 // After orders selected nodes without requiring an excluded prerequisite to run.
 // Use AfterSuccess when a missing or failed prerequisite makes execution invalid.
-func (n NodeRef) After(nodes ...NodeRef) NodeRef { return n.after("ordered", nodes) }
+func (n NodeRef) After(nodes ...NodeRef) NodeRef { return n.after("ordered", false, nodes) }
 
-func (n NodeRef) AfterSuccess(nodes ...NodeRef) NodeRef    { return n.after("succeeded", nodes) }
-func (n NodeRef) AfterCompletion(nodes ...NodeRef) NodeRef { return n.after("completed", nodes) }
-func (n NodeRef) AfterStarted(nodes ...NodeRef) NodeRef    { return n.after("started", nodes) }
-func (n NodeRef) AfterReady(nodes ...NodeRef) NodeRef      { return n.after("ready", nodes) }
+func (n NodeRef) AfterSuccess(nodes ...NodeRef) NodeRef { return n.after("succeeded", false, nodes) }
+
+func (n NodeRef) AfterCompletion(nodes ...NodeRef) NodeRef { return n.after("completed", false, nodes) }
+
+func (n NodeRef) AfterStarted(nodes ...NodeRef) NodeRef { return n.after("started", false, nodes) }
+func (n NodeRef) AfterReady(nodes ...NodeRef) NodeRef   { return n.after("ready", false, nodes) }
+
+// RunAfterReady and RunAfterSuccess allow initialization before the dependency,
+// but hold the action window until it is satisfied.
+func (n NodeRef) RunAfterReady(nodes ...NodeRef) NodeRef { return n.after("ready", true, nodes) }
+
+func (n NodeRef) RunAfterSuccess(nodes ...NodeRef) NodeRef { return n.after("succeeded", true, nodes) }
 
 // SignalsReady requires the action to call Bench.Ready. Worker initialization
 // alone does not imply application readiness for this node.

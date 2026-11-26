@@ -30,7 +30,7 @@ func (g *Graph) report(runs map[*graphNode]*graphNodeRun, started time.Time) rep
 
 		for _, dependency := range node.dependencies {
 			entry.Dependencies = append(entry.Dependencies, report.GraphDependency{
-				Node: dependency.node.name, Event: dependency.event,
+				Node: dependency.node.name, Event: dependency.event, BeforeAction: dependency.beforeAction,
 			})
 		}
 

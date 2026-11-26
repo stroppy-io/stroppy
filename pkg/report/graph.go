@@ -60,8 +60,9 @@ type GraphNode struct {
 }
 
 type GraphDependency struct {
-	Node  string `json:"node"`
-	Event string `json:"event"`
+	Node         string `json:"node"`
+	Event        string `json:"event"`
+	BeforeAction bool   `json:"before_action,omitempty"`
 }
 
 type GraphMeasurement struct {

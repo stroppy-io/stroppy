@@ -140,19 +140,13 @@ func (g *Graph) runNode(
 		}
 	}()
 
-	if !selected {
-		run.result.Status = Skipped
-
-		return
-	}
-
-	if (node.cleanup == 0 || node.optionalCleanup) && !g.execution.Enabled(node.name) {
+	if !selected || ((node.cleanup == 0 || node.optionalCleanup) && !g.execution.Enabled(node.name)) {
 		run.result.Status = skippedGraphStatus(node, runs)
 
 		return
 	}
 
-	if !waitGraphDependencies(ctx, run, runs) {
+	if !waitGraphDependencies(ctx, run, runs, false) {
 		run.result.Status = Blocked
 
 		return
@@ -245,7 +239,7 @@ func (g *Graph) executeNode(ctx context.Context, run *graphNodeRun, runs map[*gr
 		}
 	}()
 
-	child := g.nodeExecution(nodeContext, run)
+	child := g.nodeExecution(nodeContext, run, runs)
 	if g.execution.root.progress != nil {
 		child.progress = g.execution.root.progress.graphChild()
 	}
@@ -319,9 +313,9 @@ func (g *Graph) collectRuns(runs map[*graphNode]*graphNodeRun, cause error) (pan
 			e.root.stepFilter.record(report.Step{Name: node.name, Status: string(run.result.Status)})
 		}
 
-		canceledByGraph := g.execution.ctx.Err() == nil && cause != nil && errors.Is(run.err, context.Canceled)
-		if run.err != nil && !canceledByGraph {
-			failures = errors.Join(failures, fmt.Errorf("node %s: %w", node.name, run.err))
+		failure := graphRunFailure(e.ctx, cause, run.err)
+		if failure != nil {
+			failures = errors.Join(failures, fmt.Errorf("node %s: %w", node.name, failure))
 			if e.failurePhase == "" {
 				e.failurePhase = node.name
 			}
@@ -375,8 +369,14 @@ func graphOwnerStarted(node *graphNode, runs map[*graphNode]*graphNodeRun) bool 
 	return false
 }
 
-func waitGraphDependencies(ctx context.Context, run *graphNodeRun, runs map[*graphNode]*graphNodeRun) bool {
+func waitGraphDependencies(
+	ctx context.Context, run *graphNodeRun, runs map[*graphNode]*graphNodeRun, beforeAction bool,
+) bool {
 	for _, dependency := range run.node.dependencies {
+		if dependency.beforeAction != beforeAction {
+			continue
+		}
+
 		prior := runs[dependency.node]
 		if run.node.cleanup > 0 {
 			<-prior.done
@@ -433,7 +433,9 @@ func graphDependencySatisfied(event string, status StepStatus) bool {
 	}
 }
 
-func (g *Graph) nodeExecution(ctx context.Context, run *graphNodeRun) *Execution {
+func (g *Graph) nodeExecution(
+	ctx context.Context, run *graphNodeRun, runs map[*graphNode]*graphNodeRun,
+) *Execution {
 	parent := g.execution
 	child := &Execution{
 		def: parent.def, root: parent.root, ctx: ctx, databases: parent.databases,
@@ -456,6 +458,17 @@ func (g *Graph) nodeExecution(ctx context.Context, run *graphNodeRun) *Execution
 		child.ready = run.signalReady
 	}
 
+	child.beforeAction = func(ctx context.Context) error {
+		if waitGraphDependencies(ctx, run, runs, true) {
+			return nil
+		}
+
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		return inputError("node %q action prerequisite did not complete", run.node.name)
+	}
 	child.onResult = func(result Result) Result { return run.normalizeResult(parent.ctx, result) }
 
 	return child
@@ -485,7 +498,11 @@ func (run *graphNodeRun) normalizeResult(parent context.Context, result Result) 
 	if run.node.auxiliary != nil && errors.Is(result.Err, context.Canceled) && parent.Err() == nil {
 		select {
 		case <-run.ownerDone:
-			result = Result{Status: Completed}
+			if remaining := withoutGraphCancellation(result.Err); remaining == nil {
+				result = Result{Status: Completed}
+			} else {
+				result = Result{Status: Failed, Err: remaining}
+			}
 		default:
 		}
 	}

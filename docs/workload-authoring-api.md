@@ -197,6 +197,14 @@ conflicting session use, missing selected prerequisites, and unavailable modes
 before any graph action runs. Its execution topology must match observation.
 Readiness that a producer never publishes fails instead of leaving waiters behind.
 
+`RunAfterReady` and `RunAfterSuccess` gate only actions, after the node initializes.
+Use reciprocal `RunAfterReady` dependencies to initialize both query and refresh
+workers before either action window starts. A node may initialize before RF1,
+then use `RunAfterSuccess(rf1)` to delay its queries until RF1 completes. Lifecycle
+validation distinguishes initialization from action waits, rejecting real deadlocks
+without rejecting these startup barriers. Retained connections count from
+initialization through node completion, including action-barrier waits.
+
 Ordinary action failure blocks hard dependents; unrelated work and explicit
 completion-dependent diagnostics can finish. `Fatal`, parent cancellation, and
 panics cancel running work, join it, and retain their error or panic semantics.

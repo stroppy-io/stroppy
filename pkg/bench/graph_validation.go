@@ -71,14 +71,7 @@ func graphLifecycleWaits(g *Graph, event graphLifecycleEvent) []graphLifecycleEv
 
 	switch event.kind {
 	case "entry":
-		for _, dependency := range node.dependencies {
-			kind := "done"
-			if node.cleanup == 0 && (dependency.event == "ready" || dependency.event == "started") {
-				kind = dependency.event
-			}
-
-			waits = append(waits, graphLifecycleEvent{dependency.node, kind})
-		}
+		waits = append(waits, graphDependencyWaits(node, false)...)
 	case "ready":
 		kind := "entry"
 		if node.ready {
@@ -88,6 +81,7 @@ func graphLifecycleWaits(g *Graph, event graphLifecycleEvent) []graphLifecycleEv
 		waits = append(waits, graphLifecycleEvent{node, kind})
 	case "started":
 		waits = append(waits, graphLifecycleEvent{node, "entry"})
+		waits = append(waits, graphDependencyWaits(node, true)...)
 	case "action_done":
 		waits = append(waits, graphLifecycleEvent{node, "started"})
 		if node.auxiliary != nil {
@@ -100,6 +94,25 @@ func graphLifecycleWaits(g *Graph, event graphLifecycleEvent) []graphLifecycleEv
 				waits = append(waits, graphLifecycleEvent{auxiliary, "done"})
 			}
 		}
+	}
+
+	return waits
+}
+
+func graphDependencyWaits(node *graphNode, beforeAction bool) []graphLifecycleEvent {
+	var waits []graphLifecycleEvent
+
+	for _, dependency := range node.dependencies {
+		if dependency.beforeAction != beforeAction {
+			continue
+		}
+
+		kind := "done"
+		if node.cleanup == 0 && (dependency.event == "ready" || dependency.event == "started") {
+			kind = dependency.event
+		}
+
+		waits = append(waits, graphLifecycleEvent{dependency.node, kind})
 	}
 
 	return waits

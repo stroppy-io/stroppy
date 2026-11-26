@@ -71,6 +71,7 @@ type Execution struct {
 	terminalErrors atomic.Int64
 	ready          func(int)
 	onInitialized  func()
+	beforeAction   func(context.Context) error
 	onEnter        func()
 	onResult       func(Result) Result
 	onStart        func()
@@ -212,8 +213,8 @@ func (e *Execution) runStep(name string, action Action, opts *stepOptions) Resul
 
 	windowStarted := false
 
-	if err == nil && e.onInitialized != nil {
-		e.onInitialized()
+	if err == nil {
+		err = e.actionReady(ctx)
 	}
 
 	if measured && err == nil {
@@ -252,6 +253,18 @@ func (e *Execution) runStep(name string, action Action, opts *stepOptions) Resul
 	}
 
 	return e.finishStep(name, opts.policy.workers, elapsed, before, err)
+}
+
+func (e *Execution) actionReady(ctx context.Context) error {
+	if e.onInitialized != nil {
+		e.onInitialized()
+	}
+
+	if e.beforeAction != nil {
+		return e.beforeAction(ctx)
+	}
+
+	return nil
 }
 
 func initializeRetainedSession(opts *stepOptions, action Action) {

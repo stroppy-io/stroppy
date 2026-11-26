@@ -215,7 +215,8 @@ func (w *workload) validateModeRefresh(d *bench.Def, options modeOptions) error 
 		return errRefreshScale
 	}
 
-	if !d.Execution.Enabled("load_data") && !options.setExplicit {
+	if !d.Execution.Enabled("load_data") && (!options.setExplicit ||
+		d.Execution.Enabled("drop_schema") || d.Execution.Enabled("create_schema")) {
 		return errRefreshExisting
 	}
 
@@ -274,8 +275,9 @@ func (w *workload) validateMode(d *bench.Def, options modeOptions) error {
 		}
 	}
 
-	if !options.seedExplicit && !d.Execution.Enabled("load_data") {
-		return inputModeError("existing data needs an explicit query-seed")
+	if !options.seedExplicit && (!d.Execution.Enabled("load_data") || !d.Execution.Enabled("analyze")) {
+		return inputModeError("load-derived query-seed requires load_data and analyze; " +
+			"existing data needs an explicit query-seed")
 	}
 
 	if !streamDriverSupported(w.driverType) || options.streams < 1 {

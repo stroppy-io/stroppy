@@ -78,7 +78,8 @@ func (w *workload) declarePower(
 	session := g.Session("power_refresh", bench.DriverRef{})
 	rf1 := g.WorkerNode("power_rf1", w.modeRefreshInitializer(dialect, phase, set, 1, "rf1"),
 		bench.OncePerWorker(1), bench.RetainSession()).UseSession(session).AfterSuccess(previous)
-	queries.AfterSuccess(rf1)
+	queries.AfterSuccess(previous).RunAfterSuccess(rf1)
+	rf1.RunAfterReady(queries)
 
 	return g.WorkerNode("power_rf2", w.modeRefreshInitializer(dialect, phase, set, 1, "rf2"),
 		bench.OncePerWorker(1), bench.RetainSession()).UseSession(session).AfterSuccess(queries)
@@ -103,7 +104,8 @@ func (w *workload) declareThroughput(
 		refresh := g.WorkerNode("throughput_refresh",
 			w.modeRefreshInitializer(dialect, phase, set, options.streams, ""),
 			bench.OncePerWorker(1), bench.RetainSession()).AfterSuccess(previous)
-		queries.AfterReady(refresh)
+		queries.RunAfterReady(refresh)
+		refresh.RunAfterReady(queries)
 		participants = append(participants, refresh)
 	}
 

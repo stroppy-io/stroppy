@@ -91,32 +91,33 @@ func TestGraphForkJoinOwnsIndependentMeasurement(t *testing.T) {
 		order []string
 	)
 
-	started := make(chan struct{}, 2)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	started := make(chan string, 3)
 	release := make(chan struct{})
 	test := Test{Name: "graph-fork", Define: func(d *Def) error {
 		g := d.Execution.Graph("test")
-		left := g.Node("left", func(context.Context, *Bench) error {
-			started <- struct{}{}
+		action := func(name string) Action {
+			return func(ctx context.Context, _ *Bench) error {
+				started <- name
 
-			<-release
-			mu.Lock()
+				select {
+				case <-release:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
 
-			order = append(order, "left")
-			mu.Unlock()
+				mu.Lock()
 
-			return nil
-		}, SharedIterations(1, 2))
-		right := g.Node("right", func(context.Context, *Bench) error {
-			started <- struct{}{}
+				order = append(order, name)
+				mu.Unlock()
 
-			<-release
-			mu.Lock()
-
-			order = append(order, "right")
-			mu.Unlock()
-
-			return nil
-		}, SharedIterations(1, 1))
+				return nil
+			}
+		}
+		left := g.Node("left", action("left"), SharedIterations(1, 2))
+		right := g.Node("right", action("right"), SharedIterations(1, 1))
 		joined := g.Join("joined", left, right)
 		g.Node("after", func(context.Context, *Bench) error {
 			mu.Lock()
@@ -130,9 +131,27 @@ func TestGraphForkJoinOwnsIndependentMeasurement(t *testing.T) {
 		return g.Run("")
 	}}
 
-	go func() { <-started; <-started; close(release) }()
+	joined := make(chan struct{})
+	go func() {
+		defer close(joined)
 
-	result, err := RunTest(t.Context(), test, RunOptions{Metrics: &MetricsConfig{Quiet: true}, Report: &ReportOptions{}})
+		seen := make(map[string]bool)
+		for len(seen) < 2 {
+			select {
+			case name := <-started:
+				seen[name] = true
+			case <-ctx.Done():
+				return
+			}
+		}
+
+		close(release)
+	}()
+
+	result, err := RunTest(ctx, test, RunOptions{Metrics: &MetricsConfig{Quiet: true}, Report: &ReportOptions{}})
+
+	cancel()
+	<-joined
 	require.NoError(t, err)
 	require.Equal(t, "joined", order[len(order)-1])
 	require.EqualValues(t, 2, result.Executions["left"].Iterations)
@@ -493,6 +512,99 @@ func TestGraphRejectsAuxiliaryReadinessJoinCycle(t *testing.T) {
 	_, err := RunTest(t.Context(), test, RunOptions{Metrics: &MetricsConfig{Quiet: true}})
 	require.ErrorContains(t, err, "lifecycle cycle")
 	require.Zero(t, actions.Load())
+}
+
+func TestGraphUnselectedNodeKeepsOrderingBarrier(t *testing.T) {
+	var completed atomic.Bool
+
+	test := Test{Name: "graph-omitted-order", Define: func(d *Def) error {
+		g := d.Execution.Graph("test")
+		first := g.Node("first", func(context.Context, *Bench) error {
+			completed.Store(true)
+
+			return nil
+		})
+		middle := g.Node("omitted", func(context.Context, *Bench) error { return nil }).After(first)
+		last := g.Node("last", func(context.Context, *Bench) error {
+			if !completed.Load() {
+				return errors.New("ordered predecessor still running")
+			}
+
+			return nil
+		}).After(middle)
+		g.Mode("selected", "Omit the intermediate action", first, last)
+
+		return g.Run("selected")
+	}}
+	_, err := RunTest(t.Context(), test, RunOptions{Metrics: &MetricsConfig{Quiet: true}})
+	require.NoError(t, err)
+}
+
+func TestGraphActionBarrierInitializesAllWorkersBeforeWrites(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		var initialized, writes atomic.Int64
+
+		failure := errors.New("query initialization failed")
+		test := Test{Name: "graph-startup-barrier", Define: func(d *Def) error {
+			g := d.Execution.Graph("test")
+			queries := g.WorkerNode("queries", func(context.Context, *Bench) (Action, error) {
+				initialized.Add(1)
+
+				if fail {
+					return nil, failure
+				}
+
+				return func(context.Context, *Bench) error { return nil }, nil
+			}, OncePerWorker(3))
+			refresh := g.WorkerNode("refresh", func(context.Context, *Bench) (Action, error) {
+				initialized.Add(1)
+
+				return func(context.Context, *Bench) error {
+					if initialized.Load() != 4 {
+						return errors.New("refresh started before query initialization")
+					}
+
+					writes.Add(1)
+
+					return nil
+				}, nil
+			})
+			queries.RunAfterReady(refresh)
+			refresh.RunAfterReady(queries)
+
+			return g.Run("")
+		}}
+
+		_, err := RunTest(t.Context(), test, RunOptions{Metrics: &MetricsConfig{Quiet: true}})
+		if fail {
+			require.Error(t, err)
+			require.Zero(t, writes.Load())
+		} else {
+			require.NoError(t, err)
+			require.EqualValues(t, 1, writes.Load())
+		}
+	}
+}
+
+func TestGraphJoinedCancellationPreservesIndependentFailure(t *testing.T) {
+	failure := errors.New("flush failed")
+	test := Test{Name: "graph-joined-cancel", Define: func(d *Def) error {
+		g := d.Execution.Graph("test")
+		server := g.Node("server", func(ctx context.Context, b *Bench) error {
+			b.Ready()
+			<-ctx.Done()
+
+			return errors.Join(ctx.Err(), failure)
+		}).SignalsReady()
+		client := g.Node("client", func(context.Context, *Bench) error { return nil }).AfterReady(server)
+		server.While(client)
+
+		return g.Run("")
+	}}
+	result, err := RunTest(t.Context(), test, RunOptions{Metrics: &MetricsConfig{Quiet: true}, Report: &ReportOptions{}})
+	require.ErrorIs(t, err, failure)
+	require.NotErrorIs(t, err, context.Canceled)
+	require.EqualValues(t, "failed", result.Status)
 }
 
 func TestGraphCompletionDependencySurvivesOrdinaryFailure(t *testing.T) {
