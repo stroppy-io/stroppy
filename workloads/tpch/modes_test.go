@@ -151,6 +151,19 @@ func TestBenchmarkWithholdsInvalidAndChoosesConservativeRun(t *testing.T) {
 	}
 }
 
+func TestRefreshModesRejectUnsupportedScalesBeforeActions(t *testing.T) {
+	for _, mode := range []string{"power", "throughput"} {
+		for _, scale := range []string{"0.001", "100001", "NaN", "+Inf"} {
+			recorder := &record.Recorder{}
+			_, err := testkit.Record(t.Context(), Test, recorder, bench.RunOptions{
+				Params: bench.ParamInputs{CLI: map[string]string{"mode": mode, "scale-factor": scale}},
+			})
+			require.Error(t, err, mode+"/"+scale)
+			require.Empty(t, recorder.Operations(), mode+"/"+scale)
+		}
+	}
+}
+
 func TestFullModeRejectsFilteredWorkBeforeActions(t *testing.T) {
 	for _, name := range []string{
 		"drop_schema", "create_schema", "load_data", "create_indexes", "analyze",

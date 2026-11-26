@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"time"
 
@@ -208,6 +209,10 @@ func (w *workload) validateModeRefresh(d *bench.Def, options modeOptions) error 
 
 	if w.useUnlogged || pairs < 1 || options.firstSet < 1 || int64(pairs) > lastExecutableRefreshSet-options.firstSet+1 {
 		return errBenchmarkMode
+	}
+
+	if math.IsNaN(w.scaleFactor) || math.IsInf(w.scaleFactor, 0) || w.scaleFactor < 0.01 || w.scaleFactor > 100000 {
+		return errRefreshScale
 	}
 
 	if !d.Execution.Enabled("load_data") && !options.setExplicit {

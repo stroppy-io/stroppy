@@ -448,6 +448,52 @@ func TestGraphFatalKeepsRunFailedWhileCancelingSiblings(t *testing.T) {
 	require.EqualValues(t, "failed", result.Status)
 }
 
+func TestGraphFilteredNodePreservesFailedOrdering(t *testing.T) {
+	failure := errors.New("setup failed")
+
+	var writes atomic.Int64
+
+	test := Test{Name: "graph-filter-failure", Define: func(d *Def) error {
+		g := d.Execution.Graph("test")
+		first := g.Node("drop", func(context.Context, *Bench) error { return failure })
+		filtered := g.Node("create", func(context.Context, *Bench) error { return nil }).After(first)
+		g.Node("load", func(context.Context, *Bench) error {
+			writes.Add(1)
+
+			return nil
+		}).After(filtered)
+
+		return g.Run("")
+	}}
+	result, err := RunTest(t.Context(), test, RunOptions{
+		NoSteps: []string{"create"}, Metrics: &MetricsConfig{Quiet: true}, Report: &ReportOptions{},
+	})
+	require.ErrorIs(t, err, failure)
+	require.Zero(t, writes.Load())
+	require.Equal(t, "blocked", result.Steps[1].Status)
+	require.Equal(t, "blocked", result.Steps[2].Status)
+}
+
+func TestGraphRejectsAuxiliaryReadinessJoinCycle(t *testing.T) {
+	var actions atomic.Int64
+
+	test := Test{Name: "graph-lifetime-cycle", Define: func(d *Def) error {
+		g := d.Execution.Graph("test")
+		action := func(context.Context, *Bench) error {
+			actions.Add(1)
+			return nil
+		}
+		owner := g.Node("owner", action)
+		barrier := g.Node("barrier", action).AfterCompletion(owner)
+		g.Node("auxiliary", action).While(owner).AfterReady(barrier)
+
+		return g.Run("")
+	}}
+	_, err := RunTest(t.Context(), test, RunOptions{Metrics: &MetricsConfig{Quiet: true}})
+	require.ErrorContains(t, err, "lifecycle cycle")
+	require.Zero(t, actions.Load())
+}
+
 func TestGraphCompletionDependencySurvivesOrdinaryFailure(t *testing.T) {
 	failure := errors.New("failed prerequisite")
 

@@ -24,6 +24,87 @@ func validateGraphSelection(g *Graph, selected map[*graphNode]bool) error {
 	return validateAuxiliaryLifetimes(g)
 }
 
+type graphLifecycleEvent struct {
+	node *graphNode
+	kind string
+}
+
+func validateGraphLifecycles(g *Graph) error {
+	visiting, visited := make(map[graphLifecycleEvent]bool), make(map[graphLifecycleEvent]bool)
+
+	var visit func(graphLifecycleEvent) error
+
+	visit = func(event graphLifecycleEvent) error {
+		if visiting[event] {
+			return inputError("graph lifecycle cycle at %q (%s)", event.node.name, event.kind)
+		}
+
+		if visited[event] {
+			return nil
+		}
+
+		visiting[event] = true
+		for _, prerequisite := range graphLifecycleWaits(g, event) {
+			if err := visit(prerequisite); err != nil {
+				return err
+			}
+		}
+
+		delete(visiting, event)
+		visited[event] = true
+
+		return nil
+	}
+	for _, node := range g.nodes {
+		if err := visit(graphLifecycleEvent{node, "done"}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func graphLifecycleWaits(g *Graph, event graphLifecycleEvent) []graphLifecycleEvent {
+	node := event.node
+
+	var waits []graphLifecycleEvent
+
+	switch event.kind {
+	case "entry":
+		for _, dependency := range node.dependencies {
+			kind := "done"
+			if node.cleanup == 0 && (dependency.event == "ready" || dependency.event == "started") {
+				kind = dependency.event
+			}
+
+			waits = append(waits, graphLifecycleEvent{dependency.node, kind})
+		}
+	case "ready":
+		kind := "entry"
+		if node.ready {
+			kind = "started"
+		}
+
+		waits = append(waits, graphLifecycleEvent{node, kind})
+	case "started":
+		waits = append(waits, graphLifecycleEvent{node, "entry"})
+	case "action_done":
+		waits = append(waits, graphLifecycleEvent{node, "started"})
+		if node.auxiliary != nil {
+			waits = append(waits, graphLifecycleEvent{node.auxiliary, "action_done"})
+		}
+	case "done":
+		waits = append(waits, graphLifecycleEvent{node, "action_done"})
+		for _, auxiliary := range g.nodes {
+			if auxiliary.auxiliary == node {
+				waits = append(waits, graphLifecycleEvent{auxiliary, "done"})
+			}
+		}
+	}
+
+	return waits
+}
+
 func validateAuxiliaryLifetimes(g *Graph) error {
 	for _, auxiliary := range g.nodes {
 		if auxiliary.auxiliary == nil {
@@ -48,5 +129,5 @@ func validateAuxiliaryLifetimes(g *Graph) error {
 		}
 	}
 
-	return nil
+	return validateGraphLifecycles(g)
 }

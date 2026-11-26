@@ -147,9 +147,7 @@ func (g *Graph) runNode(
 	}
 
 	if (node.cleanup == 0 || node.optionalCleanup) && !g.execution.Enabled(node.name) {
-		waitSkippedGraphNode(node, runs)
-
-		run.result.Status = Skipped
+		run.result.Status = skippedGraphStatus(node, runs)
 
 		return
 	}
@@ -196,12 +194,21 @@ func joinGraphAuxiliaries(node *graphNode, runs map[*graphNode]*graphNodeRun) {
 	}
 }
 
-func waitSkippedGraphNode(node *graphNode, runs map[*graphNode]*graphNodeRun) {
+func skippedGraphStatus(node *graphNode, runs map[*graphNode]*graphNodeRun) StepStatus {
+	status := Skipped
+
 	for _, dependency := range node.dependencies {
 		if dependency.event != "started" && dependency.event != "ready" {
-			<-runs[dependency.node].done
+			prior := runs[dependency.node]
+			<-prior.done
+
+			if !graphDependencySatisfied(dependency.event, prior.result.Status) {
+				status = Blocked
+			}
 		}
 	}
+
+	return status
 }
 
 func (g *Graph) recordNodeFailure(run *graphNodeRun) {
