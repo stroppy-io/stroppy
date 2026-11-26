@@ -33,6 +33,7 @@ type rootState struct {
 	summaryWriter io.Writer
 
 	throughput    throughput
+	progress      *runProgress
 	pools         *poolTelemetry
 	txMetrics     *txMetrics
 	errorReporter *errorReporter

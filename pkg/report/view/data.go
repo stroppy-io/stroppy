@@ -69,26 +69,28 @@ type payloadView struct {
 }
 
 type page struct {
-	Title        string
-	ID           string
-	Status       string
-	Started      string
-	Driver       string
-	Warning      string
-	Identity     node
-	Steps        node
-	Errors       node
-	Failure      node
-	Metrics      []metricView
-	MetricGroups []metricGroup
-	Payloads     []payloadView
-	StepChart    chart
-	Headlines    []field
-	Original     string
-	Download     string
-	Catalog      string
-	Capture      *captureView
-	Pools        []poolView
+	Title           string
+	ID              string
+	Status          string
+	Started         string
+	Driver          string
+	Warning         string
+	Identity        node
+	Steps           node
+	Errors          node
+	Failure         node
+	Metrics         []metricView
+	MetricGroups    []metricGroup
+	Payloads        []payloadView
+	StepChart       chart
+	Headlines       []field
+	Original        string
+	Download        string
+	Catalog         string
+	Capture         *captureView
+	Pools           []poolView
+	Progress        node
+	ProgressPercent string
 }
 
 func decode(data []byte) (map[string]any, error) {
@@ -124,6 +126,15 @@ func reportPage(data []byte, id string) (page, error) {
 		Steps: tree(document["steps"]), Errors: tree(document["errors"]),
 		StepChart: stepDurations(document["steps"]), Pools: poolViews(document["pools"]),
 	}
+	if progress, ok := document["progress"].(map[string]any); ok {
+		p.Progress = tree(progress)
+		if ratio, valid := number(progress["ratio"]); valid {
+			const percentage = 100
+
+			p.ProgressPercent = fmt.Sprintf("%.1f%%", ratio*percentage)
+		}
+	}
+
 	if p.ID == "" {
 		p.ID = text(document["id"])
 	}
@@ -142,7 +153,7 @@ func reportPage(data []byte, id string) (page, error) {
 
 	for key, value := range document {
 		switch key {
-		case "metrics", "steps", "errors", "workload_reports", "failure":
+		case "metrics", "steps", "errors", "workload_reports", "failure", "progress":
 		default:
 			identity[key] = value
 		}

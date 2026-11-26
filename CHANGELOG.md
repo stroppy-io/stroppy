@@ -12,6 +12,7 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- Runs show live step, query, and load activity alongside a best-effort completion percentage, with native progress in telemetry and saved reports. ([#299](https://github.com/stroppy-io/stroppy/pull/299))
 - Paced TPC-C runs report terminal throughput ceilings, actual keying and think waits, per-warehouse rates, and deferred Delivery timing; strict noop runs explicitly identify simulated results. ([#298](https://github.com/stroppy-io/stroppy/pull/298))
 - TPC-C offers an explicit strict terminal model for both variants, separating ten terminals per warehouse from execution workers and recording deferred Delivery outcomes with unaudited qualification diagnostics. ([#296](https://github.com/stroppy-io/stroppy/pull/296))
 - Go workloads can retrieve committed stored-procedure results with `Bench.RoutineRows` without changing existing `Routine` calls. ([#296](https://github.com/stroppy-io/stroppy/pull/296))

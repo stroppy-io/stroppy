@@ -163,12 +163,21 @@ func waitRefreshPhase(ctx context.Context, ready <-chan struct{}) error {
 func (w *workload) refreshStreamAction(
 	session *bench.Session, selection streamSelection, inserted chan<- struct{}, queried <-chan struct{},
 ) bench.Action {
-	return func(ctx context.Context, _ *bench.Bench) error {
+	return func(ctx context.Context, b *bench.Bench) error {
+		total := float64(selection.count * 2)
 		for pair := range selection.count {
+			b.Progress(ctx, bench.ProgressUpdate{
+				Activity: "rf1", Unit: "refresh_functions", Current: float64(pair * 2), Total: &total,
+			})
+
 			set := selection.refreshSet + int64(pair)
 			if err := w.runRefresh(ctx, session, set, "rf1"); err != nil {
 				return bench.Fatal(err)
 			}
+
+			b.Progress(ctx, bench.ProgressUpdate{
+				Activity: "rf1", Unit: "refresh_functions", Current: float64(pair*2 + 1), Total: &total,
+			})
 
 			if selection.count == 1 {
 				close(inserted)
@@ -182,9 +191,17 @@ func (w *workload) refreshStreamAction(
 				return bench.Fatal(errRefreshQuery)
 			}
 
+			b.Progress(ctx, bench.ProgressUpdate{
+				Activity: "rf2", Unit: "refresh_functions", Current: float64(pair*2 + 1), Total: &total,
+			})
+
 			if err := w.runRefresh(ctx, session, set, "rf2"); err != nil {
 				return bench.Fatal(err)
 			}
+
+			b.Progress(ctx, bench.ProgressUpdate{
+				Activity: "rf2", Unit: "refresh_functions", Current: float64(pair*2 + 2), Total: &total,
+			})
 		}
 
 		return nil

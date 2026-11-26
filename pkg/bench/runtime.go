@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap"
 
@@ -21,6 +22,8 @@ import (
 )
 
 const defaultCleanupTimeout = 30 * time.Second
+
+var errWorkloadPanic = errors.New("workload panicked")
 
 // Bench is a stable step-worker-scoped set of author capabilities. Workers own
 // separate Bench values; workload state remains ordinary Go state.
@@ -143,6 +146,15 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 
 	e.reporting = options.Report != nil
 
+	root.progress, err = newRunProgress(root, observed.Execution.observed)
+	if err != nil {
+		if recording != nil {
+			recording.Close()
+		}
+
+		return nil, fmt.Errorf("start progress: %w", err)
+	}
+
 	if recording != nil {
 		interval := options.Capture.Interval
 		if interval == 0 {
@@ -164,6 +176,7 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 				err = errors.Join(err, failure)
 			} else {
 				panicValue = value
+				err = errors.Join(err, errWorkloadPanic)
 			}
 		}
 
@@ -257,6 +270,21 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 		if root.capture != nil {
 			root.capture.writer.Event("teardown_end", "", "", 0, 0, 0)
 			root.capture.stopSampling()
+		}
+
+		status := string(Completed)
+		if err != nil || panicValue != nil {
+			status = string(Failed)
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				status = string(Canceled)
+			}
+		} else if root.errorReporter.snapshot().terminalErrors > 0 {
+			status = string(CompletedWithErrors)
+		}
+
+		progress := root.progress.finish(status)
+		if result != nil {
+			result.Progress = &progress
 		}
 
 		result, err = finishRun(result, root, d.reports, err, phase)
@@ -381,11 +409,7 @@ func (s *summary) printDataTo(out io.Writer, data metricdata.ResourceMetrics) {
 
 				lines = append(lines, fmt.Sprintf("  %-40s %.3f", name, total))
 			case metricdata.Gauge[float64]:
-				if poolGauge(aggregation.DataPoints) {
-					lines = append(lines, poolGaugeSummaries(name, aggregation.DataPoints)...)
-				} else {
-					lines = append(lines, fmt.Sprintf("  %-40s %.3f", name, sumGauge(aggregation.DataPoints)))
-				}
+				lines = append(lines, gaugeSummaries(name, aggregation.DataPoints)...)
 			case metricdata.Histogram[float64]:
 				lines = append(lines, formatHistogramSummary(name, aggregation.DataPoints))
 			}
@@ -402,6 +426,23 @@ func (s *summary) printDataTo(out io.Writer, data metricdata.ResourceMetrics) {
 
 	for _, line := range lines {
 		fmt.Fprintln(out, line)
+	}
+}
+
+func gaugeSummaries(name string, points []metricdata.DataPoint[float64]) []string {
+	switch {
+	case poolGauge(points):
+		return poolGaugeSummaries(name, points)
+	case progressSourceGauge(points):
+		lines := make([]string, 0, len(points))
+		for _, point := range points {
+			lines = append(lines, fmt.Sprintf("  %s{%s} %.3f",
+				name, point.Attributes.Encoded(attribute.DefaultEncoder()), point.Value))
+		}
+
+		return lines
+	default:
+		return []string{fmt.Sprintf("  %-40s %.3f", name, sumGauge(points))}
 	}
 }
 

@@ -384,7 +384,24 @@ func (w *workload) initMetrics(b *bench.MetricDeclarations) *metrics {
 // loadData loads warehouse, district, customer, item, stock, orders,
 // order_line, and new_order through typed insert requests.
 func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64) error {
-	if _, err := insertRows(
+	total := 7.0
+	if w.loadItems {
+		total++
+	}
+
+	finished := 0.0
+
+	load := func(ctx context.Context, b *bench.Bench, request *insertRequest) (*bench.InsertResult, error) {
+		b.Progress(ctx, bench.ProgressUpdate{Activity: request.Table, Unit: "tables", Current: finished, Total: &total})
+
+		result, err := insertRows(ctx, b, request)
+		if err == nil {
+			finished++
+		}
+
+		return result, err
+	}
+	if _, err := load(
 		ctx,
 		b,
 		warehouseRequest(w.warehouses, w.warehouseStart, w.loadWorkers),
@@ -392,7 +409,7 @@ func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64)
 		return err
 	}
 
-	if _, err := insertRows(
+	if _, err := load(
 		ctx,
 		b,
 		districtRequest(w.warehouses, w.warehouseStart, w.loadWorkers),
@@ -400,7 +417,7 @@ func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64)
 		return err
 	}
 
-	if _, err := insertRows(
+	if _, err := load(
 		ctx,
 		b,
 		customerRequest(w.warehouses, w.warehouseStart, loadDays, w.loadWorkers),
@@ -409,12 +426,12 @@ func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64)
 	}
 
 	if w.loadItems {
-		if _, err := insertRows(ctx, b, itemRequest(w.loadWorkers)); err != nil {
+		if _, err := load(ctx, b, itemRequest(w.loadWorkers)); err != nil {
 			return err
 		}
 	}
 
-	if _, err := insertRows(
+	if _, err := load(
 		ctx,
 		b,
 		stockRequest(w.warehouses, w.warehouseStart, w.loadWorkers),
@@ -422,7 +439,7 @@ func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64)
 		return err
 	}
 
-	if _, err := insertRows(
+	if _, err := load(
 		ctx,
 		b,
 		ordersRequest(w.warehouses, w.warehouseStart, loadDays, w.loadWorkers),
@@ -430,7 +447,7 @@ func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64)
 		return err
 	}
 
-	if _, err := insertRows(
+	if _, err := load(
 		ctx,
 		b,
 		orderLineRequest(w.warehouses, w.warehouseStart, loadDays, w.loadWorkers),
@@ -438,7 +455,7 @@ func (w *workload) loadData(ctx context.Context, b *bench.Bench, loadDays int64)
 		return err
 	}
 
-	if _, err := insertRows(
+	if _, err := load(
 		ctx,
 		b,
 		newOrderRequest(w.warehouses, w.warehouseStart, w.loadWorkers),

@@ -54,8 +54,8 @@ func TestCaptureDoesNotChangeFinalCountersAndIsIndependent(t *testing.T) {
 				t.Fatalf("capture changed final result: %+v", result)
 			}
 
-			if tc.logs && result.Capture.Streams["logs"].Records != 10 {
-				t.Fatal("logs not correlated")
+			if tc.logs {
+				assertCapturedWorkloadLogs(t, result.Capture, 10)
 			}
 
 			if tc.metrics {
@@ -92,6 +92,33 @@ func TestCaptureDoesNotChangeFinalCountersAndIsIndependent(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func assertCapturedWorkloadLogs(t *testing.T, capture *report.Capture, expected int) {
+	t.Helper()
+
+	data, err := report.ReadCaptureFile(".", capture, "logs.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	count := 0
+
+	for decoder.More() {
+		var entry report.CapturedLog
+		if err := decoder.Decode(&entry); err != nil {
+			t.Fatal(err)
+		}
+
+		if entry.Message != "run progress" {
+			count++
+		}
+	}
+
+	if count != expected {
+		t.Fatalf("workload logs=%d, want %d", count, expected)
 	}
 }
 
@@ -139,8 +166,14 @@ func TestCapturedTerminalErrorRetainsStepAndWorker(t *testing.T) {
 
 	for _, step := range []string{"warmup", "workload"} {
 		var log report.CapturedLog
-		if err := decoder.Decode(&log); err != nil {
-			t.Fatal(err)
+		for {
+			if err := decoder.Decode(&log); err != nil {
+				t.Fatal(err)
+			}
+
+			if log.Message != "run progress" {
+				break
+			}
 		}
 
 		var fields struct {

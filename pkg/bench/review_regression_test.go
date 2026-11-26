@@ -146,11 +146,20 @@ func TestLoggerSerializesSharedWriter(t *testing.T) {
 	require.NoError(t, err)
 
 	lines := bytes.Split(bytes.TrimSpace(output.Bytes()), []byte("\n"))
-	require.Len(t, lines, 100)
+	records := 0
 
 	for _, line := range lines {
-		require.True(t, json.Valid(line), string(line))
+		var entry struct {
+			Message string `json:"msg"`
+		}
+		require.NoError(t, json.Unmarshal(line, &entry), string(line))
+
+		if entry.Message == "record" {
+			records++
+		}
 	}
+
+	require.Equal(t, 100, records)
 }
 
 type panicInsertDriver struct {

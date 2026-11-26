@@ -154,7 +154,8 @@ func TestQueryMetricsDoNotCountUnstartedQueries(t *testing.T) {
 
 func TestCustomQueryMetricNamesPreserveIdentity(t *testing.T) {
 	names := []string{
-		"query-1", "query_1", "query1", queryMetricName("query-1"), "custom_", "отчёт 1", "9", strings.Repeat("x", 300),
+		"query-1", "query_1", "query1", queryMetricName("query-1"), "custom_", "отчёт 1", "9",
+		strings.Repeat("x", 120), strings.Repeat("x", 300),
 	}
 
 	var sql strings.Builder

@@ -153,6 +153,62 @@ explicit positive timeout. It does not register a future finalizer: early Go
 returns must still reach cleanup, or arrange the call with `defer`. Framework
 resource finalization always runs. Cleanup errors preserve earlier causes.
 
+## Live activity and progress
+
+The engine publishes one `progress_ratio` gauge in `[0,1]` for generic UIs.
+It is a best-effort work estimate, not an ETA: selected phases have equal weights,
+and the active phase uses its duration budget, finished iterations, or native
+work fraction. Unknown work advances at phase completion. The estimate never
+moves backward and stays below 100% until the run, drain, and cleanup complete.
+Failed or canceled runs retain their last estimate; completion with errors keeps
+its distinct status even at 100%. Runtime-dependent branches can make the phase
+plan approximate. No executor, retry, or throughput window changes.
+
+Long-running work logs an update every ten seconds. Activities also log at start,
+with subsequent activity changes limited to once per second. `probe` and selected
+workload help describe the policy-derived basis; query and load totals may only
+become known during execution.
+
+Authors can report native work within the current invocation:
+
+```go
+total := float64(len(queries))
+for index, query := range queries {
+    b.Progress(ctx, bench.ProgressUpdate{
+        Activity: query.Name, Unit: "queries", Current: float64(index), Total: &total,
+    })
+    err := execute(ctx, query)
+    b.Progress(ctx, bench.ProgressUpdate{
+        Activity: query.Name, Unit: "queries", Current: float64(index + 1), Total: &total,
+    })
+    if err != nil {
+        return err
+    }
+}
+```
+
+Report finished work, not only successes. `Total: nil` means unknown; zero remains
+an explicit zero total and does not define a source ratio. Each worker owns its
+activity, so concurrent streams do not overwrite each other. Report the inner
+schedule afresh for every invocation; the execution policy owns the outer budget.
+Single-worker fixed-size schedules expose the repeated total. If observed invocation
+totals vary or become unknown, the native completed count remains cumulative but
+the projected total is omitted.
+`Activity` and `Unit` are bounded identifiers (ASCII letters, digits, `_./-`, up to
+96 characters). Never include SQL, arguments, credentials, or connection details.
+
+`progress_current`, optional `progress_total` and `progress_source_ratio`, and
+`progress_activity_elapsed_seconds` retain `step`, `worker`, `activity`, and `unit`.
+`progress_activity_active` distinguishes running work from a retained finished
+activity; finished workers' activity clocks freeze. Native sources are not summed
+across workers or units in reports or SDK aggregate snapshots; report contributors
+can read labeled values from `ReportContext.Series`. Run and step elapsed time
+have separate gauges. Lifecycle counts use `progress_events_total`;
+event labels do not create historical variants of state gauges. The additive
+`progress` report object preserves the final estimate, outcome, and native sources;
+OTLP and optional metric capture collect the same live state. Existing insert
+progress metrics remain unchanged; new load progress uses confirmed writes.
+
 ## Dedicated sessions and prepared statements
 
 `Execution.WorkerStep(name, initialize, options...)` accepts a

@@ -206,26 +206,36 @@ func (w *workload) benchmarkInitializer(
 			return nil, err
 		}
 
-		return func(ctx context.Context, _ *bench.Bench) error {
-			return w.runBenchmarkStream(ctx, session, stream, queries)
+		return func(ctx context.Context, worker *bench.Bench) error {
+			return w.runBenchmarkStream(ctx, worker, session, stream, queries)
 		}, nil
 	}
 }
 
 func (w *workload) runBenchmarkStream(
-	ctx context.Context, session *bench.Session, stream *benchmarkStream, queries []namedQuery,
+	ctx context.Context, b *bench.Bench, session *bench.Session, stream *benchmarkStream, queries []namedQuery,
 ) error {
 	stream.started = time.Now()
 	defer func() { stream.finished = time.Now() }()
 
-	for _, query := range queries {
+	total := float64(len(queries))
+	for index, query := range queries {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
+		b.Progress(ctx, bench.ProgressUpdate{
+			Activity: queryProgressName(query.name), Unit: "queries", Current: float64(index), Total: &total,
+		})
+
 		started := time.Now()
 		err := session.Exec(ctx, query.sql, nil)
 		elapsed := time.Since(started)
+
+		b.Progress(ctx, bench.ProgressUpdate{
+			Activity: queryProgressName(query.name), Unit: "queries", Current: float64(index + 1), Total: &total,
+		})
+
 		w.metrics[query.name].record(ctx, elapsed, err != nil)
 
 		measurement := benchmarkQuery{Name: query.name, Seconds: elapsed.Seconds()}

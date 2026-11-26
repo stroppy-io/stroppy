@@ -248,7 +248,7 @@ func finalizeRunReport(
 	}
 
 	switch {
-	case runErr != nil && errors.Is(runErr, context.Canceled):
+	case runErr != nil && (errors.Is(runErr, context.Canceled) || errors.Is(runErr, context.DeadlineExceeded)):
 		run.Status = report.StatusCanceled
 	case runErr != nil:
 		run.Status = report.StatusFailed
@@ -436,7 +436,7 @@ func reportMetric(metric metricdata.Metrics) (report.Metric, bool) {
 			})
 		}
 
-		if !poolGauge(aggregation.DataPoints) {
+		if !poolGauge(aggregation.DataPoints) && !progressSourceGauge(aggregation.DataPoints) {
 			result.Total = &total
 		}
 

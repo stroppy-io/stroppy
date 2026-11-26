@@ -213,7 +213,10 @@ func (s sqlSection) Run(ctx context.Context, b *bench.Bench) error {
 }
 
 func (w *workload) load(ctx context.Context, b *bench.Bench) error {
-	for _, table := range tpchTables {
+	total := float64(len(tpchTables))
+	for index, table := range tpchTables {
+		b.Progress(ctx, bench.ProgressUpdate{Activity: table, Unit: "tables", Current: float64(index), Total: &total})
+
 		source, err := tpchgen.NewBatchSource(table, w.scaleFactor)
 		if err != nil {
 			return err
@@ -285,6 +288,15 @@ func (w *workload) prepareParams(base map[string]map[string]any) map[string]map[
 // recording per-query timing/error metrics. Rows are discarded (throughput pass).
 func (w *workload) runQueries(ctx context.Context, b *bench.Bench) error {
 	lg := b.Log
+	total := 0.0
+
+	for _, name := range queryNames {
+		if _, ok := w.sql.Query(name, "body"); ok {
+			total++
+		}
+	}
+
+	finished := 0.0
 
 	for _, name := range queryNames {
 		body, ok := w.sql.Query(name, "body")
@@ -294,6 +306,8 @@ func (w *workload) runQueries(ctx context.Context, b *bench.Bench) error {
 			continue
 		}
 
+		b.Progress(ctx, bench.ProgressUpdate{Activity: name, Unit: "queries", Current: finished, Total: &total})
+
 		start := time.Now()
 
 		if w.queryOptions != "" {
@@ -302,6 +316,8 @@ func (w *workload) runQueries(ctx context.Context, b *bench.Bench) error {
 
 		_, err := b.RawRows(ctx, body, w.params[name])
 		elapsed := time.Since(start).Milliseconds()
+		finished++
+		b.Progress(ctx, bench.ProgressUpdate{Activity: name, Unit: "queries", Current: finished, Total: &total})
 		w.recordAttempt(ctx, name, float64(elapsed), err != nil)
 
 		if err != nil {
