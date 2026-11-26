@@ -351,6 +351,7 @@ func formatCatalog(
 		for _, step := range workload.Steps {
 			fmt.Fprintf(&builder, "    step: %s (%s, workers=%d, measured=%t)\n",
 				step.Name, step.Executor, step.Workers, step.Measured)
+			fmt.Fprintf(&builder, "      progress: %s; equal phase weight in run estimate\n", step.Progress)
 		}
 
 		for _, ref := range workload.DriverRefs {

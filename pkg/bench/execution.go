@@ -44,6 +44,7 @@ type StepDescription struct {
 	Executor string `json:"executor"`
 	Workers  int    `json:"workers"`
 	Measured bool   `json:"measured"`
+	Progress string `json:"progress"`
 }
 
 // Execution observes or executes steps immediately in ordinary Go order.
@@ -122,10 +123,8 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 	}
 
 	e.observed = append(e.observed, StepDescription{
-		name,
-		opts.policy.mode,
-		opts.policy.workers,
-		opts.measured || opts.policy.mode != "once",
+		Name: name, Executor: opts.policy.mode, Workers: opts.policy.workers,
+		Measured: opts.measured || opts.policy.mode != "once", Progress: policyProgressDescription(opts.policy.mode),
 	})
 	if e.root == nil {
 		return Result{Status: Observed}
@@ -172,7 +171,9 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 
 	started := time.Now()
 	e.phase = name
+
 	e.workers = opts.policy.workers
+	e.root.progress.begin(name, opts.policy)
 
 	e.startPoolTelemetry(name)
 	defer e.root.pools.stop()
@@ -209,6 +210,10 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 	}
 
 	if err == nil {
+		if e.root.progress != nil {
+			e.root.progress.measuring(e.root.throughput.current.Load())
+		}
+
 		err = e.execute(ctx, name, action, &opts, workers)
 	}
 
@@ -243,6 +248,10 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 	}
 
 	record(status, elapsed)
+
+	if e.root.progress != nil {
+		e.root.progress.end(status)
+	}
 
 	if e.root.capture != nil {
 		e.root.capture.writer.Event("step_end", name, string(status), opts.policy.workers, elapsed, 0)
@@ -393,6 +402,9 @@ func (e *Execution) execute(
 				vu.logicalSucceeded = false
 
 				err := workerAction(vu.ctx, b)
+
+				e.root.progress.iterationDone(worker)
+
 				if err == nil && !vu.logicalSucceeded && errors.Is(context.Cause(ctx), errDrainExpired) {
 					err = errDrainExpired
 				}

@@ -436,7 +436,7 @@ func reportMetric(metric metricdata.Metrics) (report.Metric, bool) {
 			})
 		}
 
-		if !poolGauge(aggregation.DataPoints) {
+		if !poolGauge(aggregation.DataPoints) && !progressSourceGauge(aggregation.DataPoints) {
 			result.Total = &total
 		}
 

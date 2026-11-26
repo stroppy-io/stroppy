@@ -718,6 +718,11 @@ func printWorkloadHelp(cmd *cobra.Command, description *bench.Description) error
 	output.WriteString("      --pprof-mutex-fraction N Sample one in N mutex events\n")
 	output.WriteString("  -h, --help               Show this help\n")
 	output.WriteString("\nBoolean parameters require an explicit value: --flag=true or --flag=false.\n")
+	output.WriteString("\nProgress is a best-effort work estimate with equal selected phase weights, not an ETA.\n")
+
+	for _, step := range description.Steps {
+		fmt.Fprintf(&output, "  %s: %s\n", step.Name, step.Progress)
+	}
 
 	writeParamHelpSection(
 		&output,

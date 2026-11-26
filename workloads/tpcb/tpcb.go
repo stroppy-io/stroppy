@@ -163,11 +163,16 @@ func (s sqlSection) Run(ctx context.Context, b *bench.Bench) error {
 }
 
 func (w *workload) load(ctx context.Context, b *bench.Bench) error {
-	for _, request := range []*insertRequest{
+	requests := []*insertRequest{
 		branchesRequest(w.scale, w.loadWorkers),
 		tellersRequest(w.scale, w.loadWorkers),
 		accountsRequest(w.scale, w.loadWorkers),
-	} {
+	}
+
+	total := float64(len(requests))
+	for index, request := range requests {
+		b.Progress(ctx, bench.ProgressUpdate{Activity: request.Table, Unit: "tables", Current: float64(index), Total: &total})
+
 		if _, err := b.Insert(
 			ctx,
 			request.Table,

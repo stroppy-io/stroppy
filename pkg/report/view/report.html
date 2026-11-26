@@ -321,6 +321,10 @@
 <h2>Execution</h2>
 <p>Step outcomes and measured wall-clock windows.</p>
 </div>{{template "chart" .StepChart}}
+{{if .ProgressPercent}}<details class="panel" open>
+<summary>Run progress · {{.ProgressPercent}} estimated work completion</summary>
+<div class="details-body"><p class="scope-note">Equal selected phase weights; not an ETA or success rate. Outcome is reported separately.</p>{{template "node" .Progress}}</div>
+</details>{{end}}
 <details class="panel">
 <summary>All step data</summary>
 <div class="details-body">{{template "node" .Steps}}

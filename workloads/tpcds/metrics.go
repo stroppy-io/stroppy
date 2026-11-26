@@ -47,6 +47,15 @@ func queryMetricName(name string) string {
 	return fmt.Sprintf("custom_%x", sha256.Sum256([]byte(name)))
 }
 
+func queryProgressName(name string) string {
+	const maxActivityLength = 96
+	if len(name) > maxActivityLength {
+		return fmt.Sprintf("custom_%x", sha256.Sum256([]byte(name)))
+	}
+
+	return queryMetricName(name)
+}
+
 func declareQueryMetrics(declarations *bench.MetricDeclarations, names []string) map[string]*queryMetrics {
 	unique := make(map[string]bool)
 

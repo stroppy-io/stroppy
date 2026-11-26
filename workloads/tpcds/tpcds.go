@@ -277,7 +277,10 @@ func (s schemaSection) Run(ctx context.Context, b *bench.Bench) error {
 }
 
 func (w *workload) load(ctx context.Context, b *bench.Bench) error {
-	for _, table := range tpcdsTables {
+	total := float64(len(tpcdsTables))
+	for index, table := range tpcdsTables {
+		b.Progress(ctx, bench.ProgressUpdate{Activity: table, Unit: "tables", Current: float64(index), Total: &total})
+
 		source, err := tpcdsgen.NewBatchSource(table, w.scaleFactor)
 		if err != nil {
 			return err
@@ -322,14 +325,24 @@ func (w *workload) work(ctx context.Context, b *bench.Bench) error {
 		return err
 	}
 
-	for _, q := range queries {
+	total := float64(len(queries))
+	for index, q := range queries {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 
+		b.Progress(ctx, bench.ProgressUpdate{
+			Activity: queryProgressName(q.name), Unit: "queries", Current: float64(index), Total: &total,
+		})
+
 		start := time.Now()
 		err := b.Exec(ctx, q.sql, nil)
 		elapsed := time.Since(start)
+
+		b.Progress(ctx, bench.ProgressUpdate{
+			Activity: queryProgressName(q.name), Unit: "queries", Current: float64(index + 1), Total: &total,
+		})
+
 		w.metrics[q.name].record(ctx, elapsed, err != nil)
 
 		if err != nil {

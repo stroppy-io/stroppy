@@ -273,6 +273,14 @@ func (b *Bench) newBatchInsertTracker(req *driver.InsertRequest) *insertprogress
 	cfg.Logger = b.lg.Named("insert-progress")
 	cfg.OnSample = func(snapshot insertprogress.Snapshot) {
 		b.root.txMetrics.recordInsertProgress(b.vu, &snapshot)
+
+		if b.root.progress != nil {
+			b.root.progress.insert(b.vu.worker, &snapshot)
+		}
+	}
+
+	if b.root.progress != nil {
+		b.root.progress.insert(b.vu.worker, &insertprogress.Snapshot{Table: req.Table, TotalRows: req.Source.TotalRows()})
 	}
 
 	return insertprogress.NewTracker(&cfg)

@@ -63,7 +63,8 @@ func (w *workload) streamAction() bench.Action {
 
 		b.Log.Warn(message, "stream", stream.ID, "seed", stream.Seed)
 
-		for _, number := range stream.Order {
+		total := float64(len(stream.Order))
+		for index, number := range stream.Order {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -76,6 +77,8 @@ func (w *workload) streamAction() bench.Action {
 			name := queryNames[number-1]
 			body, _ := w.sql.Query(name, "body")
 
+			b.Progress(ctx, bench.ProgressUpdate{Activity: name, Unit: "queries", Current: float64(index), Total: &total})
+
 			start := time.Now()
 			if stream.started.IsZero() {
 				stream.started = start
@@ -84,6 +87,8 @@ func (w *workload) streamAction() bench.Action {
 			_, err = session.RawRows(ctx, body, stream.Parameters[name])
 			stream.finished = time.Now()
 			elapsed := stream.finished.Sub(start).Seconds() * 1000
+
+			b.Progress(ctx, bench.ProgressUpdate{Activity: name, Unit: "queries", Current: float64(index + 1), Total: &total})
 			w.recordAttempt(ctx, name, elapsed, err != nil)
 
 			stream.Attempted++
