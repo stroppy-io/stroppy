@@ -145,6 +145,7 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 	e.policies = map[string]report.Execution{}
 
 	e.reporting = options.Report != nil
+	e.expectedGraphs = observed.Execution.graphs
 
 	root.progress, err = newRunProgress(root, observed.Execution.observed)
 	if err != nil {
@@ -287,7 +288,17 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 			result.Progress = &progress
 		}
 
-		result, err = finishRun(result, root, d.reports, err, phase)
+		reports := d.reports
+		if len(e.graphReports) > 0 {
+			reports = append(slices.Clone(reports), reportDefinition{
+				kind: report.ExecutionGraphsKind, schema: 1,
+				contributor: func(ReportContext) (ReportContribution, error) {
+					return ReportContribution{Status: report.WorkloadReportOK, Data: e.graphReports}, nil
+				},
+			})
+		}
+
+		result, err = finishRun(result, root, reports, err, phase)
 		if root.capture != nil && result != nil {
 			root.capture.finish(result)
 		}
@@ -302,6 +313,9 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 	}()
 
 	err = test.Define(d)
+	if len(e.graphs) != len(e.expectedGraphs) {
+		err = errors.Join(err, inputError("execution omitted an observed graph"))
+	}
 
 	return result, err
 }

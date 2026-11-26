@@ -238,6 +238,7 @@ type (
 		measured   bool
 		driver     DriverRef
 		initialize WorkerInit
+		retained   bool
 	}
 )
 type stepOption func(*stepOptions)
@@ -256,6 +257,10 @@ func Always(timeout time.Duration) StepOption {
 
 // Measure includes a once-only step in throughput measurement.
 func Measure() StepOption { return stepOption(func(s *stepOptions) { s.measured = true }) }
+
+// RetainSession declares one retained connection per worker, allowing graph
+// preflight to reject concurrent session demand that exceeds the driver pool.
+func RetainSession() StepOption { return stepOption(func(s *stepOptions) { s.retained = true }) }
 
 // Use selects the default database for this step.
 func Use(ref DriverRef) StepOption { return stepOption(func(s *stepOptions) { s.driver = ref }) }

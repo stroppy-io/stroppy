@@ -135,6 +135,55 @@ Without stream options, numeric q1–q22 order and qualification substitutions r
 unchanged. `validate_answers` applies only to that qualification mode; generated
 streams do not compare randomized results with the qualification answer set.
 
+## Named execution modes
+
+`--mode legacy` is the default and preserves the stream and refresh flags below.
+The explicit graph modes are:
+
+- `qualification`: load and compare the unmodified SF=1 PostgreSQL data with the reference answers.
+- `power`: RF1, power-order query stream 0, then RF2; both refreshes retain one connection.
+- `power-query-only`: diagnostic stream 0 without refreshes.
+- `throughput`: S query sessions and one refresh session executing S serial RF1/RF2 pairs, joined together.
+- `throughput-query-only`: diagnostic query streams without refreshes.
+- `full`: fresh load followed by two power/throughput runs on the evolving database.
+
+```bash
+# Complete two-run schedule; SF=1 defaults to two throughput streams.
+./build/stroppy run tpch/tx -d pg --mode full --scale-factor 1 --load-workers 4
+
+# Diagnostic power phase on existing unmodified data.
+./build/stroppy run tpch/tx -d pg --mode power --scale-factor 0.01 \
+  --query-seed 19620718 --refresh-set 1 --steps power
+```
+
+Named modes reject conflicting `--refresh-functions` and `--query-stream` inputs.
+Their worker counts and one-pass policies belong to the graph; run-policy overrides
+cannot change the schedule. Existing-data subsets require explicit `--query-seed`
+and, when writing refreshes, `--refresh-set`. Use `tpch.benchmark.next_set` only after
+a complete phase; failed or ambiguous writes require reload or reconciliation.
+Full mode rejects filters that remove required setup or phase work before any action.
+Qualification is separate from performance modes and must run before refresh mutation.
+
+Full mode derives seed0 from load completion (`mmddhhmmss`), uses seed0+s per stream,
+and repeats the same seeds in both runs. Minimum stream counts follow the specification:
+SF 1/10/30/100/300/1000/3000/10000/30000/100000 need 2/3/4/5/6/7/8/9/10/11 streams.
+At least S+1 pool connections are required. Refresh sets advance through power and
+throughput, then continue into the second run; execution supports sets 1..999.
+
+The `tpch.benchmark` report preserves every query's returned rows, stream ID/seed,
+rounded query and refresh intervals, committed refresh counts, phase windows, and
+validity reasons. Authored SQL results can contain authored data; review reports
+before sharing them. Power uses the geometric mean of 22 query and two refresh
+intervals, throughput uses `S*22*3600*SF/Ts`, and the composite is their geometric mean.
+Ts rounds up to 0.01 seconds; QI/RI round to the nearest 0.01 seconds with a 0.01-second
+minimum. Scores round to 0.1; the lower unrounded composite selects the reported run.
+Scores are withheld for incomplete, failed, skipped, simulated, nonstandard-scale,
+authored-SQL, unlogged, and subset executions. These are unaudited execution/formula
+results, not certified TPC-H disclosures or price/performance results.
+
+`probe tpch/tx --resolved -d pg --mode full` exposes the resolved graph and mode availability. Saved
+reports contain the `stroppy.execution_graphs` contribution with joined node outcomes.
+
 ## Optional refresh functions
 
 `--refresh-functions=true` enables DBGEN RF1 inserts and RF2 deletes. Flag off
@@ -188,11 +237,9 @@ completion, and safe next set. `tpch_rf1_*` / `tpch_rf2_*` expose duration in
 milliseconds plus runs/errors/elapsed-total counters. Query/refresh reporting
 spans the earliest activity through the latest query result or refresh commit,
 including waits and refresh-side generation/formatting; it is not a certified Ts.
-Raw queries/hour is omitted for failed or incomplete phases. No Power@Size,
-Throughput@Size, or QphH@Size is claimed: seed derivation, full/two-run sequencing,
-strict scale/stream rules, and canonical score reporting remain tracked by
-[#262](https://github.com/stroppy-io/stroppy/issues/262). Named composable modes and
-general execution dependencies are proposed in [#275](https://github.com/stroppy-io/stroppy/issues/275).
+Raw queries/hour is omitted for failed or incomplete phases. This legacy RF mode
+claims no Power@Size, Throughput@Size, or QphH@Size. Use the named `full` mode above
+for the complete two-run schedule and eligibility-gated formula report.
 
 ## Run shapes and two-pass runs
 

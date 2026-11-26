@@ -88,6 +88,44 @@ func TestSelectedAndResolvedProbe(t *testing.T) {
 	}
 }
 
+func TestProbeExposesNamedGraphsWithoutRunningActions(t *testing.T) {
+	for _, args := range [][]string{
+		{"tpch/tx", "-o", "json"},
+		{"tpch/tx", "--resolved", "-d", "pg", "--mode", "full", "-o", "json"},
+		{"tpcds", "-o", "json"},
+	} {
+		command := NewCommand(bench.RegisteredCatalog())
+
+		var output bytes.Buffer
+		command.SetOut(&output)
+		command.SetArgs(args)
+
+		if err := command.Execute(); err != nil {
+			t.Fatal(err)
+		}
+
+		catalog := decodeCatalog(t, output.Bytes())
+		if len(catalog.Workloads[0].Graphs) != 1 {
+			t.Fatalf("missing graph for %v", args)
+		}
+
+		graph := catalog.Workloads[0].Graphs[0]
+
+		names := make(map[string]bool)
+		for _, mode := range graph.Modes {
+			names[mode.Name] = true
+		}
+
+		if args[0] == "tpch/tx" && (!names["full"] || !names["power"] || !names["throughput-query-only"]) {
+			t.Fatalf("missing TPC-H modes: %v", names)
+		}
+
+		if args[0] == "tpcds" && (!names["queries"] || !names["benchmark"]) {
+			t.Fatalf("missing TPC-DS modes: %v", names)
+		}
+	}
+}
+
 func TestProbeRejectsInputsWithoutResolution(t *testing.T) {
 	command := NewCommand(bench.RegisteredCatalog())
 	command.SetArgs([]string{"tpcc/tx", "--scale-factor", "2"})

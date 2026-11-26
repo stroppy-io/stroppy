@@ -7,9 +7,7 @@ import (
 	"time"
 
 	"github.com/stroppy-io/stroppy/v6/pkg/bench"
-	"github.com/stroppy-io/stroppy/v6/pkg/bench/mpp"
 	"github.com/stroppy-io/stroppy/v6/pkg/report"
-	"github.com/stroppy-io/stroppy/v6/workloads/tpch/dbgen"
 	"github.com/stroppy-io/stroppy/v6/workloads/tpch/tpchgen"
 )
 
@@ -104,108 +102,6 @@ func declareRefreshMetrics(d *bench.MetricDeclarations) map[string]*queryMetrics
 	}
 
 	return metrics
-}
-
-func (w *workload) executeRefreshStreams(d *bench.Def, dialect *mpp.Selection, selection streamSelection) {
-	inserted, queried := make(chan struct{}), make(chan struct{})
-	queryInitialize := w.streamInitializer(dialect)
-	initialize := func(ctx context.Context, b *bench.Bench) (bench.Action, error) {
-		if b.Worker() < selection.count {
-			action, err := queryInitialize(ctx, b)
-			if err == nil && selection.count == 1 {
-				action = powerQueryAction(action, inserted, queried)
-			}
-
-			return action, err
-		}
-
-		if err := dialect.Step(func(context.Context, *bench.Bench) error { return nil })(ctx, b); err != nil {
-			return nil, err
-		}
-
-		session, err := b.Session(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		dbgen.EnsureInit(w.scaleFactor)
-
-		return w.refreshStreamAction(session, selection, inserted, queried), nil
-	}
-	d.Execution.WorkerStep("workload", initialize, bench.OncePerWorker(selection.count+1))
-}
-
-func powerQueryAction(action bench.Action, inserted <-chan struct{}, queried chan<- struct{}) bench.Action {
-	return func(ctx context.Context, b *bench.Bench) error {
-		if err := waitRefreshPhase(ctx, inserted); err != nil {
-			return err
-		}
-
-		if err := action(ctx, b); err != nil {
-			return err
-		}
-
-		close(queried)
-
-		return nil
-	}
-}
-
-func waitRefreshPhase(ctx context.Context, ready <-chan struct{}) error {
-	select {
-	case <-ready:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-func (w *workload) refreshStreamAction(
-	session *bench.Session, selection streamSelection, inserted chan<- struct{}, queried <-chan struct{},
-) bench.Action {
-	return func(ctx context.Context, b *bench.Bench) error {
-		total := float64(selection.count * 2)
-		for pair := range selection.count {
-			b.Progress(ctx, bench.ProgressUpdate{
-				Activity: "rf1", Unit: "refresh_functions", Current: float64(pair * 2), Total: &total,
-			})
-
-			set := selection.refreshSet + int64(pair)
-			if err := w.runRefresh(ctx, session, set, "rf1"); err != nil {
-				return bench.Fatal(err)
-			}
-
-			b.Progress(ctx, bench.ProgressUpdate{
-				Activity: "rf1", Unit: "refresh_functions", Current: float64(pair*2 + 1), Total: &total,
-			})
-
-			if selection.count == 1 {
-				close(inserted)
-
-				if err := waitRefreshPhase(ctx, queried); err != nil {
-					return err
-				}
-			}
-
-			if w.queryFailures.Load() {
-				return bench.Fatal(errRefreshQuery)
-			}
-
-			b.Progress(ctx, bench.ProgressUpdate{
-				Activity: "rf2", Unit: "refresh_functions", Current: float64(pair*2 + 1), Total: &total,
-			})
-
-			if err := w.runRefresh(ctx, session, set, "rf2"); err != nil {
-				return bench.Fatal(err)
-			}
-
-			b.Progress(ctx, bench.ProgressUpdate{
-				Activity: "rf2", Unit: "refresh_functions", Current: float64(pair*2 + 2), Total: &total,
-			})
-		}
-
-		return nil
-	}
 }
 
 func nextRefreshSet(set int64) int64 {

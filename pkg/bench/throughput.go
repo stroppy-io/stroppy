@@ -70,6 +70,12 @@ type throughput struct {
 }
 
 func (r *rootState) startThroughput(name string, workers int) error {
+	_, err := r.newMeasurement(name, workers)
+
+	return err
+}
+
+func (r *rootState) newMeasurement(name string, workers int) (*measurement, error) {
 	t := &r.throughput
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -88,7 +94,7 @@ func (r *rootState) startThroughput(name string, workers int) error {
 		for i, name := range names {
 			gauge, err := meter.Float64ObservableGauge(r.metricsPrefix+name, otelmetric.WithUnit(units[i]))
 			if err != nil {
-				return fmt.Errorf("create throughput %s: %w", name, err)
+				return nil, fmt.Errorf("create throughput %s: %w", name, err)
 			}
 
 			gauges[i] = gauge
@@ -96,7 +102,7 @@ func (r *rootState) startThroughput(name string, workers int) error {
 
 		completed, err := meter.Float64ObservableCounter(r.metricsPrefix + "successful_transactions_total")
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		_, err = meter.RegisterCallback(func(_ context.Context, observer otelmetric.Observer) error {
@@ -137,7 +143,7 @@ func (r *rootState) startThroughput(name string, workers int) error {
 			return nil
 		}, gauges[0], gauges[1], gauges[2], gauges[3], completed)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		t.registered = true
@@ -150,7 +156,7 @@ func (r *rootState) startThroughput(name string, workers int) error {
 	t.windows = append(t.windows, window)
 	t.current.Store(window)
 
-	return nil
+	return window, nil
 }
 
 func (t *throughput) stop() {
@@ -167,7 +173,7 @@ func (b *Bench) LogicalOperation(fn func() error) error {
 	b.vu.logicalDepth++
 	defer func() { b.vu.logicalDepth-- }()
 
-	window := b.root.throughput.current.Load()
+	window := b.vu.measurement()
 
 	var writer *measurementWriter
 	if outer && window != nil {

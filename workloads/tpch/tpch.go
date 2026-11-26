@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -24,18 +25,20 @@ var (
 )
 
 type workload struct {
-	sql           *bench.SQL
-	schema        *bench.SQL // sql, except on the MPP dialect where the schema has its own file
-	driverType    bench.DriverTypeName
-	isPicodata    bool
-	needsEndDates bool
-	scaleFactor   float64
-	loadWorkers   int
-	useUnlogged   bool
-	ydbColumn     bool
-	ydbStoreMode  string
-	sqlFile       string
-	queryOptions  string
+	sql               *bench.SQL
+	schema            *bench.SQL // sql, except on the MPP dialect where the schema has its own file
+	driverType        bench.DriverTypeName
+	isPicodata        bool
+	needsEndDates     bool
+	scaleFactor       float64
+	loadWorkers       int
+	useUnlogged       bool
+	ydbColumn         bool
+	ydbStoreMode      string
+	sqlFile           string
+	queryOptions      string
+	selectedMode      string
+	modeLoadCompleted time.Time
 
 	params         map[string]map[string]any // final per-query params (end dates + q1 cutoff precomputed)
 	m              map[string]*queryMetrics
@@ -90,10 +93,6 @@ func define(d *bench.Def) error {
 		return err
 	}
 
-	step := func(name string, action bench.Action) {
-		d.Execution.Step(name, dialectChoice.Step(action))
-	}
-
 	w.useUnlogged = w.useUnlogged && w.driverType == bench.DriverPostgres
 	w.ydbColumn = w.driverType == bench.DriverYDB && w.ydbStoreMode == "column"
 	w.isPicodata = w.driverType == bench.DriverPicodata
@@ -103,10 +102,35 @@ func define(d *bench.Def) error {
 		return err
 	}
 
+	if selection.mode != "legacy" {
+		w.m = w.initMetrics(&d.Metrics)
+		w.params = w.buildParams()
+		w.refreshMetrics = declareRefreshMetrics(&d.Metrics)
+
+		return w.executeMode(d, dialectChoice, selectMode(selection))
+	}
+
 	if err := w.prepareExecution(d, selection); err != nil {
 		return err
 	}
 
+	return w.executeLegacyGraph(d, dialectChoice, selection, settings)
+}
+
+func (w *workload) executeLegacyGraph(
+	d *bench.Def, dialectChoice *mpp.Selection, selection streamSelection, settings bench.RunSettings,
+) error {
+	g := d.Execution.Graph("tpch")
+
+	var previous, setup []bench.NodeRef
+
+	step := func(name string, action bench.Action, options ...bench.StepOption) bench.NodeRef {
+		node := g.Node(name, dialectChoice.Step(action), options...).After(previous...)
+		previous = []bench.NodeRef{node}
+		setup = append(setup, node)
+
+		return node
+	}
 	for _, name := range []string{"drop_schema", "create_schema"} {
 		section := sqlSection{w, name}
 		step(name, section.Run)
@@ -129,23 +153,39 @@ func define(d *bench.Def) error {
 	section = sqlSection{w, "analyze"}
 	step(section.name, section.Run)
 
-	w.executeQueries(d, dialectChoice, selection, settings)
+	legacySetup := slices.Clone(setup)
 
-	return d.Execution.Err()
-}
+	var (
+		qualification bench.NodeRef
+		legacy        []bench.NodeRef
+	)
 
-func (w *workload) executeQueries(
-	d *bench.Def, dialect *mpp.Selection, selection streamSelection, settings bench.RunSettings,
-) {
 	switch {
 	case !selection.enabled:
-		d.Execution.Step("validate_answers", dialect.Step(w.validate))
-		d.Execution.Step("workload", dialect.Step(w.runQueries), settings.Policy())
+		qualification = step("validate_answers", w.validate)
+		legacy = append(legacy, qualification, step("workload", w.runQueries, settings.Policy()))
 	case selection.refresh:
-		w.executeRefreshStreams(d, dialect, selection)
+		legacy = w.declareRefreshStreams(g, dialectChoice, selection, previous)
 	default:
-		d.Execution.WorkerStep("workload", w.streamInitializer(dialect), bench.OncePerWorker(selection.count))
+		legacy = append(legacy, g.WorkerNode("workload", w.streamInitializer(dialectChoice),
+			bench.OncePerWorker(selection.count), bench.RetainSession()).After(previous...))
 	}
+
+	g.Mode("legacy", "Preserve existing run and stream flags", append(legacySetup, legacy...)...)
+
+	if !selection.enabled {
+		g.Mode("qualification", "Qualification on unmodified data; no performance score",
+			append(slices.Clone(legacySetup), qualification)...)
+	}
+
+	options := selectMode(selection)
+	if !options.streamsExplicit {
+		options.streams = max(1, minimumStreams(w.scaleFactor))
+	}
+
+	w.declarePerformanceModes(d, g, dialectChoice, options, legacySetup)
+
+	return g.Run("legacy")
 }
 
 func (w *workload) prepareExecution(d *bench.Def, selection streamSelection) error {

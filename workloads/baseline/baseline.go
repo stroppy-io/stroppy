@@ -54,13 +54,14 @@ func define(d *bench.Def) error {
 	iso, _ := d.Param.String("tx-isolation", "", "Transaction isolation override.")
 	db := d.Drivers.Declare("default", bench.DriverConfig{})
 	w.iso = db.ResolveIsolation(bench.TxIsolationName(iso), resolveIsolation(db.Kind(), ""))
-	d.Execution.Step("drop_schema", w.drop)
-	d.Execution.Step("create_schema", w.create)
-	d.Execution.Step("load_data", w.load)
-	d.Execution.Step("workload", w.work, settings.Policy())
-	d.Execution.Step("cleanup", w.drop, bench.Always(cleanupTimeout))
+	g := d.Execution.Graph("baseline")
+	drop := g.Node("drop_schema", w.drop)
+	create := g.Node("create_schema", w.create).After(drop)
+	load := g.Node("load_data", w.load).After(create)
+	work := g.Node("workload", w.work, settings.Policy()).After(load)
+	g.Node("cleanup", w.drop, bench.Always(cleanupTimeout)).AfterCompletion(work)
 
-	return d.Execution.Err()
+	return g.Run("")
 }
 
 func (w *workload) drop(ctx context.Context, b *bench.Bench) error {

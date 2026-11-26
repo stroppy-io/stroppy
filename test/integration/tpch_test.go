@@ -516,7 +516,8 @@ func validateTpchSF1Summary(out string) error {
 	}
 	summaryCount := 0
 	for _, line := range strings.Split(out, "\n") {
-		if line == tpchSF1Summary {
+		message, _, _ := strings.Cut(line, "\t")
+		if message == tpchSF1Summary {
 			summaryCount++
 		}
 	}
@@ -543,6 +544,8 @@ func TestValidateTpchSF1Summary(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "all answers match", output: heading + "  q1  : OK      rows=4 (want 4)\n" + tpchSF1Summary},
+		{name: "structured log fields", output: heading + tpchSF1Summary + "\t{\"step\":\"validate_answers\",\"worker\":0}"},
+		{name: "extra message text", output: heading + tpchSF1Summary + " invalid", wantErr: true},
 		{name: "missing heading", output: tpchSF1Summary, wantErr: true},
 		{name: "diff total", output: heading + "  total=22  ok=21  diff=1  skipped=0  error=0", wantErr: true},
 		{name: "skipped total", output: heading + "  total=22  ok=21  diff=0  skipped=1  error=0", wantErr: true},

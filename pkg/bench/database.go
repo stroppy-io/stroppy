@@ -291,8 +291,13 @@ func (b *Bench) Database(ref DriverRef) *Database {
 }
 
 func (e *Execution) database(ctx context.Context, name string) (driver.Driver, *config.DriverConfig, error) {
-	e.databaseMu.Lock()
-	defer e.databaseMu.Unlock()
+	owner := e
+	if e.databaseOwner != nil {
+		owner = e.databaseOwner
+	}
+
+	owner.databaseMu.Lock()
+	defer owner.databaseMu.Unlock()
 
 	if name == "default" {
 		name = ""

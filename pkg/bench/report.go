@@ -97,6 +97,10 @@ func (r *ReportDeclarations) Contribute(kind string, schema int, contributor Rep
 		invalid("report", errEmptyReportKind)
 	}
 
+	if kind == report.ExecutionGraphsKind {
+		invalid("report", inputError("report kind %q is reserved for execution topology", kind))
+	}
+
 	if schema < 1 {
 		invalid("report", errInvalidReportSchema)
 	}

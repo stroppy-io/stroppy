@@ -40,6 +40,7 @@ func TestBuiltInWorkloadParameterSchemas(t *testing.T) {
 		{"tpcds", []bench.ParamSchema{
 			param("benchmark", bench.ParamTypeBool, false, "BENCHMARK", "benchmark"),
 			param("load-workers", bench.ParamTypeInt, 0, "LOAD_WORKERS", "loadWorkers"),
+			tpcdsModeParam(),
 			param("pg-unlogged", bench.ParamTypeBool, false, "PG_UNLOGGED", "pgUnlogged"),
 			param("query-seed", bench.ParamTypeInt64, int64(19620718), "QUERY_SEED", "querySeed"),
 			param("query-stream", bench.ParamTypeInt, 0, "QUERY_STREAM", "queryStream"),
@@ -54,6 +55,7 @@ func TestBuiltInWorkloadParameterSchemas(t *testing.T) {
 		}},
 		{"tpch/tx", []bench.ParamSchema{
 			param("load-workers", bench.ParamTypeInt, 0, "LOAD_WORKERS", "loadWorkers"),
+			tpchModeParam(),
 			param("pg-unlogged", bench.ParamTypeBool, false, "PG_UNLOGGED", "pgUnlogged"),
 			picodataLimitParam("pico-motion-row-max", "PICO_MOTION_ROW_MAX", "picoMotionRowMax"),
 			picodataLimitParam("pico-vdbe-opcode-max", "PICO_VDBE_OPCODE_MAX", "picoVdbeOpcodeMax"),
@@ -166,6 +168,22 @@ func tpcDSRefreshSetParam() bench.ParamSchema {
 func tpchRefreshSetParam() bench.ParamSchema {
 	value := param("refresh-set", bench.ParamTypeInt64, int64(1), "REFRESH_SET", "refreshSet")
 	value.Constraints = []bench.Constraint{{Kind: "min", Value: int64(1)}, {Kind: "max", Value: int64(999)}}
+
+	return value
+}
+
+func tpcdsModeParam() bench.ParamSchema {
+	value := param("mode", bench.ParamTypeString, "legacy", "MODE", "mode")
+	value.Constraints = []bench.Constraint{{Kind: "one-of", Value: []string{"legacy", "queries", "benchmark"}}}
+
+	return value
+}
+
+func tpchModeParam() bench.ParamSchema {
+	value := param("mode", bench.ParamTypeString, "legacy", "MODE", "mode")
+	value.Constraints = []bench.Constraint{{Kind: "one-of", Value: []string{
+		"legacy", "full", "power", "power-query-only", "throughput", "throughput-query-only", "qualification",
+	}}}
 
 	return value
 }

@@ -27,6 +27,7 @@ func define(d *bench.Def) error {
 	body, bodyInfo := d.Param.String("sql-body", "", "Inline SQL to execute.")
 	file, fileInfo := d.Param.String("sql-file", "", "SQL file to execute.")
 	w := &workload{}
+	g := d.Execution.Graph("execute_sql")
 
 	switch {
 	case file != "" && (sqlSourcePriority(fileInfo.Source) > sqlSourcePriority(bodyInfo.Source) || body == ""):
@@ -40,10 +41,10 @@ func define(d *bench.Def) error {
 		w.sql = bench.ParseSQL(body)
 	default:
 		// Default-only discovery can describe a SQL runner without a source.
-		d.Execution.Step("validate_source", w.requireSource)
-		d.Execution.Step("workload", w.work, settings.Policy())
+		validate := g.Node("validate_source", w.requireSource)
+		g.Node("workload", w.work, settings.Policy()).After(validate)
 
-		return d.Execution.Err()
+		return g.Run("")
 	}
 
 	w.names = w.sql.Names("")
@@ -51,9 +52,9 @@ func define(d *bench.Def) error {
 		return errSQLSourceNoQueries
 	}
 
-	d.Execution.Step("workload", w.work, settings.Policy())
+	g.Node("workload", w.work, settings.Policy())
 
-	return d.Execution.Err()
+	return g.Run("")
 }
 
 func sqlSourcePriority(source bench.ParamSource) int {
