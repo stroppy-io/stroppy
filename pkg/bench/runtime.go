@@ -272,7 +272,7 @@ func RunTest(ctx context.Context, test Test, options RunOptions) (result *report
 		status := string(Completed)
 		if err != nil || panicValue != nil {
 			status = string(Failed)
-			if errors.Is(err, context.Canceled) {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				status = string(Canceled)
 			}
 		} else if root.errorReporter.snapshot().terminalErrors > 0 {

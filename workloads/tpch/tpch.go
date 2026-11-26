@@ -306,13 +306,14 @@ func (w *workload) runQueries(ctx context.Context, b *bench.Bench) error {
 			continue
 		}
 
+		b.Progress(ctx, bench.ProgressUpdate{Activity: name, Unit: "queries", Current: finished, Total: &total})
+
+		start := time.Now()
+
 		if w.queryOptions != "" {
 			body = picodataSQL(body, w.queryOptions)
 		}
 
-		b.Progress(ctx, bench.ProgressUpdate{Activity: name, Unit: "queries", Current: finished, Total: &total})
-
-		start := time.Now()
 		_, err := b.RawRows(ctx, body, w.params[name])
 		elapsed := time.Since(start).Milliseconds()
 		finished++

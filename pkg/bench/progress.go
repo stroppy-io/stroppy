@@ -47,13 +47,14 @@ type ProgressUpdate struct {
 }
 
 type workerProgress struct {
-	update    ProgressUpdate
-	started   time.Time
-	stopped   time.Time
-	iteration uint64
-	completed float64
-	insert    *insertprogress.Snapshot
-	active    atomic.Bool
+	update        ProgressUpdate
+	started       time.Time
+	stopped       time.Time
+	iteration     uint64
+	completed     float64
+	variableTotal bool
+	insert        *insertprogress.Snapshot
+	active        atomic.Bool
 }
 
 type runProgress struct {
@@ -314,8 +315,15 @@ func (p *runProgress) update(worker int, iteration uint64, update ProgressUpdate
 	source := p.workers[worker]
 	if source.update.Unit != update.Unit {
 		source.completed = 0
-	} else if source.iteration != iteration {
-		source.completed += source.update.Current
+		source.variableTotal = false
+	} else {
+		if source.update.Total == nil || update.Total == nil || *source.update.Total != *update.Total {
+			source.variableTotal = true
+		}
+
+		if source.iteration != iteration {
+			source.completed += source.update.Current
+		}
 	}
 
 	changed := source.update.Activity != update.Activity && update.Activity != ""
@@ -526,10 +534,12 @@ func (p *runProgress) nativeSource(worker int, state *workerProgress, now time.T
 	update := state.update
 
 	current, total := update.Current, update.Total
-	if p.policy.mode != "once" && total != nil {
+	if p.policy.mode != "once" {
 		current += state.completed
 
 		switch {
+		case total == nil || state.variableTotal:
+			total = nil
 		case p.policy.mode == "shared-iterations" && p.policy.workers == 1:
 			planned := *total * float64(p.policy.iterations)
 			total = &planned

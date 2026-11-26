@@ -191,6 +191,9 @@ Report finished work, not only successes. `Total: nil` means unknown; zero remai
 an explicit zero total and does not define a source ratio. Each worker owns its
 activity, so concurrent streams do not overwrite each other. Report the inner
 schedule afresh for every invocation; the execution policy owns the outer budget.
+Single-worker fixed-size schedules expose the repeated total. If observed invocation
+totals vary or become unknown, the native completed count remains cumulative but
+the projected total is omitted.
 `Activity` and `Unit` are bounded identifiers (ASCII letters, digits, `_./-`, up to
 96 characters). Never include SQL, arguments, credentials, or connection details.
 

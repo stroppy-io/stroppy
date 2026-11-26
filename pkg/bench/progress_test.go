@@ -213,9 +213,39 @@ func TestProgressRuntimeFlowIsBoundedAndMonotonic(t *testing.T) {
 	require.Less(t, value.Ratio, 1.0)
 }
 
+func TestProgressVariableInvocationTotalsRemainUnknown(t *testing.T) {
+	for _, second := range []*float64{nil, new(1.0), new(2.0)} {
+		_, p := progressFixture(t, Policy{})
+		p.begin("queries", SharedIterations(1, 2))
+
+		first := 2.0
+		p.update(0, 0, ProgressUpdate{Activity: "q2", Unit: "queries", Current: 2, Total: &first})
+		p.iterationDone(0)
+
+		current := 1.0
+		if second != nil {
+			current = *second
+		}
+
+		p.update(0, 1, ProgressUpdate{Activity: "q1", Unit: "queries", Current: current, Total: second})
+		p.mu.Lock()
+		source := p.nativeSource(0, p.workers[0], time.Now())
+		p.mu.Unlock()
+		require.InDelta(t, 2+current, source.Current, 0)
+
+		if second != nil && *second == first {
+			require.NotNil(t, source.Total)
+			require.InDelta(t, 4, *source.Total, 0)
+		} else {
+			require.Nil(t, source.Total)
+		}
+	}
+}
+
 func TestProgressPublicAPIReportsNativeWorkAndOutcome(t *testing.T) {
 	for name, terminal := range map[string]error{
 		"completed": nil, "failed": errors.New("failed"), "canceled": context.Canceled,
+		"deadline": context.DeadlineExceeded,
 	} {
 		t.Run(name, func(t *testing.T) {
 			core, logs := observer.New(zap.InfoLevel)
@@ -236,11 +266,20 @@ func TestProgressPublicAPIReportsNativeWorkAndOutcome(t *testing.T) {
 			require.ErrorIs(t, err, terminal)
 			require.NotNil(t, result.Progress)
 			require.InDelta(t, result.Progress.Ratio, *result.Metrics["progress_ratio"].Total, 0)
+			require.Equal(t, string(result.Status), result.Progress.Status)
+
+			if errors.Is(terminal, context.DeadlineExceeded) || errors.Is(terminal, context.Canceled) {
+				require.Equal(t, report.StatusCanceled, result.Status)
+			}
 
 			if terminal == nil {
 				require.InDelta(t, 1.0, result.Progress.Ratio, 0)
 			} else {
 				require.Less(t, result.Progress.Ratio, 1.0)
+			}
+
+			if name == "failed" {
+				require.Equal(t, report.StatusFailed, result.Status)
 			}
 
 			require.NotEmpty(t, logs.FilterMessage("run progress").All())

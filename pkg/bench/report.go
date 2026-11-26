@@ -248,7 +248,7 @@ func finalizeRunReport(
 	}
 
 	switch {
-	case runErr != nil && errors.Is(runErr, context.Canceled):
+	case runErr != nil && (errors.Is(runErr, context.Canceled) || errors.Is(runErr, context.DeadlineExceeded)):
 		run.Status = report.StatusCanceled
 	case runErr != nil:
 		run.Status = report.StatusFailed
