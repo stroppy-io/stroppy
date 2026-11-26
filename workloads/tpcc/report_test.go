@@ -312,6 +312,23 @@ func TestComplianceReportInsufficientSample(t *testing.T) {
 	}
 }
 
+func TestComplianceReportNonstandardTerminalPopulation(t *testing.T) {
+	report, err := complianceReport(fullMix([]float64{50, 40, 30, 60, 80}), reportOptions{
+		workload: "tpcc/tx", paced: true, terminalPopulationMismatch: true, elapsed: time.Minute,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if report.ComplianceApplicable || report.MixCompliant != nil || report.ResponseCompliant != nil {
+		t.Fatal("nonstandard terminal population received compliance verdicts")
+	}
+
+	if !strings.Contains(report.Note, "not ten per active warehouse") {
+		t.Fatal(report.Note)
+	}
+}
+
 func TestComplianceReportUnpacedRun(t *testing.T) {
 	report, err := complianceReport(
 		fullMix([]float64{50, 40, 30, 60, 80}),

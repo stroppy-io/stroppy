@@ -161,22 +161,25 @@ func (o *txObservation) quantile(q float64) float64 {
 // Report is the machine-readable TPC-C compliance report. Verdict fields that do
 // not apply to the run (unpaced) are nil.
 type Report struct {
-	Workload             string      `json:"workload"`
-	Paced                bool        `json:"paced"`
-	SpreadWarehouses     bool        `json:"spread_warehouses,omitempty"`
-	NonTransactional     bool        `json:"non_transactional,omitempty"`
-	ComplianceApplicable bool        `json:"compliance_applicable"`
-	ElapsedSeconds       float64     `json:"elapsed_seconds"`
-	WarmupSeconds        float64     `json:"warmup_seconds,omitempty"`
-	DrainSeconds         float64     `json:"drain_seconds,omitempty"`
-	TpmC                 float64     `json:"tpm_c"`
-	MixCompliant         *bool       `json:"mix_compliant"`
-	ResponseCompliant    *bool       `json:"response_compliant"`
-	MixTolerancePct      float64     `json:"mix_tolerance_pct"`
-	Transactions         []TxReport  `json:"transactions"`
-	Statistical          Statistical `json:"statistical"`
-	Steadiness           Steadiness  `json:"steadiness"`
-	Note                 string      `json:"note,omitempty"`
+	Workload                   string          `json:"workload"`
+	Paced                      bool            `json:"paced"`
+	SpreadWarehouses           bool            `json:"spread_warehouses,omitempty"`
+	NonTransactional           bool            `json:"non_transactional,omitempty"`
+	ComplianceApplicable       bool            `json:"compliance_applicable"`
+	ElapsedSeconds             float64         `json:"elapsed_seconds"`
+	WarmupSeconds              float64         `json:"warmup_seconds,omitempty"`
+	DrainSeconds               float64         `json:"drain_seconds,omitempty"`
+	TpmC                       float64         `json:"tpm_c"`
+	MixCompliant               *bool           `json:"mix_compliant"`
+	ResponseCompliant          *bool           `json:"response_compliant"`
+	MixTolerancePct            float64         `json:"mix_tolerance_pct"`
+	Transactions               []TxReport      `json:"transactions"`
+	Statistical                Statistical     `json:"statistical"`
+	Steadiness                 Steadiness      `json:"steadiness"`
+	Note                       string          `json:"note,omitempty"`
+	Terminals                  *TerminalReport `json:"terminal_model,omitempty"`
+	Pacing                     *PacingReport   `json:"pacing,omitempty"`
+	TerminalPopulationMismatch bool            `json:"terminal_population_mismatch,omitempty"`
 }
 
 // TxReport is the per-transaction-type observation and, when applicable, its
@@ -226,12 +229,13 @@ type Steadiness struct {
 // reportOptions carries the run context a report is computed against. Deterministic:
 // the caller supplies the elapsed measurement window rather than reading a clock.
 type reportOptions struct {
-	workload         string
-	paced            bool
-	spreadWarehouses bool
-	nonTransactional bool
-	elapsed          time.Duration
-	steady           steadySeries
+	workload                   string
+	paced                      bool
+	spreadWarehouses           bool
+	nonTransactional           bool
+	terminalPopulationMismatch bool
+	elapsed                    time.Duration
+	steady                     steadySeries
 }
 
 func (o reportOptions) complianceNote() string {
@@ -246,6 +250,10 @@ func (o reportOptions) complianceNote() string {
 
 	if o.spreadWarehouses {
 		return "home warehouse changes per transaction: fixed-terminal TPC-C compliance is not applicable"
+	}
+
+	if o.terminalPopulationMismatch {
+		return "terminal population is not ten per active warehouse: TPC-C compliance is not applicable"
 	}
 
 	return "unpaced stress run: §5.2.5 compliance " +
@@ -345,14 +353,16 @@ func complianceReport(obs []txObservation, opts reportOptions) (Report, error) {
 	elapsedSeconds := opts.elapsed.Seconds()
 
 	r := Report{
-		Workload:             opts.workload,
-		Paced:                opts.paced,
-		SpreadWarehouses:     opts.spreadWarehouses,
-		NonTransactional:     opts.nonTransactional,
-		ComplianceApplicable: opts.paced && !opts.spreadWarehouses && !opts.nonTransactional,
-		ElapsedSeconds:       elapsedSeconds,
-		MixTolerancePct:      mixTolerancePct,
-		Transactions:         make([]TxReport, 0, len(obs)),
+		Workload:         opts.workload,
+		Paced:            opts.paced,
+		SpreadWarehouses: opts.spreadWarehouses,
+		NonTransactional: opts.nonTransactional,
+		ComplianceApplicable: opts.paced && !opts.spreadWarehouses && !opts.nonTransactional &&
+			!opts.terminalPopulationMismatch,
+		TerminalPopulationMismatch: opts.terminalPopulationMismatch,
+		ElapsedSeconds:             elapsedSeconds,
+		MixTolerancePct:            mixTolerancePct,
+		Transactions:               make([]TxReport, 0, len(obs)),
 		Statistical: Statistical{
 			TotalMeasurements: total,
 			NewOrders:         newOrderCount,
@@ -606,6 +616,8 @@ func (r *Report) text() string {
 			fmt.Fprintln(&b, r.Note)
 		case r.SpreadWarehouses:
 			fmt.Fprintln(&b, "compliance: NOT APPLICABLE (home warehouse changes per transaction; raw stats below)")
+		case r.TerminalPopulationMismatch:
+			fmt.Fprintln(&b, "compliance: NOT APPLICABLE (terminal population is not ten per active warehouse)")
 		default:
 			fmt.Fprintln(&b, "compliance: NOT APPLICABLE (unpaced stress run; raw stats below)")
 		}
@@ -698,6 +710,16 @@ func passFail(v *bool) string {
 }
 
 func (w *workload) complianceContribution(context bench.ReportContext) (bench.ReportContribution, error) {
+	if w.strict != nil {
+		terminals := w.strict.report()
+
+		return bench.ReportContribution{Data: Report{
+			Workload: w.Name(), Paced: true, Terminals: &terminals,
+			Pacing: w.pacingReport(time.Duration(terminals.MeasurementSeconds * float64(time.Second))),
+			Note:   terminals.Note,
+		}}, nil
+	}
+
 	obs := make([]txObservation, len(complianceTxTable))
 
 	for i, spec := range complianceTxTable {
@@ -736,11 +758,13 @@ func (w *workload) complianceContribution(context bench.ReportContext) (bench.Re
 	compliance, err := complianceReport(obs, reportOptions{
 		workload: w.Name(), paced: w.pacing, spreadWarehouses: w.spreadWarehouses,
 		nonTransactional: w.isPicodata, elapsed: elapsed, steady: series,
+		terminalPopulationMismatch: w.terminalPopulationMismatch,
 	})
 	if err != nil {
 		return bench.ReportContribution{}, err
 	}
 
+	compliance.Pacing = w.pacingReport(elapsed)
 	compliance.WarmupSeconds = context.Measurements["warmup"]
 	compliance.DrainSeconds = max(0, context.Measurements["workload"]-elapsed.Seconds())
 
@@ -802,7 +826,16 @@ func renderCompliance(output io.Writer, data json.RawMessage) error {
 		return err
 	}
 
-	_, err := io.WriteString(output, value.text())
+	text := value.text()
+	if value.Terminals != nil {
+		text = value.Terminals.text()
+	}
+
+	if value.Pacing != nil {
+		text += value.Pacing.text()
+	}
+
+	_, err := io.WriteString(output, text)
 
 	return err
 }

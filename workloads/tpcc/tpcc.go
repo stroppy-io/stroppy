@@ -74,11 +74,14 @@ type workload struct {
 	steady          *steady
 	warmup          time.Duration
 
-	approximationOnce sync.Once
-	historyOnce       sync.Once
-	historyID         atomic.Int64
-	historyErr        error
-	vuStates          []*vuState
+	approximationOnce          sync.Once
+	historyOnce                sync.Once
+	historyID                  atomic.Int64
+	historyErr                 error
+	vuStates                   []*vuState
+	strict                     *terminalModel
+	pace                       *pacing
+	terminalPopulationMismatch bool
 }
 
 type metrics struct {
@@ -116,7 +119,7 @@ func procsDriverSupported(dt bench.DriverTypeName) bool {
 	}
 }
 
-//nolint:funlen // workload options and ordered phases stay visible.
+//nolint:funlen,cyclop,gocognit // workload options and ordered phases stay visible.
 func define(d *bench.Def, variant string) error {
 	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
 	w := &workload{variant: variant, vuStates: make([]*vuState, settings.Workers)}
@@ -129,6 +132,8 @@ func define(d *bench.Def, variant string) error {
 		bench.Aliases("warehouses"),
 	)
 	w.warehouses = int64(max(warehouses, 1))
+	w.terminalPopulationMismatch = int64(settings.Workers)/districtsPerWarehouse != w.warehouses ||
+		settings.Workers%districtsPerWarehouse != 0
 	start, _ := d.Param.Int("warehouse-start", 1, "First warehouse ID.")
 	w.warehouseStart = int64(start)
 	w.wIDMax = w.warehouseStart + w.warehouses - 1
@@ -192,7 +197,13 @@ func define(d *bench.Def, variant string) error {
 	w.isYdb = w.driverType == bench.DriverYDB
 	w.hasReturning = w.driverType == bench.DriverPostgres || w.driverType == bench.DriverYDB
 
+	if err := w.defineTerminals(d, settings); err != nil {
+		return err
+	}
+
 	w.m = w.initMetrics(&d.Metrics)
+	w.initPacing(&d.Metrics, settings.Workers)
+
 	for _, name := range []string{"drop_schema", "create_schema"} {
 		section := sqlSection{workload: w, name: name}
 		d.Execution.Step(name, section.Run)
@@ -201,6 +212,11 @@ func define(d *bench.Def, variant string) error {
 	if variant == "procs" {
 		section := sqlSection{workload: w, name: "create_procedures"}
 		d.Execution.Step(section.name, section.Run)
+
+		if w.strict != nil {
+			terminalSection := sqlSection{workload: w, name: "create_terminal_procedures"}
+			d.Execution.Step(terminalSection.name, terminalSection.Run)
+		}
 	}
 
 	unlogged := w.pgUnlogged && w.driverType == bench.DriverPostgres
@@ -225,6 +241,10 @@ func define(d *bench.Def, variant string) error {
 
 	d.Execution.Step("validate_population", w.validate)
 
+	if w.strict != nil {
+		return w.runTerminals(d, settings)
+	}
+
 	if w.warmup > 0 {
 		d.Execution.Step("warmup", w.Iterate,
 			bench.ConstantWorkers(settings.Workers, w.warmup, settings.Drain))
@@ -235,6 +255,15 @@ func define(d *bench.Def, variant string) error {
 	}
 
 	w.measureStart = time.Now()
+	if w.pace != nil {
+		end := time.Time{}
+		if w.measureDuration > 0 {
+			end = w.measureStart.Add(w.measureDuration)
+		}
+
+		w.pace.window(w.measureStart, end)
+	}
+
 	w.steady = w.initSteady()
 	d.Execution.Step("workload", w.Iterate, settings.Policy())
 	w.measureEnd = time.Now()
@@ -464,13 +493,17 @@ func (w *workload) runPaced(
 	ctx context.Context, b *bench.Bench, vs *vuState, name string, operation func() error,
 ) error {
 	if w.pacing {
-		if err := sleepSeconds(ctx, float64(keyingTime[name])); err != nil {
+		if err := w.pacedWait(ctx, name, 0, float64(keyingTime[name])); err != nil {
 			return err
 		}
 	}
 
 	started := time.Now()
+
 	err := b.LogicalOperation(operation)
+	if w.pace != nil {
+		w.pace.response(transactionIndex(name), vs.homeWID, started, time.Now(), errors.Join(err, ctx.Err()))
+	}
 
 	phase := w.completionPhase()
 	if w.m != nil {
@@ -488,7 +521,7 @@ func (w *workload) runPaced(
 	}
 
 	// Thinking is terminal idle time, not part of the completed operation.
-	_ = sleepSeconds(ctx, thinkTime(vs.picker, thinkTimeMean[name]))
+	_ = w.pacedWait(ctx, name, 1, thinkTime(vs.picker, thinkTimeMean[name]))
 
 	return err
 }
@@ -1232,14 +1265,24 @@ func (w *workload) orderStatus(ctx context.Context, b *bench.Bench, vs *vuState)
 
 // --- delivery ---
 
-//nolint:gocognit // TPC-C spec transaction; complexity is inherent to the spec.
 func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.deliveryTotal.Add(ctx, 1)
 
 	wID := vs.homeWID
 	carrierID := vs.ri(vs.dCarrier, 1, 10)
 
-	return b.Retry(ctx, w.retryOptions(ctx), func() error {
+	_, err := w.deliverOrders(ctx, b, wID, carrierID)
+
+	return err
+}
+
+//nolint:gocognit // TPC-C spec transaction; complexity is inherent to the spec.
+func (w *workload) deliverOrders(ctx context.Context, b *bench.Bench, wID, carrierID int64) ([]deliveredOrder, error) {
+	var delivered []deliveredOrder
+
+	err := b.Retry(ctx, w.retryOptions(ctx), func() error {
+		delivered = nil
+
 		return b.BeginTx(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, func(tx *bench.Tx) error {
 			for dID := int64(1); dID <= districtsPerWarehouse; dID++ {
 				minRow, err := tx.RawRow(ctx, w.q("workload_tx_delivery", "get_min_new_order"), map[string]any{
@@ -1302,11 +1345,18 @@ func (w *workload) delivery(ctx context.Context, b *bench.Bench, vs *vuState) er
 				}); err != nil {
 					return err
 				}
+
+				delivered = append(delivered, deliveredOrder{District: dID, Order: oID})
 			}
 
 			return nil
 		})
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return delivered, nil
 }
 
 // --- stock_level (read-only) ---
@@ -1316,7 +1366,7 @@ func (w *workload) stockLevel(ctx context.Context, b *bench.Bench, vs *vuState) 
 	w.m.stockLevelTotal.Add(ctx, 1)
 
 	wID := vs.homeWID
-	dID := vs.ri(vs.slDID, 1, districtsPerWarehouse)
+	dID := vs.stockDistrict()
 	threshold := vs.ri(vs.slThreshold, 10, 20)
 
 	return b.Retry(ctx, w.retryOptions(ctx), func() error {
@@ -1429,6 +1479,7 @@ type vuState struct {
 	dCarrier *rand.Rand
 
 	slDID, slThreshold *rand.Rand
+	stockDID           int64
 
 	nurand255     *rand.Rand
 	nurand255Salt uint64

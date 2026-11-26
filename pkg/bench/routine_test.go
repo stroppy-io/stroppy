@@ -17,6 +17,15 @@ type routineTestDriver struct {
 	*commitFailDriver
 	outcome error
 	calls   int
+	rows    [][]any
+}
+
+func (d *routineTestDriver) RunRoutineRows(
+	context.Context, config.TxIsolationLevel, string, map[string]any,
+) ([][]any, *driver.QueryResult, error) {
+	d.calls++
+
+	return d.rows, nil, d.outcome
 }
 
 func (d *routineTestDriver) RunRoutine(
@@ -25,6 +34,49 @@ func (d *routineTestDriver) RunRoutine(
 	d.calls++
 
 	return nil, d.outcome
+}
+
+func TestRoutineRowsCommittedResults(t *testing.T) {
+	for _, outcome := range []error{
+		nil,
+		&driver.RoutineError{Cause: errors.New("rollback"), RollbackConfirmed: true},
+		&driver.RoutineError{Cause: errors.New("reply lost"), Ambiguous: true},
+	} {
+		root := newRuntimeTestRoot(t)
+		backend := &routineTestDriver{commitFailDriver: &commitFailDriver{}, outcome: outcome, rows: [][]any{{1, 2101}}}
+		b := &Bench{
+			root: root, vu: &VU{root: root, vuid: 1, ctx: t.Context()}, drv: backend,
+			cfg: &config.DriverConfig{DriverType: config.DriverTypePostgres},
+		}
+
+		rows, err := b.RoutineRows(t.Context(), BeginOpts{Name: "delivery"}, "SELECT delivery()", nil)
+		if outcome == nil {
+			require.NoError(t, err)
+			require.Equal(t, backend.rows, rows)
+		} else {
+			require.ErrorIs(t, err, outcome)
+			require.Nil(t, rows)
+		}
+	}
+}
+
+type routineDiscardDriver struct{ driver.Driver }
+
+func (*routineDiscardDriver) RunRoutine(
+	context.Context, config.TxIsolationLevel, string, map[string]any,
+) (*driver.QueryResult, error) {
+	return &driver.QueryResult{}, nil
+}
+
+func TestRoutineRowsUnsupported(t *testing.T) {
+	root := newRuntimeTestRoot(t)
+	b := &Bench{
+		root: root, vu: &VU{root: root, vuid: 1, ctx: t.Context()}, drv: &routineDiscardDriver{},
+		cfg: &config.DriverConfig{DriverType: config.DriverTypePostgres},
+	}
+	rows, err := b.RoutineRows(t.Context(), BeginOpts{}, "SELECT delivery()", nil)
+	require.ErrorContains(t, err, "does not support routine results")
+	require.Nil(t, rows)
 }
 
 func TestJoinedRoutineAmbiguityPreventsRetry(t *testing.T) {

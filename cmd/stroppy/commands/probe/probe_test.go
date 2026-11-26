@@ -37,7 +37,7 @@ func TestHumanCatalogIncludesGroupedWorkloads(t *testing.T) {
 		"WORKLOADS (typed parameters)",
 		"  tpcc/tx\n",
 		"    run:      --drain-timeout, --duration, --executor, --iterations, --query-timeout, --vus",
-		"    workload: --load-items",
+		"    workload: --delivery-results, --load-items",
 		"stroppy run <workload> --help",
 		"DRIVERS (supported insert methods)",
 	} {
