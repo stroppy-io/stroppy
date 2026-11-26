@@ -26,6 +26,7 @@ type deliveryResult struct {
 	Orders           []deliveredOrder `json:"orders"`
 	SkippedDistricts []int64          `json:"skipped_districts"`
 	Error            string           `json:"error,omitempty"`
+	Simulated        bool             `json:"simulated,omitempty"`
 }
 
 type deliveryLog struct {
@@ -70,6 +71,13 @@ func (w *workload) finishDelivery(ctx context.Context, b *bench.Bench, result *d
 
 	err := b.LogicalOperation(func() error {
 		var err error
+
+		if w.driverType == bench.DriverNoop {
+			result.Simulated = true
+
+			return w.simulateDelivery(ctx, b, result)
+		}
+
 		if w.variant == "procs" {
 			result.Orders, err = w.procDeliveredOrders(ctx, b, result.Warehouse, result.Carrier)
 		} else {
@@ -83,7 +91,7 @@ func (w *workload) finishDelivery(ctx context.Context, b *bench.Bench, result *d
 	if err != nil {
 		result.Orders = nil
 		result.Error = err.Error()
-	} else {
+	} else if !result.Simulated {
 		for district := int64(1); district <= districtsPerWarehouse; district++ {
 			found := false
 
@@ -105,10 +113,22 @@ func (w *workload) finishDelivery(ctx context.Context, b *bench.Bench, result *d
 	m.mu.Lock()
 	m.stats.delivery(result, m.measurement, m.end, err)
 	m.mu.Unlock()
+	w.pace.delivered(ctx, result, err, false)
 
 	if writeErr := m.results.write(result); writeErr != nil {
 		return bench.Fatal(errors.Join(err, fmt.Errorf("tpcc delivery results: %w", writeErr)))
 	}
+
+	return err
+}
+
+func (w *workload) simulateDelivery(ctx context.Context, b *bench.Bench, result *deliveryResult) error {
+	if w.variant == "procs" {
+		return b.Routine(ctx, bench.BeginOpts{Isolation: w.iso, Name: "delivery"}, w.q("workload_procs", "delivery"),
+			map[string]any{"d_w_id": result.Warehouse, "d_o_carrier_id": result.Carrier})
+	}
+
+	_, err := w.deliverOrders(ctx, b, result.Warehouse, result.Carrier)
 
 	return err
 }
