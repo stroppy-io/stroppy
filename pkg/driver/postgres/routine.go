@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 
@@ -19,12 +20,26 @@ import (
 func (d *Driver) RunRoutine(
 	ctx context.Context, isolation config.TxIsolationLevel, query string, args map[string]any,
 ) (*driver.QueryResult, error) {
+	_, result, err := d.runRoutine(ctx, isolation, query, args, false)
+
+	return result, err
+}
+
+func (d *Driver) RunRoutineRows(
+	ctx context.Context, isolation config.TxIsolationLevel, query string, args map[string]any,
+) ([][]any, *driver.QueryResult, error) {
+	return d.runRoutine(ctx, isolation, query, args, true)
+}
+
+func (d *Driver) runRoutine(
+	ctx context.Context, isolation config.TxIsolationLevel, query string, args map[string]any, collect bool,
+) ([][]any, *driver.QueryResult, error) {
 	ctx, cancel := sqldriver.StatementTimeout(ctx, d.queryTimeout)
 	defer cancel()
 
 	conn, err := d.pool.Acquire(pool.WithRoutineIsolation(ctx, isolation))
 	if err != nil {
-		return nil, &driver.RoutineError{Cause: err}
+		return nil, nil, &driver.RoutineError{Cause: err}
 	}
 	defer conn.Release()
 
@@ -44,7 +59,7 @@ func (d *Driver) RunRoutine(
 
 	if err != nil {
 		if !errors.Is(err, sqldriver.ErrExtraArgument) {
-			return nil, &driver.RoutineError{Cause: fmt.Errorf("arguments processing error: %w", err)}
+			return nil, nil, &driver.RoutineError{Cause: fmt.Errorf("arguments processing error: %w", err)}
 		}
 
 		d.logger.Warn("unused query arguments ignored; query execution continues", zap.Error(err), zap.String("sql", query))
@@ -54,7 +69,15 @@ func (d *Driver) RunRoutine(
 	rows, err := conn.Query(ctx, processed, values...)
 	elapsed := time.Since(started)
 
+	var valuesRows [][]any
+
 	if rows != nil {
+		if collect && err == nil {
+			valuesRows, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) ([]any, error) {
+				return row.Values()
+			})
+		}
+
 		rows.Close()
 		err = driver.JoinErrors(err, rows.Err())
 	}
@@ -72,10 +95,10 @@ func (d *Driver) RunRoutine(
 			confirmed = false
 		}
 
-		return &result.QueryResult, &driver.RoutineError{
+		return nil, &result.QueryResult, &driver.RoutineError{
 			Cause: err, RollbackConfirmed: confirmed, Ambiguous: !confirmed && !pgconn.SafeToRetry(err),
 		}
 	}
 
-	return &result.QueryResult, nil
+	return valuesRows, &result.QueryResult, nil
 }

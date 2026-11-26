@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/stroppy-io/stroppy/v6/pkg/config"
 	"github.com/stroppy-io/stroppy/v6/pkg/driver"
 )
 
@@ -27,7 +28,59 @@ func (b *Bench) Routine(ctx context.Context, opts BeginOpts, query string, args 
 	}
 
 	result, runErr := backend.RunRoutine(b.operationContext(ctx), isolation, query, args)
-	err = b.finishQuery(result, runErr)
+
+	return b.finishRoutine(result, runErr, opts, isolation, started)
+}
+
+// RoutineRows retains results only after the atomic routine has finished successfully.
+func (b *Bench) RoutineRows(
+	ctx context.Context, opts BeginOpts, query string, args map[string]any,
+) ([][]any, error) {
+	if err := b.ensureDriver(ctx); err != nil {
+		return nil, err
+	}
+
+	isolation, err := ParseTxIsolation(string(opts.Isolation))
+	if err != nil {
+		return nil, err
+	}
+
+	backend, ok := b.drv.(driver.RoutineRowsExecutor)
+	if !ok {
+		if _, atomic := b.drv.(driver.RoutineExecutor); atomic {
+			return nil, inputError("driver %s does not support routine results", b.DriverTypeName())
+		}
+
+		var rows [][]any
+
+		err := b.BeginTx(ctx, opts, func(tx *Tx) error {
+			var queryErr error
+
+			rows, queryErr = tx.RawRows(ctx, query, args)
+
+			return queryErr
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return rows, nil
+	}
+
+	started := time.Now()
+
+	rows, result, runErr := backend.RunRoutineRows(b.operationContext(ctx), isolation, query, args)
+	if err := b.finishRoutine(result, runErr, opts, isolation, started); err != nil {
+		return nil, err
+	}
+
+	return rows, nil
+}
+
+func (b *Bench) finishRoutine(
+	result *driver.QueryResult, runErr error, opts BeginOpts, isolation config.TxIsolationLevel, started time.Time,
+) error {
+	err := b.finishQuery(result, runErr)
 	action := "commit"
 
 	if err != nil {

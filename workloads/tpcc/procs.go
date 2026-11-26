@@ -161,7 +161,7 @@ func (w *workload) procDelivery(ctx context.Context, b *bench.Bench, vs *vuState
 func (w *workload) procStockLevel(ctx context.Context, b *bench.Bench, vs *vuState) error {
 	w.m.stockLevelTotal.Add(ctx, 1)
 
-	dID := vs.ri(vs.slDID, 1, districtsPerWarehouse)
+	dID := vs.stockDistrict()
 	threshold := vs.ri(vs.slThreshold, 10, 20)
 	args := map[string]any{
 		"st_w_id":   vs.homeWID,

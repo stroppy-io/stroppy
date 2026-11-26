@@ -111,21 +111,42 @@ func (d *Driver) newRoutineDriver(ctx context.Context, isolation config.TxIsolat
 func (d *Driver) RunRoutine(
 	ctx context.Context, isolation config.TxIsolationLevel, query string, args map[string]any,
 ) (*driver.QueryResult, error) {
+	_, result, err := d.runRoutine(ctx, isolation, query, args, false)
+
+	return result, err
+}
+
+func (d *Driver) RunRoutineRows(
+	ctx context.Context, isolation config.TxIsolationLevel, query string, args map[string]any,
+) ([][]any, *driver.QueryResult, error) {
+	return d.runRoutine(ctx, isolation, query, args, true)
+}
+
+func (d *Driver) runRoutine(
+	ctx context.Context, isolation config.TxIsolationLevel, query string, args map[string]any, collect bool,
+) ([][]any, *driver.QueryResult, error) {
 	backend, err := d.routineDriver(ctx, isolation)
 	if err != nil {
-		return nil, &driver.RoutineError{Cause: err}
+		return nil, nil, &driver.RoutineError{Cause: err}
 	}
 
 	result, err := backend.RunQuery(ctx, query, args)
+
+	var rows [][]any
+
 	if result != nil && result.Rows != nil {
+		if collect && err == nil {
+			rows = result.Rows.ReadAll(0)
+		}
+
 		err = driver.JoinErrors(err, result.Rows.Close(), result.Rows.Err())
 	}
 
 	if err != nil {
 		_, confirmed := errors.AsType[*gomysql.MySQLError](err)
 
-		return result, &driver.RoutineError{Cause: err, RollbackConfirmed: confirmed, Ambiguous: !confirmed}
+		return nil, result, &driver.RoutineError{Cause: err, RollbackConfirmed: confirmed, Ambiguous: !confirmed}
 	}
 
-	return result, nil
+	return rows, result, nil
 }

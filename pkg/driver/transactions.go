@@ -16,6 +16,12 @@ type RoutineExecutor interface {
 		query string, args map[string]any) (*QueryResult, error)
 }
 
+// RoutineRowsExecutor returns rows only after the entire atomic invocation completes.
+type RoutineRowsExecutor interface {
+	RunRoutineRows(ctx context.Context, isolation config.TxIsolationLevel,
+		query string, args map[string]any) ([][]any, *QueryResult, error)
+}
+
 // RoutineError distinguishes a server-confirmed rollback from a lost commit acknowledgement.
 type RoutineError struct {
 	Cause             error

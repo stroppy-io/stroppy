@@ -578,6 +578,8 @@ CALL PAYMENT_atomic(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h
 CALL OSTAT_atomic(:os_w_id, :os_d_id, :os_c_id, :byname, :os_c_last)
 --= delivery
 CALL DELIVERY_atomic(:d_w_id, :d_o_carrier_id)
+--= delivery_results
+CALL DELIVERY_RESULTS_atomic(:d_w_id, :d_o_carrier_id)
 --= stock_level
 CALL SLEV_atomic(:st_w_id, :st_d_id, :threshold)
 
@@ -712,3 +714,62 @@ SELECT COUNT(*) FROM stock
 WHERE s_w_id = :w_id
   AND s_quantity < :threshold
   AND s_i_id IN ({ids})
+
+--+ create_terminal_procedures
+--= drop_delivery_results
+DROP PROCEDURE IF EXISTS DELIVERY_RESULTS_atomic
+--= delivery_results
+CREATE PROCEDURE DELIVERY_RESULTS_atomic(
+  IN d_w_id INT,
+  IN d_o_carrier_id INT
+)
+BEGIN
+  DECLARE v_d_id INT;
+  DECLARE v_no_o_id INT;
+  DECLARE v_c_id INT;
+  DECLARE v_ol_total DECIMAL(12,2);
+  DECLARE v_results JSON DEFAULT (JSON_ARRAY());
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
+
+  START TRANSACTION;
+  SET v_d_id = 1;
+  WHILE v_d_id <= 10 DO
+    SET v_no_o_id = NULL;
+    SELECT MIN(no_o_id) INTO v_no_o_id
+    FROM new_order
+    WHERE no_d_id = v_d_id AND no_w_id = d_w_id;
+
+    IF v_no_o_id IS NOT NULL THEN
+      DELETE FROM new_order
+      WHERE no_o_id = v_no_o_id AND no_d_id = v_d_id AND no_w_id = d_w_id;
+
+      SELECT o_c_id INTO v_c_id
+      FROM orders
+      WHERE o_id = v_no_o_id AND o_d_id = v_d_id AND o_w_id = d_w_id;
+
+      UPDATE orders SET o_carrier_id = d_o_carrier_id
+      WHERE o_id = v_no_o_id AND o_d_id = v_d_id AND o_w_id = d_w_id;
+
+      UPDATE order_line SET ol_delivery_d = NOW()
+      WHERE ol_o_id = v_no_o_id AND ol_d_id = v_d_id AND ol_w_id = d_w_id;
+
+      SELECT COALESCE(SUM(ol_amount), 0) INTO v_ol_total
+      FROM order_line
+      WHERE ol_o_id = v_no_o_id AND ol_d_id = v_d_id AND ol_w_id = d_w_id;
+
+      UPDATE customer
+      SET c_balance = c_balance + v_ol_total,
+          c_delivery_cnt = c_delivery_cnt + 1
+      WHERE c_id = v_c_id AND c_d_id = v_d_id AND c_w_id = d_w_id;
+      SET v_results = JSON_ARRAY_APPEND(v_results, '$', JSON_ARRAY(v_d_id, v_no_o_id));
+    END IF;
+
+    SET v_d_id = v_d_id + 1;
+  END WHILE;
+  COMMIT;
+  SELECT v_results;
+END

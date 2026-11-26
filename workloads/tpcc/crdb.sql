@@ -559,6 +559,8 @@ SELECT PAYMENT(:p_w_id, :p_d_id, :p_c_w_id, :p_c_d_id, :p_c_id, :byname, :h_amou
 SELECT OSTAT(:os_w_id, :os_d_id, :os_c_id, :byname, :os_c_last)
 --= delivery
 SELECT DELIVERY(:d_w_id, :d_o_carrier_id)
+--= delivery_results
+SELECT DELIVERY_RESULTS(:d_w_id, :d_o_carrier_id)::TEXT
 --= stock_level
 SELECT SLEV(:st_w_id, :st_d_id, :threshold)
 
@@ -717,3 +719,54 @@ SELECT COUNT(*) FROM stock
 WHERE s_w_id = :w_id
   AND s_quantity < :threshold
   AND s_i_id IN ({ids})
+
+--+ create_terminal_procedures
+--= delivery_results
+CREATE OR REPLACE FUNCTION DELIVERY_RESULTS (
+  d_w_id INTEGER,
+  d_o_carrier_id INTEGER
+) RETURNS JSONB AS $$
+DECLARE
+  v_no_o_id INTEGER;
+  v_c_id INTEGER;
+  v_ol_total NUMERIC;
+  v_results JSONB := '[]'::JSONB;
+BEGIN
+  FOR v_d_id IN 1 .. 10 LOOP
+    SELECT min(no_o_id) INTO v_no_o_id
+    FROM new_order
+    WHERE no_d_id = v_d_id AND no_w_id = d_w_id;
+
+    IF v_no_o_id IS NULL THEN
+      CONTINUE;
+    END IF;
+
+    DELETE FROM new_order
+    WHERE no_o_id = v_no_o_id AND no_d_id = v_d_id AND no_w_id = d_w_id;
+
+    SELECT o_c_id INTO v_c_id
+    FROM orders
+    WHERE o_id = v_no_o_id AND o_d_id = v_d_id AND o_w_id = d_w_id;
+
+    UPDATE orders
+    SET o_carrier_id = d_o_carrier_id
+    WHERE o_id = v_no_o_id AND o_d_id = v_d_id AND o_w_id = d_w_id;
+
+    UPDATE order_line
+    SET ol_delivery_d = current_timestamp
+    WHERE ol_o_id = v_no_o_id AND ol_d_id = v_d_id AND ol_w_id = d_w_id;
+
+    SELECT COALESCE(SUM(ol_amount), 0) INTO v_ol_total
+    FROM order_line
+    WHERE ol_o_id = v_no_o_id AND ol_d_id = v_d_id AND ol_w_id = d_w_id;
+
+    UPDATE customer
+    SET c_balance = c_balance + v_ol_total,
+        c_delivery_cnt = c_delivery_cnt + 1
+    WHERE c_id = v_c_id AND c_d_id = v_d_id AND c_w_id = d_w_id;
+    v_results := v_results || jsonb_build_array(jsonb_build_array(v_d_id, v_no_o_id));
+  END LOOP;
+
+  RETURN v_results;
+END;
+$$ LANGUAGE 'plpgsql';
