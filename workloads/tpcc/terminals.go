@@ -18,24 +18,25 @@ var errStrictTerminals = errors.New(
 )
 
 type terminalModel struct {
-	mu          sync.Mutex
-	changed     chan struct{}
-	ready       terminalQueue
-	active      int
-	started     time.Time
-	measurement time.Time
-	end         time.Time
-	warmup      time.Duration
-	duration    time.Duration
-	workers     int
-	terminals   int
-	resultsPath string
-	results     *deliveryLog
-	deliveries  map[int64][]*terminalJob
-	stats       strictStatistics
-	cutoff      time.Time
-	pace        *pacing
-	idle        []*terminalJob
+	mu            sync.Mutex
+	changed       chan struct{}
+	ready         terminalQueue
+	active        int
+	started       time.Time
+	measurement   time.Time
+	end           time.Time
+	warmup        time.Duration
+	duration      time.Duration
+	workers       int
+	terminals     int
+	resultsPath   string
+	results       *deliveryLog
+	deliveries    map[int64][]*terminalJob
+	stats         strictStatistics
+	cutoff        time.Time
+	pace          *pacing
+	idle          []*terminalJob
+	metricContext context.Context //nolint:containedctx // Cleanup retains workload metric labels after workers stop.
 }
 
 type terminal struct {
@@ -304,6 +305,8 @@ func (m *terminalModel) reschedule(job *terminalJob, now time.Time) {
 
 func (w *workload) terminalIteration(ctx context.Context, b *bench.Bench) (err error) {
 	m := w.strict
+	m.retainMetricContext(ctx)
+
 	canceled := make(chan struct{})
 
 	stop := context.AfterFunc(ctx, func() {
@@ -369,6 +372,15 @@ func (w *workload) terminalIteration(ctx context.Context, b *bench.Bench) (err e
 
 			b.RecordError("tpcc terminal", err)
 		}
+	}
+}
+
+func (m *terminalModel) retainMetricContext(ctx context.Context) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.metricContext == nil {
+		m.metricContext = context.WithoutCancel(ctx)
 	}
 }
 
@@ -492,13 +504,18 @@ func (m *terminalModel) close() error {
 
 	var pendingErr error
 
+	ctx := m.metricContext
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	cutoff := time.Now()
 	if !m.cutoff.IsZero() && m.cutoff.Before(cutoff) {
 		cutoff = m.cutoff
 	}
 
 	for _, job := range m.idle {
-		m.recordWaits(context.Background(), job, cutoff)
+		m.recordWaits(ctx, job, cutoff)
 	}
 
 	m.idle = nil
@@ -510,7 +527,7 @@ func (m *terminalModel) close() error {
 
 	for _, job := range pending {
 		if job.delivery == nil {
-			m.recordWaits(context.Background(), job, cutoff)
+			m.recordWaits(ctx, job, cutoff)
 
 			continue
 		}
@@ -522,7 +539,7 @@ func (m *terminalModel) close() error {
 			m.stats.DeliveryPending++
 		}
 
-		m.pace.delivered(context.Background(), job.delivery, nil, true)
+		m.pace.delivered(ctx, job.delivery, nil, true)
 		pendingErr = errors.Join(pendingErr, m.results.write(job.delivery))
 	}
 

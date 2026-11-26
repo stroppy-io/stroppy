@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -152,6 +153,52 @@ func TestPacingSpreadAndDeliveryDiagnostics(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestStrictCleanupMetricsRetainWorkloadStep(t *testing.T) {
+	fixture := bench.Test{Name: "cleanup-metrics", Define: func(d *bench.Def) error {
+		m := &terminalModel{}
+		w := &workload{strict: m, pacing: true, warehouses: 1, warehouseStart: 1}
+		w.initPacing(&d.Metrics, 1)
+
+		path := filepath.Join(t.TempDir(), "delivery.jsonl")
+
+		d.Execution.Step("workload", func(ctx context.Context, _ *bench.Bench) error {
+			var err error
+
+			m.results, err = newDeliveryLog(path)
+			if err != nil {
+				return err
+			}
+
+			canceled, cancel := context.WithCancel(ctx)
+			m.retainMetricContext(canceled)
+
+			cancel()
+
+			start := time.Now().Add(-time.Second)
+			m.pace = w.pace
+			m.measurement, m.end, m.cutoff = start, start.Add(time.Minute), time.Now()
+			w.pace.window(m.measurement, m.end)
+			m.idle = []*terminalJob{{transaction: 0, keyingStart: start, ready: start.Add(18 * time.Second)}}
+			m.ready = terminalQueue{&terminalJob{delivery: &deliveryResult{Queued: start, Warehouse: 1, Carrier: 1}}}
+
+			return nil
+		})
+		d.Execution.Step("cleanup", func(context.Context, *bench.Bench) error { return m.close() })
+
+		return d.Execution.Err()
+	}}
+	result, err := testkit.Run(t.Context(), fixture, bench.RunOptions{})
+	require.NoError(t, err)
+
+	for _, name := range []string{"tpcc_new_order_keying_seconds", "tpcc_delivery_queue_seconds"} {
+		require.NotNil(t, result.Metrics[name].Count)
+
+		for _, series := range result.Metrics[name].Series {
+			require.Equal(t, "workload", series.Attributes["step"])
+		}
+	}
+}
+
 func TestStrictNoopDeliverySimulation(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "delivery.jsonl")
 	result, err := testkit.Run(t.Context(), Procs, bench.RunOptions{
@@ -164,4 +211,14 @@ func TestStrictNoopDeliverySimulation(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, result.Errors.TerminalErrors)
 	require.NotNil(t, result.Metrics["tpcc_delivery_queue_seconds"].Count)
+
+	for name, metric := range result.Metrics {
+		if !strings.HasSuffix(name, "_keying_seconds") && !strings.HasSuffix(name, "_think_seconds") {
+			continue
+		}
+
+		for _, series := range metric.Series {
+			require.Equal(t, "workload", series.Attributes["step"])
+		}
+	}
 }
