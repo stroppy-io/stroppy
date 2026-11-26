@@ -49,6 +49,7 @@ type ProgressUpdate struct {
 type workerProgress struct {
 	update    ProgressUpdate
 	started   time.Time
+	stopped   time.Time
 	iteration uint64
 	completed float64
 	insert    *insertprogress.Snapshot
@@ -141,6 +142,7 @@ func (p *runProgress) registerMetrics() error {
 	names := []string{
 		"progress_ratio", "progress_elapsed_seconds", "progress_step_elapsed_seconds",
 		"progress_current", "progress_total", "progress_source_ratio", "progress_activity_elapsed_seconds",
+		"progress_activity_active",
 	}
 	instruments := make([]otelmetric.Observable, 0, len(names)+1)
 
@@ -212,6 +214,13 @@ func observeProgressSource(
 	}
 
 	observer.ObserveFloat64(gauges[6], source.ElapsedSeconds, attrs)
+
+	active := 0.0
+	if source.Active {
+		active = 1
+	}
+
+	observer.ObserveFloat64(gauges[7], active, attrs)
 }
 
 func (p *runProgress) watch() {
@@ -265,6 +274,14 @@ func (p *runProgress) measuring(window *measurement) {
 func (p *runProgress) end(status StepStatus) {
 	p.mu.Lock()
 	now := time.Now()
+
+	for _, source := range p.workers {
+		if source.active.Load() {
+			source.stopped = now
+			source.active.Store(false)
+		}
+	}
+
 	value := p.snapshotLocked(now)
 
 	var sources []report.ProgressSource
@@ -306,6 +323,8 @@ func (p *runProgress) update(worker int, iteration uint64, update ProgressUpdate
 		source.started = time.Now()
 	}
 
+	source.stopped = time.Time{}
+
 	if changed && update.Unit == "tables" {
 		source.insert = nil
 	}
@@ -344,7 +363,10 @@ func (p *runProgress) iterationDone(worker int) {
 	}
 	// The step owns the worker slice until all actions have joined.
 	if source := p.workers[worker]; source.active.Load() {
+		p.mu.Lock()
+		source.stopped = time.Now()
 		source.active.Store(false)
+		p.mu.Unlock()
 	}
 }
 
@@ -477,6 +499,7 @@ func (p *runProgress) workerProgress(worker int, state *workerProgress, now time
 
 	value.Sources = append(value.Sources, report.ProgressSource{
 		Worker: worker, Unit: "rows", Activity: load.Table,
+		Active:  load.Event != insertprogress.EventCompleted && load.Event != insertprogress.EventFailed,
 		Current: float64(load.ConfirmedRows), Total: known, ElapsedSeconds: load.Elapsed.Seconds(),
 	})
 	if p.policy.mode != "once" || known == nil {
@@ -516,8 +539,12 @@ func (p *runProgress) nativeSource(worker int, state *workerProgress, now time.T
 		}
 	}
 
+	if !state.stopped.IsZero() {
+		now = state.stopped
+	}
+
 	return report.ProgressSource{
-		Worker: worker, Unit: update.Unit, Activity: update.Activity,
+		Worker: worker, Unit: update.Unit, Activity: update.Activity, Active: state.active.Load(),
 		Current: current, Total: total, ElapsedSeconds: max(0, now.Sub(state.started).Seconds()),
 	}
 }
@@ -552,6 +579,7 @@ func (p *runProgress) logLocked(now time.Time) {
 		fields = append(fields, zap.String(label, text))
 		if source.Activity != "" {
 			fields = append(fields, zap.String("activity_"+strconv.Itoa(source.Worker), source.Activity),
+				zap.Bool("activity_active_"+strconv.Itoa(source.Worker), source.Active),
 				zap.Float64("activity_elapsed_seconds_"+strconv.Itoa(source.Worker), source.ElapsedSeconds))
 		}
 	}

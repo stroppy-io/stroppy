@@ -132,6 +132,54 @@ func TestProgressMetricsReplaceActivityAndOmitUnknownTotals(t *testing.T) {
 	}
 }
 
+func TestFinishedProgressActivityClockFreezes(t *testing.T) {
+	_, p := progressFixture(t, Policy{})
+	p.begin("streams", OncePerWorker(2))
+
+	total := 1.0
+	p.update(0, 0, ProgressUpdate{Activity: "q1", Unit: "queries", Current: 1, Total: &total})
+	p.update(1, 0, ProgressUpdate{Activity: "q2", Unit: "queries", Total: &total})
+	p.iterationDone(0)
+	p.mu.Lock()
+	first := p.snapshotLocked(time.Now())
+	later := p.snapshotLocked(time.Now().Add(time.Minute))
+	p.mu.Unlock()
+	require.False(t, first.Sources[0].Active)
+	require.True(t, first.Sources[1].Active)
+	require.InDelta(t, first.Sources[0].ElapsedSeconds, later.Sources[0].ElapsedSeconds, 0)
+	require.Greater(t, later.Sources[1].ElapsedSeconds, first.Sources[1].ElapsedSeconds)
+}
+
+func TestProgressSDKExcludesNonadditiveAggregates(t *testing.T) {
+	test := Test{Name: "progress-snapshots", Define: func(d *Def) error {
+		d.Report.Contribute("progress.snapshot", 1, func(snapshot ReportContext) (ReportContribution, error) {
+			for _, name := range []string{"progress_current", "progress_total", "progress_source_ratio"} {
+				require.NotContains(t, snapshot.Metrics, name)
+				require.NotEmpty(t, snapshot.Series[name].Series)
+			}
+
+			return ReportContribution{Status: report.WorkloadReportOK}, nil
+		})
+		d.Execution.Step("queries", func(ctx context.Context, b *Bench) error {
+			total := 1.0
+			b.Progress(ctx, ProgressUpdate{Activity: "q1", Unit: "queries", Current: 1, Total: &total})
+			metrics, err := b.CollectedMetrics()
+			require.NoError(t, err)
+
+			for _, name := range []string{"progress_current", "progress_total", "progress_source_ratio"} {
+				require.NotContains(t, metrics, name)
+			}
+
+			return nil
+		}, OncePerWorker(2))
+
+		return d.Execution.Err()
+	}}
+	result, err := RunTest(t.Context(), test, RunOptions{Report: &ReportOptions{}, Metrics: &MetricsConfig{Quiet: true}})
+	require.NoError(t, err)
+	require.Len(t, result.Metrics["progress_source_ratio"].Series, 3)
+}
+
 func TestProgressRetainsFinishedStepSources(t *testing.T) {
 	_, p := progressFixture(t, Policy{}, Policy{})
 	p.begin("queries", Policy{mode: "once", workers: 1})

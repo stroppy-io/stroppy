@@ -196,8 +196,11 @@ schedule afresh for every invocation; the execution policy owns the outer budget
 
 `progress_current`, optional `progress_total` and `progress_source_ratio`, and
 `progress_activity_elapsed_seconds` retain `step`, `worker`, `activity`, and `unit`.
-Native sources are not summed across workers or units in reports. Run and step
-elapsed time have separate gauges. Lifecycle counts use `progress_events_total`;
+`progress_activity_active` distinguishes running work from a retained finished
+activity; finished workers' activity clocks freeze. Native sources are not summed
+across workers or units in reports or SDK aggregate snapshots; report contributors
+can read labeled values from `ReportContext.Series`. Run and step elapsed time
+have separate gauges. Lifecycle counts use `progress_events_total`;
 event labels do not create historical variants of state gauges. The additive
 `progress` report object preserves the final estimate, outcome, and native sources;
 OTLP and optional metric capture collect the same live state. Existing insert

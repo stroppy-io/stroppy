@@ -16,6 +16,7 @@ type ProgressSource struct {
 	Step           string   `json:"step"`
 	Worker         int      `json:"worker"`
 	Activity       string   `json:"activity,omitempty"`
+	Active         bool     `json:"active"`
 	Unit           string   `json:"unit"`
 	Current        float64  `json:"current"`
 	Total          *float64 `json:"total,omitempty"`

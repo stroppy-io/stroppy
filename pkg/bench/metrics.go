@@ -51,6 +51,7 @@ var frameworkMetricNames = map[string]bool{
 	"progress_total":                    true,
 	"progress_source_ratio":             true,
 	"progress_activity_elapsed_seconds": true,
+	"progress_activity_active":          true,
 	"progress_events_total":             true,
 }
 
