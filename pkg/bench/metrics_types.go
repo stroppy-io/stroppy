@@ -106,6 +106,7 @@ type metricRegistry struct {
 	meter         otelmetric.Meter
 	prefix        string
 	metrics       map[string]*metric
+	aliases       map[string]bool
 	started       time.Time
 	scope         instrumentation.Scope
 	deltaReaders  int
@@ -129,7 +130,7 @@ func (r *metricRegistry) newInstrument(
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, ok := r.metrics[name]; ok {
+	if _, ok := r.metrics[name]; ok || r.aliases[name] {
 		return nil, fmt.Errorf("%w: %q", errMetricAlreadyRegistered, name)
 	}
 
@@ -157,6 +158,10 @@ func (r *metricRegistry) newInstrument(
 		unit, description = "", ""
 	}
 
+	if existing := r.compatibleInstrument(name, typ, unit, description); existing != nil {
+		return existing, nil
+	}
+
 	m := &metric{
 		Name: name, Type: typ, unit: unit, description: description,
 		bounds: bounds, started: r.started, deltaReaders: r.deltaReaders, exemplarFilter: metricExemplarFilter(),
@@ -179,6 +184,23 @@ func (r *metricRegistry) newInstrument(
 	r.metrics[name] = m
 
 	return m, nil
+}
+
+func (r *metricRegistry) compatibleInstrument(name string, typ metricType, unit, description string) *metric {
+	for registeredName, existing := range r.metrics {
+		if strings.EqualFold(registeredName, name) && existing.Type == typ &&
+			existing.unit == unit && existing.description == description {
+			if r.aliases == nil {
+				r.aliases = map[string]bool{}
+			}
+
+			r.aliases[name] = true
+
+			return existing
+		}
+	}
+
+	return nil
 }
 
 func (m *metric) taggedAttributes(tags []string) metricAttributes {

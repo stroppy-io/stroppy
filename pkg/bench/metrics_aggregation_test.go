@@ -17,6 +17,8 @@ import (
 )
 
 func TestNativeExportPreservesExponentialOverride(t *testing.T) {
+	t.Setenv("OTEL_METRIC_EXPORT_INTERVAL", "3600000")
+
 	for _, temporality := range []string{"cumulative", "delta"} {
 		t.Run(temporality, func(t *testing.T) {
 			t.Setenv("OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION", "base2_exponential_bucket_histogram")

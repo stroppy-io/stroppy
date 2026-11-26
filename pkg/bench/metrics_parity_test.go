@@ -17,6 +17,53 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 )
 
+func TestMetricCaseInsensitiveIdentity(t *testing.T) {
+	for _, typ := range []metricType{Counter, Trend, Rate, Gauge} {
+		t.Run(fmt.Sprint(typ), func(t *testing.T) {
+			provider, reader, registry, prefix, err := newMeterProvider(t.Context(), nil)
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
+
+			first, err := registry.newInstrument("latency", typ, "ms", "latency", []float64{1, 2})
+			require.NoError(t, err)
+			second, err := registry.newInstrument("Latency", typ, "ms", "latency", []float64{1, 2})
+			require.NoError(t, err)
+			first.add(t.Context(), 1, attributes())
+			second.add(t.Context(), 2, attributes())
+
+			var data metricdata.ResourceMetrics
+			require.NoError(t, reader.Collect(t.Context(), &data))
+			require.Len(t, data.ScopeMetrics, 1)
+
+			if typ == Rate {
+				require.Len(t, data.ScopeMetrics[0].Metrics, 2)
+				require.InDelta(t, 2, findSum(t, data, prefix+"latency_events_total"), 0)
+				require.InDelta(t, 2, findSum(t, data, prefix+"latency_true_total"), 0)
+			} else {
+				require.Len(t, data.ScopeMetrics[0].Metrics, 1)
+				require.Equal(t, prefix+"latency", data.ScopeMetrics[0].Metrics[0].Name)
+
+				switch typ {
+				case Counter:
+					require.InDelta(t, 3, findSum(t, data, prefix+"latency"), 0)
+				case Trend:
+					point := findHistogram(t, data, prefix+"latency").DataPoints[0]
+					require.Equal(t, uint64(2), point.Count)
+					require.InDelta(t, 3, point.Sum, 0)
+				case Gauge:
+					point := data.ScopeMetrics[0].Metrics[0].Data.(metricdata.Gauge[float64]).DataPoints[0]
+					require.InDelta(t, 2, point.Value, 0)
+				case Rate:
+					t.Fatal("rate handled separately")
+				}
+			}
+
+			_, err = registry.NewMetric("Latency", typ)
+			require.ErrorIs(t, err, errMetricAlreadyRegistered)
+		})
+	}
+}
+
 func TestMetricAggregationMatchesSDK(t *testing.T) {
 	for _, workers := range []int{1, 100, 256} {
 		t.Run(fmt.Sprintf("workers=%d", workers), func(t *testing.T) {
