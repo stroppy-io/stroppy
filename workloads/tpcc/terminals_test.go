@@ -121,8 +121,7 @@ func TestStrictDeliveryAcknowledgesBeforeExecution(t *testing.T) {
 
 					return nil
 				})
-				d.Execution.Step("traffic", w.terminalIteration,
-					bench.ConstantWorkers(1, time.Millisecond, bench.DrainTimeout(time.Second)))
+				d.Execution.Step("traffic", w.terminalIteration, bench.OncePerWorker(1))
 				d.Execution.Step("close", func(context.Context, *bench.Bench) error { return m.close() })
 
 				return d.Execution.Err()
