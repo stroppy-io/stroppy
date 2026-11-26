@@ -178,6 +178,7 @@ type Report struct {
 	Steadiness                 Steadiness      `json:"steadiness"`
 	Note                       string          `json:"note,omitempty"`
 	Terminals                  *TerminalReport `json:"terminal_model,omitempty"`
+	Pacing                     *PacingReport   `json:"pacing,omitempty"`
 	TerminalPopulationMismatch bool            `json:"terminal_population_mismatch,omitempty"`
 }
 
@@ -714,7 +715,8 @@ func (w *workload) complianceContribution(context bench.ReportContext) (bench.Re
 
 		return bench.ReportContribution{Data: Report{
 			Workload: w.Name(), Paced: true, Terminals: &terminals,
-			Note: terminals.Note,
+			Pacing: w.pacingReport(time.Duration(terminals.MeasurementSeconds * float64(time.Second))),
+			Note:   terminals.Note,
 		}}, nil
 	}
 
@@ -762,6 +764,7 @@ func (w *workload) complianceContribution(context bench.ReportContext) (bench.Re
 		return bench.ReportContribution{}, err
 	}
 
+	compliance.Pacing = w.pacingReport(elapsed)
 	compliance.WarmupSeconds = context.Measurements["warmup"]
 	compliance.DrainSeconds = max(0, context.Measurements["workload"]-elapsed.Seconds())
 
@@ -823,13 +826,16 @@ func renderCompliance(output io.Writer, data json.RawMessage) error {
 		return err
 	}
 
+	text := value.text()
 	if value.Terminals != nil {
-		_, err := io.WriteString(output, value.Terminals.text())
-
-		return err
+		text = value.Terminals.text()
 	}
 
-	_, err := io.WriteString(output, value.text())
+	if value.Pacing != nil {
+		text += value.Pacing.text()
+	}
+
+	_, err := io.WriteString(output, text)
 
 	return err
 }

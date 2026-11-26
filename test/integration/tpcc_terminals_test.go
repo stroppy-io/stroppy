@@ -86,6 +86,22 @@ SELECT 1
 			var run report.Run
 			require.NoError(t, json.Unmarshal(raw, &run))
 			require.Equal(t, report.StatusCompleted, run.Status)
+			var diagnostics struct {
+				Pacing struct {
+					ExpectedMax    float64 `json:"expected_max_tpmc"`
+					DeliveryCount  uint64  `json:"delivery_count"`
+					DeliveryFailed uint64  `json:"delivery_failed"`
+				} `json:"pacing"`
+			}
+			for _, section := range run.WorkloadReports {
+				if section.Kind == "tpcc.compliance" {
+					require.NoError(t, json.Unmarshal(section.Data, &diagnostics))
+				}
+			}
+			require.InDelta(t, 128.6, diagnostics.Pacing.ExpectedMax, 1e-9)
+			require.Positive(t, diagnostics.Pacing.DeliveryCount)
+			require.Zero(t, diagnostics.Pacing.DeliveryFailed)
+			require.NotNil(t, run.Metrics["tpcc_delivery_queue_seconds"].Count)
 			output, err := os.Open(results)
 			require.NoError(t, err)
 			defer output.Close()

@@ -277,6 +277,53 @@ remain separate obligations under TPC-C 5.11. Transaction SQL and load generatio
 retain their existing qualifications; enabling strict terminals does not certify
 them. No software option replaces the specification's audit requirements.
 
+## Pacing observations and throughput ceilings
+
+Paced runs add a `pacing` report section; unpaced runs do not register these
+metrics. `expected_max_tpmc` is the specification's rounded 12.86 times the
+configured warehouse count, derived from the keying/think constants and
+45/43/4/4/4 mix. `minimum_tpmc` is nine times that warehouse count (§4.1.3).
+The diagnostic verdict is `exceeds_terminal_model_ceiling`, `under_loaded`, or
+`pass`; a 5% ceiling allowance covers finite-sample variation, not certification.
+Warehouse spread, nonstandard terminal populations, and nontransactional
+approximations receive `not_applicable` instead.
+
+`model_max_tpmc` uses the selected model's mix. The strict 23-card deck yields
+about **12.605 tpmC per warehouse**, not 12.86: its 10/10/1/1/1 mix spends more
+terminal time on Payment. The 12.86 specification limit is an upper bound, not a
+promise that every permitted transaction mix reaches it. A second
+`response_adjusted_max_tpmc` adds each transaction's measured mean response time
+to the terminal budget; it remains null until every type has measured responses.
+The report exposes the assumed mix, keying/think constants, measured fraction,
+fixed-binding status, and each warehouse's terminal count, New-Orders, rate,
+and independent ceiling/floor verdict.
+
+Per-transaction keying and think observations report full-wait count, sum,
+minimum, mean, and maximum in seconds (§8.1.6.3). Interrupted waits have separate
+counts and applied seconds; they never lower the full-wait averages unnoticed.
+Only waits wholly inside measurement enter full-wait summaries; histogram series
+also retain warmup, boundary, and drain observations. Strict scheduler idle time
+ends at the scheduled deadline; subsequent worker-queue delay belongs to response
+time, not keying or thinking. Unfinished cycles at the measurement cutoff remain
+visible as truncated waits.
+
+The `tpcc_<transaction>_keying_seconds` and
+`tpcc_<transaction>_think_seconds` histograms use `phase` and
+`wait_outcome=full|truncated`. The New-Order report also includes its think-time
+histogram (§5.6.3). Strict Delivery adds `tpcc_delivery_queue_seconds`, an
+`outcome=success|error|pending` histogram, and
+`tpcc_delivery_over_80_seconds`. Its report retains failures, pending deliveries,
+and queue-to-completion latency separately. Stress Delivery remains synchronous:
+its deferred-Delivery observations are explicitly unsupported, never invented.
+
+For framework-only pacing checks, strict `tpcc/procs -d noop` exercises the same
+terminal scheduler and procedure-call overhead without a database. Delivery
+records and the pacing report are marked `simulated`; no committed order IDs or
+skipped-district claims are fabricated. This measures terminal timing, not SQL
+correctness or database throughput. Use sufficient warehouses, warmup, and
+measurement time before comparing its measured rate with the selected-model
+ceiling. Short synchronized-start runs need not equal an asymptotic mean.
+
 ## Integration test
 
 ```bash

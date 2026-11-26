@@ -34,6 +34,8 @@ type terminalModel struct {
 	deliveries  map[int64][]*terminalJob
 	stats       strictStatistics
 	cutoff      time.Time
+	pace        *pacing
+	idle        []*terminalJob
 }
 
 type terminal struct {
@@ -48,6 +50,10 @@ type terminalJob struct {
 	transaction int
 	ready       time.Time
 	delivery    *deliveryResult
+	keyingStart time.Time
+	thinkStart  time.Time
+	thinkEnd    time.Time
+	previous    int
 }
 
 type terminalQueue []*terminalJob
@@ -144,6 +150,7 @@ func (m *terminalModel) initialize(w *workload) error {
 	}
 
 	m.results = log
+	m.pace = w.pace
 	m.deliveries = make(map[int64][]*terminalJob)
 
 	w.vuStates = make([]*vuState, m.terminals)
@@ -196,6 +203,10 @@ func (m *terminalModel) start(now time.Time) {
 	m.measurement = now.Add(m.warmup)
 
 	m.end = m.measurement.Add(m.duration)
+	if m.pace != nil {
+		m.pace.window(m.measurement, m.end)
+	}
+
 	if m.cutoff.IsZero() || m.end.Before(m.cutoff) {
 		m.cutoff = m.end
 	}
@@ -203,16 +214,16 @@ func (m *terminalModel) start(now time.Time) {
 	for _, job := range m.ready {
 		job.transaction = job.terminal.selectTransaction()
 
+		job.keyingStart = now
 		job.ready = now.Add(time.Duration(keyingTime[txNames[job.transaction]]) * time.Second)
-		if !job.ready.Before(m.end) {
-			job.ready = m.end
-		}
 	}
 
 	kept := m.ready[:0]
 	for _, job := range m.ready {
 		if job.ready.Before(m.end) {
 			kept = append(kept, job)
+		} else {
+			m.idle = append(m.idle, job)
 		}
 	}
 
@@ -278,9 +289,16 @@ func (m *terminalModel) reschedule(job *terminalJob, now time.Time) {
 	think := thinkTime(t.think, thinkTimeMean[txNames[job.transaction]])
 	next := t.selectTransaction()
 
-	ready := now.Add(time.Duration(think*float64(time.Second)) + time.Duration(keyingTime[txNames[next]])*time.Second)
-	if ready.Before(m.end) {
-		heap.Push(&m.ready, &terminalJob{terminal: t, transaction: next, ready: ready})
+	thinkEnd := now.Add(time.Duration(think * float64(time.Second)))
+
+	nextJob := &terminalJob{
+		terminal: t, transaction: next, previous: job.transaction, thinkStart: now, thinkEnd: thinkEnd,
+		keyingStart: thinkEnd, ready: thinkEnd.Add(time.Duration(keyingTime[txNames[next]]) * time.Second),
+	}
+	if nextJob.ready.Before(m.end) {
+		heap.Push(&m.ready, nextJob)
+	} else {
+		m.idle = append(m.idle, nextJob)
 	}
 }
 
@@ -317,6 +335,7 @@ func (w *workload) terminalIteration(ctx context.Context, b *bench.Bench) (err e
 		}
 
 		started := job.ready
+		m.recordWaits(ctx, job, job.ready)
 
 		switch {
 		case job.delivery != nil:
@@ -338,6 +357,7 @@ func (w *workload) terminalIteration(ctx context.Context, b *bench.Bench) (err e
 
 		if job.delivery == nil {
 			w.recordTerminal(ctx, job, started, completed, err)
+			w.pace.response(job.transaction, job.terminal.state.homeWID, started, completed, err)
 		}
 
 		m.complete(ctx, job, started, completed, err)
@@ -352,12 +372,39 @@ func (w *workload) terminalIteration(ctx context.Context, b *bench.Bench) (err e
 	}
 }
 
+func (m *terminalModel) recordWaits(ctx context.Context, job *terminalJob, cutoff time.Time) {
+	if m.pace == nil || job.delivery != nil {
+		return
+	}
+
+	if !job.thinkStart.IsZero() && cutoff.After(job.thinkStart) {
+		end := job.thinkEnd
+		if cutoff.Before(end) {
+			end = cutoff
+		}
+
+		m.pace.appliedWait(ctx, job.previous, 1, job.thinkStart, end, !cutoff.Before(job.thinkEnd))
+	}
+
+	if !job.keyingStart.IsZero() && cutoff.After(job.keyingStart) {
+		end := job.ready
+		if cutoff.Before(end) {
+			end = cutoff
+		}
+
+		m.pace.appliedWait(ctx, job.transaction, 0, job.keyingStart, end, !cutoff.Before(job.ready))
+	}
+}
+
 func (m *terminalModel) stopMeasurement(now time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.cutoff.IsZero() || now.Before(m.cutoff) {
 		m.cutoff = now
+		if m.pace != nil {
+			m.pace.window(m.measurement, now)
+		}
 	}
 }
 
@@ -445,6 +492,17 @@ func (m *terminalModel) close() error {
 
 	var pendingErr error
 
+	cutoff := time.Now()
+	if !m.cutoff.IsZero() && m.cutoff.Before(cutoff) {
+		cutoff = m.cutoff
+	}
+
+	for _, job := range m.idle {
+		m.recordWaits(context.Background(), job, cutoff)
+	}
+
+	m.idle = nil
+
 	pending := append(terminalQueue(nil), m.ready...)
 	for _, jobs := range m.deliveries {
 		pending = append(pending, jobs...)
@@ -452,6 +510,8 @@ func (m *terminalModel) close() error {
 
 	for _, job := range pending {
 		if job.delivery == nil {
+			m.recordWaits(context.Background(), job, cutoff)
+
 			continue
 		}
 
@@ -462,6 +522,7 @@ func (m *terminalModel) close() error {
 			m.stats.DeliveryPending++
 		}
 
+		m.pace.delivered(context.Background(), job.delivery, nil, true)
 		pendingErr = errors.Join(pendingErr, m.results.write(job.delivery))
 	}
 

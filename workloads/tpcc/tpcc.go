@@ -80,6 +80,7 @@ type workload struct {
 	historyErr                 error
 	vuStates                   []*vuState
 	strict                     *terminalModel
+	pace                       *pacing
 	terminalPopulationMismatch bool
 }
 
@@ -201,6 +202,8 @@ func define(d *bench.Def, variant string) error {
 	}
 
 	w.m = w.initMetrics(&d.Metrics)
+	w.initPacing(&d.Metrics, settings.Workers)
+
 	for _, name := range []string{"drop_schema", "create_schema"} {
 		section := sqlSection{workload: w, name: name}
 		d.Execution.Step(name, section.Run)
@@ -252,6 +255,15 @@ func define(d *bench.Def, variant string) error {
 	}
 
 	w.measureStart = time.Now()
+	if w.pace != nil {
+		end := time.Time{}
+		if w.measureDuration > 0 {
+			end = w.measureStart.Add(w.measureDuration)
+		}
+
+		w.pace.window(w.measureStart, end)
+	}
+
 	w.steady = w.initSteady()
 	d.Execution.Step("workload", w.Iterate, settings.Policy())
 	w.measureEnd = time.Now()
@@ -481,13 +493,17 @@ func (w *workload) runPaced(
 	ctx context.Context, b *bench.Bench, vs *vuState, name string, operation func() error,
 ) error {
 	if w.pacing {
-		if err := sleepSeconds(ctx, float64(keyingTime[name])); err != nil {
+		if err := w.pacedWait(ctx, name, 0, float64(keyingTime[name])); err != nil {
 			return err
 		}
 	}
 
 	started := time.Now()
+
 	err := b.LogicalOperation(operation)
+	if w.pace != nil {
+		w.pace.response(transactionIndex(name), vs.homeWID, started, time.Now(), errors.Join(err, ctx.Err()))
+	}
 
 	phase := w.completionPhase()
 	if w.m != nil {
@@ -505,7 +521,7 @@ func (w *workload) runPaced(
 	}
 
 	// Thinking is terminal idle time, not part of the completed operation.
-	_ = sleepSeconds(ctx, thinkTime(vs.picker, thinkTimeMean[name]))
+	_ = w.pacedWait(ctx, name, 1, thinkTime(vs.picker, thinkTimeMean[name]))
 
 	return err
 }
