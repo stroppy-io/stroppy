@@ -4,7 +4,8 @@
 
 - Baseline: `453639f671ae3e4da45eac0fdd791a99eb68c607`, official OTel 1.44.0 aggregation.
 - Native implementation: `743ce8a973e89cf30251dc980efa9ff008cd50a9`, OTel 1.44.0 retained.
-- Final measured candidate: that implementation plus the dependency-only diff committed as `cb0c8e52c7c65d7a0b5f0093d0102454c38e9235`; OTel 1.47.0, OTLP schemas 1.11.0, grpc-gateway 2.30.0. No `replace` directives.
+- Initial measured candidate: that implementation plus the dependency-only diff committed as `cb0c8e52c7c65d7a0b5f0093d0102454c38e9235`; OTel 1.47.0, OTLP schemas 1.11.0, grpc-gateway 2.30.0. No `replace` directives.
+- Reviewed implementation: `38468b80e504e2412647a1908b27f243baf4b970`, with regression fixes for rejected-series bindings, sampled delta reservoir reuse, and explicit empty histogram bounds. Its gates were rerun separately.
 - Apple M5 Pro, macOS arm64, 18 logical CPUs, Go 1.27.4. Both CLI binaries built with the repository's `make build`, without PGO.
 - `GOMAXPROCS=4`, `GOGC=100`, `GOMEMLIMIT=off`. This limits Go execution parallelism; it is **not physical CPU affinity**.
 - Built-in `baseline` workload, noop driver, `--steps workload`, `constant-vus`, no database I/O or load phase. Default 30-second drain; actual measured time includes drain.
@@ -63,6 +64,13 @@ setting. Median block changes were -0.26% with export off (range -0.55% to -0.12
 and +0.02% with export on (range -0.48% to +1.30%). All 24 runs were clean.
 These small differences do not support a dependency speedup or material regression.
 
+The reviewed implementation passed another 36-run executable gate: +44.62%
+serial, +41.09% at 100 VUs, and +42.26% at 256 VUs. A separate 24-run 100-VU
+matrix gave +42.14% with OTLP off and +87.48% on. All runs were clean.
+`reviewed-gate-summary.json`, `reviewed-export-summary.json`, and
+`reviewed-reports.tar.gz` retain current-code evidence; `reviewed-binary.sha256`
+identifies the measured binary.
+
 ## Recording, collection, and complete transactions
 
 Separate existing Go benchmarks compare each material change. Raw results are
@@ -113,6 +121,46 @@ bounded WAL, and one disposable clone at a time; the entire final block was reru
 No workload/error checks were changed. The task-owned PostgreSQL container was
 stopped afterward. `docker-tpcb-runs.jsonl` and `docker-tpcb-reports.tar.gz` retain
 results, commands, image identity, external counts, and discarded-attempt evidence.
+
+## Client-limited PostgreSQL follow-up
+
+To isolate client CPU cost, matched Linux/arm64 binaries were built from unchanged
+`453639f` and candidate `2df230f`. Both ran in task-owned containers sharing the
+PostgreSQL network namespace, removing Docker Desktop's host-port forwarding.
+Client CPU quotas and `GOMAXPROCS` were both set to one or two; PostgreSQL had no
+container CPU quota inside Docker's six-vCPU VM. This is CPU quota isolation,
+not physical CPU affinity or separate hardware.
+
+TPC-B SF16, eight VUs, eight connections, explicit READ COMMITTED, OTLP off, one
+fresh analyzed-template clone per invocation, five-second warmup, history reset,
+then 20 seconds measured. Three ABBA blocks per target. Client CPU came from
+cgroup `usage_usec` around the measured process. History row counts exactly
+matched reported successful transactions in every measured run.
+
+| Client quota | Baseline median block TPS | Candidate median block TPS | Median paired gain | Block gain range | Client CPU used |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 1 CPU, 8 VUs | 21,728.56 | 22,683.15 | **+4.71%** | +3.09% to +4.98% | approximately 99% of one CPU |
+| 2 CPUs, 8 VUs | 23,812.59 | 24,377.88 | **+2.37%** | +1.05% to +4.19% | approximately 1.31–1.33 CPUs |
+
+The one-CPU result is a real-database throughput improvement from a client-only
+change: all three paired blocks improve, the client saturates its quota, and the
+database can sustain higher work rates. The two-CPU result is mixed-limit, not a
+fully CPU-saturated client result. A four-CPU/32-VU ABBA headroom control reached
+29,282.97 baseline and 30,574.37 candidate TPS; the same-eight-VU/four-CPU control
+remained near 24k TPS. Neither target exhausted PostgreSQL's aggregate capacity,
+but eight-VU round trips and scheduling still constrain two-CPU throughput.
+
+Earlier macOS host clients at `GOMAXPROCS=1/2` reached only approximately 4.4k/4.3k
+TPS and used 55%/75% of one CPU. Those valid observations are retained as a
+port-forwarded mixed-limit control, not substituted for the CPU-bound result.
+No failure was hidden: all 60 host/Linux runs across target and headroom cases
+completed without errors and matched external committed-work counts.
+
+`postgres-client-cpu-summary.json`, the `postgres-*-results-*.jsonl` files, and
+`postgres-client-cpu-reports.tar.gz` retain reports, scripts, cgroup samples,
+Linux binary checksums, and image identity. PostgreSQL was stopped afterward.
+These client-limit measurements precede the three reviewed edge-case fixes;
+current-code noop/export gates above were rerun after those fixes.
 
 ## Correctness boundary
 
