@@ -3,10 +3,12 @@ package bench
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	otelmetric "go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/trace"
@@ -153,6 +155,118 @@ func TestNativePublicMetricWarmRecordingAllocations(t *testing.T) {
 	labels := []Label{LabelValue("result", "ok"), LabelValue("operation", "read")}
 	handle.Record(ctx, 1, labels...)
 	require.Zero(t, testing.AllocsPerRun(1000, func() { handle.Record(ctx, 1, labels...) }))
+}
+
+func TestNativeOverflowWarmRecordingAllocations(t *testing.T) {
+	registry := newmetricRegistry("")
+	metric, err := registry.NewMetric("count", Counter)
+	require.NoError(t, err)
+
+	ctx := metricWorkerContext(context.Background(), 0, 100)
+	for index := range metricCardinalityLimit {
+		metric.add(ctx, 1, attributes("key", strconv.Itoa(index)))
+	}
+
+	first, second := attributes("key", "rejected-a"), attributes("key", "rejected-b")
+	metric.add(ctx, 1, first)
+	metric.add(ctx, 1, second)
+	require.Zero(t, testing.AllocsPerRun(1000, func() {
+		metric.add(ctx, 1, first)
+		metric.add(ctx, 1, second)
+	}))
+}
+
+func TestNativeDeltaSampledRecordingAllocations(t *testing.T) {
+	for _, typ := range []metricType{Counter, Trend, Rate} {
+		t.Run(fmt.Sprint(typ), func(t *testing.T) {
+			registry := newmetricRegistry("")
+			selector := func(sdkmetric.InstrumentKind) metricdata.Temporality { return metricdata.DeltaTemporality }
+			producer := registry.producer(selector)
+			metric, err := registry.NewMetric("sample", typ)
+			require.NoError(t, err)
+
+			sc := trace.NewSpanContext(trace.SpanContextConfig{
+				TraceID: trace.TraceID{1}, SpanID: trace.SpanID{2}, TraceFlags: trace.FlagsSampled,
+			})
+			ctx := trace.ContextWithSpanContext(context.Background(), sc)
+			attrs := attributes()
+			metric.add(ctx, 1, attrs)
+			shard := metric.writers[metricWriterLimit].Load().shard
+			reservoir := shard.deltas[0].reservoir
+
+			for range 3 {
+				_, err = producer.Produce(t.Context())
+				require.NoError(t, err)
+				require.Same(t, reservoir, shard.deltas[0].reservoir)
+				require.Zero(t, testing.AllocsPerRun(100, func() { metric.add(ctx, 1, attrs) }))
+			}
+		})
+	}
+}
+
+func TestNativeDeltaDoesNotRepeatOldExemplars(t *testing.T) {
+	registry := newmetricRegistry("")
+	selector := func(sdkmetric.InstrumentKind) metricdata.Temporality { return metricdata.DeltaTemporality }
+	producer := registry.producer(selector)
+	histogram, err := registry.NewMetric("latency", Trend)
+	require.NoError(t, err)
+
+	sc := trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID: trace.TraceID{1}, SpanID: trace.SpanID{2}, TraceFlags: trace.FlagsSampled,
+	})
+	histogram.add(trace.ContextWithSpanContext(context.Background(), sc), 1, attributes())
+
+	scopes, err := producer.Produce(t.Context())
+	require.NoError(t, err)
+	point := findHistogram(t, metricdata.ResourceMetrics{ScopeMetrics: scopes}, "latency").DataPoints[0]
+	require.NotEmpty(t, point.Exemplars)
+	histogram.add(context.Background(), 8, attributes())
+
+	scopes, err = producer.Produce(t.Context())
+	require.NoError(t, err)
+	point = findHistogram(t, metricdata.ResourceMetrics{ScopeMetrics: scopes}, "latency").DataPoints[0]
+	require.Empty(t, point.Exemplars)
+	require.Equal(t, uint64(1), point.Count)
+	require.InDelta(t, 8, point.Sum, 0)
+}
+
+func TestNativeHistogramBoundsMatchSDK(t *testing.T) {
+	for _, bounds := range [][]float64{nil, {}, {1, 2}} {
+		t.Run(fmt.Sprintf("%#v", bounds), func(t *testing.T) {
+			registry := newmetricRegistry("")
+			histogram, err := registry.newInstrument("latency", Trend, "ms", "", bounds)
+			require.NoError(t, err)
+
+			reader := sdkmetric.NewManualReader()
+			provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+
+			t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
+
+			referenceBounds := bounds
+			if bounds == nil {
+				referenceBounds = histogramBounds("latency")
+			}
+
+			reference, err := provider.Meter("test").Float64Histogram("latency",
+				otelmetric.WithExplicitBucketBoundaries(referenceBounds...))
+			require.NoError(t, err)
+
+			for _, value := range []float64{0, 1, 2, 7, 1000} {
+				histogram.add(t.Context(), value, attributes())
+				reference.Record(t.Context(), value)
+			}
+
+			scopes, err := registry.producer(sdkmetric.DefaultTemporalitySelector).Produce(t.Context())
+			require.NoError(t, err)
+
+			var data metricdata.ResourceMetrics
+			require.NoError(t, reader.Collect(t.Context(), &data))
+			expected := findHistogram(t, data, "latency").DataPoints[0]
+			actual := findHistogram(t, metricdata.ResourceMetrics{ScopeMetrics: scopes}, "latency").DataPoints[0]
+			require.Equal(t, expected.Bounds, actual.Bounds)
+			require.Equal(t, expected.BucketCounts, actual.BucketCounts)
+		})
+	}
 }
 
 func TestNativeExemplarFiltersAndRateValues(t *testing.T) {

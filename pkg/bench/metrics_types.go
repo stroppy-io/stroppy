@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelmetric "go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/exemplar"
 )
 
@@ -133,6 +134,10 @@ func (r *metricRegistry) newInstrument(
 	if typ == Trend {
 		if bounds == nil {
 			bounds = histogramBounds(name)
+		} else if len(bounds) == 0 {
+			aggregation := sdkmetric.DefaultAggregationSelector(sdkmetric.InstrumentKindHistogram)
+			defaults, _ := aggregation.(sdkmetric.AggregationExplicitBucketHistogram)
+			bounds = defaults.Boundaries
 		}
 
 		bounds = slices.Clone(bounds)

@@ -76,6 +76,13 @@ func (m *metric) bindSeries(id int, attrs metricAttributes) *metricWriterBinding
 	}
 
 	key.attributes = seriesKey
+	if cached, ok := m.bindings.Load(key); ok {
+		binding, _ := cached.(*metricWriterBinding)
+		m.writers[id].Store(binding)
+
+		return binding
+	}
+
 	binding := &metricWriterBinding{original: attrs.set, shard: shard}
 	stored, _ := m.bindings.LoadOrStore(key, binding)
 	binding, _ = stored.(*metricWriterBinding)

@@ -40,6 +40,7 @@ type metricValues struct {
 	max                      float64
 	buckets                  []uint64
 	reservoir, trueReservoir exemplar.Reservoir
+	exemplarSince            time.Time
 }
 
 // A shard lock keeps histogram fields consistent with concurrent collection.
@@ -130,7 +131,7 @@ func (v *metricValues) record(value float64, typ metricType, bucket int) {
 	v.count++
 }
 
-func collectNativeExemplars(reservoir exemplar.Reservoir) []metricdata.Exemplar[float64] {
+func collectNativeExemplars(reservoir exemplar.Reservoir, since time.Time) []metricdata.Exemplar[float64] {
 	if reservoir == nil {
 		return nil
 	}
@@ -140,6 +141,10 @@ func collectNativeExemplars(reservoir exemplar.Reservoir) []metricdata.Exemplar[
 
 	out := make([]metricdata.Exemplar[float64], 0, len(samples))
 	for _, sample := range samples {
+		if sample.Time.Before(since) {
+			continue
+		}
+
 		out = append(out, metricdata.Exemplar[float64]{
 			Value: sample.Value.Float64(), Time: sample.Time,
 			TraceID: slices.Clone(sample.TraceID), SpanID: slices.Clone(sample.SpanID),
@@ -166,14 +171,17 @@ func (s *metricShard) snapshot(delta int) collectedMetric {
 
 	out := collectedMetric{
 		metricValues: *value,
-		samples:      collectNativeExemplars(value.reservoir),
-		trueSamples:  collectNativeExemplars(value.trueReservoir),
+		samples:      collectNativeExemplars(value.reservoir, value.exemplarSince),
+		trueSamples:  collectNativeExemplars(value.trueReservoir, value.exemplarSince),
 	}
 
 	out.buckets = slices.Clone(value.buckets)
 	if delta >= 0 {
 		clear(value.buckets)
-		*value = metricValues{buckets: value.buckets}
+		*value = metricValues{
+			buckets: value.buckets, reservoir: value.reservoir, trueReservoir: value.trueReservoir,
+			exemplarSince: time.Now(),
+		}
 	}
 
 	return out
