@@ -415,8 +415,18 @@ func graphStepOptions(e *Execution, node *graphNode) (options stepOptions, err e
 }
 
 func validateGraphJoin(node *graphNode) error {
-	if node.join && (node.session != nil || node.ready || node.cleanup > 0 || node.auxiliary != nil ||
-		node.before != nil || node.after != nil) {
+	if !node.join {
+		return nil
+	}
+
+	for _, dependency := range node.dependencies {
+		if dependency.beforeAction {
+			return inputError("graph join cannot have action-only dependencies; use AfterReady or AfterSuccess")
+		}
+	}
+
+	if node.session != nil || node.ready || node.cleanup > 0 || node.auxiliary != nil ||
+		node.before != nil || node.after != nil {
 		return inputError("graph join cannot own worker lifecycle or resources")
 	}
 

@@ -192,7 +192,8 @@ Dependency semantics are explicit:
 
 `Sequence` connects consecutive nodes with success dependencies. Nodes without a
 dependency can run concurrently. `Join(name, nodes...)` creates a success barrier
-without a worker, database action, or synthetic progress weight. A graph rejects cycles, cross-graph handles,
+without a worker, database action, or synthetic progress weight. Joins accept entry
+dependencies, not action-only dependencies. A graph rejects cycles, cross-graph handles,
 conflicting session use, missing selected prerequisites, and unavailable modes
 before any graph action runs. Its execution topology must match observation.
 Readiness that a producer never publishes fails instead of leaving waiters behind.

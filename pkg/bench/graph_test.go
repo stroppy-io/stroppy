@@ -159,6 +159,34 @@ func TestGraphForkJoinOwnsIndependentMeasurement(t *testing.T) {
 	require.NotContains(t, result.Executions, "joined")
 }
 
+func TestGraphJoinRejectsActionOnlyDependencies(t *testing.T) {
+	for _, ready := range []bool{false, true} {
+		var calls atomic.Int64
+
+		test := Test{Name: "graph-join-action", Define: func(d *Def) error {
+			g := d.Execution.Graph("test")
+			first := g.Node("first", func(context.Context, *Bench) error {
+				calls.Add(1)
+
+				return nil
+			})
+			second := g.Node("second", func(context.Context, *Bench) error { return nil })
+
+			joined := g.Join("joined", first)
+			if ready {
+				joined.RunAfterReady(second)
+			} else {
+				joined.RunAfterSuccess(second)
+			}
+
+			return g.Run("")
+		}}
+		_, err := RunTest(t.Context(), test, RunOptions{Metrics: &MetricsConfig{Quiet: true}})
+		require.ErrorContains(t, err, "join cannot have action-only dependencies")
+		require.Zero(t, calls.Load())
+	}
+}
+
 func TestGraphInvalidPlanHasNoSideEffects(t *testing.T) {
 	var calls atomic.Int64
 
