@@ -162,6 +162,14 @@ Linux binary checksums, and image identity. PostgreSQL was stopped afterward.
 These client-limit measurements precede the three reviewed edge-case fixes;
 current-code noop/export gates above were rerun after those fixes.
 
+## Nondefault histogram export
+
+`OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=base2_exponential_bucket_histogram`
+retains official SDK aggregation for exported histograms. Local reports still use
+native explicit buckets. This opt-in compatibility path records histogram values
+in both stores and does not carry the default-path performance claim above.
+The normal explicit-bucket path does not call SDK histogram recording.
+
 ## Correctness boundary
 
 - Differential aggregation against official SDK emission at 1/100/256 workers checks names, units, descriptions, attribute sets, monotonicity/temporality, counter/rate totals, histogram counts/bounds/buckets/extrema, and gauge last values.
@@ -194,11 +202,24 @@ It uses three ABBA blocks at 1, 100, and 256 VUs, stores full reports, and exits
 nonzero if correctness checks fail or the median thresholds are missed. Absolute
 binary paths avoid working-directory ambiguity. It never disables recording.
 
-For the export-on comparison, use the same command arguments with a config file
-setting `global.exporter.otlpExport.otlpHttpEndpoint` to a real loopback collector
-or decoding receiver and `otlpEndpointInsecure=true`. Set
-`OTEL_METRIC_EXPORT_INTERVAL=1000`; verify received batches rather than treating an
-unreachable exporter as a valid performance result.
+For export-on, pass the config as the fourth argument. The gate forwards it with
+`-f` to both binaries on every invocation. For a collector listening on loopback
+port 4318, create `/absolute/path/to/otlp.json`:
+
+```json
+{"global":{"exporter":{"otlpExport":{"otlpHttpEndpoint":"127.0.0.1:4318","otlpEndpointInsecure":true}}}}
+```
+
+Then run:
+
+```sh
+OTEL_METRIC_EXPORT_INTERVAL=1000 bash benchmarks/metrics-native-20261126/gate.sh \
+  /absolute/path/to/stroppy-base /absolute/path/to/stroppy-candidate /new/export-output \
+  /absolute/path/to/otlp.json
+```
+
+Verify received batches at the collector or decoding receiver; an unreachable
+exporter is not a valid export-on performance result.
 
 ## Discarded experiment and remaining scope
 

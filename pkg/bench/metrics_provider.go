@@ -70,8 +70,16 @@ func newMeterProvider(
 	limits := sdkmetric.WithCardinalityLimitSelector(func(sdkmetric.InstrumentKind) (int, bool) {
 		return metricCardinalityLimit, false
 	})
+	// Native snapshots retain explicit buckets even when export requests exponential aggregation.
 	manualReader := sdkmetric.NewManualReader(
 		limits, sdkmetric.WithProducer(registry.producer(sdkmetric.DefaultTemporalitySelector)),
+		sdkmetric.WithAggregationSelector(func(kind sdkmetric.InstrumentKind) sdkmetric.Aggregation {
+			if kind == sdkmetric.InstrumentKindHistogram {
+				return sdkmetric.AggregationDrop{}
+			}
+
+			return sdkmetric.DefaultAggregationSelector(kind)
+		}),
 	)
 	options := []sdkmetric.Option{sdkmetric.WithReader(manualReader)}
 
@@ -88,6 +96,10 @@ func newMeterProvider(
 	}
 
 	if enabled {
+		aggregation := exporter.Aggregation(sdkmetric.InstrumentKindHistogram)
+		_, registry.sdkHistograms = aggregation.(sdkmetric.AggregationBase2ExponentialHistogram)
+		exportProducer := registry.producer(exporter.Temporality)
+		exportProducer.skipHistograms = registry.sdkHistograms
 		options = append(options, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(
 			&metadataExporter{
 				Exporter:   exporter,
@@ -95,7 +107,7 @@ func newMeterProvider(
 			},
 			sdkmetric.WithInterval(metricExportInterval()),
 			limits,
-			sdkmetric.WithProducer(registry.producer(exporter.Temporality)),
+			sdkmetric.WithProducer(exportProducer),
 		)))
 	}
 

@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# != 3 ]]; then
-  printf 'Usage: %s BASE_BINARY CANDIDATE_BINARY NEW_OUTPUT_DIRECTORY\n' "$0" >&2
+if [[ $# -lt 3 || $# -gt 4 ]]; then
+  printf 'Usage: %s BASE_BINARY CANDIDATE_BINARY NEW_OUTPUT_DIRECTORY [CONFIG_FILE]\n' "$0" >&2
   exit 2
 fi
 baseline=$1
 candidate=$2
 output=$3
+config=()
+if [[ $# == 4 ]]; then
+  [[ -f "$4" ]] || { printf 'Config not found: %s\n' "$4" >&2; exit 2; }
+  config=(-f "$4")
+fi
 mkdir "$output"
 : > "$output/results.jsonl"
 
@@ -25,7 +30,7 @@ for vus in 1 100 256; do
       stem="$output/vus${vus}-block${block}-pos${position}-${variant}"
       GOMAXPROCS=4 GOGC=100 GOMEMLIMIT=off "$binary" run baseline -d noop \
         --steps workload --executor constant-vus --vus "$vus" --duration 8s \
-        --report-format json --no-save-report > "$stem.json" 2> "$stem.stderr"
+        --report-format json --no-save-report ${config[@]+"${config[@]}"} > "$stem.json" 2> "$stem.stderr"
       jq -e '.status == "completed" and .errors.terminal_errors == 0 and
         .errors.failed_iterations == 0 and .errors.failed_queries == 0 and
         .errors.retry_attempts == 0 and

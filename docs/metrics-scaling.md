@@ -5,6 +5,9 @@ native worker shards. OpenTelemetry collects preaggregated metric data through
 its public `Producer` interface and retains ownership of HTTP/gRPC export,
 authentication, TLS, retries, and shutdown. Throughput and pool observables still
 use SDK collection callbacks; they do not record through the SDK per operation.
+The explicit opt-in exponential-histogram exporter setting retains an SDK-backed
+histogram path alongside native local buckets; default-path gains do not apply to
+that compatibility mode.
 
 ## Aggregation
 

@@ -188,11 +188,12 @@ func (s *metricShard) snapshot(delta int) collectedMetric {
 }
 
 type metricProducer struct {
-	registry *metricRegistry
-	selector sdkmetric.TemporalitySelector
-	delta    int
-	mu       sync.Mutex
-	started  time.Time
+	registry       *metricRegistry
+	selector       sdkmetric.TemporalitySelector
+	delta          int
+	mu             sync.Mutex
+	started        time.Time
+	skipHistograms bool
 }
 
 func (r *metricRegistry) producer(selector sdkmetric.TemporalitySelector) *metricProducer {
@@ -240,6 +241,10 @@ func (p *metricProducer) Produce(ctx context.Context) ([]metricdata.ScopeMetrics
 
 	out := metricdata.ScopeMetrics{Scope: r.scope}
 	for _, metric := range r.metrics {
+		if p.skipHistograms && metric.Type == Trend {
+			continue
+		}
+
 		kind := sdkmetric.InstrumentKindCounter
 
 		switch metric.Type {

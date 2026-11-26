@@ -63,6 +63,7 @@ type metric struct {
 	started        time.Time
 	deltaReaders   int
 	exemplarFilter exemplar.Filter
+	sdkHistogram   otelmetric.Float64Histogram
 	emptyAttrs     metricAttributes
 	overflow       metricAttributes
 	tagAttrs       sync.Map
@@ -94,16 +95,21 @@ func (m *metric) addWriter(ctx context.Context, value float64, attrs metricAttri
 	}
 
 	binding.shard.record(ctx, value, m.Type, m.bounds, m.exemplarFilter)
+
+	if m.sdkHistogram != nil {
+		m.sdkHistogram.Record(ctx, value, binding.attributes.record...)
+	}
 }
 
 type metricRegistry struct {
-	mu           sync.Mutex
-	meter        otelmetric.Meter
-	prefix       string
-	metrics      map[string]*metric
-	started      time.Time
-	scope        instrumentation.Scope
-	deltaReaders int
+	mu            sync.Mutex
+	meter         otelmetric.Meter
+	prefix        string
+	metrics       map[string]*metric
+	started       time.Time
+	scope         instrumentation.Scope
+	deltaReaders  int
+	sdkHistograms bool
 }
 
 func newmetricRegistry(prefix string) *metricRegistry {
@@ -156,6 +162,18 @@ func (r *metricRegistry) newInstrument(
 		bounds: bounds, started: r.started, deltaReaders: r.deltaReaders, exemplarFilter: metricExemplarFilter(),
 		emptyAttrs: attributes(),
 		overflow:   metricAttributesFromSet(attribute.NewSet(attribute.Bool("otel.metric.overflow", true))),
+	}
+
+	if typ == Trend && r.sdkHistograms {
+		var err error
+
+		m.sdkHistogram, err = r.meter.Float64Histogram(r.prefix+name,
+			otelmetric.WithUnit(unit), otelmetric.WithDescription(description),
+			otelmetric.WithExplicitBucketBoundaries(bounds...),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("create metric %q: %w", name, err)
+		}
 	}
 
 	r.metrics[name] = m

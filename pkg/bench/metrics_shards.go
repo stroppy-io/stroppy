@@ -25,8 +25,9 @@ type metricWriterSeries struct {
 }
 
 type metricWriterBinding struct {
-	original *attribute.Set
-	shard    *metricShard
+	original   *attribute.Set
+	shard      *metricShard
+	attributes metricAttributes
 }
 
 func (m *metric) bindSeries(id int, attrs metricAttributes) *metricWriterBinding {
@@ -84,6 +85,10 @@ func (m *metric) bindSeries(id int, attrs metricAttributes) *metricWriterBinding
 	}
 
 	binding := &metricWriterBinding{original: attrs.set, shard: shard}
+	if m.sdkHistogram != nil {
+		binding.attributes = metricAttributesFromSet(set)
+	}
+
 	stored, _ := m.bindings.LoadOrStore(key, binding)
 	binding, _ = stored.(*metricWriterBinding)
 	m.writers[id].Store(binding)
