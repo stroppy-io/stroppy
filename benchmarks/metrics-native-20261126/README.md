@@ -71,6 +71,14 @@ matrix gave +42.14% with OTLP off and +87.48% on. All runs were clean.
 `reviewed-reports.tar.gz` retain current-code evidence; `reviewed-binary.sha256`
 identifies the measured binary.
 
+After the exponential-export compatibility fix at `a487c0e34383a46e3cb5f4b6bec028d94d637432`,
+a further 24-run 100-VU matrix retained **+42.23%** median gain with OTLP off
+(block range +40.61% to +42.86%) and **+88.90%** on (+88.35% to +89.47%). All runs
+were clean. `final-fallback-summary.json`, `final-fallback-runs.jsonl`, and
+`final-fallback-reports.tar.gz` preserve those results; the associated checksum
+file identifies the binary. Full race/coverage tests, targeted exponential
+cumulative/delta regressions, lint, and build passed on that implementation.
+
 ## Recording, collection, and complete transactions
 
 Separate existing Go benchmarks compare each material change. Raw results are
