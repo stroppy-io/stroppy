@@ -369,6 +369,28 @@ func TestGraphCapacityFailsBeforeSetup(t *testing.T) {
 	require.Zero(t, writes.Load())
 }
 
+func TestGraphReadinessRejectsInitializerSignal(t *testing.T) {
+	var actions atomic.Int64
+
+	test := Test{Name: "graph-initializer-ready", Define: func(d *Def) error {
+		g := d.Execution.Graph("test")
+		g.WorkerNode("server", func(_ context.Context, b *Bench) (Action, error) {
+			b.Ready()
+
+			return func(context.Context, *Bench) error {
+				actions.Add(1)
+
+				return nil
+			}, nil
+		}).SignalsReady()
+
+		return g.Run("")
+	}}
+	_, err := RunTest(t.Context(), test, RunOptions{Metrics: &MetricsConfig{Quiet: true}})
+	require.ErrorContains(t, err, "readiness must be signaled during the action window")
+	require.Zero(t, actions.Load())
+}
+
 func TestGraphReadinessRequiresAllWorkers(t *testing.T) {
 	var ready atomic.Int64
 

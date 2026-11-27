@@ -29,6 +29,10 @@ func withoutGraphCancellation(err error) error {
 
 	if wrapped, ok := err.(interface{ Unwrap() error }); ok && errors.Is(err, context.Canceled) {
 		if remaining := withoutGraphCancellation(wrapped.Unwrap()); remaining != nil {
+			if IsFatalError(err) {
+				return Fatal(remaining)
+			}
+
 			return remaining
 		}
 

@@ -69,6 +69,7 @@ type Execution struct {
 	window         *measurement
 	progress       *runProgress
 	terminalErrors atomic.Int64
+	actionActive   atomic.Bool
 	ready          func(int)
 	onInitialized  func()
 	beforeAction   func(context.Context) error
@@ -400,6 +401,9 @@ func (e *Execution) bench(vu *VU, name string) *Bench {
 func (e *Execution) execute(
 	parent context.Context, name string, action Action, opts *stepOptions, initialized []*stepWorker,
 ) error {
+	e.actionActive.Store(true)
+	defer e.actionActive.Store(false)
+
 	parent = context.WithValue(parent, metricStepKey{}, name)
 
 	ctx, cancel := context.WithCancelCause(parent)

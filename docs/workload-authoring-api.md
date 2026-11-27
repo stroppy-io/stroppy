@@ -186,7 +186,8 @@ Dependency semantics are explicit:
   errors. This does not ignore graph cancellation or a fatal failure.
 - `AfterStarted`: wait until the predecessor begins its action window.
 - `AfterReady`: wait for successful worker initialization, or for every worker's
-  `Bench.Ready()` when the producer declares `SignalsReady()`.
+  `Bench.Ready()` when the producer declares `SignalsReady()`. Explicit readiness
+  is action-only; calls during initialization or after the action window fail.
 - `After`: order work when selected, but permit an excluded predecessor. This
   supports existing-data workflows; it is not a data-validity prerequisite.
 

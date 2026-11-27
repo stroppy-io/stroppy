@@ -35,6 +35,10 @@ func (b *Bench) Ready() {
 		invalid("graph readiness", inputError("node does not declare a readiness milestone"))
 	}
 
+	if !b.execution.actionActive.Load() {
+		invalid("graph readiness", inputError("readiness must be signaled during the action window"))
+	}
+
 	b.execution.ready(b.Worker())
 }
 

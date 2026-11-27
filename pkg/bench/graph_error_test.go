@@ -20,5 +20,9 @@ func TestGraphCancellationKeepsJoinedFailures(t *testing.T) {
 		require.NotErrorIs(t, remaining, context.Canceled)
 	}
 
+	remaining := withoutGraphCancellation(Fatal(errors.Join(context.Canceled, failure)))
+	require.ErrorIs(t, remaining, failure)
+	require.NotErrorIs(t, remaining, context.Canceled)
+	require.True(t, IsFatalError(remaining))
 	require.NoError(t, withoutGraphCancellation(fmt.Errorf("stopped: %w", context.Canceled)))
 }
