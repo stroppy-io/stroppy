@@ -10,6 +10,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ## [Unreleased]
 
+## [6.5.0] - 2026-11-27
+
 ### Added
 
 - Go workloads can compose named execution graphs with concurrent phases, readiness dependencies, joined auxiliary work, and scoped cleanup without changing existing immediate steps. ([#300](https://github.com/stroppy-io/stroppy/pull/300))
