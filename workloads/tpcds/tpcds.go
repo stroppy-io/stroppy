@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -77,8 +78,19 @@ func tpcdsSupported(dt bench.DriverTypeName) bool { return dt != bench.DriverCRD
 func define(d *bench.Def) error {
 	settings := bench.RunParameters(&d.Param, bench.RunDefaults{})
 	w := &workload{}
-	benchmark, _ := d.Param.Bool("benchmark", false,
+	benchmark, benchmarkInfo := d.Param.Bool("benchmark", false,
 		"Run load, power, two throughput tests and data maintenance; report QphDS@SF.")
+
+	mode, modeInfo := d.Param.String("mode", "legacy", "Execution graph mode; legacy preserves benchmark selection.",
+		bench.OneOf("legacy", "queries", "benchmark"))
+	if modeInfo.Explicit() && mode != "legacy" {
+		if benchmarkInfo.Explicit() && benchmark != (mode == "benchmark") {
+			return errBenchmarkOptions
+		}
+
+		benchmark = mode == "benchmark"
+	}
+
 	refreshSet, refreshInfo := d.Param.Int64("refresh-set", 1,
 		"First maintenance set; required when continuing existing data.", bench.Min(int64(1)))
 	streamDefault := benchmarkStreamDefault(benchmark)
@@ -133,10 +145,6 @@ func define(d *bench.Def) error {
 		return err
 	}
 
-	step := func(name string, action bench.Action, options ...bench.StepOption) {
-		d.Execution.Step(name, dialectChoice.Step(action), options...)
-	}
-
 	w.useUnlogged = w.useUnlogged && w.driver == bench.DriverPostgres
 
 	w.throughput = w.streams > 1
@@ -153,7 +161,92 @@ func define(d *bench.Def) error {
 		}
 	}
 
-	schemaFile, queryFile := dialectFiles(w.driver, dialectChoice.GP(), w.schemaFile, w.sqlFile)
+	schemaFile, queryFile := w.sqlFiles(dialectChoice.GP())
+
+	if err := w.loadSQL(d, schemaFile, queryFile); err != nil {
+		return err
+	}
+
+	w.metrics = declareQueryMetrics(&d.Metrics, w.querySQL.Names(""))
+
+	return w.executeGraph(d, dialectChoice, settings, benchmark, refreshSet, refreshInfo.Explicit())
+}
+
+func (w *workload) executeGraph(
+	d *bench.Def, dialectChoice *mpp.Selection, settings bench.RunSettings,
+	benchmark bool, refreshSet int64, refreshExplicit bool,
+) error {
+	g := d.Execution.Graph("tpcds")
+
+	var previous, members []bench.NodeRef
+
+	step := func(name string, action bench.Action, options ...bench.StepOption) bench.NodeRef {
+		node := g.Node(name, dialectChoice.Step(action), options...).After(previous...)
+		previous = []bench.NodeRef{node}
+		members = append(members, node)
+
+		return node
+	}
+	benchmarkWork := w
+
+	if !benchmark {
+		candidate := *w
+		benchmarkWork = &candidate
+	}
+
+	benchmarkErr := benchmarkWork.configureBenchmark(d, settings, refreshSet, refreshExplicit, benchmark)
+	if benchmark && benchmarkErr != nil {
+		return benchmarkErr
+	}
+	defer func() {
+		if benchmarkWork.benchmark != nil && benchmarkWork.benchmark.directory != "" {
+			_ = os.RemoveAll(benchmarkWork.benchmark.directory)
+		}
+	}()
+
+	var maintenance bench.NodeRef
+	if benchmarkErr == nil {
+		maintenance = g.Node("generate_maintenance", dialectChoice.Step(benchmarkWork.generateMaintenance))
+		if benchmark {
+			previous = []bench.NodeRef{maintenance}
+		}
+	}
+
+	step("drop_schema", w.drop)
+	step("create_schema", w.create)
+
+	w.executeLoad(step)
+
+	setup := slices.Clone(members)
+	query := g.Node("workload", dialectChoice.Step(w.work), settings.Policy()).After(previous...)
+	g.Mode("queries", "Query workload with optional setup and qualification", append(slices.Clone(setup), query)...)
+
+	benchmarkMembers := append([]bench.NodeRef{maintenance}, setup...)
+
+	if benchmarkErr == nil {
+		benchmarkStep := func(name string, action bench.Action, options ...bench.StepOption) bench.NodeRef {
+			node := g.Node(name, dialectChoice.Step(action), options...).After(previous...)
+			previous = []bench.NodeRef{node}
+			benchmarkMembers = append(benchmarkMembers, node)
+
+			return node
+		}
+		benchmarkWork.declareBenchmark(g, benchmarkStep, dialectChoice.Step, &previous, &benchmarkMembers)
+		g.Mode("benchmark", "Power, two throughput tests and data maintenance", benchmarkMembers...)
+	} else {
+		g.Mode("benchmark", "Power, two throughput tests and data maintenance").Require(benchmarkErr)
+	}
+
+	selected := "queries"
+	if benchmark {
+		selected = "benchmark"
+	}
+
+	return g.Run(selected)
+}
+
+func (w *workload) sqlFiles(gp bool) (schemaFile, queryFile string) {
+	schemaFile, queryFile = dialectFiles(w.driver, gp, w.schemaFile, w.sqlFile)
 	if w.sqlDialect == "mariadb" {
 		if w.schemaFile == "" {
 			schemaFile = "schema.mysql.sql"
@@ -164,6 +257,11 @@ func define(d *bench.Def) error {
 		}
 	}
 
+	return schemaFile, queryFile
+}
+
+func (w *workload) loadSQL(d *bench.Def, schemaFile, queryFile string) error {
+	var err error
 	if w.schemaFile != "" {
 		w.schemaSQL, err = d.Queries.Override(schemaFile)
 	} else {
@@ -180,56 +278,26 @@ func define(d *bench.Def) error {
 		w.querySQL, err = d.Queries.Load(files, queryFile)
 	}
 
-	if err != nil {
-		return err
-	}
-
-	w.metrics = declareQueryMetrics(&d.Metrics, w.querySQL.Names(""))
-	if benchmark {
-		if err := w.configureBenchmark(d, settings, refreshSet, refreshInfo.Explicit()); err != nil {
-			return err
-		}
-	}
-
-	if benchmark {
-		step("generate_maintenance", w.generateMaintenance)
-
-		if w.benchmark.directory != "" {
-			defer os.RemoveAll(w.benchmark.directory)
-		}
-	}
-
-	step("drop_schema", w.drop)
-	step("create_schema", w.create)
-
-	w.executeLoad(d, dialectChoice.Step)
-
-	if benchmark {
-		w.executeBenchmark(d, dialectChoice.Step)
-	} else {
-		step("workload", w.work, settings.Policy())
-	}
-
-	return d.Execution.Err()
+	return err
 }
 
-func (w *workload) executeLoad(d *bench.Def, wrap func(bench.Action) bench.Action) {
+func (w *workload) executeLoad(step func(string, bench.Action, ...bench.StepOption) bench.NodeRef) {
 	if w.useUnlogged {
-		d.Execution.Step("set_unlogged", wrap(w.unlogged))
+		step("set_unlogged", w.unlogged)
 	}
 
-	d.Execution.Step("load_data", wrap(w.load))
+	step("load_data", w.load)
 	section := schemaSection{w, "create_indexes"}
-	d.Execution.Step(section.name, wrap(section.Run))
+	step(section.name, section.Run)
 
 	if w.useUnlogged {
-		d.Execution.Step("set_logged", wrap(w.logged))
+		step("set_logged", w.logged)
 	}
 
-	d.Execution.Step("analyze", wrap(w.analyzeAction))
+	step("analyze", w.analyzeAction)
 
 	if !w.throughput && w.genStream < 0 && answerValidationSupported(w.driver) {
-		d.Execution.Step("validate_answers", wrap(w.validate))
+		step("validate_answers", w.validate)
 	}
 }
 

@@ -153,6 +153,102 @@ explicit positive timeout. It does not register a future finalizer: early Go
 returns must still reach cleanup, or arrange the call with `defer`. Framework
 resource finalization always runs. Cleanup errors preserve earlier causes.
 
+## Execution graphs and modes
+
+`Execution.Graph` adds declarative orchestration without changing `Step` or
+`WorkerStep`. Nodes reuse ordinary actions, initializers, and step options.
+Declaring a node does not run it; `Graph.Run` resolves a mode, validates its
+selected dependencies, then waits for all started work and owned cleanup.
+
+```go
+g := d.Execution.Graph("example")
+create := g.Node("create", work.create)
+load := g.Node("load", work.load).AfterSuccess(create)
+queries := g.WorkerNode("queries", work.initialize,
+    bench.OncePerWorker(4), bench.RetainSession()).AfterSuccess(load)
+refresh := g.WorkerNode("refresh", work.initializeRefresh,
+    bench.OncePerWorker(1), bench.RetainSession()).AfterSuccess(load)
+g.Measure("throughput", queries, refresh)
+g.Node("cleanup", work.drop).Finally(5*time.Second, queries, refresh)
+g.Mode("full", "Load and run queries with refresh", queries, refresh)
+return g.Run("full")
+```
+
+Modes select shared nodes and their hard prerequisites. `Group` namespaces an
+ordinary declaration helper and returns its node references for composition.
+Instantiate the same helper under different group names to reuse a phase more
+than once. Group names do not create workers or duplicate metric counters.
+
+Dependency semantics are explicit:
+
+- `AfterSuccess`: require clean completion, not `CompletedWithErrors`.
+- `AfterCompletion`: wait for the predecessor to finish, even with ordinary
+  errors. This does not ignore graph cancellation or a fatal failure.
+- `AfterStarted`: wait until the predecessor begins its action window.
+- `AfterReady`: wait for successful worker initialization, or for every worker's
+  `Bench.Ready()` when the producer declares `SignalsReady()`. Explicit readiness
+  is action-only; calls during initialization or after the action window fail.
+- `After`: order work when selected, but permit an excluded predecessor. This
+  supports existing-data workflows; it is not a data-validity prerequisite.
+
+`Sequence` connects consecutive nodes with success dependencies. Nodes without a
+dependency can run concurrently. `Join(name, nodes...)` creates a success barrier
+without a worker, database action, or synthetic progress weight. Joins accept entry
+dependencies, not action-only dependencies. A graph rejects cycles, cross-graph handles,
+conflicting session use, missing selected prerequisites, and unavailable modes
+before any graph action runs. Its execution topology must match observation.
+Readiness that a producer never publishes fails instead of leaving waiters behind.
+
+`RunAfterReady` and `RunAfterSuccess` gate only actions, after the node initializes.
+Use reciprocal `RunAfterReady` dependencies to initialize both query and refresh
+workers before either action window starts. A node may initialize before RF1,
+then use `RunAfterSuccess(rf1)` to delay its queries until RF1 completes. Lifecycle
+validation distinguishes initialization from action waits, rejecting real deadlocks
+without rejecting these startup barriers. Retained connections count from
+initialization through node completion, including action-barrier waits.
+
+Ordinary action failure blocks hard dependents; unrelated work and explicit
+completion-dependent diagnostics can finish. `Fatal`, parent cancellation, and
+panics cancel running work, join it, and retain their error or panic semantics.
+Repeated-policy iteration errors keep their existing continuation behavior.
+
+`Finally(timeout, owners...)` runs once after entered owners have joined, using a
+bounded detached cleanup context. It is resource cleanup, not an optional filtered
+phase. Existing `Always(timeout)` remains a filterable once-only action. `While`
+assigns a long-lived auxiliary node to foreground work: owner completion cancels
+that auxiliary, and graph completion still waits for it. Finite required refresh
+work should be an ordinary node, not `While`, so query completion never discards
+unfinished writes. Actions must honor their contexts; the framework cannot join
+arbitrary goroutines created outside its declared work.
+
+Each node owns its workers, initialization, sessions, policy, errors, and native
+measurement window. `Graph.Session` plus `NodeRef.UseSession` retains one connection
+across explicitly ordered single-worker nodes. Concurrent borrowers are rejected;
+node-local cursors, transactions, and prepared statements are cleaned up before the
+next borrower, and the connection closes after its final selected user.
+`RetainSession()` declares and opens one retained connection per worker before
+its action window. Graph preflight checks the maximum overlapping declared demand
+against configured limits, then verifies the actual driver capacity before graph
+actions. Declare retained usage in initializers too; arbitrary undeclared session
+acquisition cannot be inferred from Go closures.
+Note that a graph-owned session remains reserved between its sequential borrowers.
+
+`Before` runs once after initialization, immediately before action execution.
+`AfterResult` receives the joined node outcome. These execution-only boundaries
+support workload-owned measurement state without adding fake database actions.
+`Graph.Measure` reports the enclosing action window of its named participants;
+it does not add their counters again. Exact workload-specific submission/commit
+intervals remain separate. Sequential graphs retain per-step connection-pool
+counters. Graphs with overlapping work use one common pool scope rather than
+attributing the same wait delta to overlapping nodes.
+
+Use `DescribeGraphs` or `Catalog.DescribeGraphs` for copied topology and mode
+availability. Resolved probe JSON includes `graphs`; saved run reports carry the
+versioned `stroppy.execution_graphs` contribution. Call `Run.ExecutionGraphs()` to
+decode node outcomes, dependency events, policies, timing offsets, and measurement
+participants without changing the existing `Run` struct. A group path can be selected with `--steps` or `--no-steps` using
+its prefix. Filters never silently restore an excluded destructive prerequisite.
+
 ## Live activity and progress
 
 The engine publishes one `progress_ratio` gauge in `[0,1]` for generic UIs.

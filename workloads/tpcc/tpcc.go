@@ -203,50 +203,60 @@ func define(d *bench.Def, variant string) error {
 
 	w.m = w.initMetrics(&d.Metrics)
 	w.initPacing(&d.Metrics, settings.Workers)
+	g := d.Execution.Graph("tpcc")
+
+	var previous []bench.NodeRef
+
+	step := func(name string, action bench.Action, options ...bench.StepOption) bench.NodeRef {
+		node := g.Node(name, action, options...).After(previous...)
+		previous = []bench.NodeRef{node}
+
+		return node
+	}
 
 	for _, name := range []string{"drop_schema", "create_schema"} {
 		section := sqlSection{workload: w, name: name}
-		d.Execution.Step(name, section.Run)
+		step(name, section.Run)
 	}
 
 	if variant == "procs" {
 		section := sqlSection{workload: w, name: "create_procedures"}
-		d.Execution.Step(section.name, section.Run)
+		step(section.name, section.Run)
 
 		if w.strict != nil {
 			terminalSection := sqlSection{workload: w, name: "create_terminal_procedures"}
-			d.Execution.Step(terminalSection.name, terminalSection.Run)
+			step(terminalSection.name, terminalSection.Run)
 		}
 	}
 
 	unlogged := w.pgUnlogged && w.driverType == bench.DriverPostgres
 	if unlogged {
 		section := sqlSection{workload: w, name: "set_unlogged"}
-		d.Execution.Step(section.name, section.Run)
+		step(section.name, section.Run)
 	}
 
-	d.Execution.Step("load_data", w.load)
+	step("load_data", w.load)
 	section := sqlSection{workload: w, name: "create_indexes"}
-	d.Execution.Step(section.name, section.Run)
+	step(section.name, section.Run)
 
 	if unlogged {
 		loggedSection := sqlSection{workload: w, name: "set_logged"}
-		d.Execution.Step(loggedSection.name, loggedSection.Run)
+		step(loggedSection.name, loggedSection.Run)
 	}
 
 	for _, name := range []string{"create_foreign_keys", "analyze"} {
 		nextSection := sqlSection{workload: w, name: name}
-		d.Execution.Step(name, nextSection.Run)
+		step(name, nextSection.Run)
 	}
 
-	d.Execution.Step("validate_population", w.validate)
+	step("validate_population", w.validate)
 
 	if w.strict != nil {
-		return w.runTerminals(d, settings)
+		return w.runTerminalGraph(g, step, settings)
 	}
 
 	if w.warmup > 0 {
-		d.Execution.Step("warmup", w.Iterate,
+		step("warmup", w.Iterate,
 			bench.ConstantWorkers(settings.Workers, w.warmup, settings.Drain))
 	}
 
@@ -254,21 +264,21 @@ func define(d *bench.Def, variant string) error {
 		w.measureDuration = settings.Duration
 	}
 
-	w.measureStart = time.Now()
-	if w.pace != nil {
-		end := time.Time{}
-		if w.measureDuration > 0 {
-			end = w.measureStart.Add(w.measureDuration)
+	step("workload", w.Iterate, settings.Policy()).Before(func() {
+		w.measureStart = time.Now()
+		if w.pace != nil {
+			end := time.Time{}
+			if w.measureDuration > 0 {
+				end = w.measureStart.Add(w.measureDuration)
+			}
+
+			w.pace.window(w.measureStart, end)
 		}
 
-		w.pace.window(w.measureStart, end)
-	}
+		w.steady = w.initSteady()
+	}).AfterResult(func(bench.Result) { w.measureEnd = time.Now() })
 
-	w.steady = w.initSteady()
-	d.Execution.Step("workload", w.Iterate, settings.Policy())
-	w.measureEnd = time.Now()
-
-	return d.Execution.Err()
+	return g.Run("")
 }
 func (w *workload) Name() string { return "tpcc/" + w.variant }
 

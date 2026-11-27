@@ -77,6 +77,7 @@ type page struct {
 	Warning         string
 	Identity        node
 	Steps           node
+	Graphs          node
 	Errors          node
 	Failure         node
 	Metrics         []metricView
@@ -114,6 +115,55 @@ func decode(data []byte) (map[string]any, error) {
 	return document, nil
 }
 
+func graphObjectDetails(raw any) node {
+	objects, _ := raw.([]any)
+	value := node{}
+
+	for _, raw := range objects {
+		object, _ := raw.(map[string]any)
+		entry := tree(object)
+
+		entry.Title = text(object["name"])
+		if status, ok := object["status"]; ok {
+			entry.Title += " · " + text(status)
+		}
+
+		value.Items = append(value.Items, entry)
+	}
+
+	return value
+}
+
+func executionGraphData(document map[string]any) node {
+	contributions, _ := document["workload_reports"].([]any)
+	for _, raw := range contributions {
+		item, _ := raw.(map[string]any)
+		if text(item["kind"]) == report.ExecutionGraphsKind {
+			graphs, _ := item["data"].([]any)
+			value := node{}
+
+			for _, raw := range graphs {
+				graph, _ := raw.(map[string]any)
+
+				entry := tree(graph)
+				for index := range entry.Fields {
+					field := &entry.Fields[index]
+					if field.Name == "nodes" || field.Name == "measurements" {
+						field.Value = graphObjectDetails(graph[field.Name])
+					}
+				}
+
+				entry.Title = text(graph["name"]) + " · " + text(graph["mode"])
+				value.Items = append(value.Items, entry)
+			}
+
+			return value
+		}
+	}
+
+	return node{}
+}
+
 func reportPage(data []byte, id string) (page, error) {
 	document, err := decode(data)
 	if err != nil {
@@ -123,7 +173,7 @@ func reportPage(data []byte, id string) (page, error) {
 	p := page{
 		Title: text(document["workload"]), ID: id, Status: text(document["status"]),
 		Started: text(document["started_at"]), Driver: text(document["driver"]), Original: string(data),
-		Steps: tree(document["steps"]), Errors: tree(document["errors"]),
+		Steps: tree(document["steps"]), Graphs: executionGraphData(document), Errors: tree(document["errors"]),
 		StepChart: stepDurations(document["steps"]), Pools: poolViews(document["pools"]),
 	}
 	if progress, ok := document["progress"].(map[string]any); ok {
@@ -153,7 +203,7 @@ func reportPage(data []byte, id string) (page, error) {
 
 	for key, value := range document {
 		switch key {
-		case "metrics", "steps", "errors", "workload_reports", "failure", "progress":
+		case "metrics", "steps", "errors", "workload_reports", "failure", "progress", "graphs":
 		default:
 			identity[key] = value
 		}
@@ -383,6 +433,10 @@ func payloads(value any) []payloadView {
 		if !ok {
 			views = append(views, payloadView{Kind: fmt.Sprintf("Result %d", i+1), Data: tree(item)})
 
+			continue
+		}
+
+		if text(object["kind"]) == report.ExecutionGraphsKind {
 			continue
 		}
 

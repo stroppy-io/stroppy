@@ -38,13 +38,14 @@ func define(d *bench.Def) error {
 		w.workers[i] = rand.New(rand.NewPCG(demoSeed^uint64(i+1), 0))
 	}
 
-	d.Execution.Step("drop_schema", w.drop)
-	d.Execution.Step("create_schema", w.create)
-	d.Execution.Step("load_data", w.load)
-	d.Execution.Step("workload", w.work, settings.Policy())
-	d.Execution.Step("cleanup", w.drop, bench.Always(30*time.Second))
+	g := d.Execution.Graph("simple")
+	drop := g.Node("drop_schema", w.drop)
+	create := g.Node("create_schema", w.create).After(drop)
+	load := g.Node("load_data", w.load).After(create)
+	work := g.Node("workload", w.work, settings.Policy()).After(load)
+	g.Node("cleanup", w.drop, bench.Always(30*time.Second)).AfterCompletion(work)
 
-	return d.Execution.Err()
+	return g.Run("")
 }
 
 func (w *workload) drop(ctx context.Context, b *bench.Bench) error {

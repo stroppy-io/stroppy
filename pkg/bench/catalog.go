@@ -114,6 +114,30 @@ func (c *Catalog) Describe(name string) (Description, error) {
 	return DescribeTest(test)
 }
 
+func (c *Catalog) Graphs(name string) ([]GraphDescription, error) {
+	test, ok := c.Test(name)
+	if !ok {
+		return nil, fmt.Errorf("%w %q", errNoWorkloadRegistered, name)
+	}
+
+	d, err := observe(test, ParamInputs{}, nil, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return slices.Clone(d.Execution.graphs), nil
+}
+
+//nolint:gocritic // public run inputs are copied operation values.
+func (c *Catalog) DescribeGraphs(name string, options RunOptions) ([]GraphDescription, error) {
+	test, ok := c.Test(name)
+	if !ok {
+		return nil, fmt.Errorf("%w %q", errNoWorkloadRegistered, name)
+	}
+
+	return DescribeGraphs(test, options)
+}
+
 func (c *Catalog) Resolve(name string, inputs ParamInputs, drivers map[string]DriverConfig) (Description, error) {
 	return c.ResolveRun(name, RunOptions{Params: inputs, Drivers: drivers})
 }

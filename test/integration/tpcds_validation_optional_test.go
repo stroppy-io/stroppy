@@ -78,21 +78,8 @@ func testTPCDSAnswerValidation(t *testing.T, driver, url string) {
 
 	var report struct {
 		Reports []struct {
-			Kind string `json:"kind"`
-			Data struct {
-				Status string `json:"status"`
-				Reason string `json:"reason"`
-				Totals struct {
-					Total   int `json:"total"`
-					Diff    int `json:"diff"`
-					Error   int `json:"error"`
-					Skipped int `json:"skipped"`
-				} `json:"totals"`
-				Queries []struct {
-					Query  string `json:"query"`
-					Status string `json:"status"`
-				} `json:"queries"`
-			} `json:"data"`
+			Kind string          `json:"kind"`
+			Data json.RawMessage `json:"data"`
 		} `json:"workload_reports"`
 	}
 	if err := json.Unmarshal(data, &report); err != nil {
@@ -104,13 +91,30 @@ func testTPCDSAnswerValidation(t *testing.T, driver, url string) {
 			continue
 		}
 
-		totals := validation.Data.Totals
+		var result struct {
+			Status string `json:"status"`
+			Reason string `json:"reason"`
+			Totals struct {
+				Total   int `json:"total"`
+				Diff    int `json:"diff"`
+				Error   int `json:"error"`
+				Skipped int `json:"skipped"`
+			} `json:"totals"`
+			Queries []struct {
+				Query  string `json:"query"`
+				Status string `json:"status"`
+			} `json:"queries"`
+		}
+		if err := json.Unmarshal(validation.Data, &result); err != nil {
+			t.Fatal(err)
+		}
+		totals := result.Totals
 		if totals.Total != 103 || totals.Error != 0 || totals.Skipped != 0 || totals.Diff == 0 ||
-			validation.Data.Status != "failed" || !strings.Contains(validation.Data.Reason, "database defect") {
-			t.Fatalf("fixture must execute all queries and retain expected differences: %+v", validation.Data)
+			result.Status != "failed" || !strings.Contains(result.Reason, "database defect") {
+			t.Fatalf("fixture must execute all queries and retain expected differences: %+v", result)
 		}
 
-		for _, query := range validation.Data.Queries {
+		for _, query := range result.Queries {
 			if query.Query == "query_96" && query.Status == "ok" {
 				return
 			}

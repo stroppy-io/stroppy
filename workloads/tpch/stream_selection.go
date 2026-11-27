@@ -29,22 +29,27 @@ type streamSelection struct {
 	refresh            bool
 	refreshSet         int64
 	refreshSetExplicit bool
+	seedExplicit       bool
+	countExplicit      bool
+	mode               string
 }
 
 func selectStreams(d *bench.Def) (streamSelection, bench.RunSettings, error) {
+	mode, _ := d.Param.String("mode", "legacy", "Execution mode; legacy preserves existing flags.",
+		bench.OneOf("legacy", "full", "power", "power-query-only", "throughput", "throughput-query-only", "qualification"))
 	count, countInfo := d.Param.Int("streams", 1,
 		"Query streams, each executed once on its own session.", bench.Min(1))
 	id, streamInfo := d.Param.Int("query-stream", 0,
 		"One generated stream; 0 uses the Appendix A power order.", bench.Min(0))
 	seed, seedInfo := d.Param.Int64("query-seed", 19620718,
 		"Base query seed; stream s uses seed+s.", bench.Min(int64(1)), bench.Max(querySeedModulus-1))
-	refresh, _ := d.Param.Bool("refresh-functions", false,
+	refresh, refreshInfo := d.Param.Bool("refresh-functions", false,
 		"Execute RF1/RF2 with the selected power or throughput query streams.")
 
 	refreshSet, refreshSetInfo := d.Param.Int64("refresh-set", 1,
 		"First DBGEN refresh-set number; continue with the prior report's next set.",
 		bench.Min(int64(1)), bench.Max(lastExecutableRefreshSet))
-	if refreshSetInfo.Explicit() && !refresh {
+	if mode == "legacy" && refreshSetInfo.Explicit() && !refresh {
 		return streamSelection{}, bench.RunSettings{}, errRefreshSetFlag
 	}
 
@@ -52,6 +57,7 @@ func selectStreams(d *bench.Def) (streamSelection, bench.RunSettings, error) {
 		enabled: countInfo.Explicit() || streamInfo.Explicit() || seedInfo.Explicit() || refresh,
 		count:   count, id: id, seed: seed, single: streamInfo.Explicit(),
 		refresh: refresh, refreshSet: refreshSet, refreshSetExplicit: refreshSetInfo.Explicit(),
+		seedExplicit: seedInfo.Explicit(), countExplicit: countInfo.Explicit(), mode: mode,
 	}
 	if refresh && count == 1 && !streamInfo.Explicit() {
 		selection.single = true
@@ -64,6 +70,20 @@ func selectStreams(d *bench.Def) (streamSelection, bench.RunSettings, error) {
 	}
 
 	settings := bench.RunParameters(&d.Param, defaults)
+
+	if mode != "legacy" {
+		if refreshInfo.Explicit() || streamInfo.Explicit() {
+			return selection, settings, errBenchmarkMode
+		}
+
+		expectedWorkers, expectedIterations := max(1, defaults.Workers), max(int64(1), defaults.Iterations)
+		if settings.Executor != "shared-iterations" || settings.Workers != expectedWorkers ||
+			settings.Iterations != expectedIterations {
+			return selection, settings, errBenchmarkMode
+		}
+
+		return selection, settings, nil
+	}
 
 	return selection, settings, selection.validate(settings)
 }

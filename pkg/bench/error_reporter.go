@@ -143,7 +143,11 @@ func (r *errorReporter) record(
 	}
 
 	group, state := r.groupState(group, err, redactor)
+
 	count := state.count.Add(1)
+	if vu != nil && vu.execution != nil {
+		vu.execution.terminalErrors.Add(1)
+	}
 
 	switch scope {
 	case terminalErrorIteration:

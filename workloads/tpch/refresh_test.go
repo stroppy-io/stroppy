@@ -218,7 +218,18 @@ func TestPowerBarrierCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	if !errors.Is(waitRefreshPhase(ctx, make(chan struct{})), context.Canceled) {
-		t.Fatal("power barrier ignored cancellation")
+	test := bench.Test{Name: "power-cancellation", Define: func(d *bench.Def) error {
+		g := d.Execution.Graph("power")
+		rf1 := g.Node("rf1", func(ctx context.Context, _ *bench.Bench) error { return ctx.Err() })
+		g.Node("queries", func(context.Context, *bench.Bench) error {
+			t.Error("canceled queries executed")
+
+			return nil
+		}).AfterSuccess(rf1)
+
+		return g.Run("")
+	}}
+	if _, err := testkit.Run(ctx, test, bench.RunOptions{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("power graph ignored cancellation: %v", err)
 	}
 }

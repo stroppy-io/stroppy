@@ -96,6 +96,29 @@ func TestRenderIsCompleteOfflineWithStaticFallback(t *testing.T) {
 	}
 }
 
+func TestExecutionGraphContributionHasDedicatedDetails(t *testing.T) {
+	data := `{"kind":"run","schema":4,"workload_reports":[{"kind":"stroppy.execution_graphs",
+		"schema":1,"status":"ok","data":[{"name":"test","mode":"full","nodes":[
+		{"name":"queries","status":"blocked","dependencies":[{"node":"refresh","event":"ready"}]}],
+		"measurements":[{"name":"joined_window","nodes":["queries","refresh"],"seconds":2}]}]}]}`
+
+	var output bytes.Buffer
+	if err := Render(&output, []byte(data), ""); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, value := range []string{"Execution graphs and selected modes", "blocked", "ready", "joined_window"} {
+		if !strings.Contains(output.String(), value) {
+			t.Errorf("missing graph detail %s", value)
+		}
+	}
+
+	p, err := reportPage([]byte(data), "")
+	if err != nil || len(p.Payloads) != 0 {
+		t.Fatalf("graph duplicated as workload payload: %v, %+v", err, p.Payloads)
+	}
+}
+
 func TestChartsPreserveScopeAndOverflow(t *testing.T) {
 	t.Parallel()
 

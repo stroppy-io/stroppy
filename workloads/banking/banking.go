@@ -129,15 +129,14 @@ func defineVariant(d *bench.Def, variant string) error {
 		return err
 	}
 
-	for _, name := range []string{"drop_schema", "create_schema"} {
-		d.Execution.Step(name, sqlSection{sql: w.sql, name: name}.Run)
-	}
+	g := d.Execution.Graph("banking")
+	drop := g.Node("drop_schema", sqlSection{sql: w.sql, name: "drop_schema"}.Run)
+	create := g.Node("create_schema", sqlSection{sql: w.sql, name: "create_schema"}.Run).After(drop)
+	load := g.Node("load_data", w.load).After(create)
+	transfer := g.Node("transfer", w.transfer, settings.Policy()).After(load)
+	g.Node("verify", w.verify).After(transfer)
 
-	d.Execution.Step("load_data", w.load)
-	d.Execution.Step("transfer", w.transfer, settings.Policy())
-	d.Execution.Step("verify", w.verify)
-
-	return d.Execution.Err()
+	return g.Run("")
 }
 
 // load fills every account with its initial balance and its own token, so the

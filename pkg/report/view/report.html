@@ -325,6 +325,10 @@
 <summary>Run progress · {{.ProgressPercent}} estimated work completion</summary>
 <div class="details-body"><p class="scope-note">Equal selected phase weights; not an ETA or success rate. Outcome is reported separately.</p>{{template "node" .Progress}}</div>
 </details>{{end}}
+{{if .Graphs.Items}}<details class="panel" open>
+<summary>Execution graphs and selected modes</summary>
+<div class="details-body"><p class="scope-note">Dependency events, joined node outcomes, and explicit measurement participants. Overlapping node durations are not additive.</p>{{template "node" .Graphs}}</div>
+</details>{{end}}
 <details class="panel">
 <summary>All step data</summary>
 <div class="details-body">{{template "node" .Steps}}

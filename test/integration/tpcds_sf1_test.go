@@ -30,16 +30,7 @@ func TestTPCDSQualificationSF1(t *testing.T) {
 	var report struct {
 		WorkloadReports []struct {
 			Kind string `json:"kind"`
-			Data struct {
-				Status string `json:"status"`
-				Totals struct {
-					Total   int `json:"total"`
-					OK      int `json:"ok"`
-					Diff    int `json:"diff"`
-					Skipped int `json:"skipped"`
-					Error   int `json:"error"`
-				} `json:"totals"`
-			} `json:"data"`
+			Data json.RawMessage `json:"data"`
 		} `json:"workload_reports"`
 	}
 	if err := json.Unmarshal(data, &report); err != nil {
@@ -51,10 +42,23 @@ func TestTPCDSQualificationSF1(t *testing.T) {
 			continue
 		}
 
-		totals := validation.Data.Totals
-		if validation.Data.Status != "ok" || totals.Total != 103 || totals.OK != 103 ||
+		var result struct {
+			Status string `json:"status"`
+			Totals struct {
+				Total int `json:"total"`
+				OK int `json:"ok"`
+				Diff int `json:"diff"`
+				Skipped int `json:"skipped"`
+				Error int `json:"error"`
+			} `json:"totals"`
+		}
+		if err := json.Unmarshal(validation.Data, &result); err != nil {
+			t.Fatal(err)
+		}
+		totals := result.Totals
+		if result.Status != "ok" || totals.Total != 103 || totals.OK != 103 ||
 			totals.Diff != 0 || totals.Skipped != 0 || totals.Error != 0 {
-			t.Fatalf("qualification must pass all 103 kit-backed statements: %+v", validation.Data)
+			t.Fatalf("qualification must pass all 103 kit-backed statements: %+v", result)
 		}
 
 		return

@@ -110,6 +110,10 @@ func (w *workload) defineTerminals(d *bench.Def, settings bench.RunSettings) err
 		}
 	}
 
+	if w.warmup > time.Duration(math.MaxInt64)-settings.Duration {
+		return fmt.Errorf("%w: warmup and duration exceed timer capacity", errStrictTerminals)
+	}
+
 	w.pacing = true
 	w.strict = &terminalModel{
 		workers: settings.Workers, terminals: int(w.warehouses) * districtsPerWarehouse,
@@ -119,29 +123,27 @@ func (w *workload) defineTerminals(d *bench.Def, settings bench.RunSettings) err
 	return nil
 }
 
-func (w *workload) runTerminals(d *bench.Def, settings bench.RunSettings) (err error) {
+func (w *workload) runTerminalGraph(
+	g *bench.Graph, step func(string, bench.Action, ...bench.StepOption) bench.NodeRef, settings bench.RunSettings,
+) (err error) {
 	model := w.strict
 	defer func() { err = errors.Join(err, model.close()) }()
 
-	if model.warmup > time.Duration(math.MaxInt64)-model.duration {
-		return fmt.Errorf("%w: warmup and duration exceed timer capacity", errStrictTerminals)
-	}
-
-	d.Execution.Step("initialize_terminals", func(ctx context.Context, b *bench.Bench) error {
+	step("initialize_terminals", func(ctx context.Context, b *bench.Bench) error {
 		if err := w.initializeHistory(ctx, b); err != nil {
 			return err
 		}
 
 		return model.initialize(w)
 	})
-	d.Execution.Step("workload", w.terminalIteration,
+	step("workload", w.terminalIteration,
 		bench.ConstantWorkers(model.workers, model.warmup+model.duration, settings.Drain))
 
-	d.Execution.Step("delivery_results", func(context.Context, *bench.Bench) error {
+	step("delivery_results", func(context.Context, *bench.Bench) error {
 		return model.close()
 	}, bench.Always(30*time.Second))
 
-	return d.Execution.Err()
+	return g.Run("")
 }
 
 func (m *terminalModel) initialize(w *workload) error {

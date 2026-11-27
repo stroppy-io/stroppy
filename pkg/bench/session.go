@@ -26,6 +26,8 @@ type Session struct {
 	closed      bool
 	transaction *Tx
 	rows        map[*Rows]struct{}
+	borrowed    bool
+	prepared    map[*Prepared]struct{}
 }
 
 type Prepared struct {
@@ -69,12 +71,21 @@ func (b *Bench) Session(ctx context.Context) (*Session, error) {
 	acquire, cancel := context.WithTimeout(ctx, defaultCleanupTimeout)
 	defer cancel()
 
-	backend, err := provider.OpenSession(b.operationContext(acquire))
+	var (
+		backend driver.Session
+		err     error
+	)
+	if owner := b.graphSession(); owner != nil {
+		backend, err = owner.open(acquire, b)
+	} else {
+		backend, err = provider.OpenSession(b.operationContext(acquire))
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("open session %q: %w", name, err)
 	}
 
-	s := &Session{backend: backend, rows: map[*Rows]struct{}{}}
+	s := &Session{backend: backend, rows: map[*Rows]struct{}{}, borrowed: b.graphSession() != nil}
 	s.sessionQueries = &sessionQueries{b: b, owner: s, run: backend.RunQuery}
 	b.vu.sessions[name] = s
 
@@ -87,25 +98,43 @@ func (s *Session) Prepare(ctx context.Context, query QueryHandle) (*Prepared, er
 	}
 
 	backend, err := s.backend.Prepare(s.b.operationContext(ctx), query.Name, query.Text)
+	if owner := s.b.graphSession(); owner != nil {
+		owner.fail(err)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("prepare %q: %w", query.Name, err)
 	}
 
-	return &Prepared{
+	statement := &Prepared{
 		backend: backend, owner: s, identity: query,
 		sessionQueries: &sessionQueries{b: s.b, owner: s, run: func(
 			ctx context.Context, _ string, args map[string]any,
 		) (*driver.QueryResult, error) {
 			return backend.RunQuery(ctx, args)
 		}, sql: query.Text},
-	}, nil
+	}
+	if s.borrowed {
+		if s.prepared == nil {
+			s.prepared = make(map[*Prepared]struct{})
+		}
+
+		s.prepared[statement] = struct{}{}
+	}
+
+	return statement, nil
 }
 
 func (p *Prepared) Close(ctx context.Context) error {
 	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), defaultCleanupTimeout)
 	defer cancel()
 
-	return p.backend.Close(p.b.operationContext(cleanup))
+	err := p.backend.Close(p.b.operationContext(cleanup))
+	if err == nil && p.owner != nil {
+		delete(p.owner.prepared, p)
+	}
+
+	return err
 }
 
 func (s *Session) Begin(ctx context.Context, opts BeginOpts) (*Tx, error) {
@@ -119,6 +148,10 @@ func (s *Session) Begin(ctx context.Context, opts BeginOpts) (*Tx, error) {
 	}
 
 	backend, err := s.backend.Begin(s.b.operationContext(ctx), iso)
+	if owner := s.b.graphSession(); owner != nil {
+		owner.fail(err)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("session begin: %w", err)
 	}
@@ -152,7 +185,13 @@ func (s *Session) BeginTx(ctx context.Context, opts BeginOpts, action func(*Tx) 
 
 func (s *Session) trackRows(rows *Rows) {
 	s.rows[rows] = struct{}{}
-	rows.onClose = func() { delete(s.rows, rows) }
+	rows.onClose = func() {
+		delete(s.rows, rows)
+
+		if owner := s.b.graphSession(); owner != nil {
+			owner.fail(rows.Err())
+		}
+	}
 }
 
 func (s *Session) closeRows() error {
@@ -180,6 +219,20 @@ func (s *Session) Close(ctx context.Context) error {
 	}
 
 	s.closed = true
+	if s.borrowed {
+		for statement := range s.prepared {
+			err = driver.JoinErrors(err, statement.Close(ctx))
+		}
+
+		if err != nil {
+			owner := s.b.graphSession()
+			owner.mu.Lock()
+			owner.invalid = true
+			owner.mu.Unlock()
+		}
+
+		return err
+	}
 
 	return driver.JoinErrors(err, s.backend.Close(s.b.operationContext(ctx)))
 }
@@ -248,7 +301,12 @@ func (q *sessionQueries) execute(ctx context.Context, sql string, args map[strin
 		return nil, ErrSessionClosed
 	}
 
-	return q.run(q.b.operationContext(ctx), sql, args)
+	result, err := q.run(q.b.operationContext(ctx), sql, args)
+	if owner := q.b.graphSession(); owner != nil {
+		owner.fail(err)
+	}
+
+	return result, err
 }
 
 func (q *sessionQueries) exec(ctx context.Context, args map[string]any) error {

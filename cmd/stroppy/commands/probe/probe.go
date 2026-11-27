@@ -89,7 +89,19 @@ are read without setting up a workload or connecting to a database.
 				return err
 			}
 
-			return printDescriptions(cmd.OutOrStdout(), formatFlagValue, []bench.Description{description}, nil)
+			var graphs []bench.GraphDescription
+			if resolved {
+				graphs, err = runcommand.ResolveGraphs(workloadCatalog, name, inputs)
+			} else {
+				graphs, err = workloadCatalog.Graphs(name)
+			}
+
+			if err != nil {
+				return err
+			}
+
+			return printDescriptions(cmd.OutOrStdout(), formatFlagValue, []bench.Description{description}, nil,
+				map[string][]bench.GraphDescription{name: graphs})
 		},
 	}
 
@@ -161,7 +173,17 @@ func printCatalog(output io.Writer, workloadCatalog *bench.Catalog, format strin
 		return fmt.Errorf("failed to describe workloads: %w", err)
 	}
 
-	return printDescriptions(output, format, descriptions, catalog)
+	graphs := make(map[string][]bench.GraphDescription, len(descriptions))
+	for _, description := range descriptions {
+		value, graphErr := workloadCatalog.Graphs(description.Name)
+		if graphErr != nil {
+			return graphErr
+		}
+
+		graphs[description.Name] = value
+	}
+
+	return printDescriptions(output, format, descriptions, catalog, graphs)
 }
 
 func printDescriptions(
@@ -169,9 +191,16 @@ func printDescriptions(
 	format string,
 	descriptions []bench.Description,
 	catalog []workloads.PresetInfo,
+	graphs ...map[string][]bench.GraphDescription,
 ) error {
 	drivers := driverCatalog()
+
 	workloadSchemas := describeWorkloads(descriptions)
+	if len(graphs) > 0 {
+		for index := range workloadSchemas {
+			workloadSchemas[index].Graphs = graphs[0][workloadSchemas[index].Name]
+		}
+	}
 
 	switch format {
 	case jsonFormat:
@@ -205,6 +234,7 @@ type workloadEntry struct {
 	DriverRefs []bench.DriverDescription `json:"driver_refs"`
 	Metrics    []bench.MetricSchema      `json:"metrics"`
 	Values     map[string]valueEntry     `json:"values,omitempty"`
+	Graphs     []bench.GraphDescription  `json:"graphs,omitempty"`
 }
 
 type valueEntry struct {
@@ -332,7 +362,8 @@ func formatCatalog(
 
 	builder.WriteString("WORKLOADS (typed parameters)\n\n")
 
-	for _, workload := range workloadSchemas {
+	for index := range workloadSchemas {
+		workload := &workloadSchemas[index]
 		builder.WriteString("  " + workload.Name + "\n")
 
 		for _, group := range []struct {
@@ -353,6 +384,8 @@ func formatCatalog(
 				step.Name, step.Executor, step.Workers, step.Measured)
 			fmt.Fprintf(&builder, "      progress: %s; equal phase weight in run estimate\n", step.Progress)
 		}
+
+		writeGraphCatalog(&builder, workload.Graphs)
 
 		for _, ref := range workload.DriverRefs {
 			fmt.Fprintf(&builder, "    database: %s (%s)\n", ref.Name, ref.Kind)
@@ -382,6 +415,20 @@ func formatCatalog(
 	builder.WriteString("\n")
 
 	return builder.String()
+}
+
+func writeGraphCatalog(output io.Writer, graphs []bench.GraphDescription) {
+	for _, graph := range graphs {
+		fmt.Fprintf(output, "    graph: %s (mode=%s)\n", graph.Name, graph.Mode)
+
+		for _, mode := range graph.Modes {
+			fmt.Fprintf(output, "      mode: %s available=%t %s\n", mode.Name, mode.Available, mode.Description)
+
+			if mode.Reason != "" {
+				fmt.Fprintf(output, "        unavailable: %s\n", mode.Reason)
+			}
+		}
+	}
 }
 
 func paramFlags(params []paramEntry, scope bench.ParamScope) []string {

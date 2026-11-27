@@ -274,13 +274,13 @@ func (b *Bench) newBatchInsertTracker(req *driver.InsertRequest) *insertprogress
 	cfg.OnSample = func(snapshot insertprogress.Snapshot) {
 		b.root.txMetrics.recordInsertProgress(b.vu, &snapshot)
 
-		if b.root.progress != nil {
-			b.root.progress.insert(b.vu.worker, &snapshot)
+		if b.vu.progress != nil {
+			b.vu.progress.insert(b.vu.worker, &snapshot)
 		}
 	}
 
-	if b.root.progress != nil {
-		b.root.progress.insert(b.vu.worker, &insertprogress.Snapshot{Table: req.Table, TotalRows: req.Source.TotalRows()})
+	if b.vu.progress != nil {
+		b.vu.progress.insert(b.vu.worker, &insertprogress.Snapshot{Table: req.Table, TotalRows: req.Source.TotalRows()})
 	}
 
 	return insertprogress.NewTracker(&cfg)
@@ -440,6 +440,9 @@ func (t *Tx) Commit(ctx context.Context) error {
 
 	if t.tx != nil {
 		if err := t.tx.Commit(t.b.operationContext(ctx)); err != nil {
+			if owner := t.b.graphSession(); owner != nil {
+				owner.fail(err)
+			}
 			// A rejected COMMIT still ends the transaction, so record the end before
 			// returning: marking it done keeps the deferred cleanup from rolling back
 			// an already-closed transaction — which surfaced to the client as a
@@ -468,6 +471,10 @@ func (t *Tx) Rollback(ctx context.Context) error {
 	if t.session != nil {
 		if err := t.session.closeRows(); err != nil {
 			rollbackErr := t.tx.Rollback(t.b.operationContext(ctx))
+			if owner := t.b.graphSession(); owner != nil {
+				owner.fail(rollbackErr)
+			}
+
 			t.b.root.txMetrics.record(t.b.vu, "rollback", t.name, t.iso)
 			t.recordEnd("rollback", false)
 
@@ -477,6 +484,9 @@ func (t *Tx) Rollback(ctx context.Context) error {
 
 	if t.tx != nil {
 		if err := t.tx.Rollback(t.b.operationContext(ctx)); err != nil {
+			if owner := t.b.graphSession(); owner != nil {
+				owner.fail(err)
+			}
 			// Same reason as Commit: a rejected rollback still ends the transaction.
 			t.b.root.txMetrics.record(t.b.vu, "rollback", t.name, t.iso)
 			t.recordEnd("rollback", false)

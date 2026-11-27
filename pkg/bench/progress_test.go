@@ -52,6 +52,28 @@ func progressSnapshot(p *runProgress) float64 {
 	return p.snapshotLocked(time.Now()).Ratio
 }
 
+func TestGraphProgressKeepsConcurrentWorkSeparate(t *testing.T) {
+	_, parent := progressFixture(t, Policy{}, Policy{})
+	left, right := parent.graphChild(), parent.graphChild()
+	policy := Policy{mode: "once", workers: 1}
+	left.begin("queries", policy)
+	right.begin("refresh", policy)
+
+	total := 10.0
+	left.update(0, 0, ProgressUpdate{Activity: "q1", Unit: "queries", Current: 5, Total: &total})
+	right.update(0, 0, ProgressUpdate{Activity: "rf1", Unit: "orders", Current: 2, Total: &total})
+	require.InDelta(t, 0.35, progressSnapshot(parent), 0.0001)
+	parent.mu.Lock()
+	value := parent.snapshotLocked(time.Now())
+	parent.mu.Unlock()
+	require.NotEmpty(t, value.Step)
+	require.Len(t, value.Sources, 2)
+	require.Equal(t, "queries", value.Sources[0].Step)
+	require.Equal(t, "refresh", value.Sources[1].Step)
+	left.end(Completed)
+	require.InDelta(t, 0.6, progressSnapshot(parent), 0.0001)
+}
+
 func TestProgressUsesEqualPhasesAndConfirmedRows(t *testing.T) {
 	_, p := progressFixture(t, Policy{}, Policy{})
 	p.begin("load", Policy{mode: "once", workers: 1})

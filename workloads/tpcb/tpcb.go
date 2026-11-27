@@ -125,26 +125,34 @@ func define(d *bench.Def, variant string) error {
 	}
 
 	w.retryMetric = d.Metrics.Counter("tpcb_retry_attempts")
+	g := d.Execution.Graph("tpcb")
+
+	var previous []bench.NodeRef
+
+	step := func(name string, action bench.Action, options ...bench.StepOption) {
+		node := g.Node(name, action, options...).After(previous...)
+		previous = []bench.NodeRef{node}
+	}
 	for _, name := range []string{"drop_schema", "create_schema"} {
 		section := sqlSection{sql: w.sql, name: name}
-		d.Execution.Step(name, section.Run)
+		step(name, section.Run)
 	}
 
 	if variant == "procs" {
 		section := sqlSection{sql: w.sql, name: "create_procedures"}
-		d.Execution.Step(section.name, section.Run)
+		step(section.name, section.Run)
 	}
 
-	d.Execution.Step("load_data", w.load)
+	step("load_data", w.load)
 
 	for _, name := range []string{"create_indexes", "create_foreign_keys", "analyze"} {
 		section := sqlSection{sql: w.sql, name: name}
-		d.Execution.Step(name, section.Run)
+		step(name, section.Run)
 	}
 
-	d.Execution.Step("workload", w.work, settings.Policy())
+	step("workload", w.work, settings.Policy())
 
-	return d.Execution.Err()
+	return g.Run("")
 }
 
 type sqlSection struct {

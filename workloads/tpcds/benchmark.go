@@ -85,7 +85,9 @@ func benchmarkOptionsSupported(w *workload, settings bench.RunSettings) bool {
 		!math.IsNaN(w.scaleFactor) && !math.IsInf(w.scaleFactor, 0) && w.scaleFactor <= 100000
 }
 
-func (w *workload) configureBenchmark(d *bench.Def, settings bench.RunSettings, set int64, explicit bool) error {
+func (w *workload) configureBenchmark(
+	d *bench.Def, settings bench.RunSettings, set int64, explicit, selected bool,
+) error {
 	if !benchmarkOptionsSupported(w, settings) {
 		return errBenchmarkOptions
 	}
@@ -114,14 +116,19 @@ func (w *workload) configureBenchmark(d *bench.Def, settings bench.RunSettings, 
 		ScaleFactor: w.scaleFactor, Sq: w.streams, FirstSet: set, TimeUnit: "hours",
 		Attempts: []maintenanceAttempt{}, Reason: benchmarkDisclaimer,
 	}
-	d.Report.Contribute("tpcds.benchmark", 1, w.benchmarkContribution)
-	d.Report.Render("tpcds.benchmark", renderBenchmark)
+	if selected {
+		d.Report.Contribute("tpcds.benchmark", 1, w.benchmarkContribution)
+		d.Report.Render("tpcds.benchmark", renderBenchmark)
+	}
 
 	return nil
 }
 
-func (w *workload) executeBenchmark(d *bench.Def, wrap func(bench.Action) bench.Action) {
-	d.Execution.Step("prepare_maintenance", wrap(w.initializeMaintenance))
+func (w *workload) declareBenchmark(
+	g *bench.Graph, step func(string, bench.Action, ...bench.StepOption) bench.NodeRef,
+	wrap func(bench.Action) bench.Action, previous, members *[]bench.NodeRef,
+) {
+	step("prepare_maintenance", w.initializeMaintenance)
 
 	for _, phase := range []struct {
 		name    string
@@ -138,7 +145,7 @@ func (w *workload) executeBenchmark(d *bench.Def, wrap func(bench.Action) bench.
 
 		w.benchmark.Phases = append(w.benchmark.Phases, state)
 		if phase.workers == 0 {
-			w.executeMaintenancePhase(d, wrap, state)
+			w.declareMaintenancePhase(step, state)
 
 			continue
 		}
@@ -148,37 +155,42 @@ func (w *workload) executeBenchmark(d *bench.Def, wrap func(bench.Action) bench.
 			state.Streams[worker].ID = phase.first + worker
 		}
 
-		result := d.Execution.WorkerStep(phase.name, w.benchmarkInitializer(state, wrap),
-			bench.OncePerWorker(phase.workers))
-		state.Status = string(result.Status)
-
-		state.Seconds, state.finished = benchmarkQueryWindow(state.Streams)
-		if phase.name == "throughput_2" && !state.finished.IsZero() {
-			maintenanceEnd := w.benchmark.Phases[len(w.benchmark.Phases)-2].finished
-			if !maintenanceEnd.IsZero() {
-				state.Seconds = state.finished.Sub(maintenanceEnd).Seconds()
-			}
+		var maintenance *benchmarkPhase
+		if phase.name == "throughput_2" {
+			maintenance = w.benchmark.Phases[len(w.benchmark.Phases)-2]
 		}
+
+		node := g.WorkerNode(phase.name, w.benchmarkInitializer(state, wrap),
+			bench.OncePerWorker(phase.workers), bench.RetainSession()).After((*previous)...)
+		node.AfterResult(func(result bench.Result) {
+			state.Status = string(result.Status)
+
+			state.Seconds, state.finished = benchmarkQueryWindow(state.Streams)
+			if maintenance != nil && !state.finished.IsZero() && !maintenance.finished.IsZero() {
+				state.Seconds = state.finished.Sub(maintenance.finished).Seconds()
+			}
+		})
+		*previous = []bench.NodeRef{node}
+		*members = append(*members, node)
 	}
 }
 
-func (w *workload) executeMaintenancePhase(
-	d *bench.Def, wrap func(bench.Action) bench.Action, state *benchmarkPhase,
+func (w *workload) declareMaintenancePhase(
+	step func(string, bench.Action, ...bench.StepOption) bench.NodeRef, state *benchmarkPhase,
 ) {
 	first := w.benchmark.FirstSet
 	if state.Name == "maintenance_2" {
 		first += int64(w.streams / 2)
 	}
 
-	result := d.Execution.Step(state.Name, wrap(func(ctx context.Context, b *bench.Bench) error {
+	step(state.Name, func(ctx context.Context, b *bench.Bench) error {
 		started := time.Now()
 		err := w.runMaintenance(ctx, b, first)
 		state.finished = time.Now()
 		state.Seconds = state.finished.Sub(started).Seconds()
 
 		return err
-	}))
-	state.Status = string(result.Status)
+	}).AfterResult(func(result bench.Result) { state.Status = string(result.Status) })
 }
 
 func (w *workload) benchmarkInitializer(

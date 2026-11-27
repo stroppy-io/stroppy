@@ -49,20 +49,37 @@ type StepDescription struct {
 
 // Execution observes or executes steps immediately in ordinary Go order.
 type Execution struct {
-	def          *Def
-	root         *rootState
-	ctx          context.Context //nolint:containedctx // execution replay owns action context lifetime.
-	err          error
-	observed     []StepDescription
-	databases    map[string]*databaseSlot
-	databaseMu   sync.Mutex
-	measurements map[string]float64
-	phase        string
-	workers      int
-	reporting    bool
-	policies     map[string]report.Execution
-	failurePhase string
-	filter       *stepFilterState
+	def            *Def
+	root           *rootState
+	ctx            context.Context //nolint:containedctx // execution replay owns action context lifetime.
+	err            error
+	observed       []StepDescription
+	databases      map[string]*databaseSlot
+	databaseMu     sync.Mutex
+	measurements   map[string]float64
+	phase          string
+	workers        int
+	reporting      bool
+	policies       map[string]report.Execution
+	failurePhase   string
+	filter         *stepFilterState
+	graphs         []GraphDescription
+	expectedGraphs []GraphDescription
+	graphReports   []report.Graph
+	window         *measurement
+	progress       *runProgress
+	terminalErrors atomic.Int64
+	actionActive   atomic.Bool
+	ready          func(int)
+	onInitialized  func()
+	beforeAction   func(context.Context) error
+	onEnter        func()
+	onResult       func(Result) Result
+	onStart        func()
+	databaseOwner  *Execution
+	graphRun       bool
+	graphCleanup   bool
+	session        *graphSession
 }
 
 func (e *Execution) WorkerStep(name string, initialize WorkerInit, options ...StepOption) Result {
@@ -90,12 +107,219 @@ func (e *Execution) Enabled(name string) bool {
 	return true
 }
 
-//nolint:gocognit,gocyclo,cyclop,funlen // immediate step outcomes, filtering and measurement order stay explicit.
 func (e *Execution) Step(name string, action Action, options ...StepOption) Result {
 	if name == "" || action == nil {
 		invalid("step", inputError("name and action are required"))
 	}
 
+	opts := e.stepOptions(options)
+
+	e.observed = append(e.observed, StepDescription{
+		Name: name, Executor: opts.policy.mode, Workers: opts.policy.workers,
+		Measured: opts.measured || opts.policy.mode != "once", Progress: policyProgressDescription(opts.policy.mode),
+	})
+	if e.root == nil {
+		return Result{Status: Observed}
+	}
+
+	record := func(status StepStatus, elapsed time.Duration) {
+		e.root.stepFilter.record(report.Step{
+			Name:            name,
+			Status:          string(status),
+			DurationSeconds: elapsed.Seconds(),
+		})
+	}
+	if !e.graphCleanup && !e.root.stepFilter.enabled(name) {
+		record(Skipped, 0)
+
+		if e.root.capture != nil {
+			e.root.capture.writer.Event("step_end", name, string(Skipped), 0, 0, 0)
+		}
+
+		return Result{Status: Skipped}
+	}
+
+	if !opts.always && (e.err != nil || e.ctx.Err() != nil) {
+		if e.ctx.Err() != nil {
+			e.err = errors.Join(e.err, e.ctx.Err())
+		}
+
+		record(Blocked, 0)
+
+		if e.root.capture != nil {
+			e.root.capture.writer.Event("step_end", name, string(Blocked), 0, 0, 0)
+		}
+
+		return Result{Status: Blocked}
+	}
+
+	return e.runStep(name, action, &opts)
+}
+
+//nolint:funlen // startup, action window and joined cleanup share one lifetime.
+func (e *Execution) runStep(name string, action Action, opts *stepOptions) Result {
+	ctx := e.ctx
+
+	cancel := func() {}
+	if opts.always {
+		ctx, cancel = context.WithTimeout(context.WithoutCancel(ctx), opts.cleanup)
+	}
+	defer cancel()
+
+	started := time.Now()
+
+	if e.onEnter != nil {
+		e.onEnter()
+	}
+
+	e.phase = name
+	e.window = nil
+	e.terminalErrors.Store(0)
+
+	e.workers = opts.policy.workers
+	if e.progress == nil && !e.graphRun {
+		e.progress = e.root.progress
+	}
+
+	e.progress.begin(name, opts.policy)
+
+	if !e.graphRun {
+		e.startPoolTelemetry(name)
+		defer e.root.pools.stop()
+	}
+
+	before := e.terminalErrors.Load()
+	if e.root.capture != nil {
+		e.root.capture.writer.Event("step_start", name, "running", opts.policy.workers,
+			opts.policy.duration, opts.policy.drain.duration)
+	}
+
+	initializeRetainedSession(opts, action)
+
+	measured := opts.measured || opts.policy.mode != "once"
+
+	var (
+		workers        []*stepWorker
+		err            error
+		startupSeconds float64
+	)
+
+	if opts.initialize != nil {
+		startupStarted := time.Now()
+		workers, err = e.initializeWorkers(ctx, name, opts)
+		startupSeconds = time.Since(startupStarted).Seconds()
+
+		defer func() { _ = closeStepWorkers(ctx, workers) }()
+	}
+
+	windowStarted := false
+
+	if err == nil {
+		err = e.actionReady(ctx)
+	}
+
+	if measured && err == nil {
+		e.window, err = e.root.newMeasurement(name, opts.policy.workers)
+		windowStarted = err == nil
+
+		defer e.stopMeasurement()
+	}
+
+	if err == nil {
+		if e.onStart != nil {
+			e.onStart()
+		}
+
+		if e.progress != nil {
+			e.progress.measuring(e.window)
+		}
+
+		err = e.execute(ctx, name, action, opts, workers)
+	}
+
+	if measured {
+		e.stopMeasurement()
+	}
+
+	err = errors.Join(err, closeStepWorkers(ctx, workers))
+
+	if !e.graphRun {
+		e.root.pools.stop()
+	}
+
+	elapsed := time.Since(started)
+
+	if windowStarted {
+		e.recordPolicy(name, opts.policy, startupSeconds)
+	}
+
+	return e.finishStep(name, opts.policy.workers, elapsed, before, err)
+}
+
+func (e *Execution) actionReady(ctx context.Context) error {
+	if e.onInitialized != nil {
+		e.onInitialized()
+	}
+
+	if e.beforeAction != nil {
+		return e.beforeAction(ctx)
+	}
+
+	return nil
+}
+
+func initializeRetainedSession(opts *stepOptions, action Action) {
+	if !opts.retained || opts.initialize != nil {
+		return
+	}
+
+	opts.initialize = func(ctx context.Context, b *Bench) (Action, error) {
+		if _, err := b.Session(ctx); err != nil {
+			return nil, err
+		}
+
+		return action, nil
+	}
+}
+
+func (e *Execution) finishStep(name string, workers int, elapsed time.Duration, before int64, err error) Result {
+	status := Completed
+	if err != nil {
+		status = Failed
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			status = Canceled
+		}
+	} else if e.terminalErrors.Load() > before {
+		status = CompletedWithErrors
+	}
+
+	if e.onResult != nil {
+		result := e.onResult(Result{Status: status, Err: err})
+		status, err = result.Status, result.Err
+	}
+
+	if err != nil {
+		if e.failurePhase == "" {
+			e.failurePhase = name
+		}
+
+		e.err = errors.Join(e.err, fmt.Errorf("step %q: %w", name, err))
+	}
+
+	e.root.stepFilter.record(report.Step{Name: name, Status: string(status), DurationSeconds: elapsed.Seconds()})
+
+	if e.progress != nil {
+		e.progress.end(status)
+	}
+
+	if e.root.capture != nil {
+		e.root.capture.writer.Event("step_end", name, string(status), workers, elapsed, 0)
+	}
+
+	return Result{Status: status, Err: err}
+}
+
+func (e *Execution) stepOptions(options []StepOption) stepOptions {
 	var opts stepOptions
 
 	for _, option := range options {
@@ -122,146 +346,18 @@ func (e *Execution) Step(name string, action Action, options ...StepOption) Resu
 		invalid("step", inputError("cleanup must run once"))
 	}
 
-	e.observed = append(e.observed, StepDescription{
-		Name: name, Executor: opts.policy.mode, Workers: opts.policy.workers,
-		Measured: opts.measured || opts.policy.mode != "once", Progress: policyProgressDescription(opts.policy.mode),
-	})
-	if e.root == nil {
-		return Result{Status: Observed}
+	return opts
+}
+
+func (e *Execution) stopMeasurement() {
+	if window := e.window; window != nil {
+		window.elapsed.CompareAndSwap(0, max(time.Since(window.started).Nanoseconds(), 1))
+		e.root.throughput.current.CompareAndSwap(window, nil)
 	}
-
-	record := func(status StepStatus, elapsed time.Duration) {
-		e.root.stepFilter.record(report.Step{
-			Name:            name,
-			Status:          string(status),
-			DurationSeconds: elapsed.Seconds(),
-		})
-	}
-	if !e.root.stepFilter.enabled(name) {
-		record(Skipped, 0)
-
-		if e.root.capture != nil {
-			e.root.capture.writer.Event("step_end", name, string(Skipped), 0, 0, 0)
-		}
-
-		return Result{Status: Skipped}
-	}
-
-	if !opts.always && (e.err != nil || e.ctx.Err() != nil) {
-		if e.ctx.Err() != nil {
-			e.err = errors.Join(e.err, e.ctx.Err())
-		}
-
-		record(Blocked, 0)
-
-		if e.root.capture != nil {
-			e.root.capture.writer.Event("step_end", name, string(Blocked), 0, 0, 0)
-		}
-
-		return Result{Status: Blocked}
-	}
-
-	ctx := e.ctx
-
-	cancel := func() {}
-	if opts.always {
-		ctx, cancel = context.WithTimeout(context.WithoutCancel(ctx), opts.cleanup)
-	}
-	defer cancel()
-
-	started := time.Now()
-	e.phase = name
-
-	e.workers = opts.policy.workers
-	e.root.progress.begin(name, opts.policy)
-
-	e.startPoolTelemetry(name)
-	defer e.root.pools.stop()
-
-	before := e.root.errorReporter.snapshot().terminalErrors
-	if e.root.capture != nil {
-		e.root.capture.writer.Event("step_start", name, "running", opts.policy.workers,
-			opts.policy.duration, opts.policy.drain.duration)
-	}
-
-	measured := opts.measured || opts.policy.mode != "once"
-
-	var (
-		workers        []*stepWorker
-		err            error
-		startupSeconds float64
-	)
-
-	if opts.initialize != nil {
-		startupStarted := time.Now()
-		workers, err = e.initializeWorkers(ctx, name, &opts)
-		startupSeconds = time.Since(startupStarted).Seconds()
-
-		defer func() { _ = closeStepWorkers(ctx, workers) }()
-	}
-
-	windowStarted := false
-
-	if measured && err == nil {
-		err = e.root.startThroughput(name, opts.policy.workers)
-		windowStarted = err == nil
-
-		defer e.root.throughput.stop()
-	}
-
-	if err == nil {
-		if e.root.progress != nil {
-			e.root.progress.measuring(e.root.throughput.current.Load())
-		}
-
-		err = e.execute(ctx, name, action, &opts, workers)
-	}
-
-	if measured {
-		e.root.throughput.stop()
-	}
-
-	err = errors.Join(err, closeStepWorkers(ctx, workers))
-
-	e.root.pools.stop()
-
-	elapsed := time.Since(started)
-
-	if windowStarted {
-		e.recordPolicy(name, opts.policy, startupSeconds)
-	}
-
-	status := Completed
-	if err != nil {
-		status = Failed
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			status = Canceled
-		}
-
-		if e.failurePhase == "" {
-			e.failurePhase = name
-		}
-
-		e.err = errors.Join(e.err, fmt.Errorf("step %q: %w", name, err))
-	} else if e.root.errorReporter.snapshot().terminalErrors > before {
-		status = CompletedWithErrors
-	}
-
-	record(status, elapsed)
-
-	if e.root.progress != nil {
-		e.root.progress.end(status)
-	}
-
-	if e.root.capture != nil {
-		e.root.capture.writer.Event("step_end", name, string(status), opts.policy.workers, elapsed, 0)
-	}
-
-	return Result{status, err}
 }
 
 func (e *Execution) recordPolicy(name string, policy Policy, startupSeconds float64) {
-	window := e.root.throughput.windows[len(e.root.throughput.windows)-1]
+	window := e.window
 	seconds := window.seconds()
 	e.measurements[name] = seconds
 
@@ -305,6 +401,9 @@ func (e *Execution) bench(vu *VU, name string) *Bench {
 func (e *Execution) execute(
 	parent context.Context, name string, action Action, opts *stepOptions, initialized []*stepWorker,
 ) error {
+	e.actionActive.Store(true)
+	defer e.actionActive.Store(false)
+
 	parent = context.WithValue(parent, metricStepKey{}, name)
 
 	ctx, cancel := context.WithCancelCause(parent)
@@ -379,6 +478,7 @@ func (e *Execution) execute(
 			}
 
 			b, vu := state.b, state.b.vu
+			vu.window, vu.progress = e.window, e.progress
 			vu.metricWriter, _ = vu.ctx.Value(metricWriterContextKey{}).(*metricWriter)
 
 			if initialized == nil {
@@ -403,7 +503,7 @@ func (e *Execution) execute(
 
 				err := workerAction(vu.ctx, b)
 
-				e.root.progress.iterationDone(worker)
+				e.progress.iterationDone(worker)
 
 				if err == nil && !vu.logicalSucceeded && errors.Is(context.Cause(ctx), errDrainExpired) {
 					err = errDrainExpired
@@ -415,7 +515,7 @@ func (e *Execution) execute(
 				if opts.policy.mode != "once" {
 					e.root.txMetrics.recordIteration(vu, time.Since(started))
 
-					if window := e.root.throughput.current.Load(); window != nil {
+					if window := vu.measurement(); window != nil {
 						window.writer(worker).iterations.Add(1)
 					}
 				}

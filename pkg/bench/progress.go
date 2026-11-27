@@ -79,6 +79,8 @@ type runProgress struct {
 	done           chan struct{}
 	lastLog        time.Time
 	activityLogged bool
+	children       []*runProgress
+	parent         *runProgress
 }
 
 type progressEvent struct{ step, event string }
@@ -113,8 +115,12 @@ func (b *Bench) Progress(ctx context.Context, update ProgressUpdate) {
 		update.Total = &total
 	}
 
-	if p := b.root.progress; p != nil {
+	if p := b.vu.progress; p != nil {
 		p.update(b.vu.worker, b.vu.iterScenario, update)
+
+		if p.parent != nil {
+			p.parent.logActivity()
+		}
 	}
 }
 
@@ -187,15 +193,41 @@ func (p *runProgress) registerMetrics() error {
 			observeProgressSource(observer, gauges, source.Step, &source)
 		}
 
-		for key, count := range p.events {
+		for key, count := range p.eventSnapshotLocked() {
 			observer.ObserveFloat64(events, count, otelmetric.WithAttributes(
 				attribute.String("step", key.step), attribute.String("event", key.event)))
+		}
+
+		for _, child := range p.children {
+			child.mu.Lock()
+			if child.step != "" {
+				seconds := child.snapshotLocked(time.Now()).StepElapsedSeconds
+				observer.ObserveFloat64(gauges[2], seconds, otelmetric.WithAttributes(attribute.String("step", child.step)))
+			}
+			child.mu.Unlock()
 		}
 
 		return nil
 	}, instruments...)
 
 	return err
+}
+
+func (p *runProgress) eventSnapshotLocked() map[progressEvent]float64 {
+	values := make(map[progressEvent]float64, len(p.events))
+	for key, count := range p.events {
+		values[key] += count
+	}
+
+	for _, child := range p.children {
+		child.mu.Lock()
+		for key, count := range child.events {
+			values[key] += count
+		}
+		child.mu.Unlock()
+	}
+
+	return values
 }
 
 func observeProgressSource(
@@ -262,7 +294,24 @@ func (p *runProgress) begin(name string, policy Policy) {
 	p.planned = max(p.planned, p.finished+1)
 	p.events[progressEvent{name, "started"}]++
 	p.mu.Unlock()
-	p.log()
+
+	if p.stop != nil {
+		p.log()
+	} else if p.parent != nil {
+		p.parent.log()
+	}
+}
+
+func (p *runProgress) graphChild() *runProgress {
+	child := &runProgress{
+		root: p.root, parent: p, started: p.started, planned: 1, status: "running",
+		retained: make(map[string][]report.ProgressSource), events: make(map[progressEvent]float64),
+	}
+	p.mu.Lock()
+	p.children = append(p.children, child)
+	p.mu.Unlock()
+
+	return child
 }
 
 func (p *runProgress) measuring(window *measurement) {
@@ -300,6 +349,9 @@ func (p *runProgress) end(status StepStatus) {
 	p.events[progressEvent{p.step, string(status)}]++
 	if status == Completed || status == CompletedWithErrors {
 		p.finished++
+		if p.parent != nil {
+			p.ratio = 1
+		}
 	}
 	p.mu.Unlock()
 }
@@ -341,7 +393,7 @@ func (p *runProgress) update(worker int, iteration uint64, update ProgressUpdate
 	source.active.Store(true)
 
 	since := time.Since(p.lastLog)
-	if (changed && (!p.activityLogged || since >= time.Second)) || since >= progressInterval {
+	if p.stop != nil && ((changed && (!p.activityLogged || since >= time.Second)) || since >= progressInterval) {
 		p.activityLogged = true
 		p.logLocked(time.Now())
 	}
@@ -433,6 +485,8 @@ func (p *runProgress) snapshotLocked(now time.Time) report.Progress {
 		value.Sources[index].Step = p.step
 	}
 
+	fraction += p.childProgress(now, &value)
+
 	for step, sources := range p.retained {
 		if step != p.step {
 			value.Sources = append(value.Sources, sources...)
@@ -445,12 +499,33 @@ func (p *runProgress) snapshotLocked(now time.Time) report.Progress {
 
 	if p.planned > 0 && p.stopped.IsZero() {
 		// Reserve the terminal percentage for teardown and runtime-discovered work.
-		p.ratio = max(p.ratio, min(progressPendingLimit, (float64(p.finished)+min(fraction, 1))/float64(p.planned)))
+		active := min(fraction, float64(max(1, len(p.children))))
+		completed := (float64(p.finished) + active) / float64(p.planned)
+		p.ratio = max(p.ratio, min(progressPendingLimit, completed))
 	}
 
 	value.Ratio = p.ratio
 
 	return value
+}
+
+func (p *runProgress) childProgress(now time.Time, value *report.Progress) float64 {
+	fraction := 0.0
+
+	for _, child := range p.children {
+		child.mu.Lock()
+		snapshot := child.snapshotLocked(now)
+		fraction += snapshot.Ratio
+		value.Sources = append(value.Sources, snapshot.Sources...)
+
+		active := child.stepStopped.IsZero() && !child.stepStarted.IsZero()
+		if active && (value.Step == "" || snapshot.StepElapsedSeconds > value.StepElapsedSeconds) {
+			value.Step, value.StepElapsedSeconds = snapshot.Step, snapshot.StepElapsedSeconds
+		}
+		child.mu.Unlock()
+	}
+
+	return fraction
 }
 
 func (p *runProgress) policyProgress(now time.Time, value *report.Progress) float64 {
@@ -559,6 +634,16 @@ func (p *runProgress) nativeSource(worker int, state *workerProgress, now time.T
 	}
 }
 
+func (p *runProgress) logActivity() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if !p.activityLogged || time.Since(p.lastLog) >= time.Second {
+		p.activityLogged = true
+		p.logLocked(time.Now())
+	}
+}
+
 func (p *runProgress) log() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -575,11 +660,20 @@ func (p *runProgress) logLocked(now time.Time) {
 		zap.String("step", value.Step), zap.Float64("elapsed_seconds", value.ElapsedSeconds),
 	}
 	for _, source := range value.Sources {
-		if source.Step != value.Step {
+		if source.Step != value.Step && len(p.children) == 0 {
 			continue
 		}
 
-		label := source.Unit + "_" + strconv.Itoa(source.Worker)
+		if len(p.children) > 0 && !source.Active {
+			continue
+		}
+
+		identity := strconv.Itoa(source.Worker)
+		if len(p.children) > 0 {
+			identity = source.Step + "/" + identity
+		}
+
+		label := source.Unit + "_" + identity
 
 		text := fmt.Sprintf("%g", source.Current)
 		if source.Total != nil {
@@ -588,9 +682,9 @@ func (p *runProgress) logLocked(now time.Time) {
 
 		fields = append(fields, zap.String(label, text))
 		if source.Activity != "" {
-			fields = append(fields, zap.String("activity_"+strconv.Itoa(source.Worker), source.Activity),
-				zap.Bool("activity_active_"+strconv.Itoa(source.Worker), source.Active),
-				zap.Float64("activity_elapsed_seconds_"+strconv.Itoa(source.Worker), source.ElapsedSeconds))
+			fields = append(fields, zap.String("activity_"+identity, source.Activity),
+				zap.Bool("activity_active_"+identity, source.Active),
+				zap.Float64("activity_elapsed_seconds_"+identity, source.ElapsedSeconds))
 		}
 	}
 

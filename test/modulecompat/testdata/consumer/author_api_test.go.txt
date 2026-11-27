@@ -14,6 +14,28 @@ import (
 	"github.com/stroppy-io/stroppy/v6/pkg/report"
 )
 
+func TestGraphCapabilities(t *testing.T) {
+    test := bench.Test{Name: "external/graph", Define: func(d *bench.Def) error {
+        graph := d.Execution.Graph("example")
+        setup := graph.Node("setup", func(context.Context, *bench.Bench) error { return nil })
+        members := graph.Group("phase", func(phase *bench.Graph) {
+            first := phase.Node("first", func(context.Context, *bench.Bench) error { return nil }).AfterSuccess(setup)
+            second := phase.Node("second", func(context.Context, *bench.Bench) error { return nil }).AfterSuccess(setup)
+            phase.Measure("window", first, second)
+        })
+        graph.Mode("full", "Run the shared phase", members...)
+        return graph.Run("full")
+    }}
+    graphs, err := bench.DescribeGraphs(test, bench.RunOptions{})
+    if err != nil { t.Fatal(err) }
+    if len(graphs) != 1 || len(graphs[0].Nodes) != 3 { t.Fatal("graph discovery") }
+    result, err := testkit.Run(t.Context(), test, bench.RunOptions{})
+    if err != nil { t.Fatal(err) }
+    realized, err := result.ExecutionGraphs()
+    if err != nil { t.Fatal(err) }
+    if result.Status != report.StatusCompleted || len(realized) != 1 { t.Fatal("graph execution") }
+}
+
 func TestPreparedSessionCapabilities(t *testing.T) {
 	if _, err := bench.NewCatalog(authoring.Prepared); err != nil { t.Fatal(err) }
 	recorder := &record.Recorder{}

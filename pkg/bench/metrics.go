@@ -289,7 +289,7 @@ func (m *txMetrics) recordQueryResult(vu *VU, elapsed time.Duration, queryErr er
 		return
 	}
 
-	if window := vu.root.throughput.current.Load(); window != nil {
+	if window := vu.measurement(); window != nil {
 		window.writer(vu.worker).queries.Add(1)
 	}
 

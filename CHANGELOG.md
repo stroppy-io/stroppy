@@ -12,6 +12,8 @@ Group lines under `Added` / `Changed` / `Fixed` / `Removed`. Append a PR link
 
 ### Added
 
+- Go workloads can compose named execution graphs with concurrent phases, readiness dependencies, joined auxiliary work, and scoped cleanup without changing existing immediate steps. ([#300](https://github.com/stroppy-io/stroppy/pull/300))
+- TPC-H offers explicit power, throughput, query-only, qualification, and complete two-run modes with load-derived seeds, refresh-set advancement, retained query output, and validity-gated formula results. ([#300](https://github.com/stroppy-io/stroppy/pull/300))
 - Runs show live step, query, and load activity alongside a best-effort completion percentage, with native progress in telemetry and saved reports. ([#299](https://github.com/stroppy-io/stroppy/pull/299))
 - Paced TPC-C runs report terminal throughput ceilings, actual keying and think waits, per-warehouse rates, and deferred Delivery timing; strict noop runs explicitly identify simulated results. ([#298](https://github.com/stroppy-io/stroppy/pull/298))
 - TPC-C offers an explicit strict terminal model for both variants, separating ten terminals per warehouse from execution workers and recording deferred Delivery outcomes with unaudited qualification diagnostics. ([#296](https://github.com/stroppy-io/stroppy/pull/296))

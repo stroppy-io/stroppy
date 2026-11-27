@@ -677,7 +677,35 @@ func printSelectedWorkloadHelp(
 		return invalidConfig(fmt.Errorf("%w: %q", errUnknownWorkload, scriptArg))
 	}
 
-	return printWorkloadHelp(cmd, &description)
+	if err := printWorkloadHelp(cmd, &description); err != nil {
+		return err
+	}
+
+	graphs, err := catalog.Graphs(description.Name)
+	if err != nil {
+		return err
+	}
+
+	for _, graph := range graphs {
+		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "\nExecution graph %s (default mode %q):\n",
+			graph.Name, graph.Mode); err != nil {
+			return err
+		}
+
+		for _, mode := range graph.Modes {
+			availability := "available"
+			if !mode.Available {
+				availability = mode.Reason
+			}
+
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "  %s: %s [%s]\n",
+				mode.Name, mode.Description, availability); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func printWorkloadHelp(cmd *cobra.Command, description *bench.Description) error {

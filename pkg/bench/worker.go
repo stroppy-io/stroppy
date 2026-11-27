@@ -62,7 +62,8 @@ type stepWorker struct {
 func (e *Execution) newStepWorker(ctx context.Context, name string, worker int, opts *stepOptions) *stepWorker {
 	//nolint:gosec // worker is nonnegative and bounded by the validated policy.
 	vu := &VU{
-		root: e.root, ctx: metricWorkerContext(ctx, worker, opts.policy.workers),
+		root: e.root, execution: e, window: e.window, progress: e.progress,
+		ctx:  metricWorkerContext(ctx, worker, opts.policy.workers),
 		vuid: uint64(worker) + 1, worker: worker, workers: opts.policy.workers,
 		stepTag: name, initPhase: opts.policy.mode == "once",
 	}
